@@ -8,7 +8,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/tide_page_models.dart';
-import '../theme.dart';
 import '../theme_controller.dart';
 
 // ── Palette adaptative ──────────────────────────────────────
@@ -23,7 +22,7 @@ const Color _amber  = Color(0xFFFFB800);
 const Color _red    = Color(0xFFFF6B6B);
 
 // Texte adaptatif : blanc en sombre, noir en clair
-Color _txt(double opacity) => _isDark ? Colors.white.withOpacity(opacity) : Colors.black.withOpacity(opacity);
+Color _txt(double opacity) => _isDark ? Colors.white.withValues(alpha: opacity) : Colors.black.withValues(alpha: opacity);
 
 // ── Données mock ────────────────────────────────────────────
 TideData _mockData() {
@@ -372,12 +371,12 @@ class _TidePageState extends State<TidePage>
                 end: Alignment.bottomRight,
                 colors: [
                   _card,
-                  _card.withOpacity(0.8),
+                  _card.withValues(alpha: 0.8),
                 ],
               ),
               boxShadow: [
                 BoxShadow(
-                  color: _accent.withOpacity(0.08),
+                  color: _accent.withValues(alpha: 0.08),
                   blurRadius: 30,
                   spreadRadius: 2,
                 ),
@@ -409,11 +408,11 @@ class _TidePageState extends State<TidePage>
                             horizontal: 12, vertical: 5),
                         decoration: BoxDecoration(
                           color: _levelColor(_data.overallLevel)
-                              .withOpacity(0.15),
+                              .withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
                             color: _levelColor(_data.overallLevel)
-                                .withOpacity(0.3),
+                                .withValues(alpha: 0.3),
                             width: 1,
                           ),
                         ),
@@ -465,17 +464,17 @@ class _TidePageState extends State<TidePage>
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 10, vertical: 5),
                             decoration: BoxDecoration(
-                              color: _accent.withOpacity(0.12),
+                              color: _accent.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: _accent.withOpacity(0.25),
+                                color: _accent.withValues(alpha: 0.25),
                                 width: 1,
                               ),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(
+                                const Icon(
                                   Icons.access_time,
                                   size: 11,
                                   color: _accent,
@@ -522,7 +521,7 @@ class _TidePageState extends State<TidePage>
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: _accent.withOpacity(0.06),
+                  color: _accent.withValues(alpha: 0.06),
                   blurRadius: 20,
                   spreadRadius: 1,
                 ),
@@ -648,7 +647,7 @@ class _TidePageState extends State<TidePage>
         child: SizedBox(
           height: 220,
           child: ShaderMask(
-            shaderCallback: (bounds) => LinearGradient(
+            shaderCallback: (bounds) => const LinearGradient(
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
               colors: [
@@ -657,7 +656,7 @@ class _TidePageState extends State<TidePage>
                 Colors.white,
                 Colors.transparent,
               ],
-              stops: const [0.0, 0.05, 0.95, 1.0],
+              stops: [0.0, 0.05, 0.95, 1.0],
             ).createShader(bounds),
             blendMode: BlendMode.dstIn,
             child: ListView.builder(
@@ -711,12 +710,12 @@ class _TidePageState extends State<TidePage>
           color: _card,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: _levelColor(selected.activityLevel).withOpacity(0.3),
+            color: _levelColor(selected.activityLevel).withValues(alpha: 0.3),
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: _levelColor(selected.activityLevel).withOpacity(0.08),
+              color: _levelColor(selected.activityLevel).withValues(alpha: 0.08),
               blurRadius: 20,
               spreadRadius: 2,
             ),
@@ -823,7 +822,7 @@ class _TidePageState extends State<TidePage>
               Text(
                 _data.hourlyCards[_selectedHourIndex].label,
                 style: GoogleFonts.inter(
-                  color: _accent.withOpacity(0.7),
+                  color: _accent.withValues(alpha: 0.7),
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
@@ -963,12 +962,12 @@ class _TidePageState extends State<TidePage>
         color: _card,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isHigh ? _accent.withOpacity(0.2) : _red.withOpacity(0.2),
+          color: isHigh ? _accent.withValues(alpha: 0.2) : _red.withValues(alpha: 0.2),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: (isHigh ? _accent : _red).withOpacity(0.05),
+            color: (isHigh ? _accent : _red).withValues(alpha: 0.05),
             blurRadius: 15,
             spreadRadius: 1,
           ),
@@ -1077,11 +1076,11 @@ class _AnimatedDotState extends State<_AnimatedDot>
           width: 8,
           height: 8,
           decoration: BoxDecoration(
-            color: _green.withOpacity(0.6 + 0.4 * _c.value),
+            color: _green.withValues(alpha: 0.6 + 0.4 * _c.value),
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: _green.withOpacity(0.3 * _c.value),
+                color: _green.withValues(alpha: 0.3 * _c.value),
                 blurRadius: 6,
                 spreadRadius: 2,
               ),
@@ -1149,7 +1148,7 @@ class _CircularGauge extends StatelessWidget {
                       width: 6,
                       height: 6,
                       decoration: BoxDecoration(
-                        color: _green.withOpacity(0.8),
+                        color: _green.withValues(alpha: 0.8),
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -1261,7 +1260,7 @@ class _CurvePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (points.isEmpty) return;
 
-    final padding = const EdgeInsets.only(left: 30, right: 30, top: 20, bottom: 30);
+    const padding = EdgeInsets.only(left: 30, right: 30, top: 20, bottom: 30);
     final w = size.width - padding.horizontal;
     final h = size.height - padding.vertical;
 
@@ -1299,8 +1298,8 @@ class _CurvePainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          _accent.withOpacity(0.25 * progress),
-          _accent.withOpacity(0.02 * progress),
+          _accent.withValues(alpha: 0.25 * progress),
+          _accent.withValues(alpha: 0.02 * progress),
         ],
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
 
@@ -1308,7 +1307,7 @@ class _CurvePainter extends CustomPainter {
 
     // Draw line with dash effect based on progress
     final linePaint = Paint()
-      ..color = _accent.withOpacity(0.9)
+      ..color = _accent.withValues(alpha: 0.9)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.5
       ..strokeCap = StrokeCap.round;
@@ -1349,7 +1348,7 @@ class _CurvePainter extends CustomPainter {
       final textSpan = TextSpan(
         text: '${event.height.toStringAsFixed(2)}m',
         style: GoogleFonts.inter(
-          color: color.withOpacity(0.9),
+          color: color.withValues(alpha: 0.9),
           fontSize: 9,
           fontWeight: FontWeight.w600,
         ),
@@ -1367,7 +1366,7 @@ class _CurvePainter extends CustomPainter {
     if (progress > 0.7) {
       final nx = xFor(currentHour);
       final nowPaint = Paint()
-        ..color = _green.withOpacity((progress - 0.7) / 0.3 * 0.8)
+        ..color = _green.withValues(alpha: (progress - 0.7) / 0.3 * 0.8)
         ..strokeWidth = 1.5;
       canvas.drawLine(
         Offset(nx, padding.top - 5),
@@ -1379,7 +1378,7 @@ class _CurvePainter extends CustomPainter {
       final labelSpan = TextSpan(
         text: 'MAINTENANT',
         style: GoogleFonts.inter(
-          color: _green.withOpacity((progress - 0.7) / 0.3),
+          color: _green.withValues(alpha: (progress - 0.7) / 0.3),
           fontSize: 8,
           fontWeight: FontWeight.w800,
         ),
@@ -1442,16 +1441,16 @@ class _HourlyCardWidget extends StatelessWidget {
         width: 110,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.12) : _card,
+          color: isSelected ? color.withValues(alpha: 0.12) : _card,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? color.withOpacity(0.5) : Colors.transparent,
+            color: isSelected ? color.withValues(alpha: 0.5) : Colors.transparent,
             width: 1.5,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: color.withOpacity(0.2),
+                    color: color.withValues(alpha: 0.2),
                     blurRadius: 20,
                     spreadRadius: 2,
                   ),
@@ -1472,10 +1471,10 @@ class _HourlyCardWidget extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: _green.withOpacity(0.2),
+                        color: _green.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(4),
                         border: Border.all(
-                            color: _green.withOpacity(0.4), width: 0.5),
+                            color: _green.withValues(alpha: 0.4), width: 0.5),
                       ),
                       child: Text(
                         'MAINTENANT',
@@ -1491,10 +1490,10 @@ class _HourlyCardWidget extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: _accent.withOpacity(0.2),
+                        color: _accent.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(4),
                         border: Border.all(
-                            color: _accent.withOpacity(0.4), width: 0.5),
+                            color: _accent.withValues(alpha: 0.4), width: 0.5),
                       ),
                       child: Text(
                         'IDÉAL',
@@ -1671,15 +1670,15 @@ class _FishIconState extends State<_FishIcon>
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    color.withOpacity(0.25),
-                    color.withOpacity(0.1),
+                    color.withValues(alpha: 0.25),
+                    color.withValues(alpha: 0.1),
                   ],
                 ),
                 borderRadius: BorderRadius.circular(widget.size * 0.35),
-                border: Border.all(color: color.withOpacity(0.6), width: 1.5),
+                border: Border.all(color: color.withValues(alpha: 0.6), width: 1.5),
                 boxShadow: [
                   BoxShadow(
-                    color: color.withOpacity(glowOpacity),
+                    color: color.withValues(alpha: glowOpacity),
                     blurRadius: 12,
                     spreadRadius: 2,
                   ),
@@ -1705,7 +1704,7 @@ class _FishIconState extends State<_FishIcon>
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: color.withOpacity(0.4),
+                            color: color.withValues(alpha: 0.4),
                             blurRadius: 4,
                             spreadRadius: 1,
                           ),
@@ -1761,7 +1760,7 @@ class _FishBodyPainter extends CustomPainter {
 
     // Queue triangulaire
     final tailPaint = Paint()
-      ..color = color.withOpacity(0.8)
+      ..color = color.withValues(alpha: 0.8)
       ..style = PaintingStyle.fill;
     final tailPath = Path();
     tailPath.moveTo(w * 0.15, h * 0.5);
@@ -1772,7 +1771,7 @@ class _FishBodyPainter extends CustomPainter {
 
     // Nageoire dorsale
     final finPaint = Paint()
-      ..color = color.withOpacity(0.6)
+      ..color = color.withValues(alpha: 0.6)
       ..style = PaintingStyle.fill;
     final finPath = Path();
     finPath.moveTo(w * 0.4, h * 0.15);
@@ -1839,7 +1838,7 @@ class _ConditionCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: _accent.withOpacity(0.05),
+                color: _accent.withValues(alpha: 0.05),
                 blurRadius: 15,
                 spreadRadius: 1,
               ),
@@ -1866,7 +1865,7 @@ class _ConditionCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: _accent.withOpacity(0.15),
+                        color: _accent.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -1890,7 +1889,7 @@ class _ConditionCard extends StatelessWidget {
                     Text(
                       subtitle,
                       style: GoogleFonts.inter(
-                        color: _amber.withOpacity(0.7),
+                        color: _amber.withValues(alpha: 0.7),
                         fontSize: 9,
                         fontWeight: FontWeight.w600,
                       ),
@@ -1985,7 +1984,7 @@ class _WindLinesPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = _accent.withOpacity(0.6)
+      ..color = _accent.withValues(alpha: 0.6)
       ..strokeWidth = 2
       ..strokeCap = StrokeCap.round;
 
@@ -2018,7 +2017,7 @@ class _WaveSinePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = _accent.withOpacity(0.7)
+      ..color = _accent.withValues(alpha: 0.7)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
 
@@ -2053,7 +2052,7 @@ class _SunArcPainter extends CustomPainter {
 
     // Arc
     final arcPaint = Paint()
-      ..color = _amber.withOpacity(0.4)
+      ..color = _amber.withValues(alpha: 0.4)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
 
@@ -2082,7 +2081,7 @@ class _SunArcPainter extends CustomPainter {
       Offset(sunX, sunY),
       8,
       Paint()
-        ..color = _amber.withOpacity(0.3)
+        ..color = _amber.withValues(alpha: 0.3)
         ..style = PaintingStyle.fill,
     );
   }
