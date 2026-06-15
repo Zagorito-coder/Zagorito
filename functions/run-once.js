@@ -34,6 +34,7 @@ async function main() {
   }
 
   console.log("Terminé.");
+  await admin.app().delete();
   process.exit(0);
 }
 

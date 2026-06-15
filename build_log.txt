@@ -1,0 +1,10 @@
+Analyzing spots_app...                                          
+
+warning - Unused import: 'package:spots_app/theme_controller.dart'. Try removing the import directive - lib\app_shell.dart:9:8 - unused_import
+   info - Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation - lib\pages\premium_page.dart:51:21 - prefer_const_constructors
+   info - Use 'const' literals as arguments to constructors of '@immutable' classes. Try adding 'const' before the literal - lib\pages\premium_page.dart:53:33 - prefer_const_literals_to_create_immutables
+   info - Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation - lib\pages\premium_page.dart:54:25 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation - lib\pages\premium_page.dart:59:25 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation - lib\theme.dart:335:22 - prefer_const_constructors
+
+6 issues found. (ran in 6.3s)

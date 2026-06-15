@@ -8,14 +8,22 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/tide_page_models.dart';
+import '../theme.dart';
+import '../theme_controller.dart';
 
-// ── Palette imposée ─────────────────────────────────────────
-const Color _bg = Color(0xFF050D1A);
-const Color _card = Color(0xFF0D1F38);
+// ── Palette adaptative ──────────────────────────────────────
+bool get _isDark => ThemeController.instance.isDark;
+
+Color get _bg   => _isDark ? const Color(0xFF050D1A) : const Color(0xFFF0F4F8);
+Color get _card => _isDark ? const Color(0xFF0D1F38) : const Color(0xFFFFFFFF);
+
 const Color _accent = Color(0xFF00D4FF);
-const Color _green = Color(0xFF00FF88);
-const Color _amber = Color(0xFFFFB800);
-const Color _red = Color(0xFFFF6B6B);
+const Color _green  = Color(0xFF00FF88);
+const Color _amber  = Color(0xFFFFB800);
+const Color _red    = Color(0xFFFF6B6B);
+
+// Texte adaptatif : blanc en sombre, noir en clair
+Color _txt(double opacity) => _isDark ? Colors.white.withOpacity(opacity) : Colors.black.withOpacity(opacity);
 
 // ── Données mock ────────────────────────────────────────────
 TideData _mockData() {
@@ -148,6 +156,7 @@ class _TidePageState extends State<TidePage>
   @override
   void initState() {
     super.initState();
+    ThemeController.instance.addListener(_onThemeChanged);
     _data = _mockData();
     _selectedHourIndex = _data.hourlyCards.indexWhere((c) => c.isNow);
     if (_selectedHourIndex < 0) _selectedHourIndex = 0;
@@ -205,8 +214,11 @@ class _TidePageState extends State<TidePage>
     }
   }
 
+  void _onThemeChanged() => setState(() {});
+
   @override
   void dispose() {
+    ThemeController.instance.removeListener(_onThemeChanged);
     _ctrl.dispose();
     _clockTimer?.cancel();
     _clockNotifier.dispose();
