@@ -14,7 +14,7 @@ import '../theme_controller.dart';
 // ── Palette adaptative ──────────────────────────────────────
 bool get _isDark => ThemeController.instance.isDark;
 
-Color get _bg   => _isDark ? const Color(0xFF050D1A) : const Color(0xFF6B7280);
+Color get _bg   => _isDark ? const Color(0xFF050D1A) : const Color(0xFFF0F4F8);
 Color get _card => _isDark ? const Color(0xFF0D1F38) : const Color(0xFFFFFFFF);
 
 const Color _accent = Color(0xFF00D4FF);
@@ -325,7 +325,7 @@ class _TidePageState extends State<TidePage>
                   Text(
                     _data.location,
                     style: GoogleFonts.inter(
-                      color: Colors.white.withOpacity(0.7),
+                      color: _txt(0.7),
                       fontSize: 13,
                       fontWeight: FontWeight.w400,
                     ),
@@ -339,7 +339,7 @@ class _TidePageState extends State<TidePage>
                 builder: (context, time, _) => Text(
                   time,
                   style: GoogleFonts.inter(
-                    color: Colors.white.withOpacity(0.6),
+                    color: _txt(0.6),
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
@@ -441,7 +441,7 @@ class _TidePageState extends State<TidePage>
                       Text(
                         'Score basé sur marée,\nlune et conditions météo',
                         style: GoogleFonts.inter(
-                          color: Colors.white.withOpacity(0.5),
+                          color: _txt(0.5),
                           fontSize: 11,
                           height: 1.4,
                         ),
@@ -450,7 +450,7 @@ class _TidePageState extends State<TidePage>
                       Text(
                         'MEILLEURES HEURES',
                         style: GoogleFonts.inter(
-                          color: Colors.white.withOpacity(0.35),
+                          color: _txt(0.35),
                           fontSize: 9,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 1.2,
@@ -536,7 +536,7 @@ class _TidePageState extends State<TidePage>
                     Text(
                       'Courbe des Marées · 24h',
                       style: GoogleFonts.inter(
-                        color: Colors.white.withOpacity(0.85),
+                        color: _txt(0.85),
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
@@ -585,7 +585,7 @@ class _TidePageState extends State<TidePage>
         Text(
           label,
           style: GoogleFonts.inter(
-            color: Colors.white.withOpacity(0.5),
+            color: _txt(0.5),
             fontSize: 10,
           ),
         ),
@@ -617,7 +617,7 @@ class _TidePageState extends State<TidePage>
               Text(
                 'Activité par heure',
                 style: GoogleFonts.inter(
-                  color: Colors.white.withOpacity(0.9),
+                  color: _txt(0.9),
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
@@ -626,7 +626,7 @@ class _TidePageState extends State<TidePage>
               Text(
                 'Glissez pour explorer',
                 style: GoogleFonts.inter(
-                  color: Colors.white.withOpacity(0.35),
+                  color: _txt(0.35),
                   fontSize: 11,
                 ),
               ),
@@ -731,7 +731,7 @@ class _TidePageState extends State<TidePage>
                   Text(
                     'Heure sélectionnée',
                     style: GoogleFonts.inter(
-                      color: Colors.white.withOpacity(0.4),
+                      color: _txt(0.4),
                       fontSize: 11,
                     ),
                   ),
@@ -739,7 +739,7 @@ class _TidePageState extends State<TidePage>
                   Text(
                     selected.label,
                     style: GoogleFonts.inter(
-                      color: Colors.white,
+                      color: _txt(1.0),
                       fontSize: 20,
                       fontWeight: FontWeight.w800,
                     ),
@@ -748,7 +748,7 @@ class _TidePageState extends State<TidePage>
                   Text(
                     'Marée ${selected.tideTrend} · ${selected.tideHeight.toStringAsFixed(2)}m · ${selected.windSpeed}km/h ${selected.windDirection}',
                     style: GoogleFonts.inter(
-                      color: Colors.white.withOpacity(0.5),
+                      color: _txt(0.5),
                       fontSize: 12,
                     ),
                   ),
@@ -769,7 +769,7 @@ class _TidePageState extends State<TidePage>
                 Text(
                   'score activité',
                   style: GoogleFonts.inter(
-                    color: Colors.white.withOpacity(0.4),
+                    color: _txt(0.4),
                     fontSize: 10,
                   ),
                 ),
@@ -814,7 +814,7 @@ class _TidePageState extends State<TidePage>
               Text(
                 'Conditions',
                 style: GoogleFonts.inter(
-                  color: Colors.white.withOpacity(0.9),
+                  color: _txt(0.9),
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
@@ -940,7 +940,7 @@ class _TidePageState extends State<TidePage>
               Text(
                 'Événements marée',
                 style: GoogleFonts.inter(
-                  color: Colors.white.withOpacity(0.9),
+                  color: _txt(0.9),
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
@@ -1001,7 +1001,7 @@ class _TidePageState extends State<TidePage>
           Text(
             _formatDecimalTime(event.time),
             style: GoogleFonts.inter(
-              color: Colors.white,
+              color: _txt(1.0),
               fontSize: 22,
               fontWeight: FontWeight.w800,
             ),
@@ -1010,7 +1010,7 @@ class _TidePageState extends State<TidePage>
           Text(
             '${event.height.toStringAsFixed(2)}m NGF',
             style: GoogleFonts.inter(
-              color: Colors.white.withOpacity(0.5),
+              color: _txt(0.5),
               fontSize: 12,
             ),
           ),
@@ -1131,7 +1131,7 @@ class _CircularGauge extends StatelessWidget {
                 Text(
                   '/100',
                   style: GoogleFonts.inter(
-                    color: Colors.white.withOpacity(0.3),
+                    color: _txt(0.3),
                     fontSize: 11,
                     fontWeight: FontWeight.w400,
                   ),
@@ -1177,7 +1177,7 @@ class _GaugePainter extends CustomPainter {
 
     // Background arc
     final bgPaint = Paint()
-      ..color = Colors.white.withOpacity(0.06)
+      ..color = _txt(0.06)
       ..style = PaintingStyle.stroke
       ..strokeWidth = stroke
       ..strokeCap = StrokeCap.round;
@@ -1396,7 +1396,7 @@ class _CurvePainter extends CustomPainter {
       final span = TextSpan(
         text: label,
         style: GoogleFonts.inter(
-          color: Colors.white.withOpacity(0.25 * progress),
+          color: _txt(0.25 * progress),
           fontSize: 9,
         ),
       );
@@ -1513,7 +1513,7 @@ class _HourlyCardWidget extends StatelessWidget {
             Text(
               card.label,
               style: GoogleFonts.inter(
-                color: Colors.white.withOpacity(0.9),
+                color: _txt(0.9),
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
               ),
@@ -1537,7 +1537,7 @@ class _HourlyCardWidget extends StatelessWidget {
                 Text(
                   '/100',
                   style: GoogleFonts.inter(
-                    color: Colors.white.withOpacity(0.3),
+                    color: _txt(0.3),
                     fontSize: 9,
                   ),
                 ),
@@ -1549,7 +1549,7 @@ class _HourlyCardWidget extends StatelessWidget {
               borderRadius: BorderRadius.circular(2),
               child: LinearProgressIndicator(
                 value: card.activityScore / 100,
-                backgroundColor: Colors.white.withOpacity(0.08),
+                backgroundColor: _txt(0.08),
                 valueColor: AlwaysStoppedAnimation<Color>(color),
                 minHeight: 3,
               ),
@@ -1563,14 +1563,14 @@ class _HourlyCardWidget extends StatelessWidget {
                   card.tideTrend == 'montante'
                       ? Icons.arrow_upward
                       : Icons.arrow_downward,
-                  color: Colors.white.withOpacity(0.4),
+                  color: _txt(0.4),
                   size: 10,
                 ),
                 const SizedBox(width: 2),
                 Text(
                   '${card.tideHeight.toStringAsFixed(1)}m',
                   style: GoogleFonts.inter(
-                    color: Colors.white.withOpacity(0.5),
+                    color: _txt(0.5),
                     fontSize: 10,
                   ),
                 ),
@@ -1581,7 +1581,7 @@ class _HourlyCardWidget extends StatelessWidget {
             Text(
               '~${card.windSpeed}km/h',
               style: GoogleFonts.inter(
-                color: Colors.white.withOpacity(0.35),
+                color: _txt(0.35),
                 fontSize: 9,
               ),
             ),
@@ -1589,7 +1589,7 @@ class _HourlyCardWidget extends StatelessWidget {
             Text(
               '~${card.waveHeight.toStringAsFixed(1)}m  ${card.temp}°C',
               style: GoogleFonts.inter(
-                color: Colors.white.withOpacity(0.35),
+                color: _txt(0.35),
                 fontSize: 9,
               ),
             ),
@@ -1701,7 +1701,7 @@ class _FishIconState extends State<_FishIcon>
                       width: widget.size * 0.1,
                       height: widget.size * 0.1,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.9),
+                        color: _txt(0.9),
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
@@ -1855,7 +1855,7 @@ class _ConditionCard extends StatelessWidget {
                   Text(
                     title,
                     style: GoogleFonts.inter(
-                      color: Colors.white.withOpacity(0.5),
+                      color: _txt(0.5),
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1882,7 +1882,7 @@ class _ConditionCard extends StatelessWidget {
                     Text(
                       subtitle,
                       style: GoogleFonts.inter(
-                        color: Colors.white.withOpacity(0.35),
+                        color: _txt(0.35),
                         fontSize: 9,
                       ),
                     ),
@@ -1907,7 +1907,7 @@ class _ConditionCard extends StatelessWidget {
                         Text(
                           value,
                           style: GoogleFonts.inter(
-                            color: Colors.white,
+                            color: _txt(1.0),
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
                           ),
@@ -1920,7 +1920,7 @@ class _ConditionCard extends StatelessWidget {
                           Text(
                             subtitle,
                             style: GoogleFonts.inter(
-                              color: Colors.white.withOpacity(0.4),
+                              color: _txt(0.4),
                               fontSize: 10,
                             ),
                           ),
