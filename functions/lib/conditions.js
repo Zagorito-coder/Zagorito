@@ -84,13 +84,13 @@ function findExtremes(times, values) {
  * Récupère les données marines (marées) via Open-Meteo Marine API
  */
 async function fetchMarineData(lat, lon) {
-  const url = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&hourly=sea_surface_height`;
+  const url = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&hourly=sea_level_height_msl`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Marine API error: ${res.status}`);
   const data = await res.json();
   return {
     times: data.hourly.time,
-    seaLevel: data.hourly.sea_surface_height,
+    seaLevel: data.hourly.sea_level_height_msl,
   };
 }
 
