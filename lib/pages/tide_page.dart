@@ -14,7 +14,7 @@ import '../theme_controller.dart';
 // ── Palette adaptative ──────────────────────────────────────
 bool get _isDark => ThemeController.instance.isDark;
 
-Color get _bg   => _isDark ? const Color(0xFF050D1A) : const Color(0xFFF0F4F8);
+Color get _bg   => _isDark ? const Color(0xFF050D1A) : const Color(0xFF6B7280);
 Color get _card => _isDark ? const Color(0xFF0D1F38) : const Color(0xFFFFFFFF);
 
 const Color _accent = Color(0xFF00D4FF);
