@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:spots_app/theme.dart';
 import 'package:spots_app/theme_controller.dart';
 import 'package:spots_app/l10n/app_localizations.dart';
+import 'package:spots_app/widgets/app_back_button.dart';
 
 class PremiumPage extends StatelessWidget {
   const PremiumPage({super.key});
@@ -26,7 +27,8 @@ class PremiumPage extends StatelessWidget {
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
-                    const SizedBox(height: 40),
+                    const AppBackButton(),
+                    const SizedBox(height: 28),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                       decoration: BoxDecoration(
@@ -59,7 +61,7 @@ class PremiumPage extends StatelessWidget {
                           icon: Icons.military_tech,
                           label: context.tr('premium.rank'),
                         ),
-                        SizedBox(width: 12),
+                        const SizedBox(width: 12),
                         _PremiumBadge(
                           icon: Icons.bar_chart,
                           label: context.tr('premium.level'),

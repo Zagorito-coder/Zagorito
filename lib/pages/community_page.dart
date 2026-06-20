@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:spots_app/theme.dart';
 import 'package:spots_app/theme_controller.dart';
 import 'package:spots_app/l10n/app_localizations.dart';
+import 'package:spots_app/widgets/app_back_button.dart';
 
 class CommunityPage extends StatelessWidget {
   const CommunityPage({super.key});
@@ -27,7 +28,8 @@ class CommunityPage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 20),
+                    const AppBackButton(),
+                    const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                       decoration: BoxDecoration(

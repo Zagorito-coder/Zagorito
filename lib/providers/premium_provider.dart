@@ -1,0 +1,14 @@
+import 'package:flutter/material.dart';
+
+/// État global du mode Premium (ex-bouton switch du bas de la carte).
+class PremiumProvider extends ChangeNotifier {
+  bool _isPremium = false;
+
+  bool get isPremium => _isPremium;
+
+  void toggle([bool? value]) {
+    if (value == _isPremium) return;
+    _isPremium = value ?? !_isPremium;
+    notifyListeners();
+  }
+}

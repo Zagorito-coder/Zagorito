@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:spots_app/theme.dart';
 import 'package:spots_app/theme_controller.dart';
 import 'package:spots_app/l10n/app_localizations.dart';
+import 'package:spots_app/widgets/app_back_button.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -32,10 +33,7 @@ class SettingsPage extends StatelessWidget {
                         // Header
                         Row(
                           children: [
-                            IconButton(
-                              icon: Icon(Icons.arrow_back, color: tc.textSecondary),
-                              onPressed: () => Navigator.of(context).pop(),
-                            ),
+                            const AppBackButton(toHome: true),
                             const Spacer(),
                             Text(
                               context.tr('settings.title'),
@@ -63,7 +61,7 @@ class SettingsPage extends StatelessWidget {
                                           Navigator.of(ctx).pop();
                                           Navigator.of(context).pop();
                                         },
-                                        child: Text(context.tr('common.confirm'), style: TextStyle(color: Colors.redAccent)),
+                                        child: Text(context.tr('common.confirm'), style: const TextStyle(color: Colors.redAccent)),
                                       ),
                                     ],
                                   ),

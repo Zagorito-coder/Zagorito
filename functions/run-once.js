@@ -37,7 +37,6 @@ async function main() {
   await admin.app().delete();
   process.exit(0);
 }
-
 main().catch((err) => {
   console.error("Erreur fatale:", err);
   process.exit(1);

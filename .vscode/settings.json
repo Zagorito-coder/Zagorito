@@ -1,3 +1,5 @@
 {
-    "github.copilot.chat.anthropic.useMessagesApi": true
+    "github.copilot.chat.anthropic.useMessagesApi": true,
+    "dart.flutterHotReloadOnSave": "all",
+    "dart.flutterHotReloadVerbose": false
 }

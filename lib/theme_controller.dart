@@ -10,7 +10,7 @@ class ThemeController extends ChangeNotifier {
   ThemeController._();
   static final ThemeController instance = ThemeController._();
 
-  bool _isDark = true;
+  bool _isDark = false;
 
   bool get isDark => _isDark;
   bool get isLight => !_isDark;

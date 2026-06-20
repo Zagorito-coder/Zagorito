@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:spots_app/models.dart';
 
 class SpotsCanvasLayer extends StatefulWidget {
@@ -8,6 +10,7 @@ class SpotsCanvasLayer extends StatefulWidget {
   final MapController mapController;
   final Spot? selectedSpot;
   final Function(Spot) onSpotTap;
+  final Function(LatLng)? onMapTap;
 
   const SpotsCanvasLayer({
     super.key,
@@ -15,6 +18,7 @@ class SpotsCanvasLayer extends StatefulWidget {
     required this.mapController,
     this.selectedSpot,
     required this.onSpotTap,
+    this.onMapTap,
   });
 
   @override
@@ -66,7 +70,12 @@ class _SpotsCanvasLayerState extends State<SpotsCanvasLayer> {
               closest = spot;
             }
           }
-          if (closest != null) widget.onSpotTap(closest);
+          if (closest != null) {
+            widget.onSpotTap(closest);
+          } else if (widget.onMapTap != null) {
+            final latLng = camera.pointToLatLng(Point(localOffset.dx, localOffset.dy));
+            widget.onMapTap!(latLng);
+          }
         },
         child: CustomPaint(
           painter: _SpotsPainter(

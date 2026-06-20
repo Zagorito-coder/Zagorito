@@ -21,6 +21,11 @@ dependencies:
   url_launcher: ^6.2.5
   http: ^1.2.0
   google_fonts: ^6.2.1
+  provider: ^6.1.5+1
+  flutter_compass: ^0.8.1
+  cached_network_image: ^3.4.1
+  flutter_map_animations: ^0.6.0
+  lottie: ^3.3.3
 
 dev_dependencies:
   flutter_test:
@@ -32,9 +37,20 @@ flutter:
   assets:
     - assets/spots.csv
     - assets/shops.csv
-    - assets/peche_cotiere_database.csv
-    - assets/peche_Montagestechnique_database.csv
+    - assets/peche_cotiere_databaseAr.csv
+    - assets/peche_cotiere_databaseEn.csv
+    - assets/peche_cotiere_databaseFr.csv
+    - assets/peche_Montagestechnique_databaseAr.csv
+    - assets/peche_Montagestechnique_databaseEn.csv
+    - assets/peche_Montagestechnique_databaseFr.csv
     - assets/logo.png
+    - assets/earth_splash.jpg
+    - assets/fish_data.json
+    - assets/images/
+    - assets/images/techniques/
+    - assets/fish_images/
+    - assets/animations/
+    - assets/launcher_icon.png
     - assets/lang/fr.json
     - assets/lang/en.json
     - assets/lang/ar.json

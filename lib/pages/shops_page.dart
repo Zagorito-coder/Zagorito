@@ -15,6 +15,7 @@ import '../services/shop_service.dart';
 import '../theme.dart';
 import '../theme_controller.dart';
 import '../l10n/app_localizations.dart';
+import '../widgets/app_back_button.dart';
 
 class ShopsPage extends StatefulWidget {
   const ShopsPage({super.key});
@@ -163,9 +164,11 @@ class _ShopsPageState extends State<ShopsPage>
 
   Widget _buildHeader(ThemeColors tc) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+      padding: const EdgeInsets.fromLTRB(12, 8, 20, 8),
       child: Row(
         children: [
+          const AppBackButton(),
+          const SizedBox(width: 10),
           Container(
             width: 44,
             height: 44,

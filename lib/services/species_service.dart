@@ -5,14 +5,23 @@
 import 'dart:convert' show utf8;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:spots_app/models/fish_species.dart';
+import 'package:spots_app/l10n/app_localizations.dart';
 
 class SpeciesService {
   static List<FishSpecies>? _cache;
+  static String? _cachedLang;
+
+  static String _fileForLang(String lang) {
+    if (lang == 'ar') return 'assets/peche_cotiere_databaseAr.csv';
+    if (lang == 'en') return 'assets/peche_cotiere_databaseEn.csv';
+    return 'assets/peche_cotiere_databaseFr.csv';
+  }
 
   static Future<List<FishSpecies>> loadSpecies() async {
-    if (_cache != null) return _cache!;
+    final lang = LanguageController.instance.langCode;
+    if (_cache != null && _cachedLang == lang) return _cache!;
 
-    final rawBytes = await rootBundle.load('assets/peche_cotiere_database.csv');
+    final rawBytes = await rootBundle.load(_fileForLang(lang));
     // Strip le BOM UTF-8 (\xEF\xBB\xBF) s'il est présent
     var raw = utf8.decode(rawBytes.buffer.asUint8List());
     if (raw.startsWith('\uFEFF')) {
@@ -34,6 +43,7 @@ class SpeciesService {
     }
 
     _cache = species;
+    _cachedLang = lang;
     return species;
   }
 
@@ -60,5 +70,8 @@ class SpeciesService {
     return result;
   }
 
-  static void clearCache() => _cache = null;
+  static void clearCache() {
+    _cache = null;
+    _cachedLang = null;
+  }
 }

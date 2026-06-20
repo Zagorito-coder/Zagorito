@@ -9,6 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/tide_page_models.dart';
 import '../theme_controller.dart';
+import '../widgets/app_back_button.dart';
+import '../l10n/app_localizations.dart';
 
 // ── Palette adaptative ──────────────────────────────────────
 bool get _isDark => ThemeController.instance.isDark;
@@ -316,6 +318,8 @@ class _TidePageState extends State<TidePage>
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           child: Row(
             children: [
+              const AppBackButton(),
+              const SizedBox(width: 8),
               // Point vert animé + lieu
               Row(
                 children: [
@@ -426,7 +430,7 @@ class _TidePageState extends State<TidePage>
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              _data.overallLabel,
+                              _tideLabel(context, _data.overallLevel),
                               style: GoogleFonts.inter(
                                 color: _levelColor(_data.overallLevel),
                                 fontSize: 12,
@@ -438,7 +442,7 @@ class _TidePageState extends State<TidePage>
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'Score basé sur marée,\nlune et conditions météo',
+                        context.tr('tide.scoreDescription'),
                         style: GoogleFonts.inter(
                           color: _txt(0.5),
                           fontSize: 11,
@@ -447,7 +451,7 @@ class _TidePageState extends State<TidePage>
                       ),
                       const SizedBox(height: 14),
                       Text(
-                        'MEILLEURES HEURES',
+                        context.tr('tide.bestHours'),
                         style: GoogleFonts.inter(
                           color: _txt(0.35),
                           fontSize: 9,
@@ -533,7 +537,7 @@ class _TidePageState extends State<TidePage>
                 Row(
                   children: [
                     Text(
-                      'Courbe des Marées · 24h',
+                      context.tr('tide.tideCurveTitle'),
                       style: GoogleFonts.inter(
                         color: _txt(0.85),
                         fontSize: 14,
@@ -541,11 +545,11 @@ class _TidePageState extends State<TidePage>
                       ),
                     ),
                     const Spacer(),
-                    _legend('Maintenant', _green),
+                    _legend(context.tr('tide.now'), _green),
                     const SizedBox(width: 12),
-                    _legend('HM', _accent),
+                    _legend(context.tr('tide.highTide'), _accent),
                     const SizedBox(width: 12),
-                    _legend('BM', _red),
+                    _legend(context.tr('tide.lowTide'), _red),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -554,8 +558,14 @@ class _TidePageState extends State<TidePage>
                   child: RepaintBoundary(
                     child: _TideCurvePainter(
                       points: _data.tidePoints,
-                      events: _data.tideEvents,
+                      events: _data.tideEvents.map((e) => TideEvent(
+                        type: e.type,
+                        time: e.time,
+                        height: e.height,
+                        label: context.tr(e.type == 'high' ? 'tide.highTideLabel' : 'tide.lowTideLabel'),
+                      )).toList(),
                       currentHour: _data.currentHour + DateTime.now().minute / 60,
+                      nowLabel: context.tr('tide.nowShort'),
                       animation: _ctrl,
                     ),
                   ),
@@ -614,7 +624,7 @@ class _TidePageState extends State<TidePage>
               ),
               const SizedBox(width: 8),
               Text(
-                'Activité par heure',
+                context.tr('tide.hourlyActivity'),
                 style: GoogleFonts.inter(
                   color: _txt(0.9),
                   fontSize: 14,
@@ -623,7 +633,7 @@ class _TidePageState extends State<TidePage>
               ),
               const Spacer(),
               Text(
-                'Glissez pour explorer',
+                context.tr('tide.swipeToExplore'),
                 style: GoogleFonts.inter(
                   color: _txt(0.35),
                   fontSize: 11,
@@ -728,7 +738,7 @@ class _TidePageState extends State<TidePage>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Heure sélectionnée',
+                    context.tr('tide.selectedHour'),
                     style: GoogleFonts.inter(
                       color: _txt(0.4),
                       fontSize: 11,
@@ -766,7 +776,7 @@ class _TidePageState extends State<TidePage>
                   ),
                 ),
                 Text(
-                  'score activité',
+                  context.tr('tide.activityScore'),
                   style: GoogleFonts.inter(
                     color: _txt(0.4),
                     fontSize: 10,
@@ -774,7 +784,7 @@ class _TidePageState extends State<TidePage>
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  selected.activityLabel,
+                  _tideLabel(context, selected.activityLevel),
                   style: GoogleFonts.inter(
                     color: _levelColor(selected.activityLevel),
                     fontSize: 11,
@@ -811,7 +821,7 @@ class _TidePageState extends State<TidePage>
               ),
               const SizedBox(width: 8),
               Text(
-                'Conditions',
+                context.tr('tide.conditions'),
                 style: GoogleFonts.inter(
                   color: _txt(0.9),
                   fontSize: 14,
@@ -842,7 +852,7 @@ class _TidePageState extends State<TidePage>
       animation: _ctrl,
       delayIndex: 7,
       icon: '🌙',
-      title: 'Phase Lune',
+      title: context.tr('tide.moonPhase'),
       value: info.phaseName,
       subtitle: info.influence,
       child: RepaintBoundary(
@@ -860,7 +870,7 @@ class _TidePageState extends State<TidePage>
       animation: _ctrl,
       delayIndex: 8,
       icon: '💨',
-      title: 'Vent',
+      title: context.tr('tide.wind'),
       value: '${info.speed} km/h ${info.direction}',
       subtitle: 'Rafales ±${info.gust} km/h',
       child: RepaintBoundary(
@@ -880,7 +890,7 @@ class _TidePageState extends State<TidePage>
       animation: _ctrl,
       delayIndex: 9,
       icon: '🌊',
-      title: 'Vagues',
+      title: context.tr('tide.waves'),
       value: '${info.height}m / ${info.period}s',
       subtitle: info.swell,
       child: RepaintBoundary(
@@ -900,7 +910,7 @@ class _TidePageState extends State<TidePage>
       animation: _ctrl,
       delayIndex: 10,
       icon: '☀️',
-      title: 'Soleil',
+      title: context.tr('tide.sun'),
       value: '${info.sunrise} — ${info.sunset}',
       subtitle: 'Or ${info.goldenHour}',
       child: RepaintBoundary(
@@ -937,7 +947,7 @@ class _TidePageState extends State<TidePage>
               ),
               const SizedBox(width: 8),
               Text(
-                'Événements marée',
+                context.tr('tide.tideEvents'),
                 style: GoogleFonts.inter(
                   color: _txt(0.9),
                   fontSize: 14,
@@ -986,7 +996,7 @@ class _TidePageState extends State<TidePage>
               ),
               const SizedBox(width: 6),
               Text(
-                event.label.toUpperCase(),
+                context.tr(event.type == 'high' ? 'tide.highTideLabel' : 'tide.lowTideLabel').toUpperCase(),
                 style: GoogleFonts.inter(
                   color: isHigh ? _accent : _red,
                   fontSize: 10,
@@ -1041,6 +1051,21 @@ String _formatDecimalTime(double time) {
   final m = ((time - h) * 60).round();
   return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
 }
+
+
+String _tideLabel(BuildContext context, String level) {
+  switch (level) {
+    case 'high':
+      return context.tr('tide.activityHigh');
+    case 'mid':
+      return context.tr('tide.activityMid');
+    case 'low':
+      return context.tr('tide.activityLow');
+    default:
+      return context.tr('tide.activityMid');
+  }
+}
+
 
 // ── Point vert animé ────────────────────────────────────────
 class _AnimatedDot extends StatefulWidget {
@@ -1215,12 +1240,14 @@ class _TideCurvePainter extends StatelessWidget {
   final List<TidePoint> points;
   final List<TideEvent> events;
   final double currentHour;
+  final String nowLabel;
   final Animation<double> animation;
 
   const _TideCurvePainter({
     required this.points,
     required this.events,
     required this.currentHour,
+    required this.nowLabel,
     required this.animation,
   });
 
@@ -1235,6 +1262,7 @@ class _TideCurvePainter extends StatelessWidget {
             points: points,
             events: events,
             currentHour: currentHour,
+            nowLabel: nowLabel,
             progress: animation.value,
           ),
         );
@@ -1247,12 +1275,14 @@ class _CurvePainter extends CustomPainter {
   final List<TidePoint> points;
   final List<TideEvent> events;
   final double currentHour;
+  final String nowLabel;
   final double progress;
 
   _CurvePainter({
     required this.points,
     required this.events,
     required this.currentHour,
+    required this.nowLabel,
     required this.progress,
   });
 
@@ -1260,7 +1290,7 @@ class _CurvePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (points.isEmpty) return;
 
-    const padding = EdgeInsets.only(left: 30, right: 30, top: 20, bottom: 30);
+    const padding = EdgeInsets.only(left: 34, right: 34, top: 28, bottom: 34);
     final w = size.width - padding.horizontal;
     final h = size.height - padding.vertical;
 
@@ -1321,21 +1351,24 @@ class _CurvePainter extends CustomPainter {
 
     // Event markers (HM/BM)
     for (final event in events) {
-      final ex = xFor(event.time);
+      final rawEx = xFor(event.time);
       final ey = yFor(event.height);
       final isHigh = event.type == 'high';
       final color = isHigh ? _accent : _red;
 
+      // Clamp marker x inside the drawing area so the label never clips
+      final ex = rawEx.clamp(padding.left + 10, size.width - padding.right - 10);
+
       // Triangle marker
       final markerPath = Path();
       if (isHigh) {
-        markerPath.moveTo(ex, ey - 18);
-        markerPath.lineTo(ex - 6, ey - 6);
-        markerPath.lineTo(ex + 6, ey - 6);
+        markerPath.moveTo(ex, ey - 8);
+        markerPath.lineTo(ex - 5, ey + 2);
+        markerPath.lineTo(ex + 5, ey + 2);
       } else {
-        markerPath.moveTo(ex, ey + 18);
-        markerPath.lineTo(ex - 6, ey + 6);
-        markerPath.lineTo(ex + 6, ey + 6);
+        markerPath.moveTo(ex, ey + 8);
+        markerPath.lineTo(ex - 5, ey - 2);
+        markerPath.lineTo(ex + 5, ey - 2);
       }
       markerPath.close();
 
@@ -1355,28 +1388,34 @@ class _CurvePainter extends CustomPainter {
       );
       final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)
         ..layout();
-      tp.paint(
-        canvas,
-        Offset(ex - tp.width / 2,
-            isHigh ? ey - 32 : ey + 20),
-      );
+
+      double labelX = ex - tp.width / 2;
+      double labelY = isHigh ? ey - 22 : ey + 10;
+      // Keep label fully inside the card bounds horizontally
+      labelX = labelX.clamp(4.0, size.width - tp.width - 4.0);
+      // Keep label inside the top/bottom drawing bounds
+      labelY = labelY.clamp(padding.top - 14, size.height - padding.bottom - tp.height + 4);
+
+      tp.paint(canvas, Offset(labelX, labelY));
     }
 
     // Now line
     if (progress > 0.7) {
-      final nx = xFor(currentHour);
+      final rawNx = xFor(currentHour);
+      final nx = rawNx.clamp(padding.left, size.width - padding.right);
       final nowPaint = Paint()
-        ..color = _green.withValues(alpha: (progress - 0.7) / 0.3 * 0.8)
+        ..color = _green.withValues(alpha: ((progress - 0.7) / 0.3).clamp(0.0, 1.0) * 0.8)
+        ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5;
       canvas.drawLine(
-        Offset(nx, padding.top - 5),
-        Offset(nx, size.height - padding.bottom + 5),
+        Offset(nx, padding.top - 2),
+        Offset(nx, size.height - padding.bottom + 2),
         nowPaint,
       );
 
       // "MAINTENANT" label
       final labelSpan = TextSpan(
-        text: 'MAINTENANT',
+        text: nowLabel,
         style: GoogleFonts.inter(
           color: _green.withValues(alpha: (progress - 0.7) / 0.3),
           fontSize: 8,
@@ -1385,7 +1424,9 @@ class _CurvePainter extends CustomPainter {
       );
       final lp = TextPainter(text: labelSpan, textDirection: TextDirection.ltr)
         ..layout();
-      lp.paint(canvas, Offset(nx - lp.width / 2, padding.top - 18));
+      double labelX = nx - lp.width / 2;
+      labelX = labelX.clamp(4.0, size.width - lp.width - 4.0);
+      lp.paint(canvas, Offset(labelX, padding.top - 18));
     }
 
     // Hour labels
@@ -1477,7 +1518,7 @@ class _HourlyCardWidget extends StatelessWidget {
                             color: _green.withValues(alpha: 0.4), width: 0.5),
                       ),
                       child: Text(
-                        'MAINTENANT',
+                        context.tr('tide.nowShort'),
                         style: GoogleFonts.inter(
                           color: _green,
                           fontSize: 7,
@@ -1496,7 +1537,7 @@ class _HourlyCardWidget extends StatelessWidget {
                             color: _accent.withValues(alpha: 0.4), width: 0.5),
                       ),
                       child: Text(
-                        'IDÉAL',
+                        context.tr('tide.ideal'),
                         style: GoogleFonts.inter(
                           color: _accent,
                           fontSize: 7,
@@ -1985,6 +2026,7 @@ class _WindLinesPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = _accent.withValues(alpha: 0.6)
+      ..style = PaintingStyle.stroke
       ..strokeWidth = 2
       ..strokeCap = StrokeCap.round;
 

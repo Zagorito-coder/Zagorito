@@ -4,13 +4,20 @@
 // ============================================================
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart' as fm;
+import 'package:latlong2/latlong.dart' as lat2;
+import 'package:provider/provider.dart';
+import '../models.dart';
 import '../models/tide_data.dart';
 import '../pages/settings_page.dart';
+import '../providers/premium_provider.dart';
+import '../services/spot_service.dart';
 import '../services/tide_service.dart';
 import '../theme.dart';
 import '../theme_controller.dart';
 import '../l10n/app_localizations.dart';
 import '../widgets/language_selector.dart';
+import '../widgets/app_tile_layer.dart';
 
 class HomePage extends StatefulWidget {
   final VoidCallback? onNavigateToSpots;
@@ -36,15 +43,37 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage>
+    with SingleTickerProviderStateMixin {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   TideData _tideData = TideData.fallback();
   bool _isLoading = true;
+  List<Spot> _spots = [];
+
+  late final AnimationController _pulseController;
 
   @override
   void initState() {
     super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
     _loadTides();
+    _loadSpots();
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadSpots() async {
+    final spots = await SpotService.loadFromCsv();
+    if (mounted) {
+      setState(() => _spots = spots);
+    }
   }
 
   Future<void> _loadTides() async {
@@ -128,9 +157,9 @@ class _HomePageState extends State<HomePage> {
                   child: _buildHeader(),
                 ),
 
-                // ── Carte Marées complète ──
+                // ── Aperçu de la carte des spots ──
                 SliverToBoxAdapter(
-                  child: _buildTidesCard(),
+                  child: _buildMapPreviewCard(),
                 ),
 
                 // ── Titre Expedition Sections ──
@@ -474,6 +503,26 @@ class _HomePageState extends State<HomePage> {
                   _DrawerItem(
                     icon: Icons.workspace_premium,
                     label: context.tr('drawer.premium'),
+                    trailing: Consumer<PremiumProvider>(
+                      builder: (context, premiumProvider, _) {
+                        return SizedBox(
+                          width: 40,
+                          height: 24,
+                          child: FittedBox(
+                            child: Switch(
+                              value: premiumProvider.isPremium,
+                              activeThumbColor: tc.gold,
+                              activeTrackColor: tc.gold.withValues(alpha: 0.35),
+                              inactiveThumbColor: tc.textSecondary,
+                              inactiveTrackColor: tc.textMuted.withValues(alpha: 0.5),
+                              onChanged: (val) {
+                                premiumProvider.toggle(val);
+                              },
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                     onTap: () {
                       Navigator.pop(context);
                       widget.onNavigateToPremium?.call();
@@ -636,8 +685,157 @@ class _HomePageState extends State<HomePage> {
   }
 
   // ─────────────────────────────────────────────
+  //  APERÇU CARTE DES SPOTS — Pleine fenêtre, spots animés
+  // ─────────────────────────────────────────────
+  Widget _buildMapPreviewCard() {
+    final tc = ThemeColors.of(context);
+    final size = MediaQuery.of(context).size;
+    final displaySpots = _spots.take(500).toList();
+    final bounds = displaySpots.isEmpty
+        ? null
+        : fm.LatLngBounds.fromPoints(
+            displaySpots.map((s) => lat2.LatLng(s.latitude, s.longitude)).toList(),
+          );
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.onNavigateToSpots,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        height: size.height * 0.52,
+        constraints: const BoxConstraints(minHeight: 360, maxHeight: 520),
+        decoration: BoxDecoration(
+          color: tc.surface.withValues(alpha: 0.95),
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(
+            color: tc.oceanLight.withValues(alpha: 0.35),
+            width: 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: tc.shadowColor.withValues(alpha: 0.45),
+              blurRadius: 30,
+              offset: const Offset(0, 12),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Mini-carte non interactive (tap redirige vers la carte complète)
+            AbsorbPointer(
+              child: fm.FlutterMap(
+                options: fm.MapOptions(
+                  initialCenter: const lat2.LatLng(31.7917, -7.0926),
+                  initialZoom: 4.5,
+                  interactionOptions: const fm.InteractionOptions(
+                    flags: fm.InteractiveFlag.none,
+                  ),
+                  initialCameraFit: bounds == null
+                      ? null
+                      : fm.CameraFit.bounds(
+                          bounds: bounds,
+                          padding: const EdgeInsets.all(24),
+                        ),
+                ),
+                children: [
+                  const AppTileLayer(satellite: true),
+                  if (displaySpots.isNotEmpty)
+                    fm.MarkerLayer(
+                      markers: displaySpots
+                          .map(
+                            (spot) => fm.Marker(
+                              width: 36,
+                              height: 36,
+                              point: lat2.LatLng(spot.latitude, spot.longitude),
+                              child: _PulsingSpotMarker(
+                                color: spot.type.color,
+                                animation: _pulseController,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                ],
+              ),
+            ),
+
+            // Gradient overlay pour la lisibilité
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.45),
+                  ],
+                ),
+              ),
+            ),
+
+            // Texte + icône d'appel à l'action
+            Positioned(
+              left: 20,
+              right: 20,
+              bottom: 16,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          context.tr('drawer.spots'),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          LanguageController.instance.langCode == 'en'
+                              ? 'Tap to open the full map'
+                              : LanguageController.instance.langCode == 'ar'
+                                  ? 'اضغط لفتح الخريطة الكاملة'
+                                  : 'Appuyez pour ouvrir la carte complète',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.map_rounded,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────
   //  CARTE MARÉES COMPLÈTE — Toutes les infos pêcheur
   // ─────────────────────────────────────────────
+  // ignore: unused_element
   Widget _buildTidesCard() {
     final tc = ThemeColors.of(context);
     final astro = _tideData.astro;
@@ -895,6 +1093,86 @@ class _HomePageState extends State<HomePage> {
     if (score >= 0.55) return const Color(0xFFFFD700);
     if (score >= 0.35) return const Color(0xFFFF8C69);
     return const Color(0xFFEF5350);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  MARQUEUR PULSANT — petit point animé sur la mini-carte
+// ═══════════════════════════════════════════════════════════
+
+class _PulsingSpotMarker extends AnimatedWidget {
+  final Color color;
+
+  const _PulsingSpotMarker({
+    required this.color,
+    required Animation<double> animation,
+  }) : super(listenable: animation);
+
+  Animation<double> get animation => listenable as Animation<double>;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = animation.value;
+    final outerScale = 0.7 + t * 0.6;
+    final midScale = 0.5 + t * 0.5;
+    final outerAlpha = 0.15 + t * 0.25;
+    final midAlpha = 0.25 + t * 0.25;
+
+    return Center(
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Halo extérieur pulsant
+          Transform.scale(
+            scale: outerScale,
+            child: Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: color.withValues(alpha: outerAlpha),
+              ),
+            ),
+          ),
+          // Halo intermédiaire
+          Transform.scale(
+            scale: midScale,
+            child: Container(
+              width: 16,
+              height: 16,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: color.withValues(alpha: midAlpha),
+              ),
+            ),
+          ),
+          // Cœur lumineux avec icône
+          Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: color,
+              border: Border.all(color: Colors.white, width: 1.4),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.8),
+                  blurRadius: 8,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: const Center(
+              child: Icon(
+                Icons.circle,
+                color: Colors.white,
+                size: 4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -1434,12 +1712,14 @@ class _DrawerItem extends StatelessWidget {
   final String label;
   final bool isActive;
   final VoidCallback? onTap;
+  final Widget? trailing;
 
   const _DrawerItem({
     required this.icon,
     required this.label,
     this.isActive = false,
     this.onTap,
+    this.trailing,
   });
 
   @override
@@ -1459,7 +1739,7 @@ class _DrawerItem extends StatelessWidget {
           fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
         ),
       ),
-      trailing: isActive
+      trailing: trailing ?? (isActive
           ? Container(
               width: 4,
               height: 20,
@@ -1468,7 +1748,7 @@ class _DrawerItem extends StatelessWidget {
                 borderRadius: BorderRadius.circular(2),
               ),
             )
-          : null,
+          : null),
       onTap: onTap,
       dense: true,
       visualDensity: VisualDensity.compact,

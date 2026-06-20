@@ -30,7 +30,7 @@ class AppShell extends StatefulWidget {
 }
 
 class AppShellState extends State<AppShell> {
-  int _currentIndex = 0;
+  int _currentIndex = 3;
 
   static const List<Widget> _pages = [
     HomePageWrapper(),
@@ -102,14 +102,14 @@ class AppShellState extends State<AppShell> {
                 isActive: _currentIndex == 1,
                 onTap: () => navigateTo(1),
               ),
-              _NavAddButton(
-                onTap: () => navigateTo(2),
+              _NavMapButton(
+                onTap: () => navigateTo(3),
               ),
               _NavItem(
-                icon: Icons.map_rounded,
-                label: LanguageController.instance.isRtl ? 'الخريطة' : (LanguageController.instance.langCode == 'en' ? 'Map' : 'Carte'),
-                isActive: _currentIndex == 3,
-                onTap: () => navigateTo(3),
+                icon: Icons.add_location_alt_rounded,
+                label: LanguageController.instance.isRtl ? 'إضافة' : (LanguageController.instance.langCode == 'en' ? 'Add' : 'Ajouter'),
+                isActive: _currentIndex == 2,
+                onTap: () => navigateTo(2),
               ),
               _NavItem(
                 icon: Icons.settings_rounded,
@@ -181,10 +181,10 @@ class _NavItem extends StatelessWidget {
   }
 }
 
-class _NavAddButton extends StatelessWidget {
+class _NavMapButton extends StatelessWidget {
   final VoidCallback onTap;
 
-  const _NavAddButton({required this.onTap});
+  const _NavMapButton({required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -211,7 +211,7 @@ class _NavAddButton extends StatelessWidget {
           ],
         ),
         child: Icon(
-          Icons.add,
+          Icons.map_rounded,
           color: ThemeColors.of(context).textPrimary,
           size: 28,
         ),
