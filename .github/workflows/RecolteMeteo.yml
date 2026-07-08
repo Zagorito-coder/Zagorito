@@ -1,0 +1,31 @@
+name: RecolteMeteoQuotidienne
+
+on:
+  schedule:
+    - cron: '0 4 * * *'   # tous les jours a 4h00 UTC
+  workflow_dispatch:       # bouton "Run workflow" manuel dans GitHub
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Recuperer le code du depot
+        uses: actions/checkout@v4
+
+      - name: Installer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Installer les dependances
+        run: pip install requests firebase-admin
+
+      - name: Recreer la cle Firebase depuis le secret GitHub
+        run: echo '${{ secrets.FIREBASE_KEY_JSON }}' > firebase-key.json
+
+      - name: Executer le script de recolte
+        run: python harvest_forecast.py
+
+      - name: Nettoyer la cle (securite)
+        if: always()
+        run: rm -f firebase-key.json

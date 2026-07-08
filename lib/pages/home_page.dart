@@ -20,6 +20,7 @@ import '../widgets/language_selector.dart';
 import '../widgets/app_tile_layer.dart';
 
 class HomePage extends StatefulWidget {
+  final List<Spot>? initialSpots;
   final VoidCallback? onNavigateToSpots;
   final VoidCallback? onNavigateToSpecies;
   final VoidCallback? onNavigateToTechniques;
@@ -27,9 +28,11 @@ class HomePage extends StatefulWidget {
   final VoidCallback? onNavigateToShops;
   final VoidCallback? onNavigateToPremium;
   final VoidCallback? onNavigateToTides;
+  final VoidCallback? onNavigateToTidesV2;
 
   const HomePage({
     super.key,
+    this.initialSpots,
     this.onNavigateToSpots,
     this.onNavigateToSpecies,
     this.onNavigateToTechniques,
@@ -37,6 +40,7 @@ class HomePage extends StatefulWidget {
     this.onNavigateToShops,
     this.onNavigateToPremium,
     this.onNavigateToTides,
+    this.onNavigateToTidesV2,
   });
 
   @override
@@ -48,17 +52,19 @@ class _HomePageState extends State<HomePage>
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   TideData _tideData = TideData.fallback();
   bool _isLoading = true;
-  List<Spot> _spots = [];
+  late List<Spot> _spots;
 
   late final AnimationController _pulseController;
 
   @override
   void initState() {
     super.initState();
+    _spots = widget.initialSpots ?? [];
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
+    // Ne pas await pour ne pas bloquer le premier frame.
     _loadTides();
     _loadSpots();
   }
@@ -70,7 +76,8 @@ class _HomePageState extends State<HomePage>
   }
 
   Future<void> _loadSpots() async {
-    final spots = await SpotService.loadFromCsv();
+    if (_spots.isNotEmpty) return; // Déjà fournis par SplashBootstrap.
+    final spots = await SpotService.loadFromCache();
     if (mounted) {
       setState(() => _spots = spots);
     }
@@ -459,6 +466,10 @@ class _HomePageState extends State<HomePage>
                       Navigator.pop(context);
                       widget.onNavigateToTides?.call();
                     },
+                    onLongPress: () {
+                      Navigator.pop(context);
+                      widget.onNavigateToTidesV2?.call();
+                    },
                   ),
                   _DrawerItem(
                     icon: Icons.location_on,
@@ -505,19 +516,20 @@ class _HomePageState extends State<HomePage>
                     label: context.tr('drawer.premium'),
                     trailing: Consumer<PremiumProvider>(
                       builder: (context, premiumProvider, _) {
-                        return SizedBox(
-                          width: 40,
-                          height: 24,
-                          child: FittedBox(
-                            child: Switch(
-                              value: premiumProvider.isPremium,
-                              activeThumbColor: tc.gold,
-                              activeTrackColor: tc.gold.withValues(alpha: 0.35),
-                              inactiveThumbColor: tc.textSecondary,
-                              inactiveTrackColor: tc.textMuted.withValues(alpha: 0.5),
-                              onChanged: (val) {
-                                premiumProvider.toggle(val);
-                              },
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: premiumProvider.isPremium
+                                ? tc.gold.withValues(alpha: 0.25)
+                                : tc.textMuted.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            premiumProvider.isPremium ? 'PRO' : 'FREE',
+                            style: TextStyle(
+                              color: premiumProvider.isPremium ? tc.gold : tc.textSecondary,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         );
@@ -740,7 +752,7 @@ class _HomePageState extends State<HomePage>
                         ),
                 ),
                 children: [
-                  const AppTileLayer(satellite: true),
+                  const AppTileLayer(style: MapStyle.satellite),
                   if (displaySpots.isNotEmpty)
                     fm.MarkerLayer(
                       markers: displaySpots
@@ -1712,6 +1724,7 @@ class _DrawerItem extends StatelessWidget {
   final String label;
   final bool isActive;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
   final Widget? trailing;
 
   const _DrawerItem({
@@ -1719,13 +1732,14 @@ class _DrawerItem extends StatelessWidget {
     required this.label,
     this.isActive = false,
     this.onTap,
+    this.onLongPress,
     this.trailing,
   });
 
   @override
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
-    return ListTile(
+    final tile = ListTile(
       leading: Icon(
         icon,
         color: isActive ? tc.oceanLight : tc.textSecondary,
@@ -1752,6 +1766,12 @@ class _DrawerItem extends StatelessWidget {
       onTap: onTap,
       dense: true,
       visualDensity: VisualDensity.compact,
+    );
+
+    if (onLongPress == null) return tile;
+    return GestureDetector(
+      onLongPress: onLongPress,
+      child: tile,
     );
   }
 }

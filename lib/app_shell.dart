@@ -17,13 +17,16 @@ import 'package:spots_app/pages/community_page.dart';
 import 'package:spots_app/pages/premium_page.dart';
 import 'package:spots_app/pages/shops_page.dart';
 import 'package:spots_app/pages/tide_page.dart';
+import 'package:spots_app/pages/windguru_page.dart';
+import 'package:spots_app/models.dart';
 
 /// Clé globale pour accéder au state de navigation
 final GlobalKey<AppShellState> appShellKey = GlobalKey<AppShellState>();
 
 /// Shell principal de l'application avec navigation par onglets
 class AppShell extends StatefulWidget {
-  const AppShell({super.key});
+  final List<Spot>? initialSpots;
+  const AppShell({super.key, this.initialSpots});
 
   @override
   State<AppShell> createState() => AppShellState();
@@ -32,13 +35,19 @@ class AppShell extends StatefulWidget {
 class AppShellState extends State<AppShell> {
   int _currentIndex = 3;
 
-  static const List<Widget> _pages = [
-    HomePageWrapper(),
-    SpeciesPageWrapper(),
-    AddSpotPlaceholder(),
-    SpotFinderPage(),
-    SettingsPageWrapper(),
-  ];
+  late final List<Widget> _pages;
+
+  @override
+  void initState() {
+    super.initState();
+    _pages = [
+      HomePageWrapper(initialSpots: widget.initialSpots),
+      const SpeciesPageWrapper(),
+      const AddSpotPlaceholder(),
+      SpotFinderPage(initialSpots: widget.initialSpots),
+      const SettingsPageWrapper(),
+    ];
+  }
 
   /// Navigue vers un onglet spécifique
   void navigateTo(int index) {
@@ -225,11 +234,13 @@ class _NavMapButton extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────
 
 class HomePageWrapper extends StatelessWidget {
-  const HomePageWrapper({super.key});
+  final List<Spot>? initialSpots;
+  const HomePageWrapper({super.key, this.initialSpots});
 
   @override
   Widget build(BuildContext context) {
     return HomePage(
+      initialSpots: initialSpots,
       onNavigateToSpots: () => appShellKey.currentState?.navigateTo(3),
       onNavigateToSpecies: () => appShellKey.currentState?.navigateTo(1),
       onNavigateToTechniques: () => _goTo(context, const TechniquesPage()),
@@ -237,6 +248,8 @@ class HomePageWrapper extends StatelessWidget {
       onNavigateToShops: () => _goTo(context, const ShopsPage()),
       onNavigateToPremium: () => _goTo(context, const PremiumPage()),
       onNavigateToTides: () => _goTo(context, const TidePage()),
+      // Debug route / bouton caché : long-press sur "Marées" dans le drawer
+      onNavigateToTidesV2: () => _goTo(context, const WindguruPage(spotId: 'casablanca_maroc')),
     );
   }
 
