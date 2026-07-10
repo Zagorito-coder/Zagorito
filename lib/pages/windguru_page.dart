@@ -241,6 +241,11 @@ class _WindguruPageState extends State<WindguruPage> {
               child: Text('Aucune donnee disponible pour ce spot'));
         }
 
+        // Verifier si on a des donnees multi-modeles
+        final hasMultiModel = forecast.slots.any(
+          (s) => s.modelWind != null || s.modelHires != null || s.modelWave != null,
+        );
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -251,37 +256,9 @@ class _WindguruPageState extends State<WindguruPage> {
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(8),
-                child: Column(
-                  children: [
-                    ForecastTable(
-                      modelName: '${forecast.locationName} — Vent GFS ~13km',
-                      runLabel: forecast.lastUpdate != null
-                          ? 'Maj : ${forecast.lastUpdate!.day}/${forecast.lastUpdate!.month} '
-                              '${forecast.lastUpdate!.hour}h${forecast.lastUpdate!.minute.toString().padLeft(2, '0')}'
-                          : '',
-                      slots: forecast.slots,
-                      model: TableModel.wind,
-                      onReady: (fn) => _scrollToSlot = fn,
-                      onSlotScrolled: (slotIndex) {
-                        _updateSelectedDayFromSlot(slotIndex, forecast);
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    ForecastTable(
-                      modelName: '${forecast.locationName} — ECMWF IFS-HRES ~9km',
-                      runLabel: '',
-                      slots: forecast.slots,
-                      model: TableModel.hires,
-                    ),
-                    const SizedBox(height: 12),
-                    ForecastTable(
-                      modelName: '${forecast.locationName} — Vagues GFS-Wave',
-                      runLabel: '',
-                      slots: forecast.slots,
-                      model: TableModel.wave,
-                    ),
-                  ],
-                ),
+                child: hasMultiModel
+                    ? _buildMultiModelTables(forecast)
+                    : _buildLegacyTable(forecast),
               ),
             ),
           ],
@@ -460,6 +437,56 @@ class _WindguruPageState extends State<WindguruPage> {
           );
         },
       ),
+    );
+  }
+
+  Widget _buildLegacyTable(SpotForecast forecast) {
+    return ForecastTable(
+      modelName: forecast.locationName,
+      runLabel: forecast.lastUpdate != null
+          ? 'Maj : ${forecast.lastUpdate!.day}/${forecast.lastUpdate!.month} '
+              '${forecast.lastUpdate!.hour}h${forecast.lastUpdate!.minute.toString().padLeft(2, '0')}'
+          : '',
+      slots: forecast.slots,
+      model: TableModel.root,
+      onReady: (fn) => _scrollToSlot = fn,
+      onSlotScrolled: (slotIndex) {
+        _updateSelectedDayFromSlot(slotIndex, forecast);
+      },
+    );
+  }
+
+  Widget _buildMultiModelTables(SpotForecast forecast) {
+    return Column(
+      children: [
+        ForecastTable(
+          modelName: '${forecast.locationName} — Vent GFS ~13km',
+          runLabel: forecast.lastUpdate != null
+              ? 'Maj : ${forecast.lastUpdate!.day}/${forecast.lastUpdate!.month} '
+                  '${forecast.lastUpdate!.hour}h${forecast.lastUpdate!.minute.toString().padLeft(2, '0')}'
+              : '',
+          slots: forecast.slots,
+          model: TableModel.wind,
+          onReady: (fn) => _scrollToSlot = fn,
+          onSlotScrolled: (slotIndex) {
+            _updateSelectedDayFromSlot(slotIndex, forecast);
+          },
+        ),
+        const SizedBox(height: 12),
+        ForecastTable(
+          modelName: '${forecast.locationName} — ECMWF IFS-HRES ~9km',
+          runLabel: '',
+          slots: forecast.slots,
+          model: TableModel.hires,
+        ),
+        const SizedBox(height: 12),
+        ForecastTable(
+          modelName: '${forecast.locationName} — Vagues GFS-Wave',
+          runLabel: '',
+          slots: forecast.slots,
+          model: TableModel.wave,
+        ),
+      ],
     );
   }
 
