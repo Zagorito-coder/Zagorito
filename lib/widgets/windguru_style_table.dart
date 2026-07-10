@@ -10,20 +10,128 @@
 
 import 'package:flutter/material.dart';
 
+// ============================================================================
+// Sous-objets modeles (additifs, nulles si absents)
+// ============================================================================
+
+/// Modele vent/haute-resolution (GFS ou ECMWF IFS-HRES).
+class WindModelSlot {
+  final double? windSpeedKt;
+  final double? windGustKt;
+  final double? windDirDeg;
+  final double? tempC;
+  final double? cloudLowPct;
+  final double? cloudMidPct;
+  final double? cloudHighPct;
+  final double? precipProbPct;
+  final double? pressureMsl;
+  final double? relHumidityPct;
+
+  const WindModelSlot({
+    this.windSpeedKt,
+    this.windGustKt,
+    this.windDirDeg,
+    this.tempC,
+    this.cloudLowPct,
+    this.cloudMidPct,
+    this.cloudHighPct,
+    this.precipProbPct,
+    this.pressureMsl,
+    this.relHumidityPct,
+  });
+
+  factory WindModelSlot.fromJson(Map<String, dynamic>? json) {
+    if (json == null) return const WindModelSlot();
+    double? n(String k) => (json[k] as num?)?.toDouble();
+    return WindModelSlot(
+      windSpeedKt: n('wind_speed_kt'),
+      windGustKt: n('wind_gust_kt'),
+      windDirDeg: n('wind_dir_deg'),
+      tempC: n('temp_c'),
+      cloudLowPct: n('cloud_low_pct'),
+      cloudMidPct: n('cloud_mid_pct'),
+      cloudHighPct: n('cloud_high_pct'),
+      precipProbPct: n('precip_prob_pct'),
+      pressureMsl: n('pressure_msl'),
+      relHumidityPct: n('rel_humidity_pct'),
+    );
+  }
+}
+
+/// Modele vagues (GFS-Wave).
+class WaveModelSlot {
+  final double? waveHeightM;
+  final double? wavePeriodS;
+  final double? waveDirDeg;
+  final double? swellHeightM;
+  final double? swellPeriodS;
+  final double? swellDirDeg;
+  final double? swell2HeightM;
+  final double? swell2PeriodS;
+  final double? swell2DirDeg;
+  final double? windwaveHeightM;
+  final double? windwavePeriodS;
+  final double? windwaveDirDeg;
+  final double? sstC;
+
+  const WaveModelSlot({
+    this.waveHeightM,
+    this.wavePeriodS,
+    this.waveDirDeg,
+    this.swellHeightM,
+    this.swellPeriodS,
+    this.swellDirDeg,
+    this.swell2HeightM,
+    this.swell2PeriodS,
+    this.swell2DirDeg,
+    this.windwaveHeightM,
+    this.windwavePeriodS,
+    this.windwaveDirDeg,
+    this.sstC,
+  });
+
+  factory WaveModelSlot.fromJson(Map<String, dynamic>? json) {
+    if (json == null) return const WaveModelSlot();
+    double? n(String k) => (json[k] as num?)?.toDouble();
+    return WaveModelSlot(
+      waveHeightM: n('wave_height_m'),
+      wavePeriodS: n('wave_period_s'),
+      waveDirDeg: n('wave_dir_deg'),
+      swellHeightM: n('swell_height_m'),
+      swellPeriodS: n('swell_period_s'),
+      swellDirDeg: n('swell_dir_deg'),
+      swell2HeightM: n('swell2_height_m'),
+      swell2PeriodS: n('swell2_period_s'),
+      swell2DirDeg: n('swell2_dir_deg'),
+      windwaveHeightM: n('windwave_height_m'),
+      windwavePeriodS: n('windwave_period_s'),
+      windwaveDirDeg: n('windwave_dir_deg'),
+      sstC: n('sst_c'),
+    );
+  }
+}
+
 /// Une "colonne" du tableau = un creneau horaire avec toutes ses valeurs.
 class ForecastSlot {
   final DateTime dateTime;
+
+  // Champs racine (compat arriere)
   final double windSpeedKnots;
   final double windGustKnots;
-  final double windDirectionDeg; // direction d'ou vient le vent, 0 = Nord
+  final double windDirectionDeg;
   final double waveHeightM;
   final double wavePeriodS;
   final double waveDirectionDeg;
   final int temperatureC;
-  final int? cloudCoverPct; // null => cellule vide "-"
-  final int? precipProbPct; // null => cellule vide "-"
-  final int ratingStars; // 0 a 5
-  final bool isNewDay; // true si c'est le premier creneau d'un nouveau jour
+  final int? cloudCoverPct;
+  final int? precipProbPct;
+  final int ratingStars;
+  final bool isNewDay;
+
+  // Nouveaux sous-objets modeles (additifs, null si absents)
+  final WindModelSlot? modelWind;
+  final WindModelSlot? modelHires;
+  final WaveModelSlot? modelWave;
 
   const ForecastSlot({
     required this.dateTime,
@@ -38,6 +146,9 @@ class ForecastSlot {
     this.precipProbPct,
     required this.ratingStars,
     this.isNewDay = false,
+    this.modelWind,
+    this.modelHires,
+    this.modelWave,
   });
 }
 
@@ -95,6 +206,21 @@ class _Palette {
 /// de creneau precis (utilise l'index dans `slots`).
 typedef ScrollToSlotFn = void Function(int slotIndex, {bool animate});
 
+/// Modele de donnees affiche par le tableau.
+enum TableModel {
+  /// Tableau racine historique (vent GFS + houle).
+  root,
+
+  /// Modele vent GFS ~13km.
+  wind,
+
+  /// Modele haute resolution ECMWF IFS-HRES ~9km.
+  hires,
+
+  /// Modele vagues GFS-Wave.
+  wave,
+}
+
 class ForecastTable extends StatefulWidget {
   final String modelName;
   final String runLabel;
@@ -102,9 +228,16 @@ class ForecastTable extends StatefulWidget {
   final double columnWidth;
   final double labelColumnWidth;
 
+  /// Modele de donnees a afficher. [TableModel.root] par defaut.
+  final TableModel model;
+
   /// Appele une fois le widget monte, avec une fonction que le parent peut
   /// garder de cote et appeler plus tard.
   final void Function(ScrollToSlotFn scrollToSlot)? onReady;
+
+  /// Notifie le parent du premier slot visible apres chaque scroll
+  /// (permet de synchroniser la barre de dates).
+  final void Function(int slotIndex)? onSlotScrolled;
 
   const ForecastTable({
     super.key,
@@ -113,7 +246,9 @@ class ForecastTable extends StatefulWidget {
     required this.slots,
     this.columnWidth = 46,
     this.labelColumnWidth = 46,
+    this.model = TableModel.root,
     this.onReady,
+    this.onSlotScrolled,
   });
 
   @override
@@ -157,6 +292,15 @@ class _ForecastTableState extends State<ForecastTable> {
     _syncing = true;
     to.jumpTo(from.offset);
     _syncing = false;
+    // Notifie le parent du 1er slot visible
+    _notifyVisibleSlot();
+  }
+
+  void _notifyVisibleSlot() {
+    if (!_bodyController.hasClients || widget.onSlotScrolled == null) return;
+    final offset = _bodyController.offset;
+    final idx = (offset / widget.columnWidth).floor().clamp(0, widget.slots.length - 1);
+    widget.onSlotScrolled!(idx);
   }
 
   @override
@@ -166,28 +310,53 @@ class _ForecastTableState extends State<ForecastTable> {
     super.dispose();
   }
 
+  List<String> get _labels {
+    switch (widget.model) {
+      case TableModel.root:
+        return ['kts', 'rafales', '', 'houle m', 'periode s', '', 'temp C', 'nuages %', 'pluie %', 'note'];
+      case TableModel.wind:
+      case TableModel.hires:
+        return ['kts', 'rafales', '', 'temp C', 'nuage B', 'nuage M', 'nuage H', 'pluie %', 'hPa', 'humidite'];
+      case TableModel.wave:
+        return ['tot. m', 'per. s', '', 'S1 m', 'S1 s', '', 'S2 m', 'S2 s', '', 'VV m', 'VV s', ''];
+    }
+  }
+
+  double get _bodyHeight {
+    final n = _labels.length;
+    return _rowHeight * n;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Titre du modele
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-          child: Row(
-            children: [
-              Text(
-                widget.modelName,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                widget.runLabel,
-                style: const TextStyle(color: Colors.grey, fontSize: 12),
-              ),
-            ],
-          ),
-        ),
+        Builder(builder: (context) {
+          final dark = _isDark(context);
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            child: Row(
+              children: [
+                Text(
+                  widget.modelName,
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: dark ? Colors.white : Colors.black87),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  widget.runLabel,
+                  style: TextStyle(
+                      color: dark ? Colors.white54 : Colors.grey,
+                      fontSize: 12),
+                ),
+              ],
+            ),
+          );
+        }),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -197,16 +366,7 @@ class _ForecastTableState extends State<ForecastTable> {
               child: Column(
                 children: [
                   const SizedBox(height: 48),
-                  _labelCell('kts'),
-                  _labelCell('rafales'),
-                  _labelCell(''),
-                  _labelCell('houle m'),
-                  _labelCell('periode s'),
-                  _labelCell(''),
-                  _labelCell('temp C'),
-                  _labelCell('nuages %'),
-                  _labelCell('pluie %'),
-                  _labelCell('note'),
+                  ..._labels.map((l) => _labelCell(l)),
                 ],
               ),
             ),
@@ -225,7 +385,7 @@ class _ForecastTableState extends State<ForecastTable> {
                     ),
                   ),
                   SizedBox(
-                    height: _rowHeight * 10,
+                    height: _bodyHeight,
                     child: ListView.builder(
                       controller: _bodyController,
                       scrollDirection: Axis.horizontal,
@@ -242,43 +402,64 @@ class _ForecastTableState extends State<ForecastTable> {
     );
   }
 
-  Widget _labelCell(String text) => Container(
-        height: _rowHeight,
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 4),
-        decoration: const BoxDecoration(
-          border: Border(right: BorderSide(color: _Palette.border)),
-        ),
-        child:
-            Text(text, style: const TextStyle(fontSize: 10, color: Colors.grey)),
-      );
+  bool _isDark(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark;
+
+  Widget _labelCell(String text) => Builder(builder: (context) {
+        final dark = _isDark(context);
+        return Container(
+          height: _rowHeight,
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 4),
+          decoration: BoxDecoration(
+            border: Border(
+              right: BorderSide(color: dark ? Colors.white12 : _Palette.border),
+            ),
+          ),
+          child: Text(text,
+              style: TextStyle(
+                  fontSize: 10,
+                  color: dark ? Colors.white54 : Colors.grey)),
+        );
+      });
 
   Widget _headerCell(ForecastSlot s) {
     final day =
         '${_weekday(s.dateTime)}\n${s.dateTime.day.toString().padLeft(2, '0')}.';
     final hour = '${s.dateTime.hour.toString().padLeft(2, '0')}h';
-    return Container(
-      width: widget.columnWidth,
-      decoration: BoxDecoration(
-        color: s.isNewDay ? _Palette.headerDay : Colors.white,
-        border: const Border(
-          left: BorderSide(color: _Palette.border),
-          bottom: BorderSide(color: _Palette.border),
+    return Builder(builder: (context) {
+      final dark = _isDark(context);
+      final bg = s.isNewDay
+          ? (dark ? const Color(0xFF2A2A2A) : _Palette.headerDay)
+          : (dark ? const Color(0xFF1E1E1E) : Colors.white);
+      final borderColor = dark ? Colors.white12 : _Palette.border;
+      return Container(
+        width: widget.columnWidth,
+        decoration: BoxDecoration(
+          color: bg,
+          border: Border(
+            left: BorderSide(color: borderColor),
+            bottom: BorderSide(color: borderColor),
+          ),
         ),
-      ),
-      alignment: Alignment.center,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(day,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 9, fontWeight: FontWeight.bold)),
-          Text(hour,
-              style: const TextStyle(fontSize: 9, color: Colors.grey)),
-        ],
-      ),
-    );
+        alignment: Alignment.center,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(day,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                    color: dark ? Colors.white70 : Colors.black87)),
+            Text(hour,
+                style: TextStyle(
+                    fontSize: 9,
+                    color: dark ? Colors.white38 : Colors.grey)),
+          ],
+        ),
+      );
+    });
   }
 
   Widget _dataColumn(ForecastSlot s) {
@@ -287,30 +468,160 @@ class _ForecastTableState extends State<ForecastTable> {
       decoration: const BoxDecoration(
         border: Border(left: BorderSide(color: _Palette.border)),
       ),
-      child: Column(
-        children: [
-          _valueCell(s.windSpeedKnots.toStringAsFixed(1),
-              _Palette.wind(s.windSpeedKnots)),
-          _valueCell(s.windGustKnots.toStringAsFixed(1),
-              _Palette.wind(s.windGustKnots)),
-          _arrowCell(s.windDirectionDeg),
-          _valueCell(
-              s.waveHeightM.toStringAsFixed(1), _Palette.wave(s.waveHeightM)),
-          _valueCell(s.wavePeriodS.toStringAsFixed(0),
-              _Palette.wave(s.wavePeriodS / 2)),
-          _arrowCell(s.waveDirectionDeg),
-          _valueCell('${s.temperatureC}',
-              _Palette.temperature(s.temperatureC)),
-          s.cloudCoverPct != null
-              ? _valueCell('${s.cloudCoverPct}', _Palette.cloud(s.cloudCoverPct!))
-              : _emptyCell(),
-          s.precipProbPct != null
-              ? _valueCell(
-                  '${s.precipProbPct}', _Palette.precip(s.precipProbPct!))
-              : _emptyCell(),
-          _starsCell(s.ratingStars),
-        ],
-      ),
+      child: _buildRows(s),
+    );
+  }
+
+  Widget _buildRows(ForecastSlot s) {
+    switch (widget.model) {
+      case TableModel.root:
+        return _buildRootRows(s);
+      case TableModel.wind:
+        return _buildWindRows(s);
+      case TableModel.hires:
+        return _buildWindRows(s, useHires: true);
+      case TableModel.wave:
+        return _buildWaveRows(s);
+    }
+  }
+
+  Column _buildRootRows(ForecastSlot s) {
+    return Column(
+      children: [
+        _valueCell(s.windSpeedKnots.toStringAsFixed(1),
+            _Palette.wind(s.windSpeedKnots)),
+        _valueCell(s.windGustKnots.toStringAsFixed(1),
+            _Palette.wind(s.windGustKnots)),
+        _arrowCell(s.windDirectionDeg),
+        _valueCell(
+            s.waveHeightM.toStringAsFixed(1), _Palette.wave(s.waveHeightM)),
+        _valueCell(s.wavePeriodS.toStringAsFixed(0),
+            _Palette.wave(s.wavePeriodS / 2)),
+        _arrowCell(s.waveDirectionDeg),
+        _valueCell(s.temperatureC.toString(),
+            _Palette.temperature(s.temperatureC)),
+        s.cloudCoverPct != null
+            ? _valueCell('${s.cloudCoverPct}', _Palette.cloud(s.cloudCoverPct!))
+            : _emptyCell(),
+        s.precipProbPct != null
+            ? _valueCell(
+                '${s.precipProbPct}', _Palette.precip(s.precipProbPct!))
+            : _emptyCell(),
+        _starsCell(s.ratingStars),
+      ],
+    );
+  }
+
+  Column _buildWindRows(ForecastSlot s, {bool useHires = false}) {
+    final m = useHires ? s.modelHires : s.modelWind;
+
+    String fmt(double? v) => v != null ? v.toStringAsFixed(1) : '-';
+
+    return Column(
+      children: [
+        _valueCell(
+            fmt(m?.windSpeedKt),
+            m?.windSpeedKt != null
+                ? _Palette.wind(m!.windSpeedKt!)
+                : Colors.grey[200]!),
+        _valueCell(
+            fmt(m?.windGustKt),
+            m?.windGustKt != null
+                ? _Palette.wind(m!.windGustKt!)
+                : Colors.grey[200]!),
+        _arrowCell(m?.windDirDeg ?? 0),
+        _valueCell(
+            m?.tempC != null ? '${m!.tempC!.round()}' : '-',
+            m?.tempC != null
+                ? _Palette.temperature(m!.tempC!.round())
+                : Colors.grey[200]!),
+        _valueCell(
+            m?.cloudLowPct != null ? '${m!.cloudLowPct!.round()}' : '-',
+            Colors.transparent),
+        _valueCell(
+            m?.cloudMidPct != null ? '${m!.cloudMidPct!.round()}' : '-',
+            Colors.transparent),
+        _valueCell(
+            m?.cloudHighPct != null ? '${m!.cloudHighPct!.round()}' : '-',
+            Colors.transparent),
+        _valueCell(
+            m?.precipProbPct != null ? '${m!.precipProbPct!.round()}' : '-',
+            m?.precipProbPct != null
+                ? _Palette.precip(m!.precipProbPct!.round())
+                : Colors.grey[200]!),
+        _valueCell(
+            m?.pressureMsl != null
+                ? '${m!.pressureMsl!.toStringAsFixed(0)}'
+                : '-',
+            Colors.transparent),
+        _valueCell(
+            m?.relHumidityPct != null
+                ? '${m!.relHumidityPct!.round()}%'
+                : '-',
+            Colors.transparent),
+      ],
+    );
+  }
+
+  Column _buildWaveRows(ForecastSlot s) {
+    final m = s.modelWave;
+
+    return Column(
+      children: [
+        // Vague totale (significative)
+        _valueCell(
+            m?.waveHeightM != null ? m!.waveHeightM!.toStringAsFixed(1) : '-',
+            m?.waveHeightM != null
+                ? _Palette.wave(m!.waveHeightM!)
+                : Colors.grey[200]!),
+        _valueCell(
+            m?.wavePeriodS != null ? m!.wavePeriodS!.toStringAsFixed(0) : '-',
+            Colors.transparent),
+        _arrowCell(m?.waveDirDeg ?? 0),
+        const SizedBox(height: 6),
+        // Houle primaire
+        _valueCell(
+            m?.swellHeightM != null ? m!.swellHeightM!.toStringAsFixed(1) : '-',
+            m?.swellHeightM != null
+                ? _Palette.wave(m!.swellHeightM!)
+                : Colors.grey[200]!),
+        _valueCell(
+            m?.swellPeriodS != null
+                ? m!.swellPeriodS!.toStringAsFixed(0)
+                : '-',
+            Colors.transparent),
+        _arrowCell(m?.swellDirDeg ?? 0),
+        const SizedBox(height: 6),
+        // Houle secondaire
+        _valueCell(
+            m?.swell2HeightM != null
+                ? m!.swell2HeightM!.toStringAsFixed(1)
+                : '-',
+            m?.swell2HeightM != null
+                ? _Palette.wave(m!.swell2HeightM!)
+                : Colors.grey[200]!),
+        _valueCell(
+            m?.swell2PeriodS != null
+                ? m!.swell2PeriodS!.toStringAsFixed(0)
+                : '-',
+            Colors.transparent),
+        _arrowCell(m?.swell2DirDeg ?? 0),
+        const SizedBox(height: 6),
+        // Vagues de vent locales
+        _valueCell(
+            m?.windwaveHeightM != null
+                ? m!.windwaveHeightM!.toStringAsFixed(1)
+                : '-',
+            m?.windwaveHeightM != null
+                ? _Palette.wave(m!.windwaveHeightM!)
+                : Colors.grey[200]!),
+        _valueCell(
+            m?.windwavePeriodS != null
+                ? m!.windwavePeriodS!.toStringAsFixed(0)
+                : '-',
+            Colors.transparent),
+        _arrowCell(m?.windwaveDirDeg ?? 0),
+      ],
     );
   }
 
@@ -320,26 +631,43 @@ class _ForecastTableState extends State<ForecastTable> {
         alignment: Alignment.center,
         child: Text(
           text,
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+          style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: _textColorForBg(color)),
         ),
       );
 
-  Widget _emptyCell() => SizedBox(
-        height: _rowHeight,
-        child:
-            const Center(child: Text('-', style: TextStyle(color: Colors.grey))),
-      );
+  /// Choisit noir ou blanc selon la luminosite du fond
+  Color _textColorForBg(Color bg) {
+    final lum = bg.computeLuminance();
+    return lum > 0.5 ? Colors.black87 : Colors.white;
+  }
 
-  Widget _arrowCell(double directionDeg) => SizedBox(
-        height: _rowHeight,
-        child: Center(
-          child: Transform.rotate(
-            angle: (directionDeg + 180) * 3.14159265 / 180,
-            child: const Icon(Icons.arrow_upward,
-                size: 16, color: Colors.black87),
+  Widget _emptyCell() => Builder(builder: (context) {
+        final dark = _isDark(context);
+        return SizedBox(
+          height: _rowHeight,
+          child: Center(
+              child: Text('-',
+                  style: TextStyle(
+                      color: dark ? Colors.white30 : Colors.grey))),
+        );
+      });
+
+  Widget _arrowCell(double directionDeg) => Builder(builder: (context) {
+        final dark = _isDark(context);
+        return SizedBox(
+          height: _rowHeight,
+          child: Center(
+            child: Transform.rotate(
+              angle: (directionDeg + 180) * 3.14159265 / 180,
+              child: Icon(Icons.arrow_upward,
+                  size: 16, color: dark ? Colors.white70 : Colors.black87),
+            ),
           ),
-        ),
-      );
+        );
+      });
 
   Widget _starsCell(int count) => SizedBox(
         height: _rowHeight,
