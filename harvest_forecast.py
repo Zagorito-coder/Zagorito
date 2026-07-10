@@ -626,6 +626,9 @@ def main_test_single_spot(spot_id, spots_list=None):
 # 7. Main (utilise pour la recolte normale — Phase 3 uniquement)
 # ---------------------------------------------------------------------------
 def main():
+    import time as time_module
+    start_time = time_module.time()
+
     cred = credentials.Certificate("firebase-key.json")
     try:
         firebase_admin.get_app()
@@ -638,23 +641,74 @@ def main():
     failed = 0
 
     for idx, spot in enumerate(SPOTS):
+        missing_models = []
+        wind_json = None
+        hires_json = None
+        wave_json = None
+
+        print(f"Recolte pour {spot['name']}...")
+        lat, lon = spot["lat"], spot["lon"]
+
+        # --- try/except PAR MODELE ---
         try:
-            print(f"Recolte pour {spot['name']}...")
-            lat, lon = spot["lat"], spot["lon"]
-
             wind_json = fetch_wind_model(lat, lon)
+            print(f"  [wind] OK ({len(wind_json['hourly']['time'])} slots)")
+        except Exception as e:
+            print(f"  [wind] ECHEC: {e}")
+            missing_models.append("wind")
+
+        try:
             hires_json = fetch_hires_model(lat, lon)
+            print(f"  [hires] OK ({len(hires_json['hourly']['time'])} slots)")
+        except Exception as e:
+            print(f"  [hires] ECHEC: {e}")
+            missing_models.append("hires")
+
+        try:
             wave_json = fetch_wave_model(lat, lon)
+            print(f"  [wave] OK ({len(wave_json['hourly']['time'])} slots)")
+        except Exception as e:
+            print(f"  [wave] ECHEC: {e}")
+            missing_models.append("wave")
 
-            daily_json = {}
-            if "daily" in wind_json:
-                daily = wind_json["daily"]
-                for i, d in enumerate(daily.get("time", [])):
-                    daily_json[d] = {
-                        "sunrise": daily["sunrise"][i] if i < len(daily.get("sunrise", [])) else None,
-                        "sunset": daily["sunset"][i] if i < len(daily.get("sunset", [])) else None,
-                    }
+        # Si aucun modele vent (obligatoire), on skip ce spot
+        if wind_json is None:
+            print(f"  !! Aucun modele vent disponible pour {spot['name']}, spot ignore.")
+            failed += 1
+            if idx < len(SPOTS) - 1:
+                time.sleep(0.2)
+            continue
 
+        # Construire quand meme avec les modeles disponibles
+        daily_json = {}
+        if "daily" in wind_json:
+            daily = wind_json["daily"]
+            for i, d in enumerate(daily.get("time", [])):
+                daily_json[d] = {
+                    "sunrise": daily["sunrise"][i] if i < len(daily.get("sunrise", [])) else None,
+                    "sunset": daily["sunset"][i] if i < len(daily.get("sunset", [])) else None,
+                }
+
+        # Si hires ou wave manquent, on passe des json vides pour que build_days_payload
+        # remplisse les slots avec null dans le sous-objet correspondant
+        if hires_json is None:
+            hires_json = {"hourly": {"time": [], "wind_speed_10m": [], "wind_gusts_10m": [],
+                                     "wind_direction_10m": [], "temperature_2m": [],
+                                     "cloud_cover_low": [], "cloud_cover_mid": [],
+                                     "cloud_cover_high": [], "precipitation_probability": [],
+                                     "pressure_msl": [], "relative_humidity_2m": []}}
+        if wave_json is None:
+            wave_json = {"hourly": {"time": [], "wave_height": [], "wave_period": [],
+                                    "wave_direction": [], "swell_wave_height": [],
+                                    "swell_wave_period": [], "swell_wave_direction": [],
+                                    "secondary_swell_wave_height": [],
+                                    "secondary_swell_wave_period": [],
+                                    "secondary_swell_wave_direction": [],
+                                    "wind_wave_height": [], "wind_wave_period": [],
+                                    "wind_wave_direction": [],
+                                    "sea_surface_temperature": []}}
+
+        try:
             days_payload, water_temp_c = build_days_payload(wind_json, hires_json, wave_json, daily_json)
             validate_payload(days_payload)
 
@@ -676,17 +730,26 @@ def main():
 
             db.collection("spots_meteo").document(spot["id"]).set(doc)
             print(f"  -> {len(days_payload)} jours envoyes sur Firestore.")
-            success += 1
+
+            if missing_models:
+                partial += 1
+                print(f"  -> PARTIEL (modeles manquants: {missing_models})")
+            else:
+                success += 1
 
         except Exception as e:
-            print(f"  !! Erreur pour {spot['name']}: {e}")
+            print(f"  !! Erreur build/write pour {spot['name']}: {e}")
             failed += 1
 
         # Delai entre spots pour rester sous 600 appels/minute
         if idx < len(SPOTS) - 1:
             time.sleep(0.2)
 
-    print(f"\nTermine. Reussis: {success}, Partiels: {partial}, Echoues: {failed}")
+    elapsed = time_module.time() - start_time
+    print(f"\n{'='*60}")
+    print(f"Termine en {elapsed:.0f}s.")
+    print(f"Reussis: {success}, Partiels: {partial}, Echoues: {failed}")
+    print(f"Total spots: {len(SPOTS)}")
 
 
 if __name__ == "__main__":
