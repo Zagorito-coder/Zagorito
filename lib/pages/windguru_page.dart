@@ -243,7 +243,9 @@ class _WindguruPageState extends State<WindguruPage> {
 
         // Verifier si on a des donnees multi-modeles
         final hasMultiModel = forecast.slots.any(
-          (s) => s.modelWind != null || s.modelHires != null || s.modelWave != null,
+          (s) => (s.modelWind != null && s.modelWind!.hasData) ||
+              (s.modelHires != null && s.modelHires!.hasData) ||
+              (s.modelWave != null && s.modelWave!.hasData),
         );
 
         return Column(
@@ -256,9 +258,19 @@ class _WindguruPageState extends State<WindguruPage> {
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(8),
-                child: hasMultiModel
-                    ? _buildMultiModelTables(forecast)
-                    : _buildLegacyTable(forecast),
+                child: Column(
+                  children: [
+                    // Toujours afficher le tableau legacy en premier
+                    _buildLegacyTable(forecast),
+                    // Puis les 3 modeles si disponibles
+                    if (hasMultiModel) ...[
+                      const SizedBox(height: 16),
+                      const Divider(),
+                      const SizedBox(height: 8),
+                      _buildMultiModelTables(forecast),
+                    ],
+                  ],
+                ),
               ),
             ),
           ],
