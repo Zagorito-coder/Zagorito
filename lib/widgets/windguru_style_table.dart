@@ -41,8 +41,11 @@ class WindModelSlot {
   });
 
   factory WindModelSlot.fromJson(Map<String, dynamic>? json) {
-    if (json == null) return const WindModelSlot();
+    if (json == null || json.isEmpty) return const WindModelSlot();
     double? n(String k) => (json[k] as num?)?.toDouble();
+    // Verifier qu'au moins un champ essentiel est present
+    final hasData = json.containsKey('wind_speed_kt') || json.containsKey('temp_c');
+    if (!hasData) return const WindModelSlot();
     return WindModelSlot(
       windSpeedKt: n('wind_speed_kt'),
       windGustKt: n('wind_gust_kt'),
@@ -56,6 +59,9 @@ class WindModelSlot {
       relHumidityPct: n('rel_humidity_pct'),
     );
   }
+
+  /// True si ce slot contient au moins une donnee reelle (pas juste des null).
+  bool get hasData => windSpeedKt != null || tempC != null;
 }
 
 /// Modele vagues (GFS-Wave).
@@ -91,8 +97,10 @@ class WaveModelSlot {
   });
 
   factory WaveModelSlot.fromJson(Map<String, dynamic>? json) {
-    if (json == null) return const WaveModelSlot();
+    if (json == null || json.isEmpty) return const WaveModelSlot();
     double? n(String k) => (json[k] as num?)?.toDouble();
+    final hasData = json.containsKey('wave_height_m') || json.containsKey('swell_wave_height');
+    if (!hasData) return const WaveModelSlot();
     return WaveModelSlot(
       waveHeightM: n('wave_height_m'),
       wavePeriodS: n('wave_period_s'),
@@ -109,6 +117,9 @@ class WaveModelSlot {
       sstC: n('sst_c'),
     );
   }
+
+  /// True si ce slot contient au moins une donnee reelle.
+  bool get hasData => waveHeightM != null || swellHeightM != null;
 }
 
 /// Une "colonne" du tableau = un creneau horaire avec toutes ses valeurs.

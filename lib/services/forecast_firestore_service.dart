@@ -107,9 +107,13 @@ class ForecastFirestoreService {
 
         // Lire le sous-objet models (additif, null si absent)
         final modelsRaw = s['models'] as Map<String, dynamic>?;
-        final modelWind = WindModelSlot.fromJson(modelsRaw?['wind'] as Map<String, dynamic>?);
-        final modelHires = WindModelSlot.fromJson(modelsRaw?['hires'] as Map<String, dynamic>?);
-        final modelWave = WaveModelSlot.fromJson(modelsRaw?['wave'] as Map<String, dynamic>?);
+        final modelWindRaw = WindModelSlot.fromJson(modelsRaw?['wind'] as Map<String, dynamic>?);
+        final modelHiresRaw = WindModelSlot.fromJson(modelsRaw?['hires'] as Map<String, dynamic>?);
+        final modelWaveRaw = WaveModelSlot.fromJson(modelsRaw?['wave'] as Map<String, dynamic>?);
+        // Ne garder que si donnees reelles (pas objet vide)
+        final modelWind = modelWindRaw.hasData ? modelWindRaw : null;
+        final modelHires = modelHiresRaw.hasData ? modelHiresRaw : null;
+        final modelWave = modelWaveRaw.hasData ? modelWaveRaw : null;
 
         allSlots.add(ForecastSlot(
           dateTime: dt,
