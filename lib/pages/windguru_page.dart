@@ -241,13 +241,6 @@ class _WindguruPageState extends State<WindguruPage> {
               child: Text('Aucune donnee disponible pour ce spot'));
         }
 
-        // Verifier si on a des donnees multi-modeles
-        final hasMultiModel = forecast.slots.any(
-          (s) => (s.modelWind != null && s.modelWind!.hasData) ||
-              (s.modelHires != null && s.modelHires!.hasData) ||
-              (s.modelWave != null && s.modelWave!.hasData),
-        );
-
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -260,15 +253,11 @@ class _WindguruPageState extends State<WindguruPage> {
                 padding: const EdgeInsets.all(8),
                 child: Column(
                   children: [
-                    // Toujours afficher le tableau legacy en premier
                     _buildLegacyTable(forecast),
-                    // Puis les 3 modeles si disponibles
-                    if (hasMultiModel) ...[
-                      const SizedBox(height: 16),
-                      const Divider(),
-                      const SizedBox(height: 8),
-                      _buildMultiModelTables(forecast),
-                    ],
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    _buildMultiModelTables(forecast),
                   ],
                 ),
               ),
