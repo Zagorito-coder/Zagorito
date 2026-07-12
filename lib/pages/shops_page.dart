@@ -7,6 +7,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models.dart';
@@ -15,7 +17,40 @@ import '../services/shop_service.dart';
 import '../theme.dart';
 import '../theme_controller.dart';
 import '../l10n/app_localizations.dart';
+import '../services/spot_service.dart';
 import '../widgets/app_back_button.dart';
+import 'shops_map_page.dart';
+
+/// 37 URLs d'images Unsplash thématiques pêche/matériel/appâts.
+/// Chaque magasin reçoit une image déterministe basée sur l'identifiant.
+/// 20 images webP locales pour les cartes magasins.
+const _shopCardAssets = <String>[
+  'assets/Shopsimages/peche-01-ocean-arsenal.webp',
+  'assets/Shopsimages/peche-02-sunset-catch.webp',
+  'assets/Shopsimages/peche-03-lagoon-pro.webp',
+  'assets/Shopsimages/peche-04-carbon-elite.webp',
+  'assets/Shopsimages/peche-05-flats-hunter.webp',
+  'assets/Shopsimages/peche-06-reef-raider.webp',
+  'assets/Shopsimages/peche-07-arctic-strike.webp',
+  'assets/Shopsimages/peche-08-amber-wave.webp',
+  'assets/Shopsimages/peche-09-deep-blue-kit.webp',
+  'assets/Shopsimages/peche-10-twilight-rig.webp',
+  'assets/Shopsimages/peche-11-tropic-tackle.webp',
+  'assets/Shopsimages/peche-12-black-edition.webp',
+  'assets/Shopsimages/peche-13-estuary-master.webp',
+  'assets/Shopsimages/peche-14-coral-combat.webp',
+  'assets/Shopsimages/peche-15-polar-pursuit.webp',
+  'assets/Shopsimages/peche-16-golden-hour.webp',
+  'assets/Shopsimages/peche-17-offshore-pro.webp',
+  'assets/Shopsimages/peche-18-dusk-patrol.webp',
+  'assets/Shopsimages/peche-19-reef-edge.webp',
+  'assets/Shopsimages/peche-20-coastal-carbon.webp',
+];
+
+String _shopImageAsset(FishingShop shop) {
+  final idx = shop.id.hashCode.abs() % _shopCardAssets.length;
+  return _shopCardAssets[idx];
+}
 
 class ShopsPage extends StatefulWidget {
   const ShopsPage({super.key});
@@ -60,12 +95,36 @@ class _ShopsPageState extends State<ShopsPage>
       final spots = await _loadSpots();
       final shops = await ShopService.loadShops();
 
-      final groups = ShopService.groupShopsBySpot(shops, spots, maxDistanceKm: 60.0);
+      // Géolocalisation (best-effort, ne bloque pas si refusée)
+      Position? userPos;
+      try {
+        userPos = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.low,
+            timeLimit: Duration(seconds: 5),
+          ),
+        );
+      } catch (_) {}
+
+      var groups = ShopService.groupShopsBySpot(shops, spots, maxDistanceKm: 60.0);
+
+      // Trier par distance à l'utilisateur si la position est disponible
+      if (userPos != null) {
+        final userLatLng = LatLng(userPos.latitude, userPos.longitude);
+        groups.sort((a, b) {
+          final dA = const Distance().as(LengthUnit.Kilometer,
+              userLatLng, LatLng(a.spotLat, a.spotLng));
+          final dB = const Distance().as(LengthUnit.Kilometer,
+              userLatLng, LatLng(b.spotLat, b.spotLng));
+          return dA.compareTo(dB);
+        });
+      }
 
       if (mounted) {
         setState(() {
           _groups = groups;
           _allShops = shops;
+
           _isLoading = false;
         });
         _animController.forward();
@@ -81,19 +140,10 @@ class _ShopsPageState extends State<ShopsPage>
   }
 
   Future<List<Spot>> _loadSpots() async {
-    final raw = await rootBundle.loadString('assets/spots.csv');
-    final lines = raw.split('\n');
-    final spots = <Spot>[];
-    for (var i = 0; i < lines.length; i++) {
-      final line = lines[i].trim();
-      if (line.isEmpty || i == 0) continue;
-      try {
-        spots.add(Spot.fromCsv(line, index: i));
-      } catch (e) {
-        debugPrint('[ShopsPage] Ligne CSV ignorée $i: $e');
-      }
-    }
-    return spots;
+    // Tente le cache local d'abord, puis le fichier chiffré spots.csv.enc
+    final cached = await SpotService.loadFromCache();
+    if (cached.isNotEmpty) return cached;
+    return SpotService.loadFromCsv();
   }
 
   List<ShopSpotGroup> get _filteredGroups {
@@ -201,7 +251,7 @@ class _ShopsPageState extends State<ShopsPage>
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  context.trArgs('shops.syncCount', args: {'count': _allShops.length.toString()}),
+                  context.trArgs('shops.shopsSynced', args: {'count': _allShops.length.toString()}),
                   style: TextStyle(
                     color: tc.textSecondary.withValues(alpha: 0.7),
                     fontSize: 12,
@@ -211,7 +261,27 @@ class _ShopsPageState extends State<ShopsPage>
               ],
             ),
           ),
-          if (_allShops.isNotEmpty)
+          if (_allShops.isNotEmpty) ...[
+            GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ShopsMapPage()),
+              ),
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF8C69).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: const Color(0xFFFF8C69).withValues(alpha: 0.25),
+                    width: 1,
+                  ),
+                ),
+                child: const Icon(Icons.map, color: Color(0xFFFF8C69), size: 20),
+              ),
+            ),
+            const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
@@ -219,7 +289,7 @@ class _ShopsPageState extends State<ShopsPage>
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
-                context.trArgs('shops.spotCount', args: {'count': _groups.length.toString()}),
+                context.trArgs('shops.spotsCount', args: {'count': _groups.length.toString()}),
                 style: const TextStyle(
                   color: Color(0xFFFF8C69),
                   fontSize: 11,
@@ -227,6 +297,7 @@ class _ShopsPageState extends State<ShopsPage>
                 ),
               ),
             ),
+          ],
         ],
       ),
     );
@@ -385,8 +456,8 @@ class _ShopsPageState extends State<ShopsPage>
                   height: 130,
                   width: double.infinity,
                   color: tc.surfaceElevated,
-                  child: Image.network(
-                    shop.imageUrl,
+                  child: Image.asset(
+                    _shopImageAsset(shop),
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Container(
                       color: tc.surfaceElevated,
@@ -398,22 +469,6 @@ class _ShopsPageState extends State<ShopsPage>
                         ),
                       ),
                     ),
-                    loadingBuilder: (_, child, progress) {
-                      if (progress == null) return child;
-                      return Container(
-                        color: tc.surfaceElevated,
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            color: tc.oceanMedium.withValues(alpha: 0.3),
-                            strokeWidth: 2,
-                            value: progress.expectedTotalBytes != null
-                                ? progress.cumulativeBytesLoaded /
-                                    progress.expectedTotalBytes!
-                                : null,
-                          ),
-                        ),
-                      );
-                    },
                   ),
                 ),
               ),

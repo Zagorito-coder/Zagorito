@@ -8,11 +8,10 @@ service cloud.firestore {
     }
 
     // Previsions meteo/maree (remplies par GitHub Actions)
-    // Lecture publique pour l'app, ecriture reservee au compte de service
+    // Securite renforcee : seuls les utilisateurs authentifies peuvent lire.
+    // Le code ForecastFirestoreService gere le cas PERMISSION_DENIED → null.
     match /spots_meteo/{document} {
-      allow read: if true;
-      // Remplace l'email ci-dessous par celui de ton compte de service
-      // (ex: harvest-forecast@ton-projet.iam.gserviceaccount.com)
+      allow read: if request.auth != null;
       allow write: if request.auth != null
                     && request.auth.token.email == 'firebase-adminsdk-fbsvc@zagorito-9a0c4.iam.gserviceaccount.com';
     }

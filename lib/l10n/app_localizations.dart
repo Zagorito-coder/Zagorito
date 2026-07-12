@@ -1,17 +1,19 @@
 // ============================================================
 //  app_localizations.dart — Système de localisation i18n
-//  Langues : Français (par défaut) 🇫🇷, English 🇬🇧, العربية 🇸🇦
+//  Langues : Français (par défaut) 🇫🇷, English 🇬🇧, العربية 🇸🇦, Español 🇪🇸
 // ============================================================
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Énumération des langues supportées
 enum AppLanguage {
   french('fr', 'Français', '🇫🇷'),
   english('en', 'English', '🇬🇧'),
-  arabic('ar', 'العربية', '🇸🇦');
+  arabic('ar', 'العربية', '🇸🇦'),
+  spanish('es', 'Español', '🇪🇸');
 
   final String code;
   final String label;
@@ -33,6 +35,8 @@ enum AppLanguage {
         return const Locale('ar', '');
       case AppLanguage.english:
         return const Locale('en', '');
+      case AppLanguage.spanish:
+        return const Locale('es', '');
       case AppLanguage.french:
         return const Locale('fr', '');
     }
@@ -45,6 +49,7 @@ enum AppLanguage {
         return TextDirection.rtl;
       case AppLanguage.english:
       case AppLanguage.french:
+      case AppLanguage.spanish:
         return TextDirection.ltr;
     }
   }
@@ -52,7 +57,9 @@ enum AppLanguage {
 
 /// Contrôleur global de la langue (singleton)
 class LanguageController extends ChangeNotifier {
-  LanguageController._();
+  LanguageController._() {
+    _load();
+  }
   static final LanguageController instance = LanguageController._();
 
   AppLanguage _currentLang = AppLanguage.french;
@@ -62,10 +69,23 @@ class LanguageController extends ChangeNotifier {
   bool get isRtl => _currentLang.textDirection == TextDirection.rtl;
   String get langCode => _currentLang.code;
 
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    final code = prefs.getString('app_language') ?? 'fr';
+    _currentLang = AppLanguage.fromCode(code);
+    notifyListeners();
+  }
+
+  Future<void> _save() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('app_language', _currentLang.code);
+  }
+
   /// Change la langue active
   void setLanguage(AppLanguage lang) {
     if (_currentLang == lang) return;
     _currentLang = lang;
+    _save();
     notifyListeners();
   }
 
@@ -101,6 +121,7 @@ class AppLocalizations {
     Locale('fr', ''),
     Locale('en', ''),
     Locale('ar', ''),
+    Locale('es', ''),
   ];
 
   /// Traduit une clé. Supporte les clés imbriquées avec des points.
@@ -151,7 +172,7 @@ class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> 
 
   @override
   bool isSupported(Locale locale) {
-    return ['fr', 'en', 'ar'].contains(locale.languageCode);
+    return ['fr', 'en', 'ar', 'es'].contains(locale.languageCode);
   }
 
   @override

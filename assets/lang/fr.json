@@ -9,6 +9,7 @@
     "subtitle": "Navigation",
     "home": "Accueil",
     "tides": "Marées",
+    "tidesPro": "Marées PRO",
     "spots": "Spots",
     "fish": "Poissons",
     "techniques": "Techniques",
@@ -138,7 +139,19 @@
     "loadingError": "Erreur de chargement",
     "retry": "Réessayer",
     "noShops": "Aucun magasin trouvé",
-    "noShopsDesc": "Essayez une autre recherche"
+    "noShopsDesc": "Essayez une autre recherche",
+    "route": "Itinéraire",
+    "call": "Appeler",
+    "routeError": "Impossible d'ouvrir l'itinéraire",
+    "callError": "Impossible de lancer l'appel"
+  },
+  "shopsMap": {
+    "title": "Carte des Magasins",
+    "count": "{count} magasins avec photo",
+    "loading": "Chargement des magasins...",
+    "loadingError": "Erreur de chargement de la carte",
+    "empty": "Aucun magasin avec photo trouvé.\nLes magasins sans image ne sont pas affichés sur cette carte.",
+    "whatsappError": "Impossible d'ouvrir WhatsApp"
   },
   "community": {
     "title": "Communauté",
@@ -153,7 +166,18 @@
     "description": "Passez Premium pour accéder à tous les détails : types de poissons, notes, zoom avancé, et plus encore.",
     "later": "Plus tard",
     "subscribe": "S'abonner",
-    "comingSoon": "Abonnement Premium à venir..."
+    "comingSoon": "Abonnement Premium à venir...",
+    "monthly": "Mensuel",
+    "monthlyPrice": "9,99 € / mois",
+    "annual": "Annuel",
+    "annualPrice": "59,99 € / an",
+    "lifetime": "À vie",
+    "lifetimePrice": "149,99 €",
+    "popular": "POPULAIRE",
+    "activate": "Activer Premium",
+    "activated": "Premium activé avec succès",
+    "activationError": "Erreur lors de l'activation",
+    "loginRequired": "Connectez-vous pour activer Premium"
   },
   "maps": {
     "fish_types_premium": "Types de poissons — Premium",
@@ -178,7 +202,10 @@
     "captainSubtitle": "Spécialiste en haute mer • Niveau 42",
     "member": "Membre Élite Abyssal",
     "vesselCrew": "NAVIRE & ÉQUIPAGE",
-    "updateCredentials": "Mettre à jour\nvos identifiants"
+    "updateCredentials": "Mettre à jour\nvos identifiants",
+  "signInFailed": "Connexion échouée. Vérifie que tu as bien un compte Google et que l'APK est signé.",
+  "signInGoogle": "Se connecter avec Google",
+  "signInGoogleSubtitle": "Synchroniser votre compte"
   },
   "language": {
     "title": "Langue",

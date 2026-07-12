@@ -964,14 +964,13 @@ class _MapScreenState extends State<MapScreen> with AutomaticKeepAliveClientMixi
     );
   }
 
-  void _onPositionChanged(MapPosition position, bool hasGesture) {
+  void _onPositionChanged(MapCamera camera, bool hasGesture) {
     _debounceTimer?.cancel();
 
-    final newBounds = position.bounds;
-    final newZoom = position.zoom ?? _currentZoom;
+    final newBounds = camera.visibleBounds;
+    final newZoom = camera.zoom;
 
     if (newZoom == _currentZoom && newBounds == _lastBounds) return;
-    if (newBounds == null) return;
 
     _debounceTimer = Timer(_debounceDuration, () {
       if (!mounted) return;

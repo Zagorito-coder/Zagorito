@@ -403,66 +403,66 @@ class _TidePageState extends State<TidePage>
                 const SizedBox(width: 20),
                 // Infos
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Badge level
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: _levelColor(_data.overallLevel)
-                              .withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Badge level
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 5),
+                          decoration: BoxDecoration(
                             color: _levelColor(_data.overallLevel)
-                                .withValues(alpha: 0.3),
-                            width: 1,
+                                .withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: _levelColor(_data.overallLevel)
+                                  .withValues(alpha: 0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                size: 12,
+                                color: _levelColor(_data.overallLevel),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _tideLabel(context, _data.overallLevel),
+                                style: GoogleFonts.inter(
+                                  color: _levelColor(_data.overallLevel),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.info_outline,
-                              size: 12,
-                              color: _levelColor(_data.overallLevel),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              _tideLabel(context, _data.overallLevel),
-                              style: GoogleFonts.inter(
-                                color: _levelColor(_data.overallLevel),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
+                        const SizedBox(height: 6),
+                        Text(
+                          context.tr('tide.scoreDescription'),
+                          style: GoogleFonts.inter(
+                            color: _txt(0.5),
+                            fontSize: 11,
+                            height: 1.4,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        context.tr('tide.scoreDescription'),
-                        style: GoogleFonts.inter(
-                          color: _txt(0.5),
-                          fontSize: 11,
-                          height: 1.4,
+                        const SizedBox(height: 8),
+                        Text(
+                          context.tr('tide.bestHours'),
+                          style: GoogleFonts.inter(
+                            color: _txt(0.35),
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.2,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 14),
-                      Text(
-                        context.tr('tide.bestHours'),
-                        style: GoogleFonts.inter(
-                          color: _txt(0.35),
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 6,
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
                         children: _data.bestHours.map((h) {
                           return Container(
                             padding: const EdgeInsets.symmetric(
@@ -534,7 +534,11 @@ class _TidePageState extends State<TidePage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(
                       context.tr('tide.tideCurveTitle'),
@@ -544,17 +548,21 @@ class _TidePageState extends State<TidePage>
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const Spacer(),
-                    _legend(context.tr('tide.now'), _green),
-                    const SizedBox(width: 12),
-                    _legend(context.tr('tide.highTide'), _accent),
-                    const SizedBox(width: 12),
-                    _legend(context.tr('tide.lowTide'), _red),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _legend(context.tr('tide.now'), _green),
+                        const SizedBox(width: 8),
+                        _legend(context.tr('tide.highTide'), _accent),
+                        const SizedBox(width: 8),
+                        _legend(context.tr('tide.lowTide'), _red),
+                      ],
+                    ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 SizedBox(
-                  height: 160,
+                  height: 140,
                   child: RepaintBoundary(
                     child: _TideCurvePainter(
                       points: _data.tidePoints,
@@ -967,7 +975,7 @@ class _TidePageState extends State<TidePage>
   Widget _buildTideEventCard(TideEvent event) {
     final isHigh = event.type == 'high';
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: _card,
         borderRadius: BorderRadius.circular(16),
@@ -992,35 +1000,39 @@ class _TidePageState extends State<TidePage>
               Icon(
                 isHigh ? Icons.water : Icons.water_drop_outlined,
                 color: isHigh ? _accent : _red,
-                size: 18,
+                size: 14,
               ),
-              const SizedBox(width: 6),
-              Text(
-                context.tr(event.type == 'high' ? 'tide.highTideLabel' : 'tide.lowTideLabel').toUpperCase(),
-                style: GoogleFonts.inter(
-                  color: isHigh ? _accent : _red,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.8,
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  context.tr(event.type == 'high' ? 'tide.highTideLabel' : 'tide.lowTideLabel').toUpperCase(),
+                  style: GoogleFonts.inter(
+                    color: isHigh ? _accent : _red,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 4),
           Text(
             _formatDecimalTime(event.time),
             style: GoogleFonts.inter(
               color: _txt(1.0),
-              fontSize: 22,
+              fontSize: 16,
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 1),
           Text(
             '${event.height.toStringAsFixed(2)}m NGF',
             style: GoogleFonts.inter(
               color: _txt(0.5),
-              fontSize: 12,
+              fontSize: 10,
             ),
           ),
         ],
@@ -1503,14 +1515,14 @@ class _HourlyCardWidget extends StatelessWidget {
           children: [
             // Badges
             SizedBox(
-              height: 18,
+              height: 16,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
                   if (card.isNow)
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
+                          horizontal: 5, vertical: 1),
                       decoration: BoxDecoration(
                         color: _green.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(4),
@@ -1529,7 +1541,7 @@ class _HourlyCardWidget extends StatelessWidget {
                   if (card.isIdeal && !card.isNow)
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
+                          horizontal: 5, vertical: 1),
                       decoration: BoxDecoration(
                         color: _accent.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(4),
@@ -1548,20 +1560,20 @@ class _HourlyCardWidget extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             // Heure
             Text(
               card.label,
               style: GoogleFonts.inter(
                 color: _txt(0.9),
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             // Fish icon (simplified)
-            _FishIcon(level: card.activityLevel, size: 28),
-            const SizedBox(height: 8),
+            _FishIcon(level: card.activityLevel, size: 24),
+            const SizedBox(height: 6),
             // Score
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -1570,7 +1582,7 @@ class _HourlyCardWidget extends StatelessWidget {
                   '${card.activityScore}',
                   style: GoogleFonts.inter(
                     color: color,
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -1578,12 +1590,12 @@ class _HourlyCardWidget extends StatelessWidget {
                   '/100',
                   style: GoogleFonts.inter(
                     color: _txt(0.3),
-                    fontSize: 9,
+                    fontSize: 8,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             // Progress bar
             ClipRRect(
               borderRadius: BorderRadius.circular(2),
@@ -1591,47 +1603,30 @@ class _HourlyCardWidget extends StatelessWidget {
                 value: card.activityScore / 100,
                 backgroundColor: _txt(0.08),
                 valueColor: AlwaysStoppedAnimation<Color>(color),
-                minHeight: 3,
+                minHeight: 2,
               ),
             ),
-            const SizedBox(height: 10),
-            // Marée
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  card.tideTrend == 'montante'
-                      ? Icons.arrow_upward
-                      : Icons.arrow_downward,
-                  color: _txt(0.4),
-                  size: 10,
-                ),
-                const SizedBox(width: 2),
-                Text(
-                  '${card.tideHeight.toStringAsFixed(1)}m',
-                  style: GoogleFonts.inter(
-                    color: _txt(0.5),
-                    fontSize: 10,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            // Vent
+            const SizedBox(height: 6),
+            // Marée + Vent + Vagues fusionnés
             Text(
-              '~${card.windSpeed}km/h',
+              '${card.tideTrend == 'montante' ? '↑' : '↓'} ${card.tideHeight.toStringAsFixed(1)}m  ~${card.windSpeed}km/h',
               style: GoogleFonts.inter(
-                color: _txt(0.35),
+                color: _txt(0.5),
                 fontSize: 9,
               ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            // Vagues + Temp
             Text(
               '~${card.waveHeight.toStringAsFixed(1)}m  ${card.temp}°C',
               style: GoogleFonts.inter(
                 color: _txt(0.35),
                 fontSize: 9,
               ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

@@ -9,6 +9,7 @@
     "subtitle": "Navigation",
     "home": "Home",
     "tides": "Tides",
+    "tidesPro": "Tides PRO",
     "spots": "Spots",
     "fish": "Fish",
     "techniques": "Techniques",
@@ -138,7 +139,19 @@
     "loadingError": "Loading error",
     "retry": "Retry",
     "noShops": "No shops found",
-    "noShopsDesc": "Try another search"
+    "noShopsDesc": "Try another search",
+    "route": "Directions",
+    "call": "Call",
+    "routeError": "Unable to open directions",
+    "callError": "Unable to make a call"
+  },
+  "shopsMap": {
+    "title": "Shops Map",
+    "count": "{count} shops with photo",
+    "loading": "Loading shops...",
+    "loadingError": "Map loading error",
+    "empty": "No shops with photos found.\nShops without images are not shown on this map.",
+    "whatsappError": "Unable to open WhatsApp"
   },
   "community": {
     "title": "Community",
@@ -153,7 +166,18 @@
     "description": "Go Premium to access all details: fish types, notes, advanced zoom, and more.",
     "later": "Later",
     "subscribe": "Subscribe",
-    "comingSoon": "Premium subscription coming soon..."
+    "comingSoon": "Premium subscription coming soon...",
+    "monthly": "Monthly",
+    "monthlyPrice": "€9.99 / month",
+    "annual": "Annual",
+    "annualPrice": "€59.99 / year",
+    "lifetime": "Lifetime",
+    "lifetimePrice": "€149.99",
+    "popular": "POPULAR",
+    "activate": "Activate Premium",
+    "activated": "Premium activated successfully",
+    "activationError": "Activation failed",
+    "loginRequired": "Log in to activate Premium"
   },
   "settings": {
     "title": "COMMAND CENTER",
@@ -172,7 +196,10 @@
     "captainSubtitle": "Deep Sea Specialist • Level 42",
     "member": "Abyssal Elite Member",
     "vesselCrew": "VESSEL & CREW",
-    "updateCredentials": "Update your\ncredentials"
+    "updateCredentials": "Update your\ncredentials",
+    "signInFailed": "Sign in failed. Make sure you have a Google account and the APK is signed.",
+    "signInGoogle": "Sign in with Google",
+    "signInGoogleSubtitle": "Sync your account"
   },
   "language": {
     "title": "Language",

@@ -133,7 +133,7 @@ class _SplashMapPageState extends State<SplashMapPage>
               ),
             ),
             children: const [
-              AppTileLayer(satellite: true),
+              AppTileLayer(style: MapStyle.satellite),
             ],
           ),
 

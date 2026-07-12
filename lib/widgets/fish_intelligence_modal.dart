@@ -43,7 +43,7 @@ class FishIntelligenceModal extends StatelessWidget {
     final size = MediaQuery.of(context).size;
 
     return Container(
-      width: size.width * 0.5,
+      width: size.width * 0.65,
       constraints: BoxConstraints(maxHeight: size.height * 0.75),
       decoration: BoxDecoration(
         color: tc.surface,

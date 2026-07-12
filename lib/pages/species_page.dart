@@ -4,6 +4,7 @@
 // ============================================================
 
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:spots_app/models/fish_species.dart';
 import 'package:spots_app/services/species_service.dart';
 import 'package:spots_app/theme.dart';
@@ -364,28 +365,11 @@ class _SpeciesCard extends StatelessWidget {
               child: SizedBox(
                 width: 90,
                 height: 90,
-                child: Image.network(
-                  species.photoUrl,
+                child: _SpeciesImage(
+                  path: species.photoUrl,
                   fit: BoxFit.cover,
-                  loadingBuilder: (context, child, progress) {
-                    if (progress == null) return child;
-                    return Container(
-                      color: tc.surfaceElevated,
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          color: tc.oceanLight,
-                          strokeWidth: 2,
-                          value: progress.expectedTotalBytes != null
-                              ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
-                              : null,
-                        ),
-                      ),
-                    );
-                  },
-                  errorBuilder: (_, __, ___) => Container(
-                    color: tc.surfaceElevated,
-                    child: Icon(Icons.image_not_supported, color: tc.textMuted),
-                  ),
+                  width: 90,
+                  height: 90,
                 ),
               ),
             ),
@@ -523,20 +507,12 @@ class SpeciesDetailPage extends StatelessWidget {
                   ],
                 ),
               ),
-              background: Stack(
+          background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.network(
-                    species.photoUrl,
+                  _SpeciesImage(
+                    path: species.photoUrl,
                     fit: BoxFit.cover,
-                    loadingBuilder: (context, child, progress) {
-                      if (progress == null) return child;
-                      return Container(color: tc.surfaceElevated);
-                    },
-                    errorBuilder: (_, __, ___) => Container(
-                      color: tc.surfaceElevated,
-                      child: Icon(Icons.image_not_supported, color: tc.textMuted, size: 48),
-                    ),
                   ),
                   // Gradient overlay
                   DecoratedBox(
@@ -885,6 +861,62 @@ class _InfoRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SpeciesImage extends StatelessWidget {
+  final String path;
+  final BoxFit fit;
+  final double? width;
+  final double? height;
+
+  const _SpeciesImage({
+    required this.path,
+    this.fit = BoxFit.cover,
+    this.width,
+    this.height,
+  });
+
+  bool get _isAsset => path.startsWith('assets/');
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
+    final errorWidget = Container(
+      color: tc.surfaceElevated,
+      width: width,
+      height: height,
+      child: Icon(Icons.image_not_supported, color: tc.textMuted),
+    );
+
+    if (_isAsset) {
+      return Image.asset(
+        path,
+        fit: fit,
+        width: width,
+        height: height,
+        errorBuilder: (_, __, ___) => errorWidget,
+      );
+    }
+
+    return CachedNetworkImage(
+      imageUrl: path,
+      fit: fit,
+      width: width,
+      height: height,
+      placeholder: (context, url) => Container(
+        color: tc.surfaceElevated,
+        width: width,
+        height: height,
+        child: Center(
+          child: CircularProgressIndicator(
+            color: tc.oceanLight,
+            strokeWidth: 2,
+          ),
+        ),
+      ),
+      errorWidget: (context, url, error) => errorWidget,
     );
   }
 }

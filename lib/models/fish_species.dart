@@ -130,12 +130,14 @@ class FishSpecies {
   }
 
   static FishSpecies fromCsvRow(List<String> cols) {
+    final id = cols[0].trim();
+    final local = _localAssetForId(id);
     return FishSpecies(
-      id: cols[0].trim(),
+      id: id,
       name: cols[1].trim(),
       scientificName: cols[2].trim(),
       family: cols[3].trim(),
-      photoUrl: cols[4].trim(),
+      photoUrl: local ?? cols[4].trim(),
       region: cols[5].trim(),
       habitat: cols[6].trim(),
       sizeMinCm: int.tryParse(cols[7].trim()) ?? 0,
@@ -148,5 +150,19 @@ class FishSpecies {
       tips: cols[14].trim(),
       regulation: cols[15].trim(),
     );
+  }
+
+  static String? _localAssetForId(String id) {
+    // Seulement les espèces qui ont une vraie image dans assets/fish_images/
+    const map = {
+      'bar-europeen': 'bar',
+      'dorade-royale': 'daurade',
+      'mulet': 'mulet',
+      'pageot-rose': 'pageot',
+      'sole': 'sole',
+      'thon-rouge': 'thon',
+    };
+    final file = map[id];
+    return file != null ? 'assets/fish_images/$file.png' : null;
   }
 }

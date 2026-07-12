@@ -39,7 +39,30 @@ app.*.symbols
 # Obfuscation related
 app.*.map.json
 
+# Environment secrets
+.env
+
+# Android keystore & signing
+/android/key.properties
+*.jks
+
+# Build logs résiduels
+/build_log*.txt
+/run_log*.txt
+/build_out.txt
+/logcat_*.txt
+/outdated.json
+/dump_*.txt
+/pid*.txt
+/analyze_*.txt
+
 # Android Studio will place build artifacts here
 /android/app/debug
 /android/app/profile
 /android/app/release
+android/app/google-services.json
+
+# Firebase / Google secrets
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+firebase-key.json

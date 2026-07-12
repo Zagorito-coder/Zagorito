@@ -6,7 +6,7 @@
 // ============================================================================
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:spots_app/widgets/windguru_style_table.dart';
+import 'package:spots_app/widgets/forecast_table.dart';
 
 class SpotForecast {
   final String locationName;

@@ -105,6 +105,8 @@ class _CuteFlagButtonState extends State<_CuteFlagButton>
         return const Color(0xFFCF142B); // rouge UK
       case AppLanguage.arabic:
         return const Color(0xFF0B7A3E); // vert arabe
+      case AppLanguage.spanish:
+        return const Color(0xFFAA151B); // rouge Espagne
     }
   }
 

@@ -466,7 +466,11 @@ class _HomePageState extends State<HomePage>
                       Navigator.pop(context);
                       widget.onNavigateToTides?.call();
                     },
-                    onLongPress: () {
+                  ),
+                  _DrawerItem(
+                    icon: Icons.waves,
+                    label: context.tr('drawer.tidesPro'),
+                    onTap: () {
                       Navigator.pop(context);
                       widget.onNavigateToTidesV2?.call();
                     },
@@ -1724,7 +1728,6 @@ class _DrawerItem extends StatelessWidget {
   final String label;
   final bool isActive;
   final VoidCallback? onTap;
-  final VoidCallback? onLongPress;
   final Widget? trailing;
 
   const _DrawerItem({
@@ -1732,7 +1735,6 @@ class _DrawerItem extends StatelessWidget {
     required this.label,
     this.isActive = false,
     this.onTap,
-    this.onLongPress,
     this.trailing,
   });
 
@@ -1768,11 +1770,7 @@ class _DrawerItem extends StatelessWidget {
       visualDensity: VisualDensity.compact,
     );
 
-    if (onLongPress == null) return tile;
-    return GestureDetector(
-      onLongPress: onLongPress,
-      child: tile,
-    );
+    return tile;
   }
 }
 

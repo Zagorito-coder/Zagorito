@@ -326,10 +326,12 @@ class _TechniquesPageState extends State<TechniquesPage> {
                                   ),
                                   itemCount: _filtered.length,
                                   itemBuilder: (context, index) {
+                                    final t = _filtered[index];
                                     return _TechniqueGridCard(
-                                      technique: _filtered[index],
+                                      key: ValueKey('${t.id}_${LanguageController.instance.langCode}'),
+                                      technique: t,
                                       onTap: () =>
-                                          _openDetail(_filtered[index]),
+                                          _openDetail(t),
                                     );
                                   },
                                 ),
@@ -359,7 +361,7 @@ class _TechniqueGridCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const _TechniqueGridCard(
-      {required this.technique, required this.onTap});
+      {super.key, required this.technique, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -935,7 +937,7 @@ class _TextCard extends StatelessWidget {
   }
 }
 
-// ── WIDGET IMAGE LOCAL OU RÉSEAU ──
+// ── WIDGET IMAGE ASSET ──
 class _TechniqueImage extends StatelessWidget {
   final String url;
   final BoxFit fit;
@@ -951,24 +953,12 @@ class _TechniqueImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Si l'URL ne contient pas http et ne commence pas par assets/,
-    // c'est un nom de fichier local dans assets/images/techniques/
-    final String assetUrl;
-    if (url.startsWith('assets/')) {
-      assetUrl = url;
-    } else if (url.startsWith('http')) {
-      return Image.network(
-        url,
-        fit: fit,
-        loadingBuilder: loadingBuilder,
-        errorBuilder: errorBuilder,
-      );
-    } else {
-      assetUrl = 'assets/images/techniques/$url';
-    }
+    // La clé avec langCode force le rebuild quand la langue change
+    final langKey = LanguageController.instance.langCode;
     return Image.asset(
-      assetUrl,
+      url,
       fit: fit,
+      key: ValueKey('${langKey}_$url'),
       errorBuilder: errorBuilder,
     );
   }

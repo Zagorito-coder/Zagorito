@@ -2,7 +2,7 @@ name: RecolteMeteoQuotidienne
 
 on:
   schedule:
-    - cron: '0 4 * * *'   # tous les jours a 4h00 UTC
+    - cron: '0 0,6,12,18 * * *'   # 4x/jour : 00h, 06h, 12h, 18h UTC (donnees fraiches toutes les 6h)
   workflow_dispatch:       # bouton "Run workflow" manuel dans GitHub
 
 jobs:

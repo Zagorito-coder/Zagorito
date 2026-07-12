@@ -27,6 +27,9 @@ class TechniqueService {
       case 'ar':
         suffix = 'Ar';
         break;
+      case 'es':
+        suffix = 'Es';
+        break;
       case 'fr':
       default:
         suffix = 'Fr';

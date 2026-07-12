@@ -2,13 +2,17 @@
 //  spot_details_panel.dart — Panneau de détails grand format
 //  Layout stable sans overflow
 //  ✅ CORRIGÉ : adaptatif clair/sombre via ThemeColors
+//  ✅ VENT : vitesse + direction + slider timeline
 // ============================================================
 
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:provider/provider.dart';
 import 'package:spots_app/models.dart';
 import 'package:spots_app/theme.dart';
+import 'package:spots_app/providers/wind_animation_provider.dart';
+import 'package:spots_app/widgets/wind_particle_painter.dart';
 
 class SpotDetailsPanel extends StatelessWidget {
   final Spot spot;
@@ -81,6 +85,16 @@ class SpotDetailsPanel extends StatelessWidget {
       LatLng(s.latitude, s.longitude),
     );
     return '${km.toStringAsFixed(1)} km';
+  }
+
+  String _translateDirection(String code) {
+    const map = {
+      'N': 'Nord', 'NNE': 'N-N-E', 'NE': 'Nord-Est', 'ENE': 'E-N-E',
+      'E': 'Est', 'ESE': 'E-S-E', 'SE': 'Sud-Est', 'SSE': 'S-S-E',
+      'S': 'Sud', 'SSO': 'S-S-O', 'SO': 'Sud-Ouest', 'OSO': 'O-S-O',
+      'O': 'Ouest', 'ONO': 'O-N-O', 'NO': 'Nord-Ouest', 'NNO': 'N-N-O',
+    };
+    return map[code] ?? code;
   }
 
   @override
@@ -245,6 +259,11 @@ class SpotDetailsPanel extends StatelessWidget {
 
           const SizedBox(height: 8),
 
+          // ── VENT (affiche des que les donnees sont chargees) ──
+          _buildWindSection(context),
+
+          const SizedBox(height: 8),
+
           // ── GOOGLE MAPS BUTTON ──
           GestureDetector(
             onTap: () => _launchUrl(_googleMapsUrl),
@@ -345,6 +364,176 @@ class SpotDetailsPanel extends StatelessWidget {
     );
   }
 
+  /// Section vent: vitesse + direction + slider timeline
+  Widget _buildWindSection(BuildContext context) {
+    final wind = context.watch<WindAnimationProvider>();
+
+    // Charger les donnees si pas encore fait (independant du toggle)
+    if (wind.currentVector == null && !wind.isLoading) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        wind.fetchForPanel(spot.latitude, spot.longitude);
+      });
+      return const SizedBox.shrink();
+    }
+
+    // Loading state
+    if (wind.isLoading && wind.forecast == null) {
+      return const SizedBox(
+        height: 40,
+        child: Center(
+          child: SizedBox(
+            width: 16, height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+
+    if (wind.currentVector == null) return const SizedBox.shrink();
+
+    final tc = ThemeColors.of(context);
+    final vector = wind.currentVector!;
+    final dirCode = WindAnimationProvider.directionToText(vector.directionDeg);
+    final dirText = _translateDirection(dirCode);
+    final windColor = WindColors.forKnots(vector.speedKt);
+
+    final slots = wind.forecast?.slots ?? [];
+    final maxIndex = (slots.length - 1).clamp(0, 100);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: tc.textPrimary.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: windColor.withValues(alpha: 0.4),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Ligne vitesse + direction
+          Row(
+            children: [
+              Icon(Icons.air, color: windColor, size: 18),
+              const SizedBox(width: 6),
+              Text(
+                '${(vector.speedKt * 1.852).toStringAsFixed(1)} km/h',
+                style: TextStyle(
+                  color: tc.textPrimary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: windColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  dirText,
+                  style: TextStyle(
+                    color: windColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              if (slots.isNotEmpty && wind.selectedHourIndex < slots.length)
+                Text(
+                  '${slots[wind.selectedHourIndex].dateTime.hour}h',
+                  style: TextStyle(
+                    color: tc.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+            ],
+          ),
+          // Slider timeline avec labels d'heures
+          if (maxIndex > 0) ...[
+            const SizedBox(height: 6),
+            SizedBox(
+              height: 52,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Labels des heures — distribues uniformement
+                  SizedBox(
+                    height: 14,
+                    child: () {
+                      if (maxIndex == 0) return const SizedBox.shrink();
+                      // Prendre les heures uniques existantes
+                      final uniqueHours = <int>[];
+                      for (final s in slots) {
+                        final h = s.dateTime.hour;
+                        if (!uniqueHours.contains(h)) uniqueHours.add(h);
+                      }
+                      if (uniqueHours.isEmpty) return const SizedBox.shrink();
+
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: uniqueHours.map((h) {
+                          final idx = slots.indexWhere((s) => s.dateTime.hour == h);
+                          final isActive = wind.selectedHourIndex < slots.length &&
+                              slots[wind.selectedHourIndex].dateTime.hour == h;
+                          return GestureDetector(
+                            onTap: () { if (idx >= 0) wind.selectHourIndex(idx); },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: isActive ? windColor.withValues(alpha: 0.2) : Colors.transparent,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '${h}h',
+                                style: TextStyle(
+                                  color: isActive ? windColor : tc.textMuted,
+                                  fontSize: 10,
+                                  fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      );
+                    }(),
+                  ),
+                  const SizedBox(height: 2),
+                  // Slider compact
+                  Expanded(
+                    child: SliderTheme(
+                      data: SliderThemeData(
+                        trackHeight: 3,
+                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+                        activeTrackColor: windColor,
+                        inactiveTrackColor: tc.textPrimary.withValues(alpha: 0.08),
+                        thumbColor: windColor,
+                        overlayColor: windColor.withValues(alpha: 0.1),
+                      ),
+                      child: Slider(
+                        value: wind.selectedHourIndex.toDouble(),
+                        min: 0,
+                        max: maxIndex.toDouble(),
+                        divisions: maxIndex > 50 ? null : maxIndex,
+                        onChanged: (v) => wind.selectHourIndex(v.round()),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   bool _isCloserSpot(Spot nearbySpot) {
     if (currentPosition == null) return false;
     const distance = Distance();
@@ -396,7 +585,6 @@ class _NearbySpotCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Top row: icon + badge
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -448,7 +636,6 @@ class _NearbySpotCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 4),
-            // Name
             Text(
               spot.name,
               style: TextStyle(
@@ -460,7 +647,6 @@ class _NearbySpotCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 2),
-            // Type + Distance
             Row(
               children: [
                 Container(

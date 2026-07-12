@@ -1,5 +1,6 @@
 // ============================================================
 //  services/spot_service.dart — Chargement et cache des spots
+//  AES-256-CBC : fichier = IV(16B) + ciphertext
 // ============================================================
 
 import 'dart:convert';
@@ -7,6 +8,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:encrypt/encrypt.dart' as enc;
 import '../models.dart';
 
 class SpotService {
@@ -17,51 +19,62 @@ class SpotService {
     return File('${dir.path}/spots_cache_v4.json');
   }
 
-  /// Exécute [computation] via [compute] sur mobile/desktop,
-  /// ou directement sur le thread principal pour le web (isolates non supportés).
-  static Future<R> _computeOrRun<Q, R>(
-    R Function(Q) computation,
-    Q message,
-  ) async {
-    if (kIsWeb) {
-      return computation(message);
-    }
-    return compute(computation, message);
-  }
+  static Future<R> _computeOrRun<Q, R>(R Function(Q) c, Q m) =>
+      kIsWeb ? Future<R>.sync(() => c(m)) : compute(c, m);
 
   static Future<List<Spot>> loadFromCache() async {
     try {
-      final file = await _cacheFile;
-      if (!file.existsSync()) return [];
-      return await _computeOrRun(_parseJson, await file.readAsString());
+      final f = await _cacheFile;
+      return f.existsSync()
+          ? await _computeOrRun(_parseJson, await f.readAsString())
+          : [];
     } catch (e) {
-      debugPrint('[SpotService] Erreur cache lecture: $e');
       return [];
     }
   }
 
-  static List<Spot> _parseJson(String contents) {
-    final list = jsonDecode(contents) as List<dynamic>;
-    return list.map((e) => Spot.fromJson(e as Map<String, dynamic>)).toList();
-  }
+  static List<Spot> _parseJson(String c) =>
+      (jsonDecode(c) as List)
+          .map((e) => Spot.fromJson(e as Map<String, dynamic>))
+          .toList();
 
-  static Future<void> saveToCache(List<Spot> spots) async {
+  static Future<void> saveToCache(List<Spot> s) async {
     try {
-      final file = await _cacheFile;
-      final data = await _computeOrRun(_serializeJson, spots);
-      await file.writeAsString(data);
-    } catch (e) {
-      debugPrint('[SpotService] Erreur cache écriture: $e');
-    }
+      await (await _cacheFile).writeAsString(
+        await _computeOrRun(
+          (list) => jsonEncode(list.map((e) => e.toJson()).toList()),
+          s,
+        ),
+      );
+    } catch (_) {}
   }
 
-  static String _serializeJson(List<Spot> spots) {
-    return jsonEncode(spots.map((s) => s.toJson()).toList());
-  }
+  // Clé AES-256 générée par tools/encrypt_spots.py
+  static const String _encKey = 'q/F+3pnu668/hPnjF96uTqZH+7E24ppnH+53+rwdya0=';
 
   static Future<List<Spot>> loadFromCsv() async {
-    final raw = await rootBundle.loadString('assets/spots.csv');
-    return await _computeOrRun(_parseCsv, raw);
+    debugPrint('[SpotService] loadFromCsv...');
+
+    final raw = await rootBundle.load('assets/spots.csv.enc');
+    final bytes = raw.buffer.asUint8List(raw.offsetInBytes, raw.lengthInBytes);
+    debugPrint('[SpotService] Fichier chargé: ${bytes.length} bytes');
+
+    // Tout le déchiffrement AES + parsing CSV dans un isolate séparé
+    final spots = await _computeOrRun(_decryptAndParse, bytes);
+    debugPrint('[SpotService] Spots parsés: ${spots.length}');
+    return spots;
+  }
+
+  static List<Spot> _decryptAndParse(Uint8List bytes) {
+    final ivBytes = bytes.sublist(0, 16);
+    final ct = bytes.sublist(16);
+    final key = enc.Key.fromBase64(_encKey);
+    final iv = enc.IV(ivBytes);
+    final cipher = enc.Encrypter(enc.AES(key, mode: enc.AESMode.cbc));
+    final decrypted =
+        Uint8List.fromList(cipher.decryptBytes(enc.Encrypted(ct), iv: iv));
+    final csv = utf8.decode(decrypted);
+    return _parseCsv(csv);
   }
 
   static List<Spot> _parseCsv(String raw) {
@@ -73,7 +86,7 @@ class SpotService {
       try {
         spots.add(Spot.fromCsv(line, index: i));
       } catch (_) {
-        debugPrint('[SpotService] Skipped malformed CSV line $i: $line');
+        debugPrint('[SpotService] Skipped CSV line $i: $line');
       }
     }
     return spots;

@@ -9,6 +9,7 @@
     "subtitle": "التنقل",
     "home": "الرئيسية",
     "tides": "المد والجزر",
+    "tidesPro": "المد والجزر PRO",
     "spots": "المواقع",
     "fish": "الأسماك",
     "techniques": "التقنيات",
@@ -138,7 +139,19 @@
     "loadingError": "خطأ في التحميل",
     "retry": "إعادة المحاولة",
     "noShops": "لم يتم العثور على متاجر",
-    "noShopsDesc": "جرب بحثًا آخر"
+    "noShopsDesc": "جرب بحثًا آخر",
+    "route": "اتجاهات",
+    "call": "اتصال",
+    "routeError": "تعذر فتح الاتجاهات",
+    "callError": "تعذر إجراء المكالمة"
+  },
+  "shopsMap": {
+    "title": "خريطة المتاجر",
+    "count": "{count} متجر مع صورة",
+    "loading": "جاري تحميل المتاجر...",
+    "loadingError": "خطأ في تحميل الخريطة",
+    "empty": "لم يتم العثور على متاجر مع صور.\nالمتاجر بدون صور لا تظهر على هذه الخريطة.",
+    "whatsappError": "تعذر فتح واتساب"
   },
   "community": {
     "title": "المجتمع",
@@ -153,7 +166,18 @@
     "description": "احصل على بريميوم للوصول إلى كل التفاصيل: أنواع الأسماك، الملاحظات، التكبير المتقدم، والمزيد.",
     "later": "لاحقًا",
     "subscribe": "اشترك",
-    "comingSoon": "الاشتراك البريميوم قريبًا..."
+    "comingSoon": "الاشتراك البريميوم قريبًا...",
+    "monthly": "شهري",
+    "monthlyPrice": "9.99 يورو / شهر",
+    "annual": "سنوي",
+    "annualPrice": "59.99 يورو / سنة",
+    "lifetime": "مدى الحياة",
+    "lifetimePrice": "149.99 يورو",
+    "popular": "الأكثر شعبية",
+    "activate": "تفعيل Premium",
+    "activated": "تم تفعيل Premium بنجاح",
+    "activationError": "فشل التفعيل",
+    "loginRequired": "سجل الدخول لتفعيل Premium"
   },
   "settings": {
     "title": "مركز القيادة",
@@ -172,7 +196,9 @@
     "captainSubtitle": "أخصائي أعماق البحار • المستوى 42",
     "member": "عضو النخبة Abyssal",
     "vesselCrew": "السفينة والطاقم",
-    "updateCredentials": "تحديث\nبيانات الاعتماد"
+    "updateCredentials": "تحديث\nبيانات الاعتماد",
+    "signInGoogle": "تسجيل الدخول بـ Google",
+    "signInGoogleSubtitle": "مزامنة حسابك"
   },
   "language": {
     "title": "اللغة",

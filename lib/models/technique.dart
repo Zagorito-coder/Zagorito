@@ -61,12 +61,28 @@ class Technique {
   });
 
   factory Technique.fromCsvRow(List<String> cols) {
+    // Construit le chemin d'image depuis l'ID pour garantir
+    // la cohérence entre toutes les langues (les CSV peuvent
+    // avoir des URLs web différentes du fichier local)
+    final id = cols[0].trim();
+    // Carte de correspondance entre ID et nom de fichier réel
+    const idToFile = {
+      'boucle-hamecon': 'boucle-hamecon',
+      'paternoster-loop': 'boucle-paternoster',
+      'perfection-loop': 'boucle-perfect',
+      'cent-percent': 'cent pourcent',
+      'thunder-knot': 'noeud-tonnerre',
+      'snell': 'sanglante',
+      'triple-loop': 'triple-boucle',
+    };
+    final filename = idToFile[id] ?? id;
+    final photoUrl = 'assets/images/techniques/$filename.jpg';
     return Technique(
-      id: cols[0].trim(),
+      id: id,
       name: cols[1].trim(),
       category: cols[2].trim(),
       description: cols[3].trim(),
-      photoUrl: cols[4].trim(),
+      photoUrl: photoUrl,
       targetFish: cols[5].trim(),
       techniqueType: cols[6].trim(),
       difficulty: cols[7].trim(),

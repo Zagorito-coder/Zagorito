@@ -17,7 +17,7 @@ import 'package:spots_app/pages/community_page.dart';
 import 'package:spots_app/pages/premium_page.dart';
 import 'package:spots_app/pages/shops_page.dart';
 import 'package:spots_app/pages/tide_page.dart';
-import 'package:spots_app/pages/windguru_page.dart';
+import 'package:spots_app/pages/forecast_page.dart';
 import 'package:spots_app/models.dart';
 
 /// Clé globale pour accéder au state de navigation
@@ -249,7 +249,7 @@ class HomePageWrapper extends StatelessWidget {
       onNavigateToPremium: () => _goTo(context, const PremiumPage()),
       onNavigateToTides: () => _goTo(context, const TidePage()),
       // Debug route / bouton caché : long-press sur "Marées" dans le drawer
-      onNavigateToTidesV2: () => _goTo(context, const WindguruPage(spotId: 'casablanca_maroc')),
+      onNavigateToTidesV2: () => _goTo(context, const ForecastPage()),
     );
   }
 

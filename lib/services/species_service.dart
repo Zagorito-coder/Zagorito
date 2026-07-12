@@ -14,6 +14,7 @@ class SpeciesService {
   static String _fileForLang(String lang) {
     if (lang == 'ar') return 'assets/peche_cotiere_databaseAr.csv';
     if (lang == 'en') return 'assets/peche_cotiere_databaseEn.csv';
+    if (lang == 'es') return 'assets/peche_cotiere_databaseEs.csv';
     return 'assets/peche_cotiere_databaseFr.csv';
   }
 
