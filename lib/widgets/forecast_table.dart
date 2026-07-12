@@ -562,7 +562,7 @@ class _ForecastTableState extends State<ForecastTable> {
                 : Colors.grey[200]!),
         _valueCell(
             m?.pressureMsl != null
-                ? '${m!.pressureMsl!.toStringAsFixed(0)}'
+                ? m!.pressureMsl!.toStringAsFixed(0)
                 : '-',
             Colors.transparent),
         _valueCell(
