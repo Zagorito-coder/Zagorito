@@ -1,0 +1,7 @@
+{
+    "github.copilot.chat.anthropic.useMessagesApi": true,
+    "dart.flutterHotReloadOnSave": "all",
+    "dart.flutterHotReloadVerbose": false,
+    "java.jdt.ls.java.home": "/Applications/Android Studio.app/Contents/jbr/Contents/Home",
+    "java.import.gradle.java.home": "/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+}

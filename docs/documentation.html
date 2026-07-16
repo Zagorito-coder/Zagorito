@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Boosterfish — Documentation Architecture & Design</title>
+<style>
+@page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+@page :first { @top-center { content: none; } @bottom-center { content: none; } }
+* { box-sizing: border-box; }
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-size: 10pt;
+  line-height: 1.55;
+  color: #222;
+  background: #fff;
+  margin: 0;
+  padding: 0;
+}
+h1 {
+  font-size: 26pt;
+  color: #006994;
+  margin: 0 0 4pt 0;
+  letter-spacing: -0.5pt;
+}
+h2 {
+  font-size: 14pt;
+  color: #0099CC;
+  border-bottom: 2pt solid #006994;
+  padding-bottom: 3pt;
+  margin: 18pt 0 8pt 0;
+  page-break-after: avoid;
+}
+h3 {
+  font-size: 11.5pt;
+  color: #14182B;
+  margin: 12pt 0 5pt 0;
+  page-break-after: avoid;
+}
+h4 {
+  font-size: 10.5pt;
+  color: #333;
+  margin: 8pt 0 4pt 0;
+}
+p { margin: 4pt 0; }
+ul, ol { margin: 4pt 0; padding-left: 18pt; }
+li { margin: 2pt 0; }
+
+.cover {
+  text-align: center;
+  padding-top: 100pt;
+  page-break-after: always;
+}
+.cover .subtitle {
+  font-size: 13pt;
+  color: #555;
+  margin-top: 8pt;
+}
+.cover .meta {
+  font-size: 9.5pt;
+  color: #888;
+  margin-top: 40pt;
+}
+.cover .version {
+  display: inline-block;
+  background: #006994;
+  color: #fff;
+  padding: 4pt 14pt;
+  border-radius: 14pt;
+  font-size: 10pt;
+  margin-top: 20pt;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 7.5pt;
+  font-weight: 600;
+  padding: 1.5pt 6pt;
+  border-radius: 4pt;
+  margin-right: 3pt;
+  vertical-align: middle;
+}
+.badge-green { background: #10B981; color: #fff; }
+.badge-blue { background: #0099CC; color: #fff; }
+.badge-gold { background: #FFD700; color: #111; }
+.badge-orange { background: #FF6B35; color: #fff; }
+.badge-purple { background: #9B59B6; color: #fff; }
+.badge-gray { background: #6B7280; color: #fff; }
+
+.codeblock {
+  background: #0A0E1F;
+  color: #E4E4E7;
+  border-radius: 6pt;
+  padding: 7pt 10pt;
+  font-family: 'Fira Code', Consolas, monospace;
+  font-size: 7.5pt;
+  line-height: 1.4;
+  margin: 5pt 0 8pt 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  page-break-inside: avoid;
+}
+.code-comment { color: #6B7280; }
+.code-keyword { color: #FF6B35; }
+.code-string { color: #10B981; }
+.code-class { color: #FFD700; }
+
+.table-wrapper { overflow-x: auto; margin: 5pt 0; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9pt;
+  page-break-inside: avoid;
+}
+th {
+  background: #006994;
+  color: #fff;
+  text-align: left;
+  padding: 4pt 6pt;
+  font-weight: 600;
+}
+td {
+  border-bottom: 0.5pt solid #E5E7EB;
+  padding: 4pt 6pt;
+  vertical-align: top;
+}
+tr:nth-child(even) { background: #F9FAFB; }
+
+.feature-card {
+  border: 0.5pt solid #E5E7EB;
+  border-radius: 6pt;
+  padding: 8pt 10pt;
+  margin: 5pt 0;
+  page-break-inside: avoid;
+}
+.feature-card h4 { margin: 0 0 3pt 0; color: #006994; }
+
+.color-swatch {
+  display: inline-block;
+  width: 12pt; height: 12pt;
+  border-radius: 3pt;
+  vertical-align: middle;
+  margin-right: 4pt;
+  border: 0.5pt solid #ccc;
+}
+
+.two-col {
+  display: flex;
+  gap: 10pt;
+  flex-wrap: wrap;
+}
+.two-col > div {
+  flex: 1 1 45%;
+  min-width: 200pt;
+}
+
+.toc { page-break-after: always; }
+.toc ul { list-style: none; padding-left: 0; }
+.toc li { padding: 2pt 0; border-bottom: 0.3pt dashed #ddd; }
+.toc a { color: #006994; text-decoration: none; }
+
+.page-break { page-break-after: always; }
+
+.small { font-size: 8.5pt; color: #555; }
+.highlight { background: #FFF9C4; padding: 0 2pt; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!--  COVER -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="cover">
+  <div style="font-size:52pt;">🎣</div>
+  <h1>Boosterfish</h1>
+  <div class="subtitle">Documentation Architecture & Design</div>
+  <div class="subtitle" style="margin-top:4pt;">Application Flutter — Spots de Pêche Côtière</div>
+  <div class="version">v1.0.0 &mdash; Décembre 2026</div>
+  <div class="meta">
+    Stack : Flutter 3.x &bull; Dart 3 &bull; OpenStreetMap &bull; Open-Meteo API<br>
+    Cible : Android / iOS / Web / Windows / macOS / Linux
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!--  TABLE DES MATIÈRES -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="toc">
+  <h2>Table des matières</h2>
+  <ul>
+    <li><a href="#s1">1. Vue d'ensemble du projet</a></li>
+    <li><a href="#s2">2. Architecture du Code</a>
+      <ul>
+        <li><a href="#s2-1">2.1 Structure des dossiers</a></li>
+        <li><a href="#s2-2">2.2 Couche Models (Données)</a></li>
+        <li><a href="#s2-3">2.3 Couche Services (Logique métier)</a></li>
+        <li><a href="#s2-4">2.4 Couche UI (Pages & Widgets)</a></li>
+        <li><a href="#s2-5">2.5 Navigation & App Shell</a></li>
+        <li><a href="#s2-6">2.6 Gestion d'état & Caching</a></li>
+      </ul>
+    </li>
+    <li><a href="#s3">3. Design System & Identité Visuelle</a>
+      <ul>
+        <li><a href="#s3-1">3.1 Palette de couleurs</a></li>
+        <li><a href="#s3-2">3.2 Typographie</a></li>
+        <li><a href="#s3-3">3.3 Composants UI réutilisables</a></li>
+        <li><a href="#s3-4">3.4 Glassmorphism & Effets visuels</a></li>
+      </ul>
+    </li>
+    <li><a href="#s4">4. Fonctionnalités par Écran</a>
+      <ul>
+        <li><a href="#s4-1">4.1 Home (Page d'accueil)</a></li>
+        <li><a href="#s4-2">4.2 Spot Finder (Carte interactive)</a></li>
+        <li><a href="#s4-3">4.3 Magasins de Pêche</a></li>
+        <li><a href="#s4-4">4.4 Encyclopédie des Poissons</a></li>
+        <li><a href="#s4-5">4.5 Communauté</a></li>
+        <li><a href="#s4-6">4.6 Techniques de Pêche</a></li>
+        <li><a href="#s4-7">4.7 Premium Hub</a></li>
+        <li><a href="#s4-8">4.8 Paramètres & Profil</a></li>
+      </ul>
+    </li>
+    <li><a href="#s5">5. API & Intégrations Externes</a></li>
+    <li><a href="#s6">6. Assets & Données</a></li>
+    <li><a href="#s7">7. Dépendances & Stack Technique</a></li>
+    <li><a href="#s8">8. Spécifications Techniques Avancées</a></li>
+    <li><a href="#s9">9. Écrans & Wireframes</a></li>
+    <li><a href="#s10">10. Roadmap & Améliorations Futures</a></li>
+  </ul>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!--  1. VUE D'ENSEMBLE -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<h2 id="s1">1. Vue d'ensemble du projet</h2>
+
+<p><strong>Boosterfish</strong> est une application mobile de référencement et découverte de <strong>spots de pêche côtière</strong> au Maroc et dans le monde. Elle combine une <strong>carte interactive</strong> avec 6200+ spots, des <strong>données de marées temps réel</strong>, une <strong>encyclopédie de poissons</strong>, des <strong>techniques de pêche</strong> et un réseau de <strong>magasins de pêche</strong> géolocalisés.</p>
+
+<div class="two-col">
+<div>
+<h3>🎯 Objectifs produit</h3>
+<ul>
+<li>Localiser rapidement les meilleurs spots de pêche</li>
+<li>Obtenir les conditions maritimes en temps réel</li>
+<li>Apprendre les techniques adaptées à chaque poisson</li>
+<li>Trouver du matériel près de son spot</li>
+<li>Partager et apprendre au sein d'une communauté</li>
+</ul>
+</div>
+<div>
+<h3>🏗️ Stack technique</h3>
+<ul>
+<li><strong>Framework</strong> : Flutter 3.x (Dart 3)</li>
+<li><strong>Carte</strong> : flutter_map + OpenStreetMap</li>
+<li><strong>Marées</strong> : Open-Meteo Marine API</li>
+<li><strong>Géolocalisation</strong> : geolocator</li>
+<li><strong>Persistence</strong> : path_provider + JSON cache</li>
+<li><strong>Deep linking</strong> : url_launcher</li>
+</ul>
+</div>
+</div>
+
+<p class="small">L'application adopte une architecture <strong>Clean Architecture</strong> simplifiée avec séparation claire entre Models, Services, Pages et Widgets réutilisables. Aucun state manager externe n'est utilisé — la gestion d'état repose sur <code>setState</code> et des patterns de cache optimisés.</p>
+
+<div class="page-break"></div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!--  2. ARCHITECTURE DU CODE -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<h2 id="s2">2. Architecture du Code</h2>
+
+<h3 id="s2-1">2.1 Structure des dossiers</h3>
+
+<div class="codeblock">spots_app/
+├── lib/
+│   ├── main.dart                 <span class="code-comment"># Point d'entrée + SpotService + MapScreen</span>
+│   ├── app_shell.dart            <span class="code-comment"># Navigation principale (BottomNavBar)</span>
+│   ├── theme.dart                <span class="code-comment"># Design system complet</span>
+│   ├── widgets.dart              <span class="code-comment"># Composants UI réutilisables</span>
+│   ├── models.dart               <span class="code-comment"># Spot + SpotType</span>
+│   ├── spot_details_panel.dart   <span class="code-comment"># Panneau détails spot</span>
+│   ├── spots_canvas_layer.dart   <span class="code-comment"># Rendu optimisé canvas</span>
+│   ├── cluster_index.dart        <span class="code-comment"># Index spatial pour clustering</span>
+│   ├── models/
+│   │   ├── fishing_shop.dart     <span class="code-comment"># Modèle magasin + ShopSpotGroup</span>
+│   │   └── tide_data.dart        <span class="code-comment"># TidePoint + TideData</span>
+│   ├── pages/
+│   │   ├── home_page.dart        <span class="code-comment"># Dashboard avec marées</span>
+│   │   ├── spot_finder_page.dart <span class="code-comment"># Écran carte (réutilise MapScreen)</span>
+│   │   ├── shops_page.dart       <span class="code-comment"># Liste magasins par spot</span>
+│   │   ├── species_page.dart     <span class="code-comment"># Encyclopédie poissons</span>
+│   │   ├── community_page.dart   <span class="code-comment"># Réseau social pêcheurs</span>
+│   │   ├── techniques_page.dart  <span class="code-comment"># Bibliothèque techniques</span>
+│   │   ├── premium_page.dart     <span class="code-comment"># Abonnement premium</span>
+│   │   └── settings_page.dart    <span class="code-comment"># Paramètres & profil</span>
+│   └── services/
+│       ├── tide_service.dart     <span class="code-comment"># API marées Open-Meteo</span>
+│       ├── astronomy_service.dart <span class="code-comment"># Calculs lunaires & activité</span>
+│       └── shop_service.dart     <span class="code-comment"># Chargement & regroupement</span>
+├── assets/
+│   ├── spots.csv                 <span class="code-comment"># 6200+ spots Maroc</span>
+│   └── shops.csv                 <span class="code-comment"># 12 magasins réels</span>
+└── pubspec.yaml                  <span class="code-comment"># Configuration + dépendances</span>
+</div>
+
+<h3 id="s2-2">2.2 Couche Models (Données)</h3>
+
+<table>
+<tr><th>Modèle</th><th>Fichier</th><th>Responsabilité</th></tr>
+<tr>
+<td><span class="badge badge-blue">Spot</span></td>
+<td><code>lib/models.dart</code></td>
+<td>Représente un spot de pêche avec nom, coordonnées GPS, type (sable/roche/falaise/mixte/remote), espèces de poissons, notes. Sérialisation JSON/CSV + inférence du type par analyse sémantique du nom.</td>
+</tr>
+<tr>
+<td><span class="badge badge-green">SpotType</span></td>
+<td><code>lib/models.dart</code></td>
+<td>Enum 5 valeurs avec extension Dart : couleur associée (#E74C3C, #9B59B6, #0066CC, #E67E22, #1ABC9C) et label localisé. Clé pour le système de légende interactive.</td>
+</tr>
+<tr>
+<td><span class="badge badge-orange">FishingShop</span></td>
+<td><code>lib/models/fishing_shop.dart</code></td>
+<td>Magasin de pêche : nom, coordonnées, téléphone, adresse, image, horaires, tags (Appâts, Cannes, Moulinet…), note. Sérialisation JSON/CSV.</td>
+</tr>
+<tr>
+<td><span class="badge badge-purple">ShopSpotGroup</span></td>
+<td><code>lib/models/fishing_shop.dart</code></td>
+<td>Regroupement logique : associe un spot à la liste des magasins situés à moins de 50 km. Utilisé pour l'affichage par section dans ShopsPage.</td>
+</tr>
+<tr>
+<td><span class="badge badge-blue">TidePoint</span></td>
+<td><code>lib/models/tide_data.dart</code></td>
+<td>Point temporel d'une courbe de marée : DateTime + hauteur (mètres).</td>
+</tr>
+<tr>
+<td><span class="badge badge-blue">TideData</span></td>
+<td><code>lib/models/tide_data.dart</code></td>
+<td>Données complètes marées : liste horaire, low/high/next, localisation, + données astronomiques (AstroData). Fallback intégré.</td>
+</tr>
+<tr>
+<td><span class="badge badge-gold">AstroData</span></td>
+<td><code>lib/services/astronomy_service.dart</code></td>
+<td>Phase lunaire, coefficient, activité poisson (0-1), lever/coucher soleil & lune, transit solunaire major/minor. Calculée algorithmiquement sans API externe.</td>
+</tr>
+</table>
+
+<h4>Inférence du type de spot (SpotType._inferSpotType)</h4>
+<p>Analyse sémantique du nom du spot pour classifier automatiquement :</p>
+<ul>
+<li><strong>Plage de sable</strong> : mots-clés "plage", "sable", "aftas"</li>
+<li><strong>Spot rocheux</strong> : "roch", "حرش", "roche", "pointe", "cap", "isk"</li>
+<li><strong>Mixte sable/rocher</strong> : présence des deux familles</li>
+<li><strong>Falaise</strong> : "falaise"</li>
+<li><strong>Remote</strong> : défaut</li>
+</ul>
+
+<h3 id="s2-3">2.3 Couche Services (Logique métier)</h3>
+
+<table>
+<tr><th>Service</th><th>Fichier</th><th>Fonctionnalités</th></tr>
+<tr>
+<td><span class="badge badge-blue">SpotService</span></td>
+<td><code>lib/main.dart</code></td>
+<td>Chargement CSV depuis assets + cache JSON persistant via <code>path_provider</code>. Parsing asynchrone avec <code>compute()</code> sur isolate. Gestion des lignes malformées (skip graceful).</td>
+</tr>
+<tr>
+<td><span class="badge badge-blue">TideService</span></td>
+<td><code>lib/services/tide_service.dart</code></td>
+<td>Appel API Open-Meteo Marine (<code>marine-api.open-meteo.com</code>) pour hauteurs de mer horaires. Timeout 10s. Fallback sur données par défaut en cas d'erreur. Extraction LOW/HIGH/NEXT.</td>
+</tr>
+<tr>
+<td><span class="badge badge-gold">AstronomyService</span></td>
+<td><code>lib/services/astronomy_service.dart</code></td>
+<td>Calculs astronomiques 100% offline :
+<ul>
+<li>Phase lunaire via synode (29.53j) depuis référence 6 jan 2000</li>
+<li>Coefficient basé sur amplitude marée / 3.8m × 120</li>
+<li>Lever/coucher soleil via déclinaison saisonnière</li>
+<li>Lever/coucher lune via retard 50min/jour</li>
+<li>Transit solunaire major/minor</li>
+<li><strong>Score d'activité poisson</strong> : coeff(40%) + phase(30%) + proximité transit(30%)</li>
+</ul></td>
+</tr>
+<tr>
+<td><span class="badge badge-orange">ShopService</span></td>
+<td><code>lib/services/shop_service.dart</code></td>
+<td>Chargement CSV + cache JSON. <strong>Regroupement géospatial</strong> : associe chaque magasin au spot le plus proche (rayon 50km) via calcul Haversine (package <code>latlong2</code>). Tri par densité de magasins.</td>
+</tr>
+</table>
+
+<h3 id="s2-4">2.4 Couche UI (Pages & Widgets)</h3>
+
+<h4>Pages principales (lib/pages/)</h4>
+<table>
+<tr><th>Page</th><th>Fichier</th><th>Lignes</th><th>Description</th></tr>
+<tr><td><span class="badge badge-blue">Home</span></td><td>home_page.dart</td><td>~1033</td><td>Dashboard complet avec carte des marées temps réel, grille d'expédition 2×3, données astronomiques</td></tr>
+<tr><td><span class="badge badge-green">Spot Finder</span></td><td>spot_finder_page.dart</td><td>—</td><td>Carte interactive avec 6200+ spots (wrappe MapScreen)</td></tr>
+<tr><td><span class="badge badge-orange">Magasins</span></td><td>shops_page.dart</td><td>~858</td><td>Liste magasins regroupés par spot, recherche, itinéraire, appel, copie GPS</td></tr>
+<tr><td><span class="badge badge-purple">Poissons</span></td><td>species_page.dart</td><td>—</td><td>Encyclopédie avec filtres (ALL, PELAGIC, BENTHIC, DEEP)</td></tr>
+<tr><td><span class="badge badge-blue">Communauté</span></td><td>community_page.dart</td><td>—</td><td>Fil social pêcheurs avec posts, likes, commentaires</td></tr>
+<tr><td><span class="badge badge-gray">Techniques</span></td><td>techniques_page.dart</td><td>—</td><td>Bibliothèque de techniques avec niveaux (Expert, Intermediate)</td></tr>
+<tr><td><span class="badge badge-gold">Premium</span></td><td>premium_page.dart</td><td>—</td><td>Hub d'abonnement avec capacités exclusives</td></tr>
+<tr><td><span class="badge badge-gray">Paramètres</span></td><td>settings_page.dart</td><td>—</td><td>Profil, spots sauvegardés, crew management</td></tr>
+</table>
+
+<h4>Widgets réutilisables (lib/widgets.dart)</h4>
+<table>
+<tr><th>Widget</th><th>Usage</th></tr>
+<tr><td><code>SpotLegend</code></td><td>Légende interactive des 5 types de spots avec sélection filtrante</td></tr>
+<tr><td><code>AnimatedCounter</code></td><td>Compteur animé avec fade + slide pour stats (spots, poissons…)</td></tr>
+<tr><td><code>GlassFloatingButton</code></td><td>Bouton flottant glassmorphique avec gradient et bordure</td></tr>
+<tr><td><code>LoadingIndicator</code></td><td>Indicateur de chargement avec message optionnel</td></tr>
+<tr><td><code>InfoChip</code></td><td>Chip d'info stylisé avec icône et couleur personnalisable</td></tr>
+<tr><td><code>SectionHeader</code></td><td>Header de section avec barre décorative verticale et icône</td></tr>
+<tr><td><code>EnhancedSearchBar</code></td><td>Barre de recherche glassmorphique avec clear button</td></tr>
+<tr><td><code>AnimatedDetailsPanel</code></td><td>Panneau de détails avec animation slide/opacity</td></tr>
+<tr><td><code>WaveDecoration</code></td><td>Décoration SVG-like de vague via CustomPainter</td></tr>
+</table>
+
+<h3 id="s2-5">2.5 Navigation & App Shell</h3>
+
+<p>L'application utilise un <strong>AppShell</strong> avec <code>IndexedStack</code> pour préserver l'état de chaque onglet. La navigation se fait via :</p>
+
+<ul>
+<li><strong>BottomNavigationBar custom</strong> : 5 onglets (Home, Fish, Add, Map, Settings) avec bouton central "Add" en gradient</li>
+<li><strong>GlobalKey</strong> (<code>appShellKey</code>) pour navigation programmatique depuis n'importe quel widget</li>
+<li><strong>MaterialPageRoute</strong> pour les pages secondaires (Techniques, Communauté, Magasins, Premium…)</li>
+</ul>
+
+<div class="codeblock"><span class="code-keyword">class</span> <span class="code-class">AppShell</span> <span class="code-keyword">extends</span> StatefulWidget {
+  <span class="code-keyword">static const</span> List<Widget> _pages = [
+    HomePageWrapper(),      <span class="code-comment">// Index 0</span>
+    SpeciesPageWrapper(),   <span class="code-comment">// Index 1</span>
+    AddSpotPlaceholder(),   <span class="code-comment">// Index 2</span>
+    SpotFinderPage(),       <span class="code-comment">// Index 3</span>
+    SettingsPageWrapper(),  <span class="code-comment">// Index 4</span>
+  ];
+}
+
+<span class="code-comment">// Navigation depuis HomePage vers une page externe :</span>
+<span class="code-keyword">void</span> _goTo(BuildContext context, Widget page) {
+  Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
+}</div>
+
+<h3 id="s2-6">2.6 Gestion d'état & Caching</h3>
+
+<table>
+<tr><th>Mécanisme</th><th>Description</th></tr>
+<tr><td><strong>JSON Cache</strong></td><td>Les spots et magasins sont persistés en JSON dans <code>getApplicationDocumentsDirectory()</code>. Chargement rapide au démarrage, re-synchronisation CSV uniquement si cache vide.</td></tr>
+<tr><td><strong>Isolate Computing</strong></td><td>Parsing CSV/JSON via <code>compute()</code> sur isolate séparé (mobile/desktop). Fallback thread principal sur web.</td></tr>
+<tr><td><strong>MarkerCacheManager</strong></td><td>Cache de widgets <code>SpotMarker</code> par clé <code>spotId_selected_premium</code>. Évite les rebuilds inutiles lors du zoom/pan.</td></tr>
+<tr><td><strong>Debounced Map Updates</strong></td><td>Timer à 100ms sur les événements de carte pour éviter les recalculs excessifs des spots visibles.</td></tr>
+<tr><td><strong>AutomaticKeepAlive</strong></td><td><code>MapScreen</code> utilise <code>AutomaticKeepAliveClientMixin</code> pour conserver l'état de la carte lors du changement d'onglet.</td></tr>
+<tr><td><strong>RefreshIndicator</strong></td><td>HomePage supporte le pull-to-refresh pour recharger les données de marées.</td></tr>
+</table>
+
+<div class="page-break"></div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!--  3. DESIGN SYSTEM -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<h2 id="s3">3. Design System & Identité Visuelle</h2>
+
+<p>L'identité visuelle de Boosterfish s'inspire de <strong>l'océan profond et du coastal fishing</strong>. Le design repose sur trois piliers : <strong>glassmorphism</strong>, <strong>gradient océanique</strong>, et <strong>typography bold</strong>.</p>
+
+<h3 id="s3-1">3.1 Palette de couleurs</h3>
+
+<table>
+<tr><th>Nom</th><th>Hex</th><th>Usage</th></tr>
+<tr><td><span class="color-swatch" style="background:#0A0E1F;"></span> Background</td><td><code>#0A0E1F</code></td><td>Fond principal (très sombre, bleu-nuit)</td></tr>
+<tr><td><span class="color-swatch" style="background:#14182B;"></span> Surface</td><td><code>#14182B</code></td><td>Cartes, panneaux, surfaces élevées</td></tr>
+<tr><td><span class="color-swatch" style="background:#1E2340;"></span> Surface Light</td><td><code>#1E2340</code></td><td>Inputs, éléments interactifs secondaires</td></tr>
+<tr><td><span class="color-swatch" style="background:#006994;"></span> Ocean Deep</td><td><code>#006994</code></td><td>Accents principaux, boutons</td></tr>
+<tr><td><span class="color-swatch" style="background:#0099CC;"></span> Ocean Medium</td><td><code>#0099CC</code></td><td>Navigation active, highlights</td></tr>
+<tr><td><span class="color-swatch" style="background:#00B4D8;"></span> Ocean Light</td><td><code>#00B4D8</code></td><td>Icons actifs, graphiques, badges</td></tr>
+<tr><td><span class="color-swatch" style="background:#90E0EF;"></span> Ocean Foam</td><td><code>#90E0EF</code></td><td>Détails subtils, reflets</td></tr>
+<tr><td><span class="color-swatch" style="background:#FF6B35;"></span> Sunset</td><td><code>#FF6B35</code></td><td>Accents chauds, CTAs secondaires</td></tr>
+<tr><td><span class="color-swatch" style="background:#FF8C69;"></span> Coral</td><td><code>#FF8C69</code></td><td>Tags, éléments de pêche</td></tr>
+<tr><td><span class="color-swatch" style="background:#F4E4C1;"></span> Sand</td><td><code>#F4E4C1</code></td><td>Textes sur fonds sombres contrastés</td></tr>
+<tr><td><span class="color-swatch" style="background:#10B981;"></span> Success</td><td><code>#10B981</code></td><td>Statut positif, ouvert, validé</td></tr>
+<tr><td><span class="color-swatch" style="background:#F59E0B;"></span> Warning</td><td><code>#F59E0B</code></td><td>Alertes, attention</td></tr>
+<tr><td><span class="color-swatch" style="background:#EF4444;"></span> Error</td><td><code>#EF4444</code></td><td>Erreurs, fermé, critique</td></tr>
+<tr><td><span class="color-swatch" style="background:#FFD700;"></span> Gold</td><td><code>#FFD700</code></td><td>Premium, badges elite, récompenses</td></tr>
+<tr><td><span class="color-swatch" style="background:#FFFFFF;"></span> Text Primary</td><td><code>#FFFFFF</code></td><td>Textes principaux</td></tr>
+<tr><td><span class="color-swatch" style="background:#B0B8C8;"></span> Text Secondary</td><td><code>#B0B8C8</code></td><td>Labels, descriptions</td></tr>
+<tr><td><span class="color-swatch" style="background:#6B7280;"></span> Text Muted</td><td><code>#6B7280</code></td><td>Placeholders, hints</td></tr>
+</table>
+
+<h3 id="s3-2">3.2 Typographie</h3>
+
+<table>
+<tr><th>Style</th><th>Taille</th><th>Poids</th><th>Usage</th></tr>
+<tr><td>Headline Large</td><td>28pt</td><td>Bold</td><td>Titres de page principaux</td></tr>
+<tr><td>Headline Medium</td><td>22pt</td><td>W700</td><td>Sections, headers</td></tr>
+<tr><td>Headline Small</td><td>18pt</td><td>W600</td><td>Sous-sections, AppBar</td></tr>
+<tr><td>Title Large</td><td>16pt</td><td>W600</td><td>Titres de cartes</td></tr>
+<tr><td>Body Large</td><td>14pt</td><td>W400</td><td>Texte courant, descriptions</td></tr>
+<tr><td>Body Medium</td><td>13pt</td><td>W400</td><td>Hints, sous-titres</td></tr>
+<tr><td>Label Large</td><td>12pt</td><td>W600</td><td>Boutons, labels, tags</td></tr>
+<tr><td>Label Medium</td><td>11pt</td><td>W500</td><td>Badges, métadonnées</td></tr>
+</table>
+
+<p>Police : <strong>Inter</strong> (Google Fonts). Lettres espacées légèrement négativement pour les headlines (-0.5pt), positivement pour les labels (+0.5pt).</p>
+
+<h3 id="s3-3">3.3 Composants UI réutilisables</h3>
+
+<div class="feature-card">
+<h4>🎴 Glass Card</h4>
+<p>Fond <code>surface 85%</code> + bordure blanche 10% + border-radius 20pt + ombre portée noire 30% blur 20pt. Utilisé pour les panneaux flottants, les cartes de légende, les modales.</p>
+</div>
+
+<div class="feature-card">
+<h4>🔘 Primary Button</h4>
+<p>Gradient <code>Ocean Medium → Ocean Deep</code> + border-radius 16pt + ombre <code>Ocean Deep 40% blur 12pt</code>. Padding horizontal 24pt / vertical 16pt.</p>
+</div>
+
+<div class="feature-card">
+<h4>🔍 Search Bar Glassmorphique</h4>
+<p><code>ClipRRect + BackdropFilter (σ=12)</code> + fond <code>#3C3C3E</code> + bordure <code>#5A5A5C</code>. Input avec <code>#2A2A2C</code> et focus border <code>#8A8A8C</code>.</p>
+</div>
+
+<div class="feature-card">
+<h4>🏷️ Info Pill</h4>
+<p>Container arrondi 12pt avec fond blanc 4% + bordure blanc 6%. Contient icône + label + valeur. Variantes : Lune (or), Activité (couleur dynamique), Transit (cyan/violet).</p>
+</div>
+
+<h3 id="s3-4">3.4 Glassmorphism & Effets visuels</h3>
+
+<table>
+<tr><th>Effet</th><th>Implémentation</th><th>Usage</th></tr>
+<tr><td><strong>Backdrop Blur</strong></td><td><code>BackdropFilter + ImageFilter.blur(σX=10-12)</code></td><td>Search bar, boutons zoom, premium bar, floating panels</td></tr>
+<tr><td><strong>Radial Gradient</strong></td><td><code>RadialGradient center(-0.25, -0.25)</code></td><td>Marqueurs goutte d'eau (3 stops : blanc 45% → couleur 92% → couleur 65%)</td></tr>
+<tr><td><strong>Box Shadow Glow</strong></td><td><code>BoxShadow blurRadius: 12, color.withAlpha(45%)</code></td><td>Marqueurs sélectionnés, boutons actifs</td></tr>
+<tr><td><strong>Animated Slide/Opacity</strong></td><td><code>AnimatedSlide + AnimatedOpacity</code></td><td>Panneau de détails spot, transitions de page</td></tr>
+<tr><td><strong>CustomPainter Vagues</strong></td><td><code>_WavePainter</code> avec courbes cubiques</td><td>Fond HomePage, décoration wave</td></tr>
+<tr><td><strong>CustomPainter Marées</strong></td><td><code>_RealTimeTidePainter</code> avec spline cubique</td><td>Graphique courbe de marée temps réel avec peak dot</td></tr>
+<tr><td><strong>Diamond Pattern</strong></td><td><code>_DiamondPatternPainter</code> (losanges semi-transparents)</td><td>Arrière-plan des cartes d'expédition</td></tr>
+</table>
+
+<div class="page-break"></div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!--  4. FONCTIONNALITÉS PAR ÉCRAN -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<h2 id="s4">4. Fonctionnalités par Écran</h2>
+
+<h3 id="s4-1">4.1 Home — Page d'Accueil Boosterfish</h3>
+
+<p>Écran central de l'application. Fond marin avec gradient teal foncé → bleu nuit + vagues animées via CustomPainter.</p>
+
+<h4>📊 Carte Marées Temps Réel</h4>
+<ul>
+<li><strong>Graphique courbe</strong> : spline cubique avec remplissage dégradé (bleu cyan 30% → 2%). Peak dot animé.</li>
+<li><strong>Timeline</strong> : 06:00 → 00:00 avec labels espacés</li>
+<li><strong>Stats</strong> : LOW (vert) / HIGH (magenta) / NEXT (blanc)</li>
+<li><strong>Données astronomiques</strong> :
+  <ul>
+  <li>Phase lunaire avec icône adaptée (8 phases)</li>
+  <li>Coefficient de marée (20-120)</li>
+  <li>Activité de poisson (Excellente/Bonne/Moyenne/Faible) avec couleur dynamique</li>
+  <li>Lever/coucher Soleil & Lune</li>
+  <li>Transit solunaire Major/Minor</li>
+  </ul>
+</li>
+<li><strong>Pull-to-refresh</strong> pour recharger les données</li>
+</ul>
+
+<h4>🧭 Grille d'Expédition (2×3)</h4>
+<table>
+<tr><th>Carte</th><th>Icône</th><th>Couleur</th><th>Navigation</th></tr>
+<tr><td>Marées</td><td>waves</td><td><span class="color-swatch" style="background:#00B4D8;"></span></td><td>— (déjà sur Home)</td></tr>
+<tr><td>Spots</td><td>location_on</td><td><span class="color-swatch" style="background:#10B981;"></span></td><td>SpotFinderPage</td></tr>
+<tr><td>Magasins</td><td>storefront</td><td><span class="color-swatch" style="background:#FF8C69;"></span></td><td>ShopsPage</td></tr>
+<tr><td>Poissons</td><td>set_meal</td><td><span class="color-swatch" style="background:#FFD700;"></span></td><td>SpeciesPage</td></tr>
+<tr><td>Techniques</td><td>school</td><td><span class="color-swatch" style="background:#00E676;"></span></td><td>TechniquesPage</td></tr>
+<tr><td>Pêcheurs</td><td>people</td><td><span class="color-swatch" style="background:#AB47BC;"></span></td><td>CommunityPage</td></tr>
+</table>
+<p>Chaque carte possède un <strong>pattern de losanges</strong> en arrière-plan (couleur de l'icône à 6% d'opacité).</p>
+
+<h3 id="s4-2">4.2 Spot Finder — Carte Interactive</h3>
+
+<p>Carte OpenStreetMap avec <strong>6200+ spots de pêche</strong> au Maroc.</p>
+
+<h4>🗺️ Fonctionnalités carte</h4>
+<ul>
+<li><strong>Marqueurs goutte d'eau glassmorphiques</strong> : forme de goutte avec gradient radial, halo lumineux, reflet highlight, icône <code>phishing</code></li>
+<li><strong>5 couleurs de spots</strong> : Rouge (sable), Violet (roche), Bleu (falaise), Orange (mixte), Cyan (remote)</li>
+<li><strong>Sélection</strong> : zoom animé (6 étapes, 40ms), label flottant avec nom + type</li>
+<li><strong>Recherche</strong> : barre glassmorphique avec autocomplete et résultats filtrés</li>
+<li><strong>Zoom limité</strong> : 8.0 max (gratuit), 16.0 max (premium)</li>
+<li><strong>Géolocalisation</strong> : marqueur position bleue, distance calculée</li>
+<li><strong>Clustering</strong> : rendu optimisé avec <code>ClusterIndex</code> et <code>SpotsCanvasLayer</code></li>
+<li><strong>Performance</strong> : <code>MarkerCacheManager</code>, debounce 100ms, visible bounds filtering</li>
+</ul>
+
+<h4>💎 Système Premium</h4>
+<ul>
+<li>Switch Premium dans la barre d'outils</li>
+<li>Zoom avancé débloqué (16.0)</li>
+<li>Dialog d'upsell avec CTA "S'abonner"</li>
+</ul>
+
+<h3 id="s4-3">4.3 Magasins de Pêche</h3>
+
+<p>Page de découverte des <strong>magasins de pêche réels</strong> au Maroc, synchronisés avec les spots.</p>
+
+<h4>🛒 Fonctionnalités</h4>
+<ul>
+<li><strong>Regroupement par spot</strong> : "Plage Ain Diab — 3 magasins" avec header sticky</li>
+<li><strong>Recherche globale</strong> : par nom, spot, ville</li>
+<li><strong>Carte magasin</strong> :
+  <ul>
+  <li>Image réelle avec badge <span class="badge badge-green">OUVERT</span> / <span class="badge badge-gray">FERMÉ</span> dynamique selon l'heure</li>
+  <li>Badge "Ferme bientôt" / "Ouvre bientôt" si < 30 min</li>
+  <li>Tags colorés : Appâts, Canne, Moulinet, Électronique, Bateau, Leurre</li>
+  <li>Note étoilée (1-5)</li>
+  </ul>
+</li>
+<li><strong>Actions rapides</strong> :
+  <ul>
+  <li>🗺️ <strong>Itinéraire</strong> → Google Maps avec coordonnées</li>
+  <li>📞 <strong>Appeler</strong> → Compose le numéro</li>
+  <li>📋 <strong>Copier</strong> → Coordonnées GPS</li>
+  </ul>
+</li>
+<li><strong>Animation d'entrée</strong> : <code>AnimationController</code> avec staggered fade-in</li>
+</ul>
+
+<h3 id="s4-4">4.4 Encyclopédie des Poissons (Species)</h3>
+
+<p>Base de données des espèces de poissons avec fiches détaillées.</p>
+
+<h4>🐟 Fonctionnalités</h4>
+<ul>
+<li><strong>Recherche</strong> : par nom, genre, trait caractéristique</li>
+<li><strong>Filtres</strong> : ALL / PELAGIC / BENTHIC / DEEP</li>
+<li><strong>Fiche espèce</strong> :
+  <ul>
+  <li>Image avec overlay gradient</li>
+  <li>Nom scientifique et nom commun</li>
+  <li>Profondeur (min-max), poids, longueur</li>
+  <li>Tags : "Strong Fighter", "Rare", etc.</li>
+  <li>Lien "View Techniques" vers la technique associée</li>
+  </ul>
+</li>
+</ul>
+
+<h3 id="s4-5">4.5 Communauté</h3>
+
+<p>Réseau social des pêcheurs avec contenu généré par les utilisateurs.</p>
+
+<h4>👥 Fonctionnalités</h4>
+<ul>
+<li><strong>Header</strong> : "ABYSSAL Communauté" avec badge statut en ligne</li>
+<li><strong>Stats</strong> : "1,284 Pêcheurs en ligne" avec filtre "Les plus récents"</li>
+<li><strong>Posts</strong> :
+  <ul>
+  <li>Avatar + nom + badge vérifié + localisation</li>
+  <li>Image de capture avec badge "Surface" / "Profondeur"</li>
+  <li>Nom du poisson + ❤️ like + 💬 commentaire</li>
+  </ul>
+</li>
+</ul>
+
+<h3 id="s4-6">4.6 Bibliothèque de Techniques</h3>
+
+<p>Collection de techniques de pêche avec niveaux de difficulté.</p>
+
+<h4>📚 Fonctionnalités</h4>
+<ul>
+<li><strong>Filtres</strong> : All Methods / Deep Sea / Fly Fishing</li>
+<li><strong>Carte technique</strong> :
+  <ul>
+  <li>Image d'illustration</li>
+  <li>Badge niveau : <span class="badge badge-green">EXPERT</span> / <span class="badge badge-blue">INTERMEDIATE</span></li>
+  <li>Titre + description courte</li>
+  <li>Métriques : durée (45 min), profondeur (200m+)</li>
+  <li>Bouton "Master Technique" avec icône play</li>
+  <li>Icône bookmark pour sauvegarder</li>
+  </ul>
+</li>
+</ul>
+
+<h3 id="s4-7">4.7 Premium Hub</h3>
+
+<p>Page d'abonnement avec capacités exclusives pour membres payants.</p>
+
+<h4>👑 Fonctionnalités</h4>
+<ul>
+<li><strong>Header</strong> : badge "PREMIUM MEMBER" + titre "Abyssal Elite"</li>
+<li><strong>Stats</strong> : Rank Apex, Level 42</li>
+<li><strong>Capacités exclusives</strong> :
+  <ul>
+  <li><strong>Premium Spots</strong> : mapping subsurface temps réel, résolution 200m, détection IA espèces</li>
+  <li><strong>Ghost Spots</strong> : coordonnées secrètes crowdsourcées, GPS offline</li>
+  <li><strong>Tide Prediction</strong> : analyse lunaire et courants hyper-locale</li>
+  </ul>
+</li>
+<li>Chaque capacité = carte avec badge EXCLUSIVE, description, icône décorative</li>
+</ul>
+
+<h3 id="s4-8">4.8 Paramètres & Profil (Command Center)</h3>
+
+<p>Centre de contrôle du profil utilisateur.</p>
+
+<h4>⚙️ Fonctionnalités</h4>
+<ul>
+<li><strong>Profil</strong> : avatar, nom "Captain Rackham", spécialité, niveau, badge "Abyssal Elite Member"</li>
+<li><strong>Vessel & Crew</strong> :
+  <ul>
+  <li>Profile Details — mettre à jour les credentials</li>
+  <li>My Spots — 12 saved coordinates</li>
+  <li>Crew Management — gérer 4 deckhands</li>
+  </ul>
+</li>
+<li><strong>Navigation rapide</strong> : Home / Aide / Paramètres (bottom nav secondaire)</li>
+</ul>
+
+<div class="page-break"></div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!--  5. API & INTÉGRATIONS -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<h2 id="s5">5. API & Intégrations Externes</h2>
+
+<table>
+<tr><th>Service</th><th>Endpoint</th><th>Données</th><th>Usage</th></tr>
+<tr>
+<td><strong>Open-Meteo Marine</strong></td>
+<td><code>marine-api.open-meteo.com/v1/marine</code></td>
+<td>Hauteurs de mer horaires (wave_height)</td>
+<td>Carte des marées temps réel sur la Home</td>
+</tr>
+<tr>
+<td><strong>OpenStreetMap</strong></td>
+<td><code>{a,b,c}.tile.openstreetmap.org</code></td>
+<td>Tuiles cartographiques</td>
+<td>Fond de carte Spot Finder</td>
+</tr>
+<tr>
+<td><strong>Geolocator</strong></td>
+<td>API native Android/iOS</td>
+<td>Position GPS</td>
+<td>Centrage carte, calcul distance spots</td>
+</tr>
+<tr>
+<td><strong>url_launcher</strong></td>
+<td>—</td>
+<td>Deep linking</td>
+<td>Google Maps (itinéraire), Téléphone (appel)</td>
+</tr>
+</table>
+
+<p><strong>AstronomyService</strong> est 100% offline — aucun appel API. Calculs mathématiques basés sur :</p>
+<ul>
+<li>Référence nouvelle lune : 6 janvier 2000, 18:14 UTC</li>
+<li>Mois synodique : 29.5305882 jours</li>
+<li>Déclinaison solaire : 23.45° × sin(2π × (284 + J)/365)</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!--  6. ASSETS & DONNÉES -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<h2 id="s6">6. Assets & Données</h2>
+
+<table>
+<tr><th>Fichier</th><th>Type</th><th>Contenu</th></tr>
+<tr>
+<td><code>assets/spots.csv</code></td>
+<td>CSV</td>
+<td>6200+ spots de pêche au Maroc. Colonnes : <code>name, latitude, longitude, fishTypes(|), notes</code>. Inférence automatique du SpotType.</td>
+</tr>
+<tr>
+<td><code>assets/shops.csv</code></td>
+<td>CSV</td>
+<td>12 magasins de pêche réels au Maroc. Colonnes : <code>name, lat, lng, phone, address, imageUrl, openTime, closeTime, tags(|), rating</code></td>
+</tr>
+</table>
+
+<p><strong>Format CSV spots</strong> :</p>
+<div class="codeblock">Plage Ain Diab,33.598,-7.669,Dorade|Bar,Plage populaire à Casablanca
+Cap Ghir,30.633,-9.867,Bonito|Thon,Spot rocheux sauvage
+...</div>
+
+<p><strong>Format CSV shops</strong> :</p>
+<div class="codeblock">Pêche Shop Casablanca,33.599,-7.618,+212522334455,12 Rue des Pêcheurs Casablanca,https://...,08:00,20:00,Appâts|Cannes|Moulinet,4.5</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!--  7. DÉPENDANCES -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<h2 id="s7">7. Dépendances & Stack Technique</h2>
+
+<table>
+<tr><th>Package</th><th>Version</th><th>Rôle</th></tr>
+<tr><td><code>flutter</code></td><td>sdk</td><td>Framework UI</td></tr>
+<tr><td><code>flutter_map</code></td><td>^6.1.0</td><td>Carte interactive (OpenStreetMap)</td></tr>
+<tr><td><code>latlong2</code></td><td>^0.9.0</td><td>Calculs géodésiques (distance, bounds)</td></tr>
+<tr><td><code>geolocator</code></td><td>^12.0.0</td><td>Géolocalisation GPS native</td></tr>
+<tr><td><code>path_provider</code></td><td>^2.1.2</td><td>Accès au système de fichiers (cache)</td></tr>
+<tr><td><code>url_launcher</code></td><td>^6.2.5</td><td>Lien externe (Maps, Téléphone)</td></tr>
+<tr><td><code>http</code></td><td>^1.2.0</td><td>Appels HTTP (Open-Meteo API)</td></tr>
+<tr><td><code>cupertino_icons</code></td><td>^1.0.6</td><td>Icônes supplémentaires</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!--  8. SPÉCIFICATIONS TECHNIQUES AVANCÉES -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<h2 id="s8">8. Spécifications Techniques Avancées</h2>
+
+<h4>Optimisations de performance</h4>
+<ul>
+<li><strong>Isolate computing</strong> : parsing CSV/JSON déporté sur isolate via <code>compute()</code></li>
+<li><strong>Marker cache</strong> : <code>MarkerCacheManager</code> avec clé <code>spotId_selected_premium</code></li>
+<li><strong>Visible bounds filtering</strong> : seuls les spots dans la viewport sont rendus</li>
+<li><strong>Debounced updates</strong> : 100ms de debounce sur les événements carte</li>
+<li><strong>AutomaticKeepAlive</strong> : la carte conserve son état lors du switch d'onglet</li>
+<li><strong>Debug mode silencieux</strong> : <code>debugPrint</code> désactivé en release</li>
+</ul>
+
+<h4>Sécurité & Robustesse</h4>
+<ul>
+<li>Fallback intégré sur toutes les API (marées, astronomie)</li>
+<li>Gestion gracieuse des lignes CSV malformées (skip + log)</li>
+<li>Timeout HTTP : 10 secondes</li>
+<li>Permissions géolocalisation gérées (denied, deniedForever)</li>
+</ul>
+
+<h4>Architecture de la carte (MapScreen)</h4>
+<ol>
+<li><code>FlutterMap</code> avec <code>MapController</code> pour contrôle programmatique</li>
+<li><code>TileLayer</code> OpenStreetMap avec 3 sous-domaines (a,b,c)</li>
+<li><code>MarkerLayer</code> conditionnel pour la position GPS</li>
+<li><code>SpotsCanvasLayer</code> pour le rendu optimisé des 6200+ spots</li>
+<li><code>ClusterIndex</code> pour le regroupement spatial</li>
+</ol>
+
+<h4>Formule du score d'activité poisson</h4>
+<div class="codeblock">score = (coefficient / 120) × 0.40          <span class="code-comment"># Amplitude marée</span>
+      + (1 - |phase - 0.5| × 2) × 0.30     <span class="code-comment"># Phase lunaire</span>
+      + (1 - distTransit / 720) × 0.30      <span class="code-comment"># Proximité transit</span>
+
+label = score ≥ 0.75 ? "Excellente"
+      : score ≥ 0.55 ? "Bonne"
+      : score ≥ 0.35 ? "Moyenne"
+      :                "Faible"</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!--  9. ÉCRANS & WIREFRAMES -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<h2 id="s9">9. Écrans & Wireframes</h2>
+
+<table>
+<tr><th>Écran</th><th>Structure visuelle</th><th>Composants clés</th></tr>
+<tr>
+<td><strong>Home</strong></td>
+<td>Scroll vertical, fond marin gradient, header "Boosterfish"</td>
+<td>TideCard (courbe + stats + astro), Grid 2×3 ExpeditionCards</td>
+</tr>
+<tr>
+<td><strong>Spot Finder</strong></td>
+<td>Fullscreen map, overlay controls</td>
+<td>SearchBar, ZoomButtons, PremiumBar, SpotMarkers, SpotLabel</td>
+</tr>
+<tr>
+<td><strong>Magasins</strong></td>
+<td>Liste par section (spot header), scroll vertical</td>
+<td>ShopCard (image + badges + tags), ActionButtons, SearchBar</td>
+</tr>
+<tr>
+<td><strong>Poissons</strong></td>
+<td>Liste verticale avec filtres horizontaux</td>
+<td>FilterChips, SpeciesCard (image overlay + stats), SearchBar</td>
+</tr>
+<tr>
+<td><strong>Communauté</strong></td>
+<td>Feed vertical type réseau social</td>
+<td>UserHeader, PostCard (image + badges), Like/Comment actions</td>
+</tr>
+<tr>
+<td><strong>Techniques</strong></td>
+<td>Liste verticale avec filtres</td>
+<td>LevelBadge, TechniqueCard (image + metrics), Bookmark</td>
+</tr>
+<tr>
+<td><strong>Premium</strong></td>
+<td>Scroll vertical, header profil</td>
+<td>RankBadge, LevelBadge, CapabilityCards avec icones décoratives</td>
+</tr>
+<tr>
+<td><strong>Paramètres</strong></td>
+<td>Scroll vertical, profil en haut</td>
+<td>Avatar, ProfileInfo, MenuCards, BottomNav secondaire</td>
+</tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!--  10. ROADMAP -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<h2 id="s10">10. Roadmap & Améliorations Futures</h2>
+
+<table>
+<tr><th>Phase</th><th>Fonctionnalité</th><th>Priorité</th></tr>
+<tr><td><span class="badge badge-green">DONE</span></td><td>Carte interactive 6200+ spots avec marqueurs glassmorphiques</td><td>✅</td></tr>
+<tr><td><span class="badge badge-green">DONE</span></td><td>Données de marées temps réel (Open-Meteo)</td><td>✅</td></tr>
+<tr><td><span class="badge badge-green">DONE</span></td><td>Calculs astronomiques offline (lune, soleil, activité)</td><td>✅</td></tr>
+<tr><td><span class="badge badge-green">DONE</span></td><td>Magasins de pêche avec itinéraire, appel, copie GPS</td><td>✅</td></tr>
+<tr><td><span class="badge badge-green">DONE</span></td><td>Navigation multi-écrans avec AppShell</td><td>✅</td></tr>
+<tr><td><span class="badge badge-blue">TODO</span></td><td>Ajout de spots par les utilisateurs (formulaire + validation)</td><td>🔜</td></tr>
+<tr><td><span class="badge badge-blue">TODO</span></td><td>Backend Firebase (Firestore, Auth, Storage)</td><td>🔜</td></tr>
+<tr><td><span class="badge badge-blue">TODO</span></td><td>Notifications push (alertes marées, nouveaux spots)</td><td>🔜</td></tr>
+<tr><td><span class="badge badge-blue">TODO</span></td><td>Mode offline complet avec synchronisation</td><td>🔜</td></tr>
+<tr><td><span class="badge badge-blue">TODO</span></td><td>Paiement in-app (Premium)</td><td>🔜</td></tr>
+<tr><td><span class="badge badge-blue">TODO</span></td><td>Photos et avis sur les spots</td><td>🔜</td></tr>
+<tr><td><span class="badge badge-blue">TODO</span></td><td>Prédictions IA de prise (ML)</td><td>🔜</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!--  FOOTER -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div style="margin-top:30pt; padding-top:10pt; border-top:1pt solid #ddd; text-align:center; color:#888; font-size:8.5pt;">
+Document généré automatiquement — Boosterfish Architecture Documentation v1.0<br>
+© 2026 — Spots App Project
+</div>
+
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Flutter: SM S918B (Wi-Fi)",
+      "request": "launch",
+      "type": "dart",
+      "deviceId": "192.168.1.10:5555",
+      "program": "lib/main.dart",
+      "preLaunchTask": "adb-connect-phone"
+    }
+  ]
+}

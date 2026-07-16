@@ -1,0 +1,20 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Abonnements : seul le proprietaire peut lire/ecrire
+    match /subscriptions/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Previsions meteo/maree (remplies par GitHub Actions)
+    // Securite renforcee : seuls les utilisateurs authentifies peuvent lire.
+    // Le code ForecastFirestoreService gere le cas PERMISSION_DENIED → null.
+    match /spots_meteo/{document} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+                    && request.auth.token.email == 'firebase-adminsdk-fbsvc@zagorito-9a0c4.iam.gserviceaccount.com';
+    }
+
+  }
+}
