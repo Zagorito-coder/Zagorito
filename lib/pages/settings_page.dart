@@ -327,7 +327,7 @@ class SettingsPage extends StatelessWidget {
   }
 
   Future<void> _openTermsOfService(BuildContext context) async {
-    const url = 'https://zagorito-coder.github.io/boosterfish/terms-of-service';
+    const url = 'https://zagorito-coder.github.io/boosterfish/terms-of-service/';
     final uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -341,7 +341,7 @@ class SettingsPage extends StatelessWidget {
   }
 
   Future<void> _openPrivacyPolicy(BuildContext context) async {
-    const url = 'https://zagorito-coder.github.io/boosterfish/privacy-policy';
+    const url = 'https://zagorito-coder.github.io/boosterfish/privacy-policy/';
     final uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
