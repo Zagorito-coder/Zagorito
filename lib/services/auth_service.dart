@@ -8,6 +8,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart' as gsi;
 import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -97,6 +98,48 @@ class AuthService extends ChangeNotifier {
       debugPrint('$st');
       _isLoading = false;
       notifyListeners();
+      return false;
+    }
+  }
+
+  /// Supprime le compte Firebase Auth et ses donnees Firestore.
+  /// Retourne true si la suppression a reussi.
+  Future<bool> deleteAccount() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return false;
+
+      // 1. Supprimer le document Firestore abonnement
+      try {
+        await FirebaseFirestore.instance
+            .collection('subscriptions')
+            .doc(user.uid)
+            .delete();
+      } catch (_) {}
+
+      // 2. Supprimer le compte Firebase Auth
+      try {
+        await user.delete();
+      } catch (e) {
+        debugPrint('[AuthService] deleteAccount failed: $e');
+        return false;
+      }
+
+      // 3. Nettoyer le stockage local
+      _localUser = null;
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('anonymous_user_id');
+        await prefs.remove('force_premium');
+      } catch (_) {}
+      try {
+        const storage = FlutterSecureStorage();
+        await storage.delete(key: 'anonymous_user_id');
+      } catch (_) {}
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('[AuthService] deleteAccount error: $e');
       return false;
     }
   }

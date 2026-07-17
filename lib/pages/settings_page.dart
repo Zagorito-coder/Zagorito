@@ -10,6 +10,7 @@ import 'package:spots_app/l10n/app_localizations.dart';
 import 'package:spots_app/widgets/app_back_button.dart';
 import 'package:spots_app/services/auth_service.dart';
 import 'package:spots_app/providers/premium_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -94,6 +95,39 @@ class SettingsPage extends StatelessWidget {
                         onTap: null,
                       ),
                     ),
+
+                    const SizedBox(height: 30),
+                    // ── Section Confidentialité ──
+                    Text(
+                      'Confidentialité',
+                      style: AppTextStyles.labelMedium(context).copyWith(letterSpacing: 1.5),
+                    ),
+                    const SizedBox(height: 12),
+                    _SettingsMenuCard(
+                      icon: Icons.privacy_tip_outlined,
+                      iconColor: tc.success,
+                      title: context.tr('settings.privacyPolicy'),
+                      subtitle: context.tr('settings.privacyPolicySubtitle'),
+                      onTap: () => _openPrivacyPolicy(context),
+                    ),
+                    const SizedBox(height: 12),
+                    _SettingsMenuCard(
+                      icon: Icons.description_outlined,
+                      iconColor: tc.textSecondary,
+                      title: 'CGU',
+                      subtitle: 'Conditions Générales d\'Utilisation',
+                      onTap: () => _openTermsOfService(context),
+                    ),
+                    if (context.watch<AuthService>().isLoggedIn) ...[
+                      const SizedBox(height: 12),
+                      _SettingsMenuCard(
+                        icon: Icons.delete_forever,
+                        iconColor: Colors.redAccent,
+                        title: context.tr('settings.deleteAccount'),
+                        subtitle: 'Supprime définitivement ton compte et toutes tes données',
+                        onTap: () => _confirmDeleteAccount(context),
+                      ),
+                    ],
 
                     const SizedBox(height: 30),
                     Text(
@@ -290,6 +324,74 @@ class SettingsPage extends StatelessWidget {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('$feature — bientôt disponible')),
     );
+  }
+
+  Future<void> _openTermsOfService(BuildContext context) async {
+    const url = 'https://zagorito-coder.github.io/boosterfish/terms-of-service';
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Impossible d\'ouvrir le lien')),
+        );
+      }
+    }
+  }
+
+  Future<void> _openPrivacyPolicy(BuildContext context) async {
+    const url = 'https://zagorito-coder.github.io/boosterfish/privacy-policy';
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Impossible d\'ouvrir le lien')),
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmDeleteAccount(BuildContext context) async {
+    final tc = ThemeColors.of(context);
+    final auth = context.read<AuthService>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: tc.surface,
+        title: Text(context.tr('settings.deleteAccount')),
+        content: Text(context.tr('settings.deleteAccountConfirm')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(context.tr('common.cancel')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(context.tr('common.confirm'),
+                style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      final messenger = ScaffoldMessenger.of(context);
+      final ok = await auth.deleteAccount();
+      if (context.mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              ok
+                  ? context.tr('settings.deleteAccountSuccess')
+                  : context.tr('settings.deleteAccountError'),
+            ),
+          ),
+        );
+      }
+    }
   }
 
   void _showEditProfileDialog(BuildContext context, ThemeColors tc) {
