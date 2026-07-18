@@ -1,4 +1,3 @@
-# ============================================================================
 # harvest_forecast.py
 # Recupere vent + houle + temperature/nuages/pluie via Open-Meteo (gratuit,
 # sans cle API), calcule une note en etoiles, et pousse tout sur Firestore.
@@ -729,6 +728,12 @@ def main():
                     doc["sunset"] = first_day["sunset"]
 
             db.collection("spots_meteo").document(spot["id"]).set(doc)
+            # Ecrit aussi l'index leger pour listAvailableSpots() sans OOM
+            db.collection("spots_index").document(spot["id"]).set({
+                "name": spot["name"],
+                "latitude": spot["lat"],
+                "longitude": spot["lon"],
+            })
             print(f"  -> {len(days_payload)} jours envoyes sur Firestore.")
 
             if missing_models:

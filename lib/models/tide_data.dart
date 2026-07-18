@@ -8,8 +8,17 @@ import '../services/astronomy_service.dart';
 class TidePoint {
   final DateTime time;
   final double height; // en mètres
+  final double windDirectionDeg; // degrés météo (direction d'où vient le vent)
+  final double wavePeriod;       // secondes
+  final double windWaveHeight;   // mètres
 
-  const TidePoint({required this.time, required this.height});
+  const TidePoint({
+    required this.time,
+    required this.height,
+    this.windDirectionDeg = 0.0,
+    this.wavePeriod = 7.0,
+    this.windWaveHeight = 0.0,
+  });
 }
 
 /// Données de marées complètes pour affichage, enrichies avec données astronomiques

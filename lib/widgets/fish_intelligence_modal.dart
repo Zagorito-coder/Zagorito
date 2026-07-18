@@ -11,6 +11,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:spots_app/l10n/app_localizations.dart';
 import 'package:spots_app/models.dart';
 import 'package:spots_app/models/fish_model.dart';
+import 'package:spots_app/models/tide_data.dart';
+import 'package:spots_app/services/tide_service.dart';
 import 'package:spots_app/theme.dart';
 
 class FishIntelligenceModal extends StatelessWidget {
@@ -72,7 +74,7 @@ class FishIntelligenceModal extends StatelessWidget {
                   const SizedBox(height: 16),
                   _TechniqueBlock(fish: fish),
                   const SizedBox(height: 16),
-                  _TideBlock(fish: fish),
+                  _TideBlock(fish: fish, currentPosition: currentPosition),
                   const SizedBox(height: 16),
                   _SpotsBlock(
                     fish: fish,
@@ -298,16 +300,64 @@ class _TechniqueBlock extends StatelessWidget {
   }
 }
 
-class _TideBlock extends StatelessWidget {
+class _TideBlock extends StatefulWidget {
   final FishModel fish;
-  const _TideBlock({required this.fish});
+  final Position? currentPosition;
+  static TideData? _cachedTide;
 
-  // TODO: Brancher ici l'API marées de la page Marées
-  double _getTideActivity() {
-    final now = DateTime.now();
-    final hour = now.hour + now.minute / 60;
-    return 0.5 + 0.5 * math.sin(hour * math.pi / 6);
+  const _TideBlock({required this.fish, this.currentPosition});
+
+  @override
+  State<_TideBlock> createState() => _TideBlockState();
+}
+
+class _TideBlockState extends State<_TideBlock> {
+  TideData? _tide;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetch();
   }
+
+  Future<void> _fetch() async {
+    if (_TideBlock._cachedTide != null) {
+      if (!mounted) return;
+      setState(() { _tide = _TideBlock._cachedTide; _loading = false; });
+      return;
+    }
+    try {
+      final lat = widget.currentPosition?.latitude ?? 33.57;
+      final lon = widget.currentPosition?.longitude ?? -7.59;
+      final d = await TideService.fetchTides(latitude: lat, longitude: lon);
+      _TideBlock._cachedTide = d;
+      if (!mounted) return;
+      setState(() { _tide = d; _loading = false; });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() { _tide = TideData.fallback(); _loading = false; });
+    }
+  }
+
+  double _getTideActivity(TideData t) {
+    if (t.hourlyPoints.isEmpty) {
+      final now = DateTime.now();
+      final hour = now.hour + now.minute / 60;
+      return 0.5 + 0.5 * math.sin(hour * math.pi / 6);
+    }
+    final now = DateTime.now();
+    double cur = t.low;
+    for (final p in t.hourlyPoints) {
+      if (p.time.isAfter(now)) { cur = p.height; break; }
+    }
+    final range = t.high - t.low;
+    if (range <= 0) return 0.5;
+    return ((cur - t.low) / range).clamp(0.0, 1.0);
+  }
+
+  double _estimateWind(TideData t) => (t.waveHeight * 15).clamp(5.0, 60.0);
+  double _estimateWaterTemp(TideData t) => (16.0 + t.waveHeight * 5).clamp(14.0, 26.0);
 
   String _getTideLabel(BuildContext context, double activity) {
     final l10n = AppLocalizations.of(context);
@@ -321,8 +371,26 @@ class _TideBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context);
-    final activity = _getTideActivity();
+    final t = _tide;
+    if (_loading) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: tc.surfaceLight.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: tc.glassBorder),
+          ),
+          child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+        ),
+      );
+    }
+
+    final activity = _getTideActivity(t!);
     final isGood = activity > 0.5;
+    final wind = _estimateWind(t);
+    final temp = _estimateWaterTemp(t);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -339,6 +407,8 @@ class _TideBlock extends StatelessWidget {
             _BlockTitle(l10n.translate('fishIntelligence.tideBlock')),
             const SizedBox(height: 10),
             _TextRow(l10n.translate('fishIntelligence.tide'), _getTideLabel(context, activity)),
+            const SizedBox(height: 6),
+            _TextRow('Hauteur', '${t.next.toStringAsFixed(2)}m (basse: ${t.low.toStringAsFixed(1)}m, haute: ${t.high.toStringAsFixed(1)}m)'),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -363,8 +433,8 @@ class _TideBlock extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            _TextRow(l10n.translate('fishIntelligence.wind'), '${(10 + activity * 25).toStringAsFixed(0)} km/h'),
-            _TextRow(l10n.translate('fishIntelligence.waterTemp'), '${(16 + activity * 6).toStringAsFixed(1)}°C'),
+            _TextRow(l10n.translate('fishIntelligence.wind'), '${wind.toStringAsFixed(0)} km/h'),
+            _TextRow(l10n.translate('fishIntelligence.waterTemp'), '${temp.toStringAsFixed(1)}°C'),
             const SizedBox(height: 6),
             Text(
               l10n.translate('fishIntelligence.simulatedNote'),

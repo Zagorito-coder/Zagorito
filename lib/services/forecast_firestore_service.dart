@@ -40,14 +40,16 @@ class ForecastFirestoreService {
   static final _db = FirebaseFirestore.instance;
 
   /// Liste tous les spots disponibles avec leurs coordonnees.
+  /// Utilise la collection legere `spots_index` creee par harvest_forecast.py
+  /// pour eviter de charger les donnees de forecast completes (OOM).
   static Future<List<Map<String, dynamic>>> listAvailableSpots() async {
     try {
-      final snap = await _db.collection('spots_meteo').get();
+      final snap = await _db.collection('spots_index').get();
       return snap.docs.map((doc) {
         final d = doc.data();
         return {
           'id': doc.id,
-          'name': d['location_name'] ?? doc.id,
+          'name': d['name'] ?? doc.id,
           'latitude': (d['latitude'] as num?)?.toDouble() ?? 0.0,
           'longitude': (d['longitude'] as num?)?.toDouble() ?? 0.0,
         };

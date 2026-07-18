@@ -19,6 +19,7 @@ import 'package:spots_app/pages/shops_page.dart';
 import 'package:spots_app/pages/tide_page.dart';
 import 'package:spots_app/pages/forecast_page.dart';
 import 'package:spots_app/models.dart';
+import 'package:spots_app/widgets/adaptive_banner_ad.dart';
 
 /// Clé globale pour accéder au state de navigation
 final GlobalKey<AppShellState> appShellKey = GlobalKey<AppShellState>();
@@ -65,16 +66,23 @@ class AppShellState extends State<AppShell> {
         LanguageController.instance,
       ]),
       builder: (context, _) => Scaffold(
-        body: Stack(
-          children: List.generate(_pages.length, (index) {
-            return Visibility(
-              visible: _currentIndex == index,
-              maintainState: true,
-              maintainAnimation: true,
-              maintainSize: false,
-              child: _pages[index],
-            );
-          }),
+        body: Column(
+          children: [
+            Expanded(
+              child: Stack(
+                children: List.generate(_pages.length, (index) {
+                  return Visibility(
+                    visible: _currentIndex == index,
+                    maintainState: true,
+                    maintainAnimation: true,
+                    maintainSize: false,
+                    child: _pages[index],
+                  );
+                }),
+              ),
+            ),
+            const AdaptiveBannerAd(),
+          ],
         ),
         bottomNavigationBar: _buildBottomNav(tc),
       ),

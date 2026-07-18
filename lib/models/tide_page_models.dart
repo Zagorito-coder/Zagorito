@@ -16,6 +16,7 @@ class HourlyCard {
   final int temp;
   final bool isIdeal;
   final bool isNow;
+  final int wavePeriod; // secondes, NOUVEAU
 
   const HourlyCard({
     required this.hour,
@@ -31,6 +32,7 @@ class HourlyCard {
     required this.temp,
     this.isIdeal = false,
     this.isNow = false,
+    this.wavePeriod = 7,
   });
 }
 

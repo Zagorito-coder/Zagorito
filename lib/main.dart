@@ -34,6 +34,7 @@ import 'package:flutter_compass/flutter_compass.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:spots_app/providers/wind_animation_provider.dart';
 import 'package:spots_app/widgets/wind_particle_layer.dart';
+import 'package:spots_app/services/ad_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -50,6 +51,7 @@ void main() {
     systemNavigationBarColor: Colors.transparent,
     systemNavigationBarIconBrightness: Brightness.dark,
   ));
+  AdService.instance.initialize();
   runApp(const SpotsApp());
 }
 
@@ -464,6 +466,10 @@ class _MapScreenState extends State<MapScreen> with AutomaticKeepAliveClientMixi
     _lastBounds = b;
   }
 
+  void _preloadInterstitial() {
+    AdService.instance.loadInterstitial();
+  }
+
   Future<void> _loadSpots() async {
     try {
       if (widget.initialSpots != null && widget.initialSpots!.isNotEmpty) {
@@ -483,6 +489,7 @@ class _MapScreenState extends State<MapScreen> with AutomaticKeepAliveClientMixi
       if (!mounted) return;
       setState(() { _spots = csv; _isLoadingSpots = false; });
       SpotService.saveToCache(csv);
+      _preloadInterstitial();
       WidgetsBinding.instance.addPostFrameCallback((_) => _updateVisibleSpots());
     } catch (e, st) {
       debugPrint('[MapScreen] ERREUR chargement spots: $e\n$st');
@@ -534,6 +541,7 @@ class _MapScreenState extends State<MapScreen> with AutomaticKeepAliveClientMixi
     setState(() { _selectedSpot = spot; _searchQuery = ''; });
     _searchController.clear(); FocusScope.of(context).unfocus();
     await _animateToSpot(spot);
+    AdService.instance.showInterstitialIfReady();
   }
 
   void _clearSelection() {
