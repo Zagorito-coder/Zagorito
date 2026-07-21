@@ -14,6 +14,7 @@ import 'package:spots_app/firebase_options.dart';
 import 'package:spots_app/app_shell.dart';
 import 'package:spots_app/providers/fish_provider.dart';
 import 'package:spots_app/providers/premium_provider.dart';
+import 'package:flutter_map_tile_caching/flutter_map_tile_caching.dart';
 import 'package:spots_app/models.dart';
 import 'package:spots_app/services/spot_service.dart';
 import 'package:spots_app/theme.dart';
