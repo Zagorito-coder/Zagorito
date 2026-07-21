@@ -1,11 +1,28 @@
 /**
  * conditions.js
- * Récupère marées + météo via Open-Meteo, calcule extrêmes de marée,
+ * Récupère marées + météo via l'API Open-Meteo sous licence commerciale,
+ * calcule extrêmes de marée,
  * phase lunaire (formule astronomique hors ligne), et un score
  * d'activité poisson 0-100.
  */
 
 const https = require('https');
+
+const OPEN_METEO_API_KEY = process.env.OPEN_METEO_API_KEY;
+const FORECAST_BASE_URL = 'https://customer-api.open-meteo.com/v1/forecast';
+const MARINE_BASE_URL = 'https://customer-marine-api.open-meteo.com/v1/marine';
+
+function apiUrl(baseUrl, params) {
+  if (!OPEN_METEO_API_KEY) {
+    throw new Error('OPEN_METEO_API_KEY est requis pour l\'usage commercial.');
+  }
+  const url = new URL(baseUrl);
+  for (const [key, value] of Object.entries(params)) {
+    url.searchParams.set(key, String(value));
+  }
+  url.searchParams.set('apikey', OPEN_METEO_API_KEY);
+  return url.toString();
+}
 
 // ─── Spots de pêche (lat/lon) ────────────────────────────────────────────────
 const FISHING_SPOTS = [
@@ -19,17 +36,25 @@ const FISHING_SPOTS = [
 // ─── Helpers HTTP ────────────────────────────────────────────────────────────
 function fetchJson(url) {
   return new Promise((resolve, reject) => {
-    https.get(url, (res) => {
+    const request = https.get(url, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          reject(new Error(`Open-Meteo HTTP ${res.statusCode}`));
+          return;
+        }
         try {
           resolve(JSON.parse(data));
         } catch (e) {
           reject(e);
         }
       });
-    }).on('error', reject);
+    });
+    request.setTimeout(30000, () => {
+      request.destroy(new Error('Open-Meteo request timeout'));
+    });
+    request.on('error', reject);
   });
 }
 
@@ -147,11 +172,13 @@ async function buildConditionsForSpot(spot) {
   const dateStr = now.toISOString().split('T')[0];
 
   // 1. Données marines (marées)
-  const marineUrl =
-    `https://marine-api.open-meteo.com/v1/marine?` +
-    `latitude=${spot.lat}&longitude=${spot.lon}` +
-    `&hourly=sea_level_height_msl` +
-    `&start_date=${dateStr}&end_date=${dateStr}`;
+  const marineUrl = apiUrl(MARINE_BASE_URL, {
+    latitude: spot.lat,
+    longitude: spot.lon,
+    hourly: 'sea_level_height_msl,wave_height,wind_wave_height,wind_wave_direction,wind_wave_period',
+    start_date: dateStr,
+    end_date: dateStr,
+  });
 
   const marineData = await fetchJson(marineUrl);
   const tideTimes = marineData.hourly?.time ?? [];
@@ -159,11 +186,13 @@ async function buildConditionsForSpot(spot) {
   const tideExtremes = findTideExtremes(tideTimes, tideHeights);
 
   // 2. Données météo
-  const forecastUrl =
-    `https://api.open-meteo.com/v1/forecast?` +
-    `latitude=${spot.lat}&longitude=${spot.lon}` +
-    `&hourly=temperature_2m,weathercode,windspeed_10m,winddirection_10m` +
-    `&start_date=${dateStr}&end_date=${dateStr}`;
+  const forecastUrl = apiUrl(FORECAST_BASE_URL, {
+    latitude: spot.lat,
+    longitude: spot.lon,
+    hourly: 'temperature_2m,weathercode,windspeed_10m,winddirection_10m',
+    start_date: dateStr,
+    end_date: dateStr,
+  });
 
   const forecastData = await fetchJson(forecastUrl);
   const weatherHourly = forecastData.hourly;
@@ -178,6 +207,23 @@ async function buildConditionsForSpot(spot) {
 
   // 3. Phase lunaire
   const moon = getMoonPhase(now);
+
+  const tideHourly = tideTimes.map((time, index) => ({
+    time,
+    height: tideHeights[index] ?? null,
+    waveHeightM: marineData.hourly?.wave_height?.[index] ?? null,
+    windWaveHeightM: marineData.hourly?.wind_wave_height?.[index] ?? null,
+    windDirectionDeg: marineData.hourly?.wind_wave_direction?.[index] ?? null,
+    wavePeriodS: marineData.hourly?.wind_wave_period?.[index] ?? null,
+  }));
+
+  const weatherHourlyPayload = (weatherHourly?.time ?? []).map((time, index) => ({
+    time,
+    temperatureC: weatherHourly.temperature_2m?.[index] ?? null,
+    windSpeedKmh: weatherHourly.windspeed_10m?.[index] ?? null,
+    windDirectionDeg: weatherHourly.winddirection_10m?.[index] ?? null,
+    weatherCode: weatherHourly.weathercode?.[index] ?? null,
+  }));
 
   // 4. Score
   const activityScore = calculateActivityScore(
@@ -199,12 +245,14 @@ async function buildConditionsForSpot(spot) {
       amplitudeMeters: Math.round(tideExtremes.amplitude * 100) / 100,
       nextHigh: tideExtremes.highs[0] ?? null,
       nextLow: tideExtremes.lows[0] ?? null,
+      hourly: tideHourly,
     },
     weather: {
       temperatureC: weatherHourly?.temperature_2m?.[nowIndex] ?? null,
       weatherCode: weatherHourly?.weathercode?.[nowIndex] ?? null,
       windSpeedKmh: weatherHourly?.windspeed_10m?.[nowIndex] ?? null,
       windDirection: weatherHourly?.winddirection_10m?.[nowIndex] ?? null,
+      hourly: weatherHourlyPayload,
     },
     moon: {
       phaseName: moon.name,

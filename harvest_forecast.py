@@ -1,6 +1,6 @@
 # harvest_forecast.py
-# Recupere vent + houle + temperature/nuages/pluie via Open-Meteo (gratuit,
-# sans cle API), calcule une note en etoiles, et pousse tout sur Firestore.
+# Recupere vent + houle + temperature/nuages/pluie via l'API commerciale
+# Open-Meteo, calcule une note en etoiles, et pousse tout sur Firestore.
 #
 # v2 — multi-modeles (Phase 2) : 3 modeles GFS ~13km / ECMWF IFS-HRES ~9km /
 # GFS-Wave, sous-objet "models" additif, sunrise/sunset, water_temp_c.
@@ -51,20 +51,13 @@ from datetime import datetime
 from collections import defaultdict
 
 # ---------------------------------------------------------------------------
-# URLs configurables (tier gratuit par defaut, passage payant anticipe)
+# URLs commerciales : la clé doit rester côté serveur/GitHub Actions.
 # ---------------------------------------------------------------------------
-OPEN_METEO_API_KEY = os.environ.get("OPEN_METEO_API_KEY")  # vide pour l'instant
+# Clé commerciale injectée uniquement par le job serveur/GitHub Actions.
+OPEN_METEO_API_KEY = os.environ.get("OPEN_METEO_API_KEY")
 
-FORECAST_BASE_URL = (
-    "https://customer-api.open-meteo.com/v1/forecast"
-    if OPEN_METEO_API_KEY else
-    "https://api.open-meteo.com/v1/forecast"
-)
-MARINE_BASE_URL = (
-    "https://customer-marine-api.open-meteo.com/v1/marine"
-    if OPEN_METEO_API_KEY else
-    "https://marine-api.open-meteo.com/v1/marine"
-)
+FORECAST_BASE_URL = "https://customer-api.open-meteo.com/v1/forecast"
+MARINE_BASE_URL = "https://customer-marine-api.open-meteo.com/v1/marine"
 
 # ---------------------------------------------------------------------------
 # 1. Liste des spots a moissonner. Ajoute-en autant que tu veux.
@@ -257,6 +250,15 @@ def _safe_num(v, default=None):
         return default
 
 
+def _error_summary(error):
+    """Résumé sûr pour les logs : ne jamais imprimer une URL avec apikey."""
+    response = getattr(error, "response", None)
+    status = getattr(response, "status_code", None)
+    if status is not None:
+        return f"HTTP {status} ({type(error).__name__})"
+    return type(error).__name__
+
+
 # ---------------------------------------------------------------------------
 # 2. Fonctions de fetch par modele
 # ---------------------------------------------------------------------------
@@ -276,6 +278,14 @@ HOURLY_WAVE = (
 )
 
 
+def _fetch_json(url, params):
+    """Appel HTTP sans laisser la clé apikey apparaître dans les erreurs."""
+    response = requests.get(url, params=params, timeout=30)
+    if not response.ok:
+        raise RuntimeError(f"Open-Meteo HTTP {response.status_code}")
+    return response.json()
+
+
 def fetch_wind_model(lat, lon):
     """GFS ~13km — modele vent principal."""
     url = FORECAST_BASE_URL
@@ -286,9 +296,7 @@ def fetch_wind_model(lat, lon):
         "wind_speed_unit": "ms",
         "models": "gfs_seamless",
     })
-    r = requests.get(url, params=params, timeout=30)
-    r.raise_for_status()
-    return r.json()
+    return _fetch_json(url, params)
 
 
 def fetch_hires_model(lat, lon):
@@ -300,9 +308,7 @@ def fetch_hires_model(lat, lon):
         "wind_speed_unit": "ms",
         "models": "ecmwf_ifs",
     })
-    r = requests.get(url, params=params, timeout=30)
-    r.raise_for_status()
-    return r.json()
+    return _fetch_json(url, params)
 
 
 def fetch_wave_model(lat, lon):
@@ -312,9 +318,7 @@ def fetch_wave_model(lat, lon):
     params.update({
         "hourly": HOURLY_WAVE,
     })
-    r = requests.get(url, params=params, timeout=30)
-    r.raise_for_status()
-    return r.json()
+    return _fetch_json(url, params)
 
 
 # ---------------------------------------------------------------------------
@@ -529,6 +533,10 @@ def main_test_single_spot(spot_id, spots_list=None):
     Execute tout le pipeline pour UN SEUL spot et ecrit dans
     "spots_meteo_test/{spot_id}" — jamais dans "spots_meteo".
     """
+    if not OPEN_METEO_API_KEY:
+        raise SystemExit(
+            "OPEN_METEO_API_KEY est obligatoire pour l'usage commercial d'Open-Meteo."
+        )
     if spots_list is None:
         spots_list = SPOTS
     spot = next((s for s in spots_list if s["id"] == spot_id), None)
@@ -626,6 +634,11 @@ def main_test_single_spot(spot_id, spots_list=None):
 # ---------------------------------------------------------------------------
 def main():
     import time as time_module
+    if not OPEN_METEO_API_KEY:
+        raise SystemExit(
+            "OPEN_METEO_API_KEY est obligatoire pour l'usage commercial d'Open-Meteo. "
+            "Ajoutez-le aux secrets GitHub Actions."
+        )
     start_time = time_module.time()
 
     cred = credentials.Certificate("firebase-key.json")
@@ -653,21 +666,21 @@ def main():
             wind_json = fetch_wind_model(lat, lon)
             print(f"  [wind] OK ({len(wind_json['hourly']['time'])} slots)")
         except Exception as e:
-            print(f"  [wind] ECHEC: {e}")
+            print(f"  [wind] ECHEC: {_error_summary(e)}")
             missing_models.append("wind")
 
         try:
             hires_json = fetch_hires_model(lat, lon)
             print(f"  [hires] OK ({len(hires_json['hourly']['time'])} slots)")
         except Exception as e:
-            print(f"  [hires] ECHEC: {e}")
+            print(f"  [hires] ECHEC: {_error_summary(e)}")
             missing_models.append("hires")
 
         try:
             wave_json = fetch_wave_model(lat, lon)
             print(f"  [wave] OK ({len(wave_json['hourly']['time'])} slots)")
         except Exception as e:
-            print(f"  [wave] ECHEC: {e}")
+            print(f"  [wave] ECHEC: {_error_summary(e)}")
             missing_models.append("wave")
 
         # Si aucun modele vent (obligatoire), on skip ce spot
@@ -743,7 +756,7 @@ def main():
                 success += 1
 
         except Exception as e:
-            print(f"  !! Erreur build/write pour {spot['name']}: {e}")
+            print(f"  !! Erreur build/write pour {spot['name']}: {_error_summary(e)}")
             failed += 1
 
         # Delai entre spots pour rester sous 600 appels/minute
@@ -755,6 +768,15 @@ def main():
     print(f"Termine en {elapsed:.0f}s.")
     print(f"Reussis: {success}, Partiels: {partial}, Echoues: {failed}")
     print(f"Total spots: {len(SPOTS)}")
+
+    # Ne pas laisser GitHub Actions afficher un succès lorsque des spots
+    # n'ont pas été actualisés : l'application risquerait de servir des
+    # prévisions périmées sans alerte opérationnelle. Les documents écrits
+    # avec succès restent disponibles pour les utilisateurs.
+    if failed > 0 or partial > 0:
+        raise SystemExit(
+            f"Récolte incomplète : {failed} échec(s), {partial} résultat(s) partiel(s)."
+        )
 
 
 if __name__ == "__main__":

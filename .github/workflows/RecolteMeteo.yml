@@ -16,14 +16,23 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements-harvest.txt
 
       - name: Installer les dependances
-        run: pip install requests firebase-admin
+        run: pip install --disable-pip-version-check -r requirements-harvest.txt
 
       - name: Recreer la cle Firebase depuis le secret GitHub
-        run: echo '${{ secrets.FIREBASE_KEY_JSON }}' > firebase-key.json
+        shell: bash
+        env:
+          FIREBASE_KEY_JSON: ${{ secrets.FIREBASE_KEY_JSON }}
+        run: |
+          umask 077
+          printf '%s' "$FIREBASE_KEY_JSON" > firebase-key.json
 
       - name: Executer le script de recolte
+        env:
+          OPEN_METEO_API_KEY: ${{ secrets.OPEN_METEO_API_KEY }}
         run: python harvest_forecast.py
 
       - name: Nettoyer la cle (securite)

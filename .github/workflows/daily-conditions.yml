@@ -15,14 +15,17 @@ jobs:
       - name: Installation de Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
 
       - name: Installation des dépendances
         working-directory: functions
-        run: npm install
+        run: npm ci
 
       - name: Récupération des conditions et écriture dans Firestore
         working-directory: functions
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          OPEN_METEO_API_KEY: ${{ secrets.OPEN_METEO_API_KEY }}
         run: node run-once.js
