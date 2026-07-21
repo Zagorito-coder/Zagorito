@@ -1,6 +1,6 @@
 // ============================================================
 //  tide_page.dart — Page Marées complète, animée, haute perf
-//  Branchée sur API Open-Meteo via TideService
+//  Branchée sur les conditions marines publiées par TideService
 // ============================================================
 
 import 'dart:async';
@@ -12,6 +12,7 @@ import '../models/tide_data.dart' as tide_data;
 import '../services/tide_service.dart' as tide_svc;
 import '../theme_controller.dart';
 import '../widgets/app_back_button.dart';
+import '../widgets/open_meteo_attribution.dart';
 import '../l10n/app_localizations.dart';
 
 // ── Palette adaptative ──────────────────────────────────────
@@ -46,13 +47,13 @@ tm.TideData _fromTideService(tide_data.TideData src) {
 
   final hourlyCards = <tm.HourlyCard>[];
   for (int h = 0; h < 24; h++) {
-    double hh = 0;
-    for (final p in tidePoints) {
-      if (p.time >= h && p.time < h + 1) { hh = p.height; break; }
-    }
-    if (hh == 0 && tidePoints.isNotEmpty) {
-      hh = tidePoints.firstWhere((p) => (p.time - h).abs() < 1, orElse: () => tidePoints.first).height;
-    }
+    final hourPoint = tidePoints.where((p) => p.time >= h && p.time < h + 1).firstOrNull;
+    final nearestPoint = tidePoints.isEmpty
+        ? null
+        : tidePoints.reduce((a, b) =>
+            (a.time - h).abs() <= (b.time - h).abs() ? a : b);
+    final selectedTidePoint = hourPoint ?? nearestPoint;
+    final hh = selectedTidePoint?.height ?? src.next;
 
     final prevH = h > 0 ? tidePoints.where((p) => p.time >= h - 1 && p.time < h).toList() : <tm.TidePoint>[];
     double prev = prevH.isNotEmpty ? prevH.last.height : hh;
@@ -67,19 +68,23 @@ tm.TideData _fromTideService(tide_data.TideData src) {
     else if (activity > 0.4) { level = 'mid'; label = 'Activité Moyenne'; }
     else { level = 'low'; label = 'Activité Faible'; }
 
-    final matchPoint = src.hourlyPoints.isNotEmpty
-        ? src.hourlyPoints.firstWhere(
-            (p) => p.time.hour == h,
-            orElse: () => src.hourlyPoints.first,
-          )
-        : null;
+    final matchPoint = src.hourlyPoints.where((p) =>
+      p.time.year == today.year &&
+      p.time.month == today.month &&
+      p.time.day == today.day &&
+      p.time.hour == h,
+    ).firstOrNull ?? (src.hourlyPoints.isEmpty
+        ? null
+        : src.hourlyPoints.reduce((a, b) =>
+            (a.time.hour - h).abs() <= (b.time.hour - h).abs() ? a : b));
 
     final windDir = matchPoint != null
         ? _degToCompass(matchPoint.windDirectionDeg)
         : 'N';
-    final wavePeriodH = matchPoint?.wavePeriod ?? 7.0;
-    final windWaveH = matchPoint?.windWaveHeight ?? src.waveHeight;
-    final windSpeed = (windWaveH * 25).round().clamp(3, 80);
+    final wavePeriodH = matchPoint?.wavePeriod ?? 0.0;
+    final windWaveH = matchPoint?.windWaveHeight ?? 0.0;
+    final windSpeed = matchPoint?.windSpeedKmh?.round().clamp(0, 200) ?? 0;
+    final temperature = matchPoint?.temperatureC?.round() ?? 0;
 
     hourlyCards.add(tm.HourlyCard(
       hour: h,
@@ -92,7 +97,7 @@ tm.TideData _fromTideService(tide_data.TideData src) {
       windSpeed: windSpeed,
       windDirection: windDir,
       waveHeight: windWaveH,
-      temp: (16 + src.waveHeight * 5).round().clamp(14, 26),
+      temp: temperature,
       isIdeal: activity > 0.7,
       isNow: isNow,
       wavePeriod: wavePeriodH.round(),
@@ -140,8 +145,22 @@ tm.TideData _fromTideService(tide_data.TideData src) {
     overallLevel: overallLevel,
     overallLabel: overallLabel,
     bestHours: bestHours,
-    waveInfo: tm.WaveInfo(height: src.waveHeight, period: 8, swell: 'Houle Atlantique'),
-    windInfo: tm.WindInfo(speed: (src.waveHeight * 15).round().clamp(5, 60), direction: 'W', gust: 4),
+    waveInfo: tm.WaveInfo(
+      height: src.waveHeight,
+      period: src.hourlyPoints.isNotEmpty
+          ? src.hourlyPoints.first.wavePeriod.round()
+          : 0,
+      swell: src.waveHeight > 0 ? 'Houle disponible' : 'Données indisponibles',
+    ),
+    windInfo: tm.WindInfo(
+      speed: src.hourlyPoints.isNotEmpty
+          ? (src.hourlyPoints.first.windSpeedKmh?.round() ?? 0)
+          : 0,
+      direction: src.hourlyPoints.isNotEmpty
+          ? _degToCompass(src.hourlyPoints.first.windDirectionDeg)
+          : '--',
+      gust: 0,
+    ),
   );
 }
 
@@ -163,9 +182,9 @@ class _TidePageState extends State<TidePage> with SingleTickerProviderStateMixin
   Timer? _clockTimer;
   int _selectedHourIndex = 0;
 
-  static tm.TideData _emptyData() {
+  static tm.TideData _emptyData([String location = '...']) {
     return tm.TideData(
-      location: '...',
+      location: location,
       hourlyCards: const [],
       tidePoints: const [],
       tideEvents: const [],
@@ -184,7 +203,7 @@ class _TidePageState extends State<TidePage> with SingleTickerProviderStateMixin
       final d = await tide_svc.TideService.fetchTides();
       if (!mounted) return;
       setState(() {
-        _data = _fromTideService(d);
+        _data = d.hourlyPoints.isEmpty ? _emptyData(d.location) : _fromTideService(d);
         _isLoading = false;
         _selectedHourIndex = _data.hourlyCards.indexWhere((c) => c.isNow);
         if (_selectedHourIndex < 0) _selectedHourIndex = 0;
@@ -239,6 +258,44 @@ class _TidePageState extends State<TidePage> with SingleTickerProviderStateMixin
 
   @override Widget build(BuildContext context) {
     if (_isLoading) return Scaffold(backgroundColor: _bg, body: const Center(child: CircularProgressIndicator()));
+    if (_data.hourlyCards.isEmpty) {
+      return Scaffold(
+        backgroundColor: _bg,
+        body: SafeArea(
+          child: Column(
+            children: [
+              const Align(alignment: Alignment.centerLeft, child: AppBackButton()),
+              const Spacer(),
+              Icon(Icons.cloud_off_outlined, color: _txt(0.55), size: 48),
+              const SizedBox(height: 16),
+              Text(
+                'Données marines indisponibles',
+                style: GoogleFonts.inter(color: _txt(0.85), fontSize: 17, fontWeight: FontWeight.w700),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Réessayez lorsque la connexion aux conditions publiées sera rétablie.',
+                style: GoogleFonts.inter(color: _txt(0.55), fontSize: 13),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              OutlinedButton(
+                onPressed: () {
+                  setState(() {
+                    _isLoading = true;
+                    _data = _emptyData();
+                  });
+                  _loadTideData();
+                },
+                child: const Text('Réessayer'),
+              ),
+              const Spacer(),
+            ],
+          ),
+        ),
+      );
+    }
     return Scaffold(backgroundColor: _bg, body: SafeArea(child: CustomScrollView(slivers: [
       SliverToBoxAdapter(child: _buildHeader()),
       SliverToBoxAdapter(child: _buildScoreCard()),
@@ -259,6 +316,7 @@ class _TidePageState extends State<TidePage> with SingleTickerProviderStateMixin
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 1.75, crossAxisSpacing: 12, mainAxisSpacing: 12),
         delegate: SliverChildListDelegate(_data.tideEvents.map((e) => _buildTideEventCard(e)).toList()),
       )),
+      const SliverToBoxAdapter(child: OpenMeteoAttribution()),
       const SliverPadding(padding: EdgeInsets.only(bottom: 32)),
     ])));
   }
@@ -359,13 +417,14 @@ class _TidePageState extends State<TidePage> with SingleTickerProviderStateMixin
 
   Widget _buildSelectedBanner() {
     final selected = _data.hourlyCards[_selectedHourIndex];
+    final windText = selected.windSpeed > 0 ? '${selected.windSpeed}km/h' : '--';
     return AnimatedSwitcher(duration: const Duration(milliseconds: 400), transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: SlideTransition(position: Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(anim), child: child)),
       child: Container(key: ValueKey(_selectedHourIndex), margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: _card, borderRadius: BorderRadius.circular(16), border: Border.all(color: _levelColor(selected.activityLevel).withValues(alpha: 0.3), width: 1), boxShadow: [BoxShadow(color: _levelColor(selected.activityLevel).withValues(alpha: 0.08), blurRadius: 20, spreadRadius: 2)]),
         child: Row(children: [
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(context.tr('tide.selectedHour'), style: GoogleFonts.inter(color: _txt(0.4), fontSize: 11)), const SizedBox(height: 4),
             Text(selected.label, style: GoogleFonts.inter(color: _txt(1.0), fontSize: 20, fontWeight: FontWeight.w800)), const SizedBox(height: 2),
-            Text('Marée ${selected.tideTrend} · ${selected.tideHeight.toStringAsFixed(2)}m · ${selected.windSpeed}km/h ${selected.windDirection}', style: GoogleFonts.inter(color: _txt(0.5), fontSize: 12)),
+            Text('Marée ${selected.tideTrend} · ${selected.tideHeight.toStringAsFixed(2)}m · $windText ${selected.windDirection}', style: GoogleFonts.inter(color: _txt(0.5), fontSize: 12)),
           ])),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
             Text('${selected.activityScore}', style: GoogleFonts.inter(color: _levelColor(selected.activityLevel), fontSize: 28, fontWeight: FontWeight.w800)),
@@ -391,8 +450,8 @@ class _TidePageState extends State<TidePage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildConditionMoon(tm.MoonInfo info) => _ConditionCard(animation: _ctrl, delayIndex: 7, icon: '🌙', title: context.tr('tide.moonPhase'), value: info.phaseName, subtitle: info.influence, child: RepaintBoundary(child: SizedBox(width: 40, height: 40, child: CustomPaint(painter: _MoonPainter(phase: 0.0)))));
-  Widget _buildConditionWind(tm.WindInfo info) => _ConditionCard(animation: _ctrl, delayIndex: 8, icon: '💨', title: context.tr('tide.wind'), value: '${info.speed} km/h ${info.direction}', subtitle: 'Rafales ±${info.gust} km/h', child: RepaintBoundary(child: SizedBox(width: 40, height: 40, child: CustomPaint(painter: _WindLinesPainter(animation: _ctrl)))));
-  Widget _buildConditionWaves(tm.WaveInfo info) => _ConditionCard(animation: _ctrl, delayIndex: 9, icon: '🌊', title: context.tr('tide.waves'), value: '${info.height}m / ${info.period}s', subtitle: info.swell, child: RepaintBoundary(child: SizedBox(width: 40, height: 40, child: CustomPaint(painter: _WaveSinePainter(animation: _ctrl)))));
+  Widget _buildConditionWind(tm.WindInfo info) => _ConditionCard(animation: _ctrl, delayIndex: 8, icon: '💨', title: context.tr('tide.wind'), value: info.speed > 0 ? '${info.speed} km/h ${info.direction}' : '--', subtitle: info.gust > 0 ? 'Rafales ±${info.gust} km/h' : 'Données indisponibles', child: RepaintBoundary(child: SizedBox(width: 40, height: 40, child: CustomPaint(painter: _WindLinesPainter(animation: _ctrl)))));
+  Widget _buildConditionWaves(tm.WaveInfo info) => _ConditionCard(animation: _ctrl, delayIndex: 9, icon: '🌊', title: context.tr('tide.waves'), value: info.height > 0 ? '${info.height.toStringAsFixed(1)}m / ${info.period}s' : '--', subtitle: info.swell, child: RepaintBoundary(child: SizedBox(width: 40, height: 40, child: CustomPaint(painter: _WaveSinePainter(animation: _ctrl)))));
   Widget _buildConditionSun(tm.SunTimes info) => _ConditionCard(animation: _ctrl, delayIndex: 10, icon: '☀️', title: context.tr('tide.sun'), value: '${info.sunrise} — ${info.sunset}', subtitle: 'Or ${info.goldenHour}', child: RepaintBoundary(child: SizedBox(width: 40, height: 40, child: CustomPaint(painter: _SunArcPainter(animation: _ctrl)))));
 
   Widget _buildEventsTitle() {
@@ -481,6 +540,9 @@ class _HourlyCardWidget extends StatelessWidget {
   const _HourlyCardWidget({required this.card, required this.isSelected, required this.onTap, required this.animation});
   @override Widget build(BuildContext context) {
     final color = _levelColor(card.activityLevel);
+    final windText = card.windSpeed > 0 ? '~${card.windSpeed}km/h' : '--';
+    final tempText = card.temp != 0 ? '${card.temp}°C' : '--';
+    final waveText = card.waveHeight > 0 ? '~${card.waveHeight.toStringAsFixed(1)}m' : '--';
     return GestureDetector(onTap: onTap, child: AnimatedContainer(duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic, width: 110, padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(color: isSelected ? color.withValues(alpha: 0.12) : _card, borderRadius: BorderRadius.circular(16), border: Border.all(color: isSelected ? color.withValues(alpha: 0.5) : Colors.transparent, width: 1.5), boxShadow: isSelected ? [BoxShadow(color: color.withValues(alpha: 0.2), blurRadius: 20, spreadRadius: 2)] : null),
       child: Column(crossAxisAlignment: CrossAxisAlignment.center, children: [
@@ -496,8 +558,8 @@ class _HourlyCardWidget extends StatelessWidget {
         ]), const SizedBox(height: 3),
         ClipRRect(borderRadius: BorderRadius.circular(2), child: LinearProgressIndicator(value: card.activityScore / 100, backgroundColor: _txt(0.08), valueColor: AlwaysStoppedAnimation<Color>(color), minHeight: 2)),
         const SizedBox(height: 6),
-        Text('${card.tideTrend == 'montante' ? '↑' : '↓'} ${card.tideHeight.toStringAsFixed(1)}m  ~${card.windSpeed}km/h', style: GoogleFonts.inter(color: _txt(0.5), fontSize: 9), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
-        Text('~${card.waveHeight.toStringAsFixed(1)}m  ${card.temp}°C', style: GoogleFonts.inter(color: _txt(0.35), fontSize: 9), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
+        Text('${card.tideTrend == 'montante' ? '↑' : '↓'} ${card.tideHeight.toStringAsFixed(1)}m  $windText', style: GoogleFonts.inter(color: _txt(0.5), fontSize: 9), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
+        Text('$waveText  $tempText', style: GoogleFonts.inter(color: _txt(0.35), fontSize: 9), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
       ]),
     ));
   }

@@ -14,11 +14,11 @@ import 'package:spots_app/pages/settings_page.dart';
 import 'package:spots_app/pages/spot_finder_page.dart';
 import 'package:spots_app/pages/techniques_page.dart';
 import 'package:spots_app/pages/community_page.dart';
-import 'package:spots_app/pages/premium_page.dart';
 import 'package:spots_app/pages/shops_page.dart';
 import 'package:spots_app/pages/tide_page.dart';
 import 'package:spots_app/pages/forecast_page.dart';
 import 'package:spots_app/models.dart';
+import 'package:spots_app/services/ad_service.dart';
 import 'package:spots_app/widgets/adaptive_banner_ad.dart';
 
 /// Clé globale pour accéder au state de navigation
@@ -48,6 +48,11 @@ class AppShellState extends State<AppShell> {
       SpotFinderPage(initialSpots: widget.initialSpots),
       const SettingsPageWrapper(),
     ];
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Le cœur de l'application est déjà chargé et l'activité Android est
+      // attachée avant d'afficher, si nécessaire, le formulaire UMP.
+      AdService.instance.initialize();
+    });
   }
 
   /// Navigue vers un onglet spécifique
@@ -65,8 +70,13 @@ class AppShellState extends State<AppShell> {
         ThemeController.instance,
         LanguageController.instance,
       ]),
-      builder: (context, _) => Scaffold(
-        body: Column(
+      builder: (context, _) => PopScope(
+        canPop: _currentIndex == 3,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop && _currentIndex != 3) navigateTo(3);
+        },
+        child: Scaffold(
+          body: Column(
           children: [
             Expanded(
               child: Stack(
@@ -74,7 +84,11 @@ class AppShellState extends State<AppShell> {
                   return Visibility(
                     visible: _currentIndex == index,
                     maintainState: true,
-                    maintainAnimation: true,
+                    // Keep each page's state, but stop hidden animations.
+                    // The home mini-map has its own pulse ticker; leaving it
+                    // active while the full map renders thousands of spots
+                    // causes avoidable CPU/GPU pressure on low-end devices.
+                    maintainAnimation: false,
                     maintainSize: false,
                     child: _pages[index],
                   );
@@ -84,7 +98,8 @@ class AppShellState extends State<AppShell> {
             const AdaptiveBannerAd(),
           ],
         ),
-        bottomNavigationBar: _buildBottomNav(tc),
+          bottomNavigationBar: _buildBottomNav(tc),
+        ),
       ),
     );
   }
@@ -109,28 +124,50 @@ class AppShellState extends State<AppShell> {
             children: [
               _NavItem(
                 icon: Icons.home_rounded,
-                label: LanguageController.instance.isRtl ? 'الرئيسية' : (LanguageController.instance.langCode == 'en' ? 'Home' : 'Accueil'),
+                label: LanguageController.instance.isRtl
+                    ? 'الرئيسية'
+                    : (LanguageController.instance.langCode == 'en'
+                        ? 'Home'
+                        : 'Accueil'),
                 isActive: _currentIndex == 0,
                 onTap: () => navigateTo(0),
               ),
               _NavItem(
                 icon: Icons.set_meal,
-                label: LanguageController.instance.isRtl ? 'الأسماك' : (LanguageController.instance.langCode == 'en' ? 'Fish' : 'Poissons'),
+                label: LanguageController.instance.isRtl
+                    ? 'الأسماك'
+                    : (LanguageController.instance.langCode == 'en'
+                        ? 'Fish'
+                        : 'Poissons'),
                 isActive: _currentIndex == 1,
                 onTap: () => navigateTo(1),
               ),
               _NavMapButton(
+                label: LanguageController.instance.isRtl
+                    ? 'الخريطة'
+                    : (LanguageController.instance.langCode == 'en'
+                        ? 'Map'
+                        : 'Carte'),
+                isActive: _currentIndex == 3,
                 onTap: () => navigateTo(3),
               ),
               _NavItem(
                 icon: Icons.add_location_alt_rounded,
-                label: LanguageController.instance.isRtl ? 'إضافة' : (LanguageController.instance.langCode == 'en' ? 'Add' : 'Ajouter'),
+                label: LanguageController.instance.isRtl
+                    ? 'إضافة'
+                    : (LanguageController.instance.langCode == 'en'
+                        ? 'Add'
+                        : 'Ajouter'),
                 isActive: _currentIndex == 2,
                 onTap: () => navigateTo(2),
               ),
               _NavItem(
                 icon: Icons.settings_rounded,
-                label: LanguageController.instance.isRtl ? 'الإعدادات' : (LanguageController.instance.langCode == 'en' ? 'Settings' : 'Paramètres'),
+                label: LanguageController.instance.isRtl
+                    ? 'الإعدادات'
+                    : (LanguageController.instance.langCode == 'en'
+                        ? 'Settings'
+                        : 'Paramètres'),
                 isActive: _currentIndex == 4,
                 onTap: () => navigateTo(4),
               ),
@@ -163,9 +200,14 @@ class _NavItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
 
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
+    return Semantics(
+      button: true,
+      selected: isActive,
+      label: label,
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
@@ -193,23 +235,35 @@ class _NavItem extends StatelessWidget {
             ),
           ],
         ),
+        ),
       ),
     );
   }
 }
 
 class _NavMapButton extends StatelessWidget {
+  final String label;
+  final bool isActive;
   final VoidCallback onTap;
 
-  const _NavMapButton({required this.onTap});
+  const _NavMapButton({
+    required this.label,
+    required this.isActive,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
+    return Semantics(
+      button: true,
+      selected: isActive,
+      label: label,
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
         width: 52,
         height: 52,
         decoration: BoxDecoration(
@@ -231,6 +285,7 @@ class _NavMapButton extends StatelessWidget {
           Icons.map_rounded,
           color: ThemeColors.of(context).textPrimary,
           size: 28,
+        ),
         ),
       ),
     );
@@ -254,7 +309,6 @@ class HomePageWrapper extends StatelessWidget {
       onNavigateToTechniques: () => _goTo(context, const TechniquesPage()),
       onNavigateToCommunity: () => _goTo(context, const CommunityPage()),
       onNavigateToShops: () => _goTo(context, const ShopsPage()),
-      onNavigateToPremium: () => _goTo(context, const PremiumPage()),
       onNavigateToTides: () => _goTo(context, const TidePage()),
       // Debug route / bouton caché : long-press sur "Marées" dans le drawer
       onNavigateToTidesV2: () => _goTo(context, const ForecastPage()),

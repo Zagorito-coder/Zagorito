@@ -49,7 +49,25 @@ class _WindParticleLayerState extends State<WindParticleLayer>
   void initState() {
     super.initState();
     _ticker = createTicker(_onTick);
-    _ticker.start();
+    widget.provider.addListener(_onProviderChanged);
+    if (widget.provider.isEnabled) {
+      _ticker.start();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant WindParticleLayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.provider != oldWidget.provider) {
+      oldWidget.provider.removeListener(_onProviderChanged);
+      widget.provider.addListener(_onProviderChanged);
+    }
+    // Si isEnabled vient de passer a true et que le Ticker ne tourne pas
+    if (widget.provider.isEnabled && !_ticker.isActive) {
+      _ticker.start();
+    } else if (!widget.provider.isEnabled && _ticker.isActive) {
+      _ticker.stop();
+    }
   }
 
   @override
@@ -61,8 +79,20 @@ class _WindParticleLayerState extends State<WindParticleLayer>
 
   @override
   void dispose() {
+    widget.provider.removeListener(_onProviderChanged);
     _ticker.dispose();
     super.dispose();
+  }
+
+  void _onProviderChanged() {
+    if (!mounted) return;
+    if (widget.provider.isEnabled && !_ticker.isActive) {
+      _ticker.start();
+    } else if (!widget.provider.isEnabled && _ticker.isActive) {
+      _ticker.stop();
+      _particles = [];
+      _animPhase = 0.0;
+    }
   }
 
   void _computeLOD() {

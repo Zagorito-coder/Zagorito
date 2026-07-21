@@ -4,23 +4,25 @@
     "tagline": "Pesca de Altura",
     "version": "Abyssal Fishing v1.0"
   },
+  "map": {
+    "searchHint": "Buscar un spot..."
+  },
   "drawer": {
     "title": "ABYSSAL",
     "subtitle": "Navegación",
     "home": "Inicio",
     "tides": "Mareas",
-    "tidesPro": "Mareas PRO",
+    "tidesPro": "Mareas avanzadas",
     "spots": "Spots",
     "fish": "Peces",
     "techniques": "Técnicas",
     "shops": "Tiendas",
     "community": "Comunidad",
-    "premium": "Premium",
     "settings": "Ajustes",
     "help": "Ayuda y Soporte",
-    "helpContent": "Para cualquier ayuda, contáctenos en support@boosterfish.app",
+    "helpContent": "Para cualquier ayuda, contáctenos en booster2fish@gmail.com",
     "logout": "Cerrar sesión",
-    "member": "Miembro Élite Abyssal"
+    "member": "Miembro BoosterFish"
   },
   "bottomNav": {
     "home": "Inicio",
@@ -52,7 +54,7 @@
     "comingSoon": "Próximamente...",
     "coefficient": "Coef",
     "transit": "Tránsito",
-    "member": "Miembro Élite Abyssal",
+    "member": "Miembro BoosterFish",
     "appName": "BoosterFish"
   },
   "species": {
@@ -86,7 +88,7 @@
     "techniqueBlock": "🎣 Técnica y Montaje",
     "montage": "🪝 Montaje",
     "expertAdvice": "💡 Consejo experto",
-    "tideBlock": "🌊 Condiciones de marea (simuladas)",
+    "tideBlock": "🌊 Condiciones marinas publicadas",
     "tide": "Marea",
     "tideRisingStrong": "Subiendo fuerte ↑",
     "tideRising": "Subiendo ↑",
@@ -95,7 +97,8 @@
     "fishActivity": "Actividad del pez",
     "wind": "Viento",
     "waterTemp": "Temp. agua",
-    "simulatedNote": "⚠️ Datos meteorológicos simulados — conectar API de mareas aquí.",
+    "simulatedNote": "Datos publicados por el servicio meteorológico; compruebe las condiciones locales.",
+    "unavailable": "Datos marinos no disponibles",
     "nearbySpots": "📍 Spots más cercanos",
     "noNearbySpots": "No se encontró ningún spot compatible cerca.",
     "loadingNearbySpots": "Buscando spots cercanos...",
@@ -157,31 +160,7 @@
     "title": "Comunidad",
     "comingSoon": "Próximamente..."
   },
-  "premium": {
-    "title": "MIEMBRO PREMIUM",
-    "elite": "Élite Abyssal",
-    "rank": "Rango: Apex",
-    "level": "Nivel 42",
-    "featureTitle": "Función Premium",
-    "description": "Hazte Premium para acceder a todos los detalles: tipos de peces, notas, zoom avanzado y más.",
-    "later": "Más tarde",
-    "subscribe": "Suscribirse",
-    "comingSoon": "Suscripción Premium próximamente...",
-    "monthly": "Mensual",
-    "monthlyPrice": "9,99 € / mes",
-    "annual": "Anual",
-    "annualPrice": "59,99 € / año",
-    "lifetime": "De por vida",
-    "lifetimePrice": "149,99 €",
-    "popular": "POPULAR",
-    "activate": "Activar Premium",
-    "activated": "Premium activado con éxito",
-    "activationError": "Error al activar",
-    "loginRequired": "Inicie sesión para activar Premium"
-  },
   "maps": {
-    "fish_types_premium": "Tipos de peces — Premium",
-    "notes_premium": "Notas detalladas — Premium",
     "open_in_google_maps": "Abrir en Google Maps",
     "nearby_spots_label": "SPOTS CERCANOS"
   },
@@ -200,12 +179,24 @@
     "initials": "CR",
     "captainName": "Capitán Rackham",
     "captainSubtitle": "Especialista en alta mar • Nivel 42",
-    "member": "Miembro Élite Abyssal",
+    "member": "Miembro BoosterFish",
     "vesselCrew": "EMBARCACIÓN Y TRIPULACIÓN",
     "updateCredentials": "Actualizar\ncredenciales",
     "signInFailed": "Inicio de sesión fallido. Asegúrese de tener una cuenta Google y que el APK esté firmado.",
+    "signInInterrupted": "El inicio de sesión con Google se interrumpió. Inténtalo de nuevo.",
+    "signInConfigurationError": "El inicio de sesión con Google no está disponible temporalmente. Comprueba la configuración.",
+    "signInUnavailable": "La ventana de inicio de sesión de Google no está disponible en este dispositivo.",
+    "signInNetworkError": "No se pudo conectar. Comprueba Internet e inténtalo de nuevo.",
+    "signInProviderDisabled": "El inicio de sesión con Google está desactivado temporalmente.",
+    "signInCredentialRejected": "Google no pudo validar este inicio de sesión. Inténtalo de nuevo.",
+    "signInUserDisabled": "Esta cuenta está desactivada.",
+    "signInTooManyRequests": "Demasiados intentos. Espera un momento e inténtalo de nuevo.",
     "signInGoogle": "Iniciar sesión con Google",
-    "signInGoogleSubtitle": "Sincronizar su cuenta"
+    "signInGoogleSubtitle": "Sincronizar su cuenta",
+    "adPrivacy": "Preferencias publicitarias",
+    "adPrivacySubtitle": "Gestionar su consentimiento de AdMob",
+    "adPrivacyUpdated": "Sus preferencias publicitarias se han actualizado.",
+    "adPrivacyError": "No se pueden abrir las preferencias publicitarias."
   },
   "language": {
     "title": "Idioma",

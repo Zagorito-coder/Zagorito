@@ -71,7 +71,7 @@ class _SplashMapPageState extends State<SplashMapPage>
   }
 
   Future<void> _preload() async {
-    await SpotService.loadFromCsv();
+    await SpotService.loadSpots();
     if (!mounted) return;
     setState(() => _spotsReady = true);
 
@@ -134,6 +134,7 @@ class _SplashMapPageState extends State<SplashMapPage>
             ),
             children: const [
               AppTileLayer(style: MapStyle.satellite),
+              AppMapAttribution(style: MapStyle.satellite),
             ],
           ),
 

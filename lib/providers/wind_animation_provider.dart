@@ -3,13 +3,15 @@
 //
 // ChangeNotifier qui gere l'etat de l'animation de vent sur la carte.
 // - isEnabled: toggle ON/OFF (false par defaut = 0% CPU/GPU)
-// - spotForecast: donnees meteo du spot selectionne (cache local)
+// - spotForecast: donnees meteo du spot selectionne (cache local avec TTL)
 // - selectedHourIndex: index du creneau horaire dans le slider
 // - windData: vecteurs U/V pre-calcules pour le painter
 // ============================================================================
 
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:spots_app/services/forecast_firestore_service.dart';
+import 'package:spots_app/utils/geo_utils.dart';
 
 /// Vecteur vent pre-calcule pour le CustomPainter.
 class WindVector {
@@ -26,6 +28,12 @@ class WindVector {
   });
 }
 
+class _CachedForecast {
+  final SpotForecast forecast;
+  final DateTime timestamp;
+  const _CachedForecast({required this.forecast, required this.timestamp});
+}
+
 class WindAnimationProvider extends ChangeNotifier {
   bool _isEnabled = false;
   String? _spotId;
@@ -35,7 +43,9 @@ class WindAnimationProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
 
-  final Map<String, SpotForecast> _cache = {};
+  final Map<String, _CachedForecast> _cache = {};
+  static const int _maxCacheEntries = 50;
+  static const Duration _cacheTtl = Duration(minutes: 30);
 
   bool get isEnabled => _isEnabled;
   String? get spotId => _spotId;
@@ -51,20 +61,27 @@ class WindAnimationProvider extends ChangeNotifier {
   /// OFF = desactive immediatement (synchrone).
   void toggleNearest(double lat, double lon) {
     if (_isEnabled) {
-      // DESACTIVER: on garde les donnees pour le panel, on stoppe juste l'animation
-      _isEnabled = false;
-      notifyListeners();
+      disable();
       return;
     }
+    enableNearest(lat, lon);
+  }
 
-    // ACTIVER: lancement asynchrone, mais l'UI voit _isEnabled = true
-    // et _isLoading = true immediatement
+  /// Active l'animation de vent et charge les donnees du spot le plus proche.
+  void enableNearest(double lat, double lon) {
+    if (_isEnabled) return;
     _isEnabled = true;
     _isLoading = true;
     _error = null;
     notifyListeners();
-
     _fetchNearest(lat, lon);
+  }
+
+  /// Desactive l'animation de vent (conserve les donnees en cache).
+  void disable() {
+    if (!_isEnabled) return;
+    _isEnabled = false;
+    notifyListeners();
   }
 
   /// Charge les donnees vent pour le panel (sans activer l'animation)
@@ -87,7 +104,7 @@ class WindAnimationProvider extends ChangeNotifier {
       String nearestId = spots.first['id'] as String;
       double minDist = double.infinity;
       for (final s in spots) {
-        final d = _haversine(
+        final d = haversineKm(
           lat, lon,
           (s['latitude'] as num).toDouble(),
           (s['longitude'] as num).toDouble(),
@@ -100,6 +117,7 @@ class WindAnimationProvider extends ChangeNotifier {
 
       await _loadSpotData(nearestId);
     } catch (e) {
+      debugPrint('[WindAnimationProvider] Erreur fetchNearest: $e');
       _error = e.toString();
       _isEnabled = false;
       _isLoading = false;
@@ -111,12 +129,17 @@ class WindAnimationProvider extends ChangeNotifier {
     _spotId = spotId;
 
     if (_cache.containsKey(spotId)) {
-      _forecast = _cache[spotId]!;
-      _selectedHourIndex = _findClosestHourIndex(_forecast!);
-      _computeVector();
-      _isLoading = false;
-      notifyListeners();
-      return;
+      final cached = _cache[spotId]!;
+      if (DateTime.now().difference(cached.timestamp) < _cacheTtl) {
+        _forecast = cached.forecast;
+        _selectedHourIndex = _findClosestHourIndex(_forecast!);
+        _computeVector();
+        _isLoading = false;
+        notifyListeners();
+        return;
+      }
+      // TTL expire, on recharge
+      _cache.remove(spotId);
     }
 
     try {
@@ -128,13 +151,15 @@ class WindAnimationProvider extends ChangeNotifier {
         notifyListeners();
         return;
       }
-      _cache[spotId] = forecast;
+      _evictCacheIfNeeded();
+      _cache[spotId] = _CachedForecast(forecast: forecast, timestamp: DateTime.now());
       _forecast = forecast;
       _selectedHourIndex = _findClosestHourIndex(forecast);
       _computeVector();
       _isLoading = false;
       notifyListeners();
     } catch (e) {
+      debugPrint('[WindAnimationProvider] Erreur loadSpotData: $e');
       _error = e.toString();
       _isEnabled = false;
       _isLoading = false;
@@ -142,16 +167,13 @@ class WindAnimationProvider extends ChangeNotifier {
     }
   }
 
-  double _haversine(double lat1, double lon1, double lat2, double lon2) {
-    const R = 6371.0;
-    final dLat = (lat2 - lat1) * 3.141592653589793 / 180;
-    final dLon = (lon2 - lon1) * 3.141592653589793 / 180;
-    final a = _sin(dLat / 2) * _sin(dLat / 2) +
-        _cos(lat1 * 3.141592653589793 / 180) *
-            _cos(lat2 * 3.141592653589793 / 180) *
-            _sin(dLon / 2) * _sin(dLon / 2);
-    final c = 2 * _atan2(_sqrt(a), _sqrt(1 - a));
-    return R * c;
+  void _evictCacheIfNeeded() {
+    while (_cache.length >= _maxCacheEntries) {
+      final oldest = _cache.entries
+          .reduce((a, b) =>
+              a.value.timestamp.isBefore(b.value.timestamp) ? a : b);
+      _cache.remove(oldest.key);
+    }
   }
 
   void selectHourIndex(int index) {
@@ -184,14 +206,17 @@ class WindAnimationProvider extends ChangeNotifier {
     final slot = _forecast!.slots[_selectedHourIndex];
     final speed = slot.windGustKnots > 0 ? slot.windGustKnots : slot.windSpeedKnots;
     final dirDeg = slot.windDirectionDeg;
-    final angleRad = (270 - dirDeg) * 3.141592653589793 / 180.0;
+    final angleRad = (270 - dirDeg) * pi / 180.0;
     _currentVector = WindVector(
-      u: speed * _cos(angleRad),
-      v: speed * _sin(angleRad),
+      u: speed * cos(angleRad),
+      v: speed * sin(angleRad),
       speedKt: speed,
       directionDeg: dirDeg.toInt(),
     );
   }
+
+  /// Vide le cache explicitement (utile pour le debug ou le logout).
+  void clearCache() => _cache.clear();
 
   static String directionToText(int deg) {
     const dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
@@ -204,39 +229,5 @@ class WindAnimationProvider extends ChangeNotifier {
   void dispose() {
     _cache.clear();
     super.dispose();
-  }
-
-  static double _sqrt(double x) {
-    if (x <= 0) return 0;
-    double g = x;
-    for (int i = 0; i < 20; i++) { g = (g + x / g) / 2; }
-    return g;
-  }
-
-  static double _atan2(double y, double x) {
-    if (x > 0) return _atan(y / x);
-    if (x < 0 && y >= 0) return _atan(y / x) + 3.141592653589793;
-    if (x < 0 && y < 0) return _atan(y / x) - 3.141592653589793;
-    if (x == 0 && y > 0) return 3.141592653589793 / 2;
-    if (x == 0 && y < 0) return -3.141592653589793 / 2;
-    return 0.0;
-  }
-
-  static double _atan(double x) {
-    double r = 0, t = x, x2 = x * x;
-    for (int i = 1; i < 20; i++) { r += t / (2 * i - 1); t *= -x2; }
-    return r;
-  }
-
-  static double _cos(double x) {
-    double r = 1.0, t = 1.0;
-    for (int i = 1; i <= 10; i++) { t *= -x * x / (2 * i * (2 * i - 1)); r += t; }
-    return r;
-  }
-
-  static double _sin(double x) {
-    double r = x, t = x;
-    for (int i = 1; i <= 10; i++) { t *= -x * x / (2 * i * (2 * i + 1)); r += t; }
-    return r;
   }
 }

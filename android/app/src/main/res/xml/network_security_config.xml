@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Configuration explicite de securite reseau pour Android 9+ (API 28+).
+  Miroir exact du comportement actuel de l'application defini par
+  android:usesCleartextTraffic="false" dans le manifeste.
+  Aucune autorisation de trafic en clair. Aucun certificat personnalise.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

@@ -11,6 +11,8 @@ class TidePoint {
   final double windDirectionDeg; // degrés météo (direction d'où vient le vent)
   final double wavePeriod;       // secondes
   final double windWaveHeight;   // mètres
+  final double? temperatureC;
+  final double? windSpeedKmh;
 
   const TidePoint({
     required this.time,
@@ -18,6 +20,8 @@ class TidePoint {
     this.windDirectionDeg = 0.0,
     this.wavePeriod = 7.0,
     this.windWaveHeight = 0.0,
+    this.temperatureC,
+    this.windSpeedKmh,
   });
 }
 
@@ -42,14 +46,14 @@ class TideData {
   });
 
   /// Valeurs par défaut quand l'API échoue
-  factory TideData.fallback() {
+  factory TideData.fallback({String location = 'Casablanca Morocco'}) {
     return TideData(
       hourlyPoints: const [],
-      low: 0.4,
-      high: 3.9,
-      next: 2.1,
-      waveHeight: 1.2,
-      location: 'Casablanca Morocco',
+      low: 0.0,
+      high: 0.0,
+      next: 0.0,
+      waveHeight: 0.0,
+      location: location,
       astro: AstroData.fallback(),
     );
   }

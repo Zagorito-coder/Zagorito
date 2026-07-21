@@ -140,10 +140,7 @@ class _ShopsPageState extends State<ShopsPage>
   }
 
   Future<List<Spot>> _loadSpots() async {
-    // Tente le cache local d'abord, puis le fichier chiffré spots.csv.enc
-    final cached = await SpotService.loadFromCache();
-    if (cached.isNotEmpty) return cached;
-    return SpotService.loadFromCsv();
+    return SpotService.loadSpots();
   }
 
   List<ShopSpotGroup> get _filteredGroups {

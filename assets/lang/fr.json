@@ -4,23 +4,25 @@
     "tagline": "Deep Sea Fishing",
     "version": "Abyssal Fishing v1.0"
   },
+  "map": {
+    "searchHint": "Rechercher un spot..."
+  },
   "drawer": {
     "title": "ABYSSAL",
     "subtitle": "Navigation",
     "home": "Accueil",
     "tides": "Marées",
-    "tidesPro": "Marées PRO",
+    "tidesPro": "Marées avancées",
     "spots": "Spots",
     "fish": "Poissons",
     "techniques": "Techniques",
     "shops": "Magasins",
     "community": "Communauté",
-    "premium": "Premium",
     "settings": "Paramètres",
     "help": "Aide & Support",
-    "helpContent": "Pour toute assistance, contactez-nous à support@boosterfish.app",
+    "helpContent": "Pour toute assistance, contactez-nous à booster2fish@gmail.com",
     "logout": "Déconnexion",
-    "member": "Abyssal Elite Member"
+    "member": "Membre BoosterFish"
   },
   "bottomNav": {
     "home": "Accueil",
@@ -52,7 +54,7 @@
     "comingSoon": "Fonctionnalité à venir...",
     "coefficient": "Coef",
     "transit": "Transit",
-    "member": "Membre Élite Abyssal",
+    "member": "Membre BoosterFish",
     "appName": "BoosterFish"
   },
   "species": {
@@ -86,7 +88,7 @@
     "techniqueBlock": "🎣 Technique & Montage",
     "montage": "🪝 Montage",
     "expertAdvice": "💡 Conseil expert",
-    "tideBlock": "🌊 Conditions marées (simulées)",
+    "tideBlock": "🌊 Conditions marines publiées",
     "tide": "Marée",
     "tideRisingStrong": "Montante forte ↑",
     "tideRising": "Montante ↑",
@@ -95,7 +97,8 @@
     "fishActivity": "Activité poisson",
     "wind": "Vent",
     "waterTemp": "Temp. eau",
-    "simulatedNote": "⚠️ Données météo simulées — brancher API marées ici.",
+    "simulatedNote": "Données publiées par le service météo ; vérifiez les conditions locales.",
+    "unavailable": "Données marines indisponibles",
     "nearbySpots": "📍 Spots les plus proches",
     "noNearbySpots": "Aucun spot compatible trouvé à proximité.",
     "loadingNearbySpots": "Recherche des spots proches...",
@@ -157,31 +160,7 @@
     "title": "Communauté",
     "comingSoon": "Fonctionnalité à venir..."
   },
-  "premium": {
-    "title": "MEMBRE PREMIUM",
-    "elite": "Abyssal Elite",
-    "rank": "Rang : Apex",
-    "level": "Niveau 42",
-    "featureTitle": "Fonctionnalité Premium",
-    "description": "Passez Premium pour accéder à tous les détails : types de poissons, notes, zoom avancé, et plus encore.",
-    "later": "Plus tard",
-    "subscribe": "S'abonner",
-    "comingSoon": "Abonnement Premium à venir...",
-    "monthly": "Mensuel",
-    "monthlyPrice": "9,99 € / mois",
-    "annual": "Annuel",
-    "annualPrice": "59,99 € / an",
-    "lifetime": "À vie",
-    "lifetimePrice": "149,99 €",
-    "popular": "POPULAIRE",
-    "activate": "Activer Premium",
-    "activated": "Premium activé avec succès",
-    "activationError": "Erreur lors de l'activation",
-    "loginRequired": "Connectez-vous pour activer Premium"
-  },
   "maps": {
-    "fish_types_premium": "Types de poissons — Premium",
-    "notes_premium": "Notes détaillées — Premium",
     "open_in_google_maps": "Ouvrir dans Google Maps",
     "nearby_spots_label": "SPOTS VOISINS"
   },
@@ -200,19 +179,32 @@
     "initials": "CR",
     "captainName": "Capitaine Rackham",
     "captainSubtitle": "Spécialiste en haute mer • Niveau 42",
-    "member": "Membre Élite Abyssal",
+    "member": "Membre BoosterFish",
     "vesselCrew": "NAVIRE & ÉQUIPAGE",
     "updateCredentials": "Mettre à jour\nvos identifiants",
   "signInFailed": "Connexion échouée. Vérifie que tu as bien un compte Google et que l'APK est signé.",
+  "signInInterrupted": "La connexion Google a été interrompue. Réessaie.",
+  "signInConfigurationError": "La connexion Google est momentanément indisponible. Vérifie la configuration de l'application.",
+  "signInUnavailable": "La fenêtre de connexion Google n'est pas disponible sur cet appareil.",
+  "signInNetworkError": "Connexion réseau impossible. Vérifie Internet puis réessaie.",
+  "signInProviderDisabled": "La connexion Google est désactivée pour le moment.",
+  "signInCredentialRejected": "Google n'a pas pu valider cette connexion. Réessaie.",
+  "signInUserDisabled": "Ce compte a été désactivé.",
+  "signInTooManyRequests": "Trop de tentatives. Attends un moment puis réessaie.",
   "signInGoogle": "Se connecter avec Google",
-  "signInGoogleSubtitle": "Synchroniser votre compte"
+  "signInGoogleSubtitle": "Synchroniser votre compte",
+  "adPrivacy": "Préférences publicitaires",
+  "adPrivacySubtitle": "Gérer votre consentement AdMob",
+  "adPrivacyUpdated": "Vos préférences publicitaires ont été mises à jour.",
+  "adPrivacyError": "Impossible d'ouvrir les préférences publicitaires."
   },
   "language": {
     "title": "Langue",
     "select": "Sélectionner la langue",
     "french": "Français",
     "english": "English",
-    "arabic": "العربية"
+    "arabic": "العربية",
+    "spanish": "Español"
   },
   "theme": {
     "dark": "Mode Sombre",

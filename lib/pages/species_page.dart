@@ -61,6 +61,7 @@ class _SpeciesPageState extends State<SpeciesPage> {
   Future<void> _loadData() async {
     try {
       final data = await SpeciesService.loadSpecies();
+      if (!mounted) return;
       setState(() {
         _allSpecies = data;
         _filtered = data;
@@ -69,6 +70,7 @@ class _SpeciesPageState extends State<SpeciesPage> {
     } catch (e, st) {
       debugPrint('[SpeciesPage] Erreur chargement espèces: $e');
       debugPrint('$st');
+      if (!mounted) return;
       setState(() {
         _error = e.toString();
         _loading = false;

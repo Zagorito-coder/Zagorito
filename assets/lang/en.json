@@ -4,23 +4,25 @@
     "tagline": "Deep Sea Fishing",
     "version": "Abyssal Fishing v1.0"
   },
+  "map": {
+    "searchHint": "Search for a spot..."
+  },
   "drawer": {
     "title": "ABYSSAL",
     "subtitle": "Navigation",
     "home": "Home",
     "tides": "Tides",
-    "tidesPro": "Tides PRO",
+    "tidesPro": "Advanced tides",
     "spots": "Spots",
     "fish": "Fish",
     "techniques": "Techniques",
     "shops": "Shops",
     "community": "Community",
-    "premium": "Premium",
     "settings": "Settings",
     "help": "Help & Support",
-    "helpContent": "For any assistance, contact us at support@boosterfish.app",
+    "helpContent": "For any assistance, contact us at booster2fish@gmail.com",
     "logout": "Logout",
-    "member": "Abyssal Elite Member"
+    "member": "BoosterFish member"
   },
   "bottomNav": {
     "home": "Home",
@@ -52,7 +54,7 @@
     "comingSoon": "Feature coming soon...",
     "coefficient": "Coef",
     "transit": "Transit",
-    "member": "Abyssal Elite Member",
+    "member": "BoosterFish member",
     "appName": "BoosterFish"
   },
   "species": {
@@ -86,7 +88,7 @@
     "techniqueBlock": "🎣 Technique & Rig",
     "montage": "🪝 Rig",
     "expertAdvice": "💡 Expert advice",
-    "tideBlock": "🌊 Tide conditions (simulated)",
+    "tideBlock": "🌊 Published marine conditions",
     "tide": "Tide",
     "tideRisingStrong": "Strong rising ↑",
     "tideRising": "Rising ↑",
@@ -95,7 +97,8 @@
     "fishActivity": "Fish activity",
     "wind": "Wind",
     "waterTemp": "Water temp.",
-    "simulatedNote": "⚠️ Simulated weather data — connect tide API here.",
+    "simulatedNote": "Data published by the weather service; check local conditions.",
+    "unavailable": "Marine data unavailable",
     "nearbySpots": "📍 Nearest spots",
       "noNearbySpots": "No compatible spot found nearby.",
       "loadingNearbySpots": "Searching for nearby spots...",
@@ -157,27 +160,9 @@
     "title": "Community",
     "comingSoon": "Feature coming soon..."
   },
-  "premium": {
-    "title": "PREMIUM MEMBER",
-    "elite": "Abyssal Elite",
-    "rank": "Rank: Apex",
-    "level": "Level 42",
-    "featureTitle": "Premium Feature",
-    "description": "Go Premium to access all details: fish types, notes, advanced zoom, and more.",
-    "later": "Later",
-    "subscribe": "Subscribe",
-    "comingSoon": "Premium subscription coming soon...",
-    "monthly": "Monthly",
-    "monthlyPrice": "€9.99 / month",
-    "annual": "Annual",
-    "annualPrice": "€59.99 / year",
-    "lifetime": "Lifetime",
-    "lifetimePrice": "€149.99",
-    "popular": "POPULAR",
-    "activate": "Activate Premium",
-    "activated": "Premium activated successfully",
-    "activationError": "Activation failed",
-    "loginRequired": "Log in to activate Premium"
+  "maps": {
+    "open_in_google_maps": "Open in Google Maps",
+    "nearby_spots_label": "NEARBY SPOTS"
   },
   "settings": {
     "title": "COMMAND CENTER",
@@ -194,19 +179,32 @@
     "initials": "CR",
     "captainName": "Captain Rackham",
     "captainSubtitle": "Deep Sea Specialist • Level 42",
-    "member": "Abyssal Elite Member",
+    "member": "BoosterFish member",
     "vesselCrew": "VESSEL & CREW",
     "updateCredentials": "Update your\ncredentials",
     "signInFailed": "Sign in failed. Make sure you have a Google account and the APK is signed.",
+    "signInInterrupted": "Google sign-in was interrupted. Please try again.",
+    "signInConfigurationError": "Google sign-in is temporarily unavailable. Check the app configuration.",
+    "signInUnavailable": "The Google sign-in window is unavailable on this device.",
+    "signInNetworkError": "Unable to connect. Check your internet connection and try again.",
+    "signInProviderDisabled": "Google sign-in is currently disabled.",
+    "signInCredentialRejected": "Google could not validate this sign-in. Please try again.",
+    "signInUserDisabled": "This account has been disabled.",
+    "signInTooManyRequests": "Too many attempts. Wait a moment and try again.",
     "signInGoogle": "Sign in with Google",
-    "signInGoogleSubtitle": "Sync your account"
+    "signInGoogleSubtitle": "Sync your account",
+    "adPrivacy": "Advertising preferences",
+    "adPrivacySubtitle": "Manage your AdMob consent",
+    "adPrivacyUpdated": "Your advertising preferences have been updated.",
+    "adPrivacyError": "Unable to open advertising preferences."
   },
   "language": {
     "title": "Language",
     "select": "Select language",
     "french": "Français",
     "english": "English",
-    "arabic": "العربية"
+    "arabic": "العربية",
+    "spanish": "Español"
   },
   "theme": {
     "dark": "Dark Mode",

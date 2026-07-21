@@ -42,6 +42,9 @@ app.*.map.json
 # Environment secrets
 .env
 
+# Source locale du catalogue chiffre embarque
+/assets/spots.csv
+
 # Android keystore & signing
 /android/key.properties
 *.jks
@@ -66,3 +69,4 @@ android/app/google-services.json
 android/app/google-services.json
 ios/Runner/GoogleService-Info.plist
 firebase-key.json
+functions/node_modules/

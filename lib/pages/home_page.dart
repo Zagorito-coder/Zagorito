@@ -6,11 +6,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart' as fm;
 import 'package:latlong2/latlong.dart' as lat2;
-import 'package:provider/provider.dart';
 import '../models.dart';
 import '../models/tide_data.dart';
 import '../pages/settings_page.dart';
-import '../providers/premium_provider.dart';
 import '../services/spot_service.dart';
 import '../services/tide_service.dart';
 import '../theme.dart';
@@ -26,7 +24,6 @@ class HomePage extends StatefulWidget {
   final VoidCallback? onNavigateToTechniques;
   final VoidCallback? onNavigateToCommunity;
   final VoidCallback? onNavigateToShops;
-  final VoidCallback? onNavigateToPremium;
   final VoidCallback? onNavigateToTides;
   final VoidCallback? onNavigateToTidesV2;
 
@@ -38,7 +35,6 @@ class HomePage extends StatefulWidget {
     this.onNavigateToTechniques,
     this.onNavigateToCommunity,
     this.onNavigateToShops,
-    this.onNavigateToPremium,
     this.onNavigateToTides,
     this.onNavigateToTidesV2,
   });
@@ -77,7 +73,7 @@ class _HomePageState extends State<HomePage>
 
   Future<void> _loadSpots() async {
     if (_spots.isNotEmpty) return; // Déjà fournis par SplashBootstrap.
-    final spots = await SpotService.loadFromCache();
+    final spots = await SpotService.loadSpots();
     if (mounted) {
       setState(() => _spots = spots);
     }
@@ -138,8 +134,16 @@ class _HomePageState extends State<HomePage>
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: ThemeController.instance.isDark
-                    ? const [Color(0xFF0D3B3B), Color(0xFF06181E), Color(0xFF0A0F1A)]
-                    : const [Color(0xFF81D4FA), Color(0xFFB3E5FC), Color(0xFFE3F2FD)],
+                      ? const [
+                          Color(0xFF0D3B3B),
+                          Color(0xFF06181E),
+                          Color(0xFF0A0F1A)
+                        ]
+                      : const [
+                          Color(0xFF81D4FA),
+                          Color(0xFFB3E5FC),
+                          Color(0xFFE3F2FD)
+                        ],
                   stops: const [0.0, 0.5, 1.0],
                 ),
               ),
@@ -176,7 +180,8 @@ class _HomePageState extends State<HomePage>
 
                 // ── Grid 2x2 ──
                 SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                   sliver: SliverGrid.count(
                     crossAxisCount: 2,
                     mainAxisSpacing: 12,
@@ -226,6 +231,7 @@ class _HomePageState extends State<HomePage>
       ),
     );
   }
+
   //  DRAWER — Menu latéral
   // ─────────────────────────────────────────────
   Widget _buildDrawer(BuildContext context, ThemeColors tc) {
@@ -239,373 +245,360 @@ class _HomePageState extends State<HomePage>
               // Header du drawer
               Container(
                 padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [tc.oceanDeep, tc.oceanMedium],
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [tc.oceanDeep, tc.oceanMedium],
+                  ),
                 ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            width: 1.5,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              width: 1.5,
+                            ),
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Colors.white.withValues(alpha: 0.2),
+                                Colors.white.withValues(alpha: 0.05),
+                              ],
+                            ),
                           ),
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Colors.white.withValues(alpha: 0.2),
-                              Colors.white.withValues(alpha: 0.05),
+                          clipBehavior: Clip.antiAlias,
+                          child: Image.asset(
+                            'assets/logo.png',
+                            width: 56,
+                            height: 56,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Icon(
+                                Icons.anchor,
+                                color: Colors.white,
+                                size: 32,
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'BoosterFish',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.5,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                context.tr('app.tagline'),
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.75),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ],
                           ),
                         ),
-                        clipBehavior: Clip.antiAlias,
-                        child: Image.asset(
-                          'assets/logo.png',
-                          width: 56,
-                          height: 56,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return const Icon(
-                              Icons.anchor,
-                              color: Colors.white,
-                              size: 32,
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'BoosterFish',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.5,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          context.tr('app.tagline'),
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.75),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
                       ],
                     ),
-                  ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.2),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.verified,
-                          color: tc.gold,
-                          size: 14,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          context.tr('home.member'),
-                          style: TextStyle(
-                            color: tc.gold,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Switch Dark / Light
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
-              child: ListenableBuilder(
-                listenable: ThemeController.instance,
-                builder: (context, child) {
-                  final isDark = ThemeController.instance.isDark;
-                  return GestureDetector(
-                    onTap: () => ThemeController.instance.toggle(),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: isDark
-                            ? const Color(0xFF1A2332)
-                            : const Color(0xFFF0F4F8),
-                        borderRadius: BorderRadius.circular(14),
+                        color: Colors.white.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: isDark
-                              ? Colors.white.withValues(alpha: 0.08)
-                              : Colors.black.withValues(alpha: 0.08),
-                          width: 1,
+                          color: Colors.white.withValues(alpha: 0.2),
                         ),
                       ),
                       child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 300),
-                            transitionBuilder: (child, anim) =>
-                                ScaleTransition(scale: anim, child: child),
-                            child: Icon(
-                              isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
-                              key: ValueKey<bool>(isDark),
-                              color: isDark ? const Color(0xFF00B4D8) : const Color(0xFFFFB300),
-                              size: 22,
-                            ),
+                          Icon(
+                            Icons.verified,
+                            color: tc.gold,
+                            size: 14,
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              isDark ? context.tr('theme.dark') : context.tr('theme.light'),
-                              style: TextStyle(
-                                color: isDark ? Colors.white.withValues(alpha: 0.85) : const Color(0xFF1A2332),
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 300),
-                            width: 46,
-                            height: 26,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(13),
-                              color: isDark ? const Color(0xFF00B4D8) : const Color(0xFFB0BEC5),
-                            ),
-                            child: AnimatedAlign(
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeInOut,
-                              alignment: isDark ? Alignment.centerRight : Alignment.centerLeft,
-                              child: Padding(
-                                padding: const EdgeInsets.all(3),
-                                child: Container(
-                                  width: 20,
-                                  height: 20,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(10),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.15),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 1),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
+                          const SizedBox(width: 6),
+                          Text(
+                            context.tr('home.member'),
+                            style: TextStyle(
+                              color: tc.gold,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
                       ),
                     ),
-                  );
-                },
+                  ],
+                ),
               ),
-            ),
 
-            // Sélecteur de langue mignon (flags only)
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 6, 16, 6),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CuteLanguageSelector(),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 6),
-
-            // Menu items
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                children: [
-                  _DrawerItem(
-                    icon: Icons.home_rounded,
-                    label: context.tr('drawer.home'),
-                    isActive: true,
-                    onTap: null,
-                  ),
-                  _DrawerItem(
-                    icon: Icons.waves,
-                    label: context.tr('drawer.tides'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      widget.onNavigateToTides?.call();
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.waves,
-                    label: context.tr('drawer.tidesPro'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      widget.onNavigateToTidesV2?.call();
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.location_on,
-                    label: context.tr('drawer.spots'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      widget.onNavigateToSpots?.call();
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.set_meal,
-                    label: context.tr('drawer.fish'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      widget.onNavigateToSpecies?.call();
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.school,
-                    label: context.tr('drawer.techniques'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      widget.onNavigateToTechniques?.call();
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.storefront,
-                    label: context.tr('drawer.shops'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      widget.onNavigateToShops?.call();
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.people,
-                    label: context.tr('drawer.community'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      widget.onNavigateToCommunity?.call();
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.workspace_premium,
-                    label: context.tr('drawer.premium'),
-                    trailing: Consumer<PremiumProvider>(
-                      builder: (context, premiumProvider, _) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: premiumProvider.isPremium
-                                ? tc.gold.withValues(alpha: 0.25)
-                                : tc.textMuted.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(12),
+              // Switch Dark / Light
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+                child: ListenableBuilder(
+                  listenable: ThemeController.instance,
+                  builder: (context, child) {
+                    final isDark = ThemeController.instance.isDark;
+                    return GestureDetector(
+                      onTap: () => ThemeController.instance.toggle(),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? const Color(0xFF1A2332)
+                              : const Color(0xFFF0F4F8),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.08)
+                                : Colors.black.withValues(alpha: 0.08),
+                            width: 1,
                           ),
-                          child: Text(
-                            premiumProvider.isPremium ? 'PRO' : 'FREE',
-                            style: TextStyle(
-                              color: premiumProvider.isPremium ? tc.gold : tc.textSecondary,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
+                        ),
+                        child: Row(
+                          children: [
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 300),
+                              transitionBuilder: (child, anim) =>
+                                  ScaleTransition(scale: anim, child: child),
+                              child: Icon(
+                                isDark
+                                    ? Icons.dark_mode_rounded
+                                    : Icons.light_mode_rounded,
+                                key: ValueKey<bool>(isDark),
+                                color: isDark
+                                    ? const Color(0xFF00B4D8)
+                                    : const Color(0xFFFFB300),
+                                size: 22,
+                              ),
                             ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                isDark
+                                    ? context.tr('theme.dark')
+                                    : context.tr('theme.light'),
+                                style: TextStyle(
+                                  color: isDark
+                                      ? Colors.white.withValues(alpha: 0.85)
+                                      : const Color(0xFF1A2332),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              width: 46,
+                              height: 26,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(13),
+                                color: isDark
+                                    ? const Color(0xFF00B4D8)
+                                    : const Color(0xFFB0BEC5),
+                              ),
+                              child: AnimatedAlign(
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeInOut,
+                                alignment: isDark
+                                    ? Alignment.centerRight
+                                    : Alignment.centerLeft,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(3),
+                                  child: Container(
+                                    width: 20,
+                                    height: 20,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(10),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black
+                                              .withValues(alpha: 0.15),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 1),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+              // Sélecteur de langue mignon (flags only)
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 6, 16, 6),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CuteLanguageSelector(),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 6),
+
+              // Menu items
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  children: [
+                    _DrawerItem(
+                      icon: Icons.home_rounded,
+                      label: context.tr('drawer.home'),
+                      isActive: true,
+                      onTap: null,
+                    ),
+                    _DrawerItem(
+                      icon: Icons.waves,
+                      label: context.tr('drawer.tides'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        widget.onNavigateToTides?.call();
+                      },
+                    ),
+                    _DrawerItem(
+                      icon: Icons.waves,
+                      label: context.tr('drawer.tidesPro'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        widget.onNavigateToTidesV2?.call();
+                      },
+                    ),
+                    _DrawerItem(
+                      icon: Icons.location_on,
+                      label: context.tr('drawer.spots'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        widget.onNavigateToSpots?.call();
+                      },
+                    ),
+                    _DrawerItem(
+                      icon: Icons.set_meal,
+                      label: context.tr('drawer.fish'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        widget.onNavigateToSpecies?.call();
+                      },
+                    ),
+                    _DrawerItem(
+                      icon: Icons.school,
+                      label: context.tr('drawer.techniques'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        widget.onNavigateToTechniques?.call();
+                      },
+                    ),
+                    _DrawerItem(
+                      icon: Icons.storefront,
+                      label: context.tr('drawer.shops'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        widget.onNavigateToShops?.call();
+                      },
+                    ),
+                    _DrawerItem(
+                      icon: Icons.people,
+                      label: context.tr('drawer.community'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        widget.onNavigateToCommunity?.call();
+                      },
+                    ),
+                    const Divider(height: 1, indent: 20, endIndent: 20),
+                    _DrawerItem(
+                      icon: Icons.settings_rounded,
+                      label: context.tr('drawer.settings'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const SettingsPage()),
+                        );
+                      },
+                    ),
+                    _DrawerItem(
+                      icon: Icons.help_outline,
+                      label: context.tr('drawer.help'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: Text(context.tr('drawer.help')),
+                            content: Text(context.tr('drawer.helpContent')),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(ctx).pop(),
+                                child: Text(context.tr('common.ok')),
+                              ),
+                            ],
                           ),
                         );
                       },
                     ),
-                    onTap: () {
-                      Navigator.pop(context);
-                      widget.onNavigateToPremium?.call();
-                    },
-                  ),
-                  const Divider(height: 1, indent: 20, endIndent: 20),
-                  _DrawerItem(
-                    icon: Icons.settings_rounded,
-                    label: context.tr('drawer.settings'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const SettingsPage()),
-                      );
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.help_outline,
-                    label: context.tr('drawer.help'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      showDialog(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: Text(context.tr('drawer.help')),
-                          content: Text(
-                              context.tr('drawer.helpContent')),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(ctx).pop(),
-                              child: Text(context.tr('common.ok')),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
 
-            // Footer du drawer
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.logout, color: tc.textMuted, size: 20),
-                  const SizedBox(width: 12),
-                  Text(
-                    context.tr('drawer.logout'),
-                    style: TextStyle(
-                      color: tc.textMuted,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
+              // Footer du drawer
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.logout, color: tc.textMuted, size: 20),
+                    const SizedBox(width: 12),
+                    Text(
+                      context.tr('drawer.logout'),
+                      style: TextStyle(
+                        color: tc.textMuted,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
   }
 
   // ─────────────────────────────────────────────
@@ -706,11 +699,22 @@ class _HomePageState extends State<HomePage>
   Widget _buildMapPreviewCard() {
     final tc = ThemeColors.of(context);
     final size = MediaQuery.of(context).size;
-    final displaySpots = _spots.take(500).toList();
+    const maxPreviewSpots = 170;
+    final displaySpots = _spots.length <= maxPreviewSpots
+        ? _spots
+        : List<Spot>.generate(
+            maxPreviewSpots,
+            (index) => _spots[
+              index * (_spots.length - 1) ~/ (maxPreviewSpots - 1)
+            ],
+            growable: false,
+          );
     final bounds = displaySpots.isEmpty
         ? null
         : fm.LatLngBounds.fromPoints(
-            displaySpots.map((s) => lat2.LatLng(s.latitude, s.longitude)).toList(),
+            displaySpots
+                .map((s) => lat2.LatLng(s.latitude, s.longitude))
+                .toList(),
           );
 
     return GestureDetector(
@@ -757,6 +761,7 @@ class _HomePageState extends State<HomePage>
                 ),
                 children: [
                   const AppTileLayer(style: MapStyle.satellite),
+                  const AppMapAttribution(style: MapStyle.satellite),
                   if (displaySpots.isNotEmpty)
                     fm.MarkerLayer(
                       markers: displaySpots
@@ -854,10 +859,14 @@ class _HomePageState extends State<HomePage>
   // ignore: unused_element
   Widget _buildTidesCard() {
     final tc = ThemeColors.of(context);
+    if (!_isLoading && _tideData.hourlyPoints.isEmpty) {
+      return _buildTidesUnavailableCard(tc);
+    }
+    final hasData = _tideData.hourlyPoints.isNotEmpty;
     final astro = _tideData.astro;
-    final lowStr = '${_tideData.low.toStringAsFixed(1)}m';
-    final highStr = '${_tideData.high.toStringAsFixed(1)}m';
-    final nextStr = '${_tideData.next.toStringAsFixed(1)}m';
+    final lowStr = hasData ? '${_tideData.low.toStringAsFixed(1)}m' : '--';
+    final highStr = hasData ? '${_tideData.high.toStringAsFixed(1)}m' : '--';
+    final nextStr = hasData ? '${_tideData.next.toStringAsFixed(1)}m' : '--';
 
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 0, 20, 24),
@@ -1056,6 +1065,44 @@ class _HomePageState extends State<HomePage>
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTidesUnavailableCard(ThemeColors tc) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: tc.surface.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: tc.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            context.tr('home.tidesTitle'),
+            style: TextStyle(
+              color: tc.textPrimary,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            context.tr('fishIntelligence.unavailable'),
+            style: TextStyle(color: tc.textSecondary, fontSize: 13),
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton(
+              onPressed: _refresh,
+              child: Text(context.tr('common.tryAgain')),
+            ),
           ),
         ],
       ),
@@ -1483,7 +1530,10 @@ class _RealTimeTidePainter extends CustomPainter {
 
     final firstTime = todayPoints.first.time;
     final lastTime = todayPoints.last.time;
-    final timeRange = lastTime.difference(firstTime).inMinutes.toDouble()
+    final timeRange = lastTime
+        .difference(firstTime)
+        .inMinutes
+        .toDouble()
         .clamp(1.0, double.infinity);
 
     final linePaint = Paint()
@@ -1548,7 +1598,11 @@ class _RealTimeTidePainter extends CustomPainter {
       canvas.drawCircle(center, 10,
           Paint()..color = const Color(0xFF00B4D8).withValues(alpha: 0.35));
       canvas.drawCircle(
-          center, 5, Paint()..color = Colors.white..style = PaintingStyle.fill);
+          center,
+          5,
+          Paint()
+            ..color = Colors.white
+            ..style = PaintingStyle.fill);
     }
   }
 
@@ -1586,8 +1640,12 @@ class _RealTimeTidePainter extends CustomPainter {
     canvas.drawPath(fillPath, fillPaint);
 
     final dotCenter = Offset(w * 0.50, h * 0.08);
-    canvas.drawCircle(dotCenter, 5,
-        Paint()..color = Colors.white..style = PaintingStyle.fill);
+    canvas.drawCircle(
+        dotCenter,
+        5,
+        Paint()
+          ..color = Colors.white
+          ..style = PaintingStyle.fill);
     canvas.drawCircle(dotCenter, 10,
         Paint()..color = const Color(0xFF00B4D8).withValues(alpha: 0.35));
   }
@@ -1728,14 +1786,12 @@ class _DrawerItem extends StatelessWidget {
   final String label;
   final bool isActive;
   final VoidCallback? onTap;
-  final Widget? trailing;
 
   const _DrawerItem({
     required this.icon,
     required this.label,
     this.isActive = false,
     this.onTap,
-    this.trailing,
   });
 
   @override
@@ -1755,7 +1811,7 @@ class _DrawerItem extends StatelessWidget {
           fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
         ),
       ),
-      trailing: trailing ?? (isActive
+      trailing: isActive
           ? Container(
               width: 4,
               height: 20,
@@ -1764,7 +1820,7 @@ class _DrawerItem extends StatelessWidget {
                 borderRadius: BorderRadius.circular(2),
               ),
             )
-          : null),
+          : null,
       onTap: onTap,
       dense: true,
       visualDensity: VisualDensity.compact,

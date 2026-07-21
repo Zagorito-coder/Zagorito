@@ -14,7 +14,6 @@ Usage:
   python3 tools/merge_spots.py <nouveau_fichier.csv>
 """
 
-import base64
 import csv
 import io
 import os
@@ -22,8 +21,9 @@ import shutil
 import sys
 from datetime import datetime
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from encrypt_spots import ROOT, _load_key
 
-KEY_B64 = 'q/F+3pnu668/hPnjF96uTqZH+7E24ppnH+53+rwdya0='
+KEY = _load_key(ROOT / '.env')
 ENC_PATH = 'assets/spots.csv.enc'
 OUTPUT_HEADER = ['Nom', 'Latitude', 'Longitude', 'Poissons', 'Notes']
 ROUND_DECIMALS = 5
@@ -31,11 +31,10 @@ ROUND_DECIMALS = 5
 
 # ── AES-256-CBC ───────────────────────────────────────────────
 def decrypt(path: str) -> str:
-    key = base64.b64decode(KEY_B64)
     with open(path, 'rb') as f:
         data = f.read()
     iv, ct = data[:16], data[16:]
-    cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
+    cipher = Cipher(algorithms.AES(KEY), modes.CBC(iv))
     dec = cipher.decryptor()
     pt = dec.update(ct) + dec.finalize()
     pad = pt[-1]
@@ -43,12 +42,11 @@ def decrypt(path: str) -> str:
 
 
 def encrypt(csv_text: str) -> bytes:
-    key = base64.b64decode(KEY_B64)
     iv = os.urandom(16)
     data = csv_text.encode('utf-8')
     pad_len = 16 - (len(data) % 16)
     data += bytes([pad_len] * pad_len)
-    cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
+    cipher = Cipher(algorithms.AES(KEY), modes.CBC(iv))
     enc = cipher.encryptor()
     return iv + enc.update(data) + enc.finalize()
 

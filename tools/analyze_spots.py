@@ -1,21 +1,20 @@
-import base64
 import csv
 import io
 import math
 import sys
 from collections import Counter
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from encrypt_spots import ROOT, _load_key
 
 sys.stdout.reconfigure(encoding='utf-8')
 
-KEY_B64 = 'q/F+3pnu668/hPnjF96uTqZH+7E24ppnH+53+rwdya0='
+KEY = _load_key(ROOT / '.env')
 
 def decrypt_csv(path: str) -> str:
-    key = base64.b64decode(KEY_B64)
     with open(path, 'rb') as f:
         data = f.read()
     iv, ct = data[:16], data[16:]
-    dec = Cipher(algorithms.AES(key), modes.CBC(iv)).decryptor()
+    dec = Cipher(algorithms.AES(KEY), modes.CBC(iv)).decryptor()
     pt = dec.update(ct) + dec.finalize()
     pad = pt[-1]
     return pt[:-pad].decode('utf-8')
@@ -26,7 +25,7 @@ def parse_csv(csv_text: str):
     for r in reader:
         try:
             lat = float(r['Latitude'])
-            lon = float(r['Longtitude'])
+            lon = float(r.get('Longitude') or r['Longtitude'])
             rows.append((lat, lon, r.get('Pays', ''), r.get('Ville', '')))
         except Exception:
             continue

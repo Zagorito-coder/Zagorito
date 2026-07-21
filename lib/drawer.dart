@@ -14,7 +14,6 @@ class AppDrawer extends StatelessWidget {
   final VoidCallback? onTechniquesTap;
   final VoidCallback? onCommunityTap;
   final VoidCallback? onShopsTap;
-  final VoidCallback? onPremiumTap;
 
   const AppDrawer({
     super.key,
@@ -23,7 +22,6 @@ class AppDrawer extends StatelessWidget {
     this.onTechniquesTap,
     this.onCommunityTap,
     this.onShopsTap,
-    this.onPremiumTap,
   });
 
   @override
@@ -132,16 +130,6 @@ class AppDrawer extends StatelessWidget {
                       onTap: () {
                         Navigator.of(context).pop();
                         onShopsTap!();
-                      },
-                    ),
-                  if (onPremiumTap != null)
-                    _DrawerItem(
-                      icon: Icons.workspace_premium,
-                      label: context.tr('drawer.premium'),
-                      isActive: currentRoute == 'premium',
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        onPremiumTap!();
                       },
                     ),
                 ],

@@ -1,22 +1,12 @@
-// ============================================================
-//  app_tile_layer.dart — Couche de tuiles réutilisable
-//  OSM standard / ArcGIS satellite / CartoDB sombre.
-//  Avec FMTC : cache automatique online + fallback offline.
-//  User-Agent explicite pour éviter les 403 OSM.
-// ============================================================
-
-import 'dart:io' show HttpClient;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:flutter_map_tile_caching/flutter_map_tile_caching.dart';
-import 'package:http/io_client.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Fonds de carte supportés.
 enum MapStyle { standard, satellite, dark }
 
-/// AppTileLayer — Couche de fond avec cache FMTC automatique.
-/// Usage : AppTileLayer(style: MapStyle.standard)
+/// Couche réseau sans téléchargement hors-ligne. Le cache persistant FMTC a
+/// été retiré afin de respecter les politiques des fournisseurs de tuiles.
 class AppTileLayer extends StatelessWidget {
   final MapStyle style;
 
@@ -26,46 +16,15 @@ class AppTileLayer extends StatelessWidget {
   });
 
   static const _userAgentPackageName = 'com.zagorito.spots_app';
-  static const _userAgent =
-      'SpotsApp/1.0 (+https://github.com/Zagorito-coder/Zagorito; noreply@github.com)';
-
-  /// Client HTTP réutilisé pour toutes les instances.
-  /// `userAgent = null` permet à FMTC d'utiliser le header User-Agent explicite.
-  static final _httpClient = IOClient(HttpClient()..userAgent = null);
-
-  /// Cache des tile providers par style pour éviter de les recréer à chaque build.
-  static final Map<MapStyle, FMTCTileProvider> _tileProviders = {};
-
-  FMTCStore get _store {
-    switch (style) {
-      case MapStyle.standard:
-        return const FMTCStore('osm');
-      case MapStyle.satellite:
-        return const FMTCStore('satellite');
-      case MapStyle.dark:
-        return const FMTCStore('dark');
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
-    final tileProvider = _tileProviders[style] ??= FMTCTileProvider(
-      stores: Map.from({
-        _store.storeName: BrowseStoreStrategy.readUpdateCreate,
-      }),
-      loadingStrategy: BrowseLoadingStrategy.onlineFirst,
-      cachedValidDuration: const Duration(days: 7),
-      httpClient: _httpClient,
-      headers: Map.from({'User-Agent': _userAgent}),
-    );
-
     switch (style) {
       case MapStyle.satellite:
         return TileLayer(
           urlTemplate:
               'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
           userAgentPackageName: _userAgentPackageName,
-          tileProvider: tileProvider,
         );
       case MapStyle.dark:
         return TileLayer(
@@ -73,14 +32,74 @@ class AppTileLayer extends StatelessWidget {
               'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
           subdomains: const ['a', 'b', 'c', 'd'],
           userAgentPackageName: _userAgentPackageName,
-          tileProvider: tileProvider,
         );
       case MapStyle.standard:
         return TileLayer(
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
           userAgentPackageName: _userAgentPackageName,
-          tileProvider: tileProvider,
         );
     }
+  }
+}
+
+/// Attribution visible et interactive, requise par les fournisseurs de cartes.
+class AppMapAttribution extends StatelessWidget {
+  final MapStyle style;
+
+  const AppMapAttribution({
+    super.key,
+    this.style = MapStyle.standard,
+  });
+
+  static Future<void> _open(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final attributions = <SourceAttribution>[];
+    switch (style) {
+      case MapStyle.satellite:
+        attributions.add(
+          TextSourceAttribution(
+            'Esri, Maxar, Earthstar Geographics and the GIS User Community',
+            onTap: () => _open(
+              'https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9',
+            ),
+          ),
+        );
+        break;
+      case MapStyle.dark:
+        attributions.add(
+          TextSourceAttribution(
+            'OpenStreetMap contributors',
+            onTap: () => _open('https://www.openstreetmap.org/copyright'),
+          ),
+        );
+        attributions.add(
+          TextSourceAttribution(
+            'CARTO',
+            onTap: () => _open('https://carto.com/attributions'),
+          ),
+        );
+        break;
+      case MapStyle.standard:
+        attributions.add(
+          TextSourceAttribution(
+            'OpenStreetMap contributors',
+            onTap: () => _open('https://www.openstreetmap.org/copyright'),
+          ),
+        );
+        break;
+    }
+
+    return RichAttributionWidget(
+      popupInitialDisplayDuration: const Duration(seconds: 4),
+      showFlutterMapAttribution: false,
+      attributions: attributions,
+    );
   }
 }

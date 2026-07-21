@@ -26,18 +26,26 @@ class SpotsCanvasLayer extends StatefulWidget {
 
 class _SpotsCanvasLayerState extends State<SpotsCanvasLayer> {
   StreamSubscription? _mapEventSubscription;
+  Timer? _repaintTimer;
 
   @override
   void initState() {
     super.initState();
     _mapEventSubscription = widget.mapController.mapEventStream.listen((_) {
-      if (mounted) setState(() {});
+      // During a pan/zoom flutter_map emits many events per frame. Rebuilding
+      // the painter for each one starves the UI thread on low-end devices.
+      // Keep the marker layer responsive while coalescing those events.
+      if (_repaintTimer?.isActive ?? false) return;
+      _repaintTimer = Timer(const Duration(milliseconds: 40), () {
+        if (mounted) setState(() {});
+      });
     });
   }
 
   @override
   void dispose() {
     _mapEventSubscription?.cancel();
+    _repaintTimer?.cancel();
     super.dispose();
   }
 
@@ -101,6 +109,13 @@ class _SpotsPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Reuse Paint instances for the whole frame. Allocating and configuring
+    // four Paints for every spot creates significant garbage at wide zooms.
+    final shadowPaint = Paint()..style = PaintingStyle.fill;
+    final mainPaint = Paint()..style = PaintingStyle.fill;
+    final borderPaint = Paint()..style = PaintingStyle.stroke;
+    final highlightPaint = Paint()..style = PaintingStyle.fill;
+
     for (final spot in visibleSpots) {
       final isSelected = spot == selectedSpot;
       final point = camera.latLngToScreenOffset(spot.location);
@@ -109,31 +124,31 @@ class _SpotsPainter extends CustomPainter {
       final baseColor = spot.type.color;
 
       // Ombre portée douce (neumorphique)
-      final shadowPaint = Paint()
-        ..color = baseColor.withValues(alpha: 0.4)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5)
-        ..style = PaintingStyle.fill;
+      // A blurred shadow for every marker is disproportionately expensive on
+      // mobile GPUs. Keep the blur for the single selected marker only and use
+      // a cheap translucent offset circle for the normal marker set.
+      shadowPaint
+        ..color = baseColor.withValues(alpha: isSelected ? 0.4 : 0.22)
+        ..maskFilter = isSelected
+            ? const MaskFilter.blur(BlurStyle.normal, 5)
+            : null;
       canvas.drawCircle(pos.translate(0, 1.5), radius, shadowPaint);
 
       // Cercle principal avec couleur unie (simplifié pour compatibilité GPU)
-      final mainPaint = Paint()
-        ..color = baseColor.withValues(alpha: 0.9)
-        ..style = PaintingStyle.fill;
+      mainPaint.color = baseColor.withValues(alpha: 0.9);
       canvas.drawCircle(pos, radius, mainPaint);
 
       // Bordure nette blanche (glassmorphique)
-      final borderPaint = Paint()
+      borderPaint
         ..color = Colors.white.withValues(alpha: 0.92)
-        ..style = PaintingStyle.stroke
         ..strokeWidth = isSelected ? 2.2 : 1.3;
       canvas.drawCircle(pos, radius, borderPaint);
 
       // Reflet highlight en haut à gauche (effet liquide)
       if (!isSelected) {
-        final highlightPaint = Paint()
+        highlightPaint
           ..color = Colors.white.withValues(alpha: 0.55)
-          ..style = PaintingStyle.fill
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.2);
+          ..maskFilter = null;
         canvas.drawCircle(
           Offset(pos.dx - radius * 0.35, pos.dy - radius * 0.35),
           radius * 0.28,

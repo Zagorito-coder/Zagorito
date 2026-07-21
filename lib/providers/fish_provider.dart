@@ -94,7 +94,8 @@ class FishProvider extends ChangeNotifier {
       _allFish = decoded
           .map((json) => FishModel.fromJson(json as Map<String, dynamic>))
           .toList();
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[FishProvider] Erreur chargement fish_data.json: $e');
       _allFish = [];
     } finally {
       _isLoadingFish = false;
@@ -119,7 +120,8 @@ class FishProvider extends ChangeNotifier {
         position: position,
       );
       _nearbySpots = await Isolate.run(() => _filterAndSortSpots(args));
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[FishProvider] Erreur calcul nearbySpots: $e');
       _nearbySpots = [];
     } finally {
       _isLoadingNearby = false;

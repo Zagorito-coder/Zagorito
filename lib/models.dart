@@ -22,11 +22,16 @@ extension SpotTypeExtension on SpotType {
 
   String get label {
     switch (this) {
-      case SpotType.sandyBeach: return 'Plage de sable';
-      case SpotType.rockySpot: return 'Spot rocheux';
-      case SpotType.cliffTop: return 'Haut de falaise';
-      case SpotType.mixedSandRock: return 'Mixte sable/rocher';
-      case SpotType.remoteSpot: return 'Loin des routes';
+      case SpotType.sandyBeach:
+        return 'Plage de sable';
+      case SpotType.rockySpot:
+        return 'Spot rocheux';
+      case SpotType.cliffTop:
+        return 'Haut de falaise';
+      case SpotType.mixedSandRock:
+        return 'Mixte sable/rocher';
+      case SpotType.remoteSpot:
+        return 'Loin des routes';
     }
   }
 }
@@ -53,9 +58,10 @@ class Spot {
   });
 
   factory Spot.fromCsv(String line, {required int index}) {
-    final parts = line.split(',');
+    final parts = _parseCsvRow(line);
     if (parts.length < 3) {
-      throw const FormatException('Ligne invalide: besoin d\'au moins 3 colonnes');
+      throw const FormatException(
+          'Ligne invalide: besoin d\'au moins 3 colonnes');
     }
 
     final name = parts[0].trim();
@@ -67,10 +73,15 @@ class Spot {
     }
 
     final List<String> fishTypes = parts.length > 3
-        ? parts[3].split('|').map((s) => s.trim()).where((s) => s.isNotEmpty).toList()
+        ? parts[3]
+            .split('|')
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty)
+            .toList()
         : <String>[];
 
-    final String notes = parts.length > 4 ? parts[4].trim() : '';
+    final String notes =
+        parts.length > 4 ? parts.sublist(4).join(',').trim() : '';
 
     return Spot(
       id: 'spot_$index',
@@ -82,6 +93,35 @@ class Spot {
       fishTypes: fishTypes,
       notes: notes,
     );
+  }
+
+  static List<String> _parseCsvRow(String line) {
+    final values = <String>[];
+    final current = StringBuffer();
+    var insideQuotes = false;
+
+    for (var i = 0; i < line.length; i++) {
+      final char = line[i];
+      if (char == '"') {
+        if (insideQuotes && i + 1 < line.length && line[i + 1] == '"') {
+          current.write('"');
+          i++;
+        } else {
+          insideQuotes = !insideQuotes;
+        }
+      } else if (char == ',' && !insideQuotes) {
+        values.add(current.toString());
+        current.clear();
+      } else {
+        current.write(char);
+      }
+    }
+
+    if (insideQuotes) {
+      throw const FormatException('Guillemets CSV non fermes');
+    }
+    values.add(current.toString());
+    return values;
   }
 
   factory Spot.fromJson(Map<String, dynamic> json) {
@@ -104,21 +144,19 @@ class Spot {
   }
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'latitude': latitude,
-    'longitude': longitude,
-    'type': type.toString(),
-    'fishTypes': fishTypes,
-    'notes': notes,
-  };
+        'id': id,
+        'name': name,
+        'latitude': latitude,
+        'longitude': longitude,
+        'type': type.toString(),
+        'fishTypes': fishTypes,
+        'notes': notes,
+      };
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is Spot &&
-          runtimeType == other.runtimeType &&
-          id == other.id;
+      other is Spot && runtimeType == other.runtimeType && id == other.id;
 
   @override
   int get hashCode => id.hashCode;

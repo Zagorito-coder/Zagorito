@@ -2,7 +2,7 @@ name: spots_app
 description: Application de spots de pêche côtière
 publish_to: 'none'
 
-version: 1.0.0+3
+version: 1.0.1+4
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -22,7 +22,6 @@ dependencies:
   http: ^1.2.0
   google_fonts: ^8.1.0
   dio: ^5.8.0
-  flutter_map_tile_caching: ^10.1.1
   provider: ^6.1.5+1
   flutter_compass: ^0.8.1
   cached_network_image: ^3.4.1
@@ -36,7 +35,7 @@ dependencies:
   cloud_firestore: ^6.6.0
   google_sign_in: ^7.2.0
   flutter_secure_storage: ^10.3.1
-  google_mobile_ads: ^5.1.0
+  google_mobile_ads: ^9.0.0
   
 
 dev_dependencies:
@@ -72,7 +71,4 @@ flutter:
     - assets/lang/ar.json
     - assets/lang/es.json
 
-dependency_overrides:
-  google_mobile_ads:
-    path: packages/google_mobile_ads_patched
 

@@ -1,21 +1,20 @@
 // ============================================================
 //  splash_bootstrap.dart — Écran de démarrage et initialisation
-//  Initialise FMTC + charge les spots une seule fois avant AppShell
+//  Initialise Firebase + charge les spots une seule fois avant AppShell
 // ============================================================
 
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemChrome, SystemUiMode;
-import 'package:flutter_map_tile_caching/flutter_map_tile_caching.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:spots_app/firebase_options.dart';
 import 'package:spots_app/app_shell.dart';
-import 'package:spots_app/models.dart';
 import 'package:spots_app/providers/fish_provider.dart';
 import 'package:spots_app/providers/premium_provider.dart';
+import 'package:spots_app/models.dart';
 import 'package:spots_app/services/spot_service.dart';
 import 'package:spots_app/theme.dart';
 
@@ -47,42 +46,16 @@ class _SplashBootstrapState extends State<SplashBootstrap> {
         debugPrint('[SplashBootstrap] Firebase error: $e');
       }
 
-      _update('Initialisation du cache cartes…', 0.1);
-      await FMTCObjectBoxBackend().initialise();
-      for (final name in const ['osm', 'satellite', 'dark']) {
-        final store = FMTCStore(name);
-        if (!(await store.manage.ready)) {
-          await store.manage.create();
-        }
-      }
-
-      _update('Chargement des spots…', 0.4);
-      List<Spot> spots;
-      final cached = await SpotService.loadFromCache();
-      if (cached.isNotEmpty) {
-        spots = cached;
-      } else {
-        spots = await SpotService.loadFromCsv();
-        if (spots.isNotEmpty) {
-          await SpotService.saveToCache(spots);
-        }
-      }
-
-      _update('Chargement des données…', 0.8);
+      _update('Chargement des données…', 0.3);
       if (!mounted) return;
       final fishProvider = context.read<FishProvider>();
-      await fishProvider.loadFishData();
 
-      // Initialiser PremiumProvider si un utilisateur Firebase est déjà connecté
-      // (session persistée après redémarrage).
-      // On attend le premier événement authStateChanges pour garantir que
-      // Firebase Auth a bien fini de restaurer la session interne.
-      if (!mounted) return;
-      final user = await FirebaseAuth.instance.authStateChanges().first;
-      if (user != null && mounted) {
-        _update('Restauration de la session…', 0.85);
-        await context.read<PremiumProvider>().init(user.uid);
-      }
+      // Paralléliser spots + fish data (indépendants)
+      final results = await Future.wait([
+        SpotService.loadSpots(),
+        fishProvider.loadFishData(),
+      ]);
+      final spots = results[0] as List<Spot>;
 
       if (!mounted) return;
 
@@ -92,9 +65,30 @@ class _SplashBootstrapState extends State<SplashBootstrap> {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => AppShell(key: appShellKey, initialSpots: spots)),
       );
+
+      // Initialiser PremiumProvider en arriere-plan (non-bloquant)
+      // pour ne pas retarder l'affichage de la carte.
+      unawaited(_initPremiumInBackground());
     } catch (e, st) {
       debugPrint('[SplashBootstrap] ERREUR: $e\n$st');
       if (mounted) setState(() => _error = '$e');
+    }
+  }
+
+  Future<void> _initPremiumInBackground() async {
+    try {
+      // On attend le premier evenement authStateChanges pour garantir que
+      // Firebase Auth a bien fini de restaurer la session interne.
+      final user = await FirebaseAuth.instance.authStateChanges().first;
+      if (user != null) {
+        // Contexte accessible via appShellKey
+        final ctx = appShellKey.currentContext;
+        if (ctx != null) {
+          await ctx.read<PremiumProvider>().init(user.uid);
+        }
+      }
+    } catch (e) {
+      debugPrint('[SplashBootstrap] Premium init background error: $e');
     }
   }
 

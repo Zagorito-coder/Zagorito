@@ -4,7 +4,7 @@
       "android": {
         "default": {
           "projectId": "zagorito-9a0c4",
-          "appId": "1:68722970471:android:e017bfa4c02db19012e9c2",
+          "appId": "1:68722970471:android:22dce79885650fc112e9c2",
           "fileOutput": "android/app/google-services.json"
         }
       },
@@ -12,7 +12,7 @@
         "lib/firebase_options.dart": {
           "projectId": "zagorito-9a0c4",
           "configurations": {
-            "android": "1:68722970471:android:e017bfa4c02db19012e9c2",
+            "android": "1:68722970471:android:22dce79885650fc112e9c2",
             "ios": "1:68722970471:ios:69befe61397a785b12e9c2",
             "macos": "1:68722970471:ios:69befe61397a785b12e9c2",
             "web": "1:68722970471:web:7c70b07c6bec178212e9c2",

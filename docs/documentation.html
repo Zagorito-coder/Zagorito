@@ -176,7 +176,7 @@ tr:nth-child(even) { background: #F9FAFB; }
   <div class="subtitle" style="margin-top:4pt;">Application Flutter — Spots de Pêche Côtière</div>
   <div class="version">v1.0.0 &mdash; Décembre 2026</div>
   <div class="meta">
-    Stack : Flutter 3.x &bull; Dart 3 &bull; OpenStreetMap &bull; Open-Meteo API<br>
+    Stack : Flutter 3.x &bull; Dart 3 &bull; OpenStreetMap &bull; Firebase &bull; Open-Meteo (backend)<br>
     Cible : Android / iOS / Web / Windows / macOS / Linux
   </div>
 </div>
@@ -214,7 +214,7 @@ tr:nth-child(even) { background: #F9FAFB; }
         <li><a href="#s4-4">4.4 Encyclopédie des Poissons</a></li>
         <li><a href="#s4-5">4.5 Communauté</a></li>
         <li><a href="#s4-6">4.6 Techniques de Pêche</a></li>
-        <li><a href="#s4-7">4.7 Premium Hub</a></li>
+        <li><a href="#s4-7">4.7 Financement publicitaire</a></li>
         <li><a href="#s4-8">4.8 Paramètres & Profil</a></li>
       </ul>
     </li>
@@ -250,7 +250,7 @@ tr:nth-child(even) { background: #F9FAFB; }
 <ul>
 <li><strong>Framework</strong> : Flutter 3.x (Dart 3)</li>
 <li><strong>Carte</strong> : flutter_map + OpenStreetMap</li>
-<li><strong>Marées</strong> : Open-Meteo Marine API</li>
+<li><strong>Marées</strong> : prévisions Open-Meteo publiées par le backend Firebase</li>
 <li><strong>Géolocalisation</strong> : geolocator</li>
 <li><strong>Persistence</strong> : path_provider + JSON cache</li>
 <li><strong>Deep linking</strong> : url_launcher</li>
@@ -289,10 +289,10 @@ tr:nth-child(even) { background: #F9FAFB; }
 │   │   ├── species_page.dart     <span class="code-comment"># Encyclopédie poissons</span>
 │   │   ├── community_page.dart   <span class="code-comment"># Réseau social pêcheurs</span>
 │   │   ├── techniques_page.dart  <span class="code-comment"># Bibliothèque techniques</span>
-│   │   ├── premium_page.dart     <span class="code-comment"># Abonnement premium</span>
+│   │   ├── premium_page.dart     <span class="code-comment"># Page de compatibilité (accès gratuit)</span>
 │   │   └── settings_page.dart    <span class="code-comment"># Paramètres & profil</span>
 │   └── services/
-│       ├── tide_service.dart     <span class="code-comment"># API marées Open-Meteo</span>
+│       ├── tide_service.dart     <span class="code-comment"># Lecture Firestore des conditions publiées</span>
 │       ├── astronomy_service.dart <span class="code-comment"># Calculs lunaires & activité</span>
 │       └── shop_service.dart     <span class="code-comment"># Chargement & regroupement</span>
 ├── assets/
@@ -364,7 +364,7 @@ tr:nth-child(even) { background: #F9FAFB; }
 <tr>
 <td><span class="badge badge-blue">TideService</span></td>
 <td><code>lib/services/tide_service.dart</code></td>
-<td>Appel API Open-Meteo Marine (<code>marine-api.open-meteo.com</code>) pour hauteurs de mer horaires. Timeout 10s. Fallback sur données par défaut en cas d'erreur. Extraction LOW/HIGH/NEXT.</td>
+<td>Lecture des prévisions publiées dans Firestore par le backend. Le backend utilise les endpoints Open-Meteo client avec une clé commerciale conservée côté serveur. L'application ne contacte jamais Open-Meteo directement ; extraction LOW/HIGH/NEXT et états sans données explicites.</td>
 </tr>
 <tr>
 <td><span class="badge badge-gold">AstronomyService</span></td>
@@ -397,7 +397,7 @@ tr:nth-child(even) { background: #F9FAFB; }
 <tr><td><span class="badge badge-purple">Poissons</span></td><td>species_page.dart</td><td>—</td><td>Encyclopédie avec filtres (ALL, PELAGIC, BENTHIC, DEEP)</td></tr>
 <tr><td><span class="badge badge-blue">Communauté</span></td><td>community_page.dart</td><td>—</td><td>Fil social pêcheurs avec posts, likes, commentaires</td></tr>
 <tr><td><span class="badge badge-gray">Techniques</span></td><td>techniques_page.dart</td><td>—</td><td>Bibliothèque de techniques avec niveaux (Expert, Intermediate)</td></tr>
-<tr><td><span class="badge badge-gold">Premium</span></td><td>premium_page.dart</td><td>—</td><td>Hub d'abonnement avec capacités exclusives</td></tr>
+<tr><td><span class="badge badge-green">Financement</span></td><td>ad_service.dart</td><td>—</td><td>Consentement UMP et annonces AdMob ; toutes les fonctions de l'application restent gratuites</td></tr>
 <tr><td><span class="badge badge-gray">Paramètres</span></td><td>settings_page.dart</td><td>—</td><td>Profil, spots sauvegardés, crew management</td></tr>
 </table>
 
@@ -422,7 +422,7 @@ tr:nth-child(even) { background: #F9FAFB; }
 <ul>
 <li><strong>BottomNavigationBar custom</strong> : 5 onglets (Home, Fish, Add, Map, Settings) avec bouton central "Add" en gradient</li>
 <li><strong>GlobalKey</strong> (<code>appShellKey</code>) pour navigation programmatique depuis n'importe quel widget</li>
-<li><strong>MaterialPageRoute</strong> pour les pages secondaires (Techniques, Communauté, Magasins, Premium…)</li>
+<li><strong>MaterialPageRoute</strong> pour les pages secondaires (Techniques, Communauté et Magasins)</li>
 </ul>
 
 <div class="codeblock"><span class="code-keyword">class</span> <span class="code-class">AppShell</span> <span class="code-keyword">extends</span> StatefulWidget {
@@ -446,7 +446,7 @@ tr:nth-child(even) { background: #F9FAFB; }
 <tr><th>Mécanisme</th><th>Description</th></tr>
 <tr><td><strong>JSON Cache</strong></td><td>Les spots et magasins sont persistés en JSON dans <code>getApplicationDocumentsDirectory()</code>. Chargement rapide au démarrage, re-synchronisation CSV uniquement si cache vide.</td></tr>
 <tr><td><strong>Isolate Computing</strong></td><td>Parsing CSV/JSON via <code>compute()</code> sur isolate séparé (mobile/desktop). Fallback thread principal sur web.</td></tr>
-<tr><td><strong>MarkerCacheManager</strong></td><td>Cache de widgets <code>SpotMarker</code> par clé <code>spotId_selected_premium</code>. Évite les rebuilds inutiles lors du zoom/pan.</td></tr>
+<tr><td><strong>MarkerCacheManager</strong></td><td>Cache de widgets <code>SpotMarker</code> par clé de spot et d'état de sélection. Évite les rebuilds inutiles lors du zoom/pan.</td></tr>
 <tr><td><strong>Debounced Map Updates</strong></td><td>Timer à 100ms sur les événements de carte pour éviter les recalculs excessifs des spots visibles.</td></tr>
 <tr><td><strong>AutomaticKeepAlive</strong></td><td><code>MapScreen</code> utilise <code>AutomaticKeepAliveClientMixin</code> pour conserver l'état de la carte lors du changement d'onglet.</td></tr>
 <tr><td><strong>RefreshIndicator</strong></td><td>HomePage supporte le pull-to-refresh pour recharger les données de marées.</td></tr>
@@ -478,7 +478,7 @@ tr:nth-child(even) { background: #F9FAFB; }
 <tr><td><span class="color-swatch" style="background:#10B981;"></span> Success</td><td><code>#10B981</code></td><td>Statut positif, ouvert, validé</td></tr>
 <tr><td><span class="color-swatch" style="background:#F59E0B;"></span> Warning</td><td><code>#F59E0B</code></td><td>Alertes, attention</td></tr>
 <tr><td><span class="color-swatch" style="background:#EF4444;"></span> Error</td><td><code>#EF4444</code></td><td>Erreurs, fermé, critique</td></tr>
-<tr><td><span class="color-swatch" style="background:#FFD700;"></span> Gold</td><td><code>#FFD700</code></td><td>Premium, badges elite, récompenses</td></tr>
+<tr><td><span class="color-swatch" style="background:#FFD700;"></span> Gold</td><td><code>#FFD700</code></td><td>Accent visuel, badges et récompenses</td></tr>
 <tr><td><span class="color-swatch" style="background:#FFFFFF;"></span> Text Primary</td><td><code>#FFFFFF</code></td><td>Textes principaux</td></tr>
 <tr><td><span class="color-swatch" style="background:#B0B8C8;"></span> Text Secondary</td><td><code>#B0B8C8</code></td><td>Labels, descriptions</td></tr>
 <tr><td><span class="color-swatch" style="background:#6B7280;"></span> Text Muted</td><td><code>#6B7280</code></td><td>Placeholders, hints</td></tr>
@@ -526,7 +526,7 @@ tr:nth-child(even) { background: #F9FAFB; }
 
 <table>
 <tr><th>Effet</th><th>Implémentation</th><th>Usage</th></tr>
-<tr><td><strong>Backdrop Blur</strong></td><td><code>BackdropFilter + ImageFilter.blur(σX=10-12)</code></td><td>Search bar, boutons zoom, premium bar, floating panels</td></tr>
+<tr><td><strong>Backdrop Blur</strong></td><td><code>BackdropFilter + ImageFilter.blur(σX=10-12)</code></td><td>Barre de recherche, boutons de zoom et panneaux flottants</td></tr>
 <tr><td><strong>Radial Gradient</strong></td><td><code>RadialGradient center(-0.25, -0.25)</code></td><td>Marqueurs goutte d'eau (3 stops : blanc 45% → couleur 92% → couleur 65%)</td></tr>
 <tr><td><strong>Box Shadow Glow</strong></td><td><code>BoxShadow blurRadius: 12, color.withAlpha(45%)</code></td><td>Marqueurs sélectionnés, boutons actifs</td></tr>
 <tr><td><strong>Animated Slide/Opacity</strong></td><td><code>AnimatedSlide + AnimatedOpacity</code></td><td>Panneau de détails spot, transitions de page</td></tr>
@@ -585,17 +585,17 @@ tr:nth-child(even) { background: #F9FAFB; }
 <li><strong>5 couleurs de spots</strong> : Rouge (sable), Violet (roche), Bleu (falaise), Orange (mixte), Cyan (remote)</li>
 <li><strong>Sélection</strong> : zoom animé (6 étapes, 40ms), label flottant avec nom + type</li>
 <li><strong>Recherche</strong> : barre glassmorphique avec autocomplete et résultats filtrés</li>
-<li><strong>Zoom limité</strong> : 8.0 max (gratuit), 16.0 max (premium)</li>
+<li><strong>Zoom</strong> : jusqu'à 16.0 pour tous les utilisateurs</li>
 <li><strong>Géolocalisation</strong> : marqueur position bleue, distance calculée</li>
 <li><strong>Clustering</strong> : rendu optimisé avec <code>ClusterIndex</code> et <code>SpotsCanvasLayer</code></li>
 <li><strong>Performance</strong> : <code>MarkerCacheManager</code>, debounce 100ms, visible bounds filtering</li>
 </ul>
 
-<h4>💎 Système Premium</h4>
+<h4>📣 Financement publicitaire</h4>
 <ul>
-<li>Switch Premium dans la barre d'outils</li>
-<li>Zoom avancé débloqué (16.0)</li>
-<li>Dialog d'upsell avec CTA "S'abonner"</li>
+<li>Les fonctions et le niveau de zoom sont accessibles sans achat</li>
+<li>UMP demande le consentement lorsque la réglementation l'exige</li>
+<li>AdMob est initialisé uniquement lorsque le statut de consentement autorise les annonces</li>
 </ul>
 
 <h3 id="s4-3">4.3 Magasins de Pêche</h3>
@@ -679,22 +679,17 @@ tr:nth-child(even) { background: #F9FAFB; }
 </li>
 </ul>
 
-<h3 id="s4-7">4.7 Premium Hub</h3>
+<h3 id="s4-7">4.7 Financement publicitaire</h3>
 
-<p>Page d'abonnement avec capacités exclusives pour membres payants.</p>
+<p>BoosterFish est actuellement une application gratuite. Aucun abonnement, achat intégré,
+compte marchand ou fonctionnalité bloquée derrière un paiement n'est présent dans la version
+active.</p>
 
-<h4>👑 Fonctionnalités</h4>
+<h4>📣 Fonctionnement</h4>
 <ul>
-<li><strong>Header</strong> : badge "PREMIUM MEMBER" + titre "Abyssal Elite"</li>
-<li><strong>Stats</strong> : Rank Apex, Level 42</li>
-<li><strong>Capacités exclusives</strong> :
-  <ul>
-  <li><strong>Premium Spots</strong> : mapping subsurface temps réel, résolution 200m, détection IA espèces</li>
-  <li><strong>Ghost Spots</strong> : coordonnées secrètes crowdsourcées, GPS offline</li>
-  <li><strong>Tide Prediction</strong> : analyse lunaire et courants hyper-locale</li>
-  </ul>
-</li>
-<li>Chaque capacité = carte avec badge EXCLUSIVE, description, icône décorative</li>
+<li><strong>Consentement</strong> : le SDK UMP affiche le formulaire requis selon la région et permet de modifier le choix depuis Paramètres.</li>
+<li><strong>Annonces</strong> : AdMob est chargé après le consentement autorisant la demande d'annonces.</li>
+<li><strong>Continuité</strong> : un refus de consentement ne bloque ni l'authentification, ni la carte, ni les données de spots.</li>
 </ul>
 
 <h3 id="s4-8">4.8 Paramètres & Profil (Command Center)</h3>
@@ -725,9 +720,9 @@ tr:nth-child(even) { background: #F9FAFB; }
 <tr><th>Service</th><th>Endpoint</th><th>Données</th><th>Usage</th></tr>
 <tr>
 <td><strong>Open-Meteo Marine</strong></td>
-<td><code>marine-api.open-meteo.com/v1/marine</code></td>
-<td>Hauteurs de mer horaires (wave_height)</td>
-<td>Carte des marées temps réel sur la Home</td>
+<td><code>customer-marine-api.open-meteo.com/v1/marine</code> (backend uniquement)</td>
+<td>Prévisions marines et météo horaires</td>
+<td>Backend planifié → Firestore → écrans Home/Tide ; aucune clé dans l'APK</td>
 </tr>
 <tr>
 <td><strong>OpenStreetMap</strong></td>
@@ -796,7 +791,7 @@ Cap Ghir,30.633,-9.867,Bonito|Thon,Spot rocheux sauvage
 <tr><td><code>geolocator</code></td><td>^12.0.0</td><td>Géolocalisation GPS native</td></tr>
 <tr><td><code>path_provider</code></td><td>^2.1.2</td><td>Accès au système de fichiers (cache)</td></tr>
 <tr><td><code>url_launcher</code></td><td>^6.2.5</td><td>Lien externe (Maps, Téléphone)</td></tr>
-<tr><td><code>http</code></td><td>^1.2.0</td><td>Appels HTTP (Open-Meteo API)</td></tr>
+<tr><td><code>http</code></td><td>^1.2.0</td><td>Appels HTTP des services tiers (notamment magasins)</td></tr>
 <tr><td><code>cupertino_icons</code></td><td>^1.0.6</td><td>Icônes supplémentaires</td></tr>
 </table>
 
@@ -808,7 +803,7 @@ Cap Ghir,30.633,-9.867,Bonito|Thon,Spot rocheux sauvage
 <h4>Optimisations de performance</h4>
 <ul>
 <li><strong>Isolate computing</strong> : parsing CSV/JSON déporté sur isolate via <code>compute()</code></li>
-<li><strong>Marker cache</strong> : <code>MarkerCacheManager</code> avec clé <code>spotId_selected_premium</code></li>
+<li><strong>Marker cache</strong> : <code>MarkerCacheManager</code> avec clé de spot et d'état de sélection</li>
 <li><strong>Visible bounds filtering</strong> : seuls les spots dans la viewport sont rendus</li>
 <li><strong>Debounced updates</strong> : 100ms de debounce sur les événements carte</li>
 <li><strong>AutomaticKeepAlive</strong> : la carte conserve son état lors du switch d'onglet</li>
@@ -857,7 +852,7 @@ label = score ≥ 0.75 ? "Excellente"
 <tr>
 <td><strong>Spot Finder</strong></td>
 <td>Fullscreen map, overlay controls</td>
-<td>SearchBar, ZoomButtons, PremiumBar, SpotMarkers, SpotLabel</td>
+<td>SearchBar, ZoomButtons, SpotMarkers, SpotLabel, attribution cartographique</td>
 </tr>
 <tr>
 <td><strong>Magasins</strong></td>
@@ -880,9 +875,9 @@ label = score ≥ 0.75 ? "Excellente"
 <td>LevelBadge, TechniqueCard (image + metrics), Bookmark</td>
 </tr>
 <tr>
-<td><strong>Premium</strong></td>
-<td>Scroll vertical, header profil</td>
-<td>RankBadge, LevelBadge, CapabilityCards avec icones décoratives</td>
+<td><strong>Publicité & confidentialité</strong></td>
+<td>Carte de préférences dans Paramètres lorsque UMP l'exige</td>
+<td>UMP, AdMob, message d'état et lien vers la politique de confidentialité</td>
 </tr>
 <tr>
 <td><strong>Paramètres</strong></td>
@@ -907,7 +902,7 @@ label = score ≥ 0.75 ? "Excellente"
 <tr><td><span class="badge badge-blue">TODO</span></td><td>Backend Firebase (Firestore, Auth, Storage)</td><td>🔜</td></tr>
 <tr><td><span class="badge badge-blue">TODO</span></td><td>Notifications push (alertes marées, nouveaux spots)</td><td>🔜</td></tr>
 <tr><td><span class="badge badge-blue">TODO</span></td><td>Mode offline complet avec synchronisation</td><td>🔜</td></tr>
-<tr><td><span class="badge badge-blue">TODO</span></td><td>Paiement in-app (Premium)</td><td>🔜</td></tr>
+<tr><td><span class="badge badge-gray">HORS PÉRIMÈTRE</span></td><td>Abonnements et paiements intégrés : volontairement absents de la version AdMob</td><td>—</td></tr>
 <tr><td><span class="badge badge-blue">TODO</span></td><td>Photos et avis sur les spots</td><td>🔜</td></tr>
 <tr><td><span class="badge badge-blue">TODO</span></td><td>Prédictions IA de prise (ML)</td><td>🔜</td></tr>
 </table>

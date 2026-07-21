@@ -12,6 +12,7 @@ import 'package:provider/provider.dart';
 import 'package:spots_app/models.dart';
 import 'package:spots_app/theme.dart';
 import 'package:spots_app/providers/wind_animation_provider.dart';
+import 'package:spots_app/widgets/open_meteo_attribution.dart';
 import 'package:spots_app/widgets/wind_particle_painter.dart';
 
 class SpotDetailsPanel extends StatelessWidget {
@@ -39,7 +40,8 @@ class SpotDetailsPanel extends StatelessWidget {
   Future<void> _launchUrl(String url) async {
     final uri = Uri.parse(url);
     try {
-      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      final launched =
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (!launched) await _launchFallback(url);
     } catch (_) {
       await _launchFallback(url);
@@ -49,12 +51,15 @@ class SpotDetailsPanel extends StatelessWidget {
   Future<void> _launchFallback(String originalUrl) async {
     String fallbackUrl = originalUrl;
     if (originalUrl.startsWith('waze://')) {
-      fallbackUrl = 'https://waze.com/ul?ll=${spot.latitude},${spot.longitude}&navigate=yes';
-    } else if (originalUrl.startsWith('geo:') || originalUrl.startsWith('comgooglemaps://')) {
+      fallbackUrl =
+          'https://waze.com/ul?ll=${spot.latitude},${spot.longitude}&navigate=yes';
+    } else if (originalUrl.startsWith('geo:') ||
+        originalUrl.startsWith('comgooglemaps://')) {
       final dest = '${spot.latitude},${spot.longitude}';
       fallbackUrl = 'https://www.google.com/maps/search/?api=1&query=$dest';
     }
-    await launchUrl(Uri.parse(fallbackUrl), mode: LaunchMode.externalApplication);
+    await launchUrl(Uri.parse(fallbackUrl),
+        mode: LaunchMode.externalApplication);
   }
 
   String get _googleMapsUrl {
@@ -69,8 +74,10 @@ class SpotDetailsPanel extends StatelessWidget {
     final sortedSpots = List<Spot>.from(allSpots)
       ..removeWhere((s) => s.id == spot.id);
     sortedSpots.sort((a, b) {
-      final distA = distance.as(LengthUnit.Kilometer, spotLatLng, LatLng(a.latitude, a.longitude));
-      final distB = distance.as(LengthUnit.Kilometer, spotLatLng, LatLng(b.latitude, b.longitude));
+      final distA = distance.as(
+          LengthUnit.Kilometer, spotLatLng, LatLng(a.latitude, a.longitude));
+      final distB = distance.as(
+          LengthUnit.Kilometer, spotLatLng, LatLng(b.latitude, b.longitude));
       return distA.compareTo(distB);
     });
     return sortedSpots.take(4).toList();
@@ -89,10 +96,22 @@ class SpotDetailsPanel extends StatelessWidget {
 
   String _translateDirection(String code) {
     const map = {
-      'N': 'Nord', 'NNE': 'N-N-E', 'NE': 'Nord-Est', 'ENE': 'E-N-E',
-      'E': 'Est', 'ESE': 'E-S-E', 'SE': 'Sud-Est', 'SSE': 'S-S-E',
-      'S': 'Sud', 'SSO': 'S-S-O', 'SO': 'Sud-Ouest', 'OSO': 'O-S-O',
-      'O': 'Ouest', 'ONO': 'O-N-O', 'NO': 'Nord-Ouest', 'NNO': 'N-N-O',
+      'N': 'Nord',
+      'NNE': 'N-N-E',
+      'NE': 'Nord-Est',
+      'ENE': 'E-N-E',
+      'E': 'Est',
+      'ESE': 'E-S-E',
+      'SE': 'Sud-Est',
+      'SSE': 'S-S-E',
+      'S': 'Sud',
+      'SSO': 'S-S-O',
+      'SO': 'Sud-Ouest',
+      'OSO': 'O-S-O',
+      'O': 'Ouest',
+      'ONO': 'O-N-O',
+      'NO': 'Nord-Ouest',
+      'NNO': 'N-N-O',
     };
     return map[code] ?? code;
   }
@@ -129,108 +148,108 @@ class SpotDetailsPanel extends StatelessWidget {
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── HEADER ──
-          Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: spotColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: spotColor.withValues(alpha: 0.4),
-                    width: 1.5,
-                  ),
-                ),
-                child: Center(
-                  child: Icon(Icons.place, color: spotColor, size: 22),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      spot.name,
-                      style: TextStyle(
-                        color: tc.textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      spot.type.label,
-                      style: TextStyle(
-                        color: spotColor.withValues(alpha: 0.9),
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              GestureDetector(
-                onTap: onClose,
-                child: Container(
-                  width: 36,
-                  height: 36,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── HEADER ──
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
-                    color: tc.textPrimary.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(12),
+                    color: spotColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: spotColor.withValues(alpha: 0.4),
+                      width: 1.5,
+                    ),
                   ),
-                  child: Icon(Icons.close, color: tc.textSecondary, size: 20),
+                  child: Center(
+                    child: Icon(Icons.place, color: spotColor, size: 22),
+                  ),
                 ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 8),
-
-          // ── CHIPS ROW ──
-          Row(
-            children: [
-              Expanded(
-                child: _InfoChip(
-                  label: spot.type.label,
-                  color: spotColor,
-                  icon: Icons.place,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        spot.name,
+                        style: TextStyle(
+                          color: tc.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        spot.type.label,
+                        style: TextStyle(
+                          color: spotColor.withValues(alpha: 0.9),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _InfoChip(
-                  label: distanceText,
-                  color: tc.oceanLight,
-                  icon: Icons.near_me,
+                GestureDetector(
+                  onTap: onClose,
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: tc.textPrimary.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(Icons.close, color: tc.textSecondary, size: 20),
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
 
-          // ── FISH TYPES ──
-          if (spot.fishTypes.isNotEmpty) ...[
             const SizedBox(height: 8),
-            if (isPremium)
+
+            // ── CHIPS ROW ──
+            Row(
+              children: [
+                Expanded(
+                  child: _InfoChip(
+                    label: spot.type.label,
+                    color: spotColor,
+                    icon: Icons.place,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _InfoChip(
+                    label: distanceText,
+                    color: tc.oceanLight,
+                    icon: Icons.near_me,
+                  ),
+                ),
+              ],
+            ),
+
+            // ── FISH TYPES ──
+            // Toutes les informations sont disponibles dans la version
+            // gratuite financée par AdMob. Les paramètres Premium sont gardés
+            // uniquement pour compatibilité avec d'anciens appelants.
+            if (spot.fishTypes.isNotEmpty) ...[
+              const SizedBox(height: 8),
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
                 children: spot.fishTypes
-                    .map((f) => _InfoChip(label: f, color: tc.success, icon: Icons.set_meal))
+                    .map((f) => _InfoChip(
+                        label: f, color: tc.success, icon: Icons.set_meal))
                     .toList(),
-              )
-            else
-              _PremiumGate(label: 'Types de poissons — Premium', onTap: onPremiumTap),
-          ],
+              ),
+            ],
 
-          // ── NOTES ──
-          if (spot.notes.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            if (isPremium)
+            // ── NOTES ──
+            if (spot.notes.isNotEmpty) ...[
+              const SizedBox(height: 8),
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(10),
@@ -252,114 +271,117 @@ class SpotDetailsPanel extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-              )
-            else
-              _PremiumGate(label: 'Notes detaillees — Premium', onTap: onPremiumTap),
-          ],
+              ),
+            ],
 
-          const SizedBox(height: 8),
+            const SizedBox(height: 8),
 
-          // ── VENT (affiche des que les donnees sont chargees) ──
-          _buildWindSection(context),
+            // ── VENT (affiche des que les donnees sont chargees) ──
+            _buildWindSection(context),
 
-          const SizedBox(height: 8),
+            const OpenMeteoAttribution(
+              padding: EdgeInsets.only(top: 4, bottom: 4),
+            ),
 
-          // ── GOOGLE MAPS BUTTON ──
-          GestureDetector(
-            onTap: () => _launchUrl(_googleMapsUrl),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    const Color(0xFF4285F4).withValues(alpha: 0.25),
-                    const Color(0xFF4285F4).withValues(alpha: 0.08),
+            const SizedBox(height: 8),
+
+            // ── GOOGLE MAPS BUTTON ──
+            GestureDetector(
+              onTap: () => _launchUrl(_googleMapsUrl),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      const Color(0xFF4285F4).withValues(alpha: 0.25),
+                      const Color(0xFF4285F4).withValues(alpha: 0.08),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: const Color(0xFF4285F4).withValues(alpha: 0.5),
+                    width: 1.2,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF4285F4),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.place, color: Colors.white, size: 13),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Ouvrir dans Google Maps',
+                      style: TextStyle(
+                        color: const Color(0xFF4285F4).withValues(alpha: 0.95),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ],
                 ),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: const Color(0xFF4285F4).withValues(alpha: 0.5),
-                  width: 1.2,
-                ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+            ),
+
+            // ── SPOTS VOISINS (prend l'espace restant) ──
+            if (nearbySpots.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Divider(color: tc.divider, height: 1),
+              const SizedBox(height: 8),
+              Row(
                 children: [
-                  Container(
-                    width: 24,
-                    height: 24,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF4285F4),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Center(
-                      child: Icon(Icons.place, color: Colors.white, size: 13),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
+                  Icon(Icons.explore_outlined,
+                      color: tc.gold.withValues(alpha: 0.8), size: 13),
+                  const SizedBox(width: 6),
                   Text(
-                    'Ouvrir dans Google Maps',
+                    'SPOTS VOISINS',
                     style: TextStyle(
-                      color: const Color(0xFF4285F4).withValues(alpha: 0.95),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+                      color: tc.gold.withValues(alpha: 0.85),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
                     ),
                   ),
                 ],
               ),
-            ),
-          ),
-
-          // ── SPOTS VOISINS (prend l'espace restant) ──
-          if (nearbySpots.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Divider(color: tc.divider, height: 1),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.explore_outlined, color: tc.gold.withValues(alpha: 0.8), size: 13),
-                const SizedBox(width: 6),
-                Text(
-                  'SPOTS VOISINS',
-                  style: TextStyle(
-                    color: tc.gold.withValues(alpha: 0.85),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.2,
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 82,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  child: Row(
+                    children: nearbySpots.asMap().entries.map((entry) {
+                      final nearbySpot = entry.value;
+                      final isLast = entry.key == nearbySpots.length - 1;
+                      final isCloser = _isCloserSpot(nearbySpot);
+                      return Padding(
+                        padding: EdgeInsets.only(right: isLast ? 0 : 8),
+                        child: _NearbySpotCard(
+                          spot: nearbySpot,
+                          distance: _getSpotDistance(nearbySpot),
+                          isCloser: isCloser,
+                          onTap: () => onSpotSelected(nearbySpot),
+                        ),
+                      );
+                    }).toList(),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 82,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                child: Row(
-                  children: nearbySpots.asMap().entries.map((entry) {
-                    final nearbySpot = entry.value;
-                    final isLast = entry.key == nearbySpots.length - 1;
-                    final isCloser = _isCloserSpot(nearbySpot);
-                    return Padding(
-                      padding: EdgeInsets.only(right: isLast ? 0 : 8),
-                      child: _NearbySpotCard(
-                        spot: nearbySpot,
-                        distance: _getSpotDistance(nearbySpot),
-                        isCloser: isCloser,
-                        onTap: () => onSpotSelected(nearbySpot),
-                      ),
-                    );
-                  }).toList(),
-                ),
               ),
-            ),
+            ],
           ],
-        ],
-      ),
+        ),
       ),
     );
   }
@@ -382,7 +404,8 @@ class SpotDetailsPanel extends StatelessWidget {
         height: 40,
         child: Center(
           child: SizedBox(
-            width: 16, height: 16,
+            width: 16,
+            height: 16,
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
         ),
@@ -479,15 +502,22 @@ class SpotDetailsPanel extends StatelessWidget {
                       return Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: uniqueHours.map((h) {
-                          final idx = slots.indexWhere((s) => s.dateTime.hour == h);
-                          final isActive = wind.selectedHourIndex < slots.length &&
+                          final idx =
+                              slots.indexWhere((s) => s.dateTime.hour == h);
+                          final isActive = wind.selectedHourIndex <
+                                  slots.length &&
                               slots[wind.selectedHourIndex].dateTime.hour == h;
                           return GestureDetector(
-                            onTap: () { if (idx >= 0) wind.selectHourIndex(idx); },
+                            onTap: () {
+                              if (idx >= 0) wind.selectHourIndex(idx);
+                            },
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 4, vertical: 1),
                               decoration: BoxDecoration(
-                                color: isActive ? windColor.withValues(alpha: 0.2) : Colors.transparent,
+                                color: isActive
+                                    ? windColor.withValues(alpha: 0.2)
+                                    : Colors.transparent,
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
@@ -495,7 +525,9 @@ class SpotDetailsPanel extends StatelessWidget {
                                 style: TextStyle(
                                   color: isActive ? windColor : tc.textMuted,
                                   fontSize: 10,
-                                  fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                                  fontWeight: isActive
+                                      ? FontWeight.bold
+                                      : FontWeight.w500,
                                 ),
                               ),
                             ),
@@ -510,9 +542,11 @@ class SpotDetailsPanel extends StatelessWidget {
                     child: SliderTheme(
                       data: SliderThemeData(
                         trackHeight: 3,
-                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+                        thumbShape:
+                            const RoundSliderThumbShape(enabledThumbRadius: 7),
                         activeTrackColor: windColor,
-                        inactiveTrackColor: tc.textPrimary.withValues(alpha: 0.08),
+                        inactiveTrackColor:
+                            tc.textPrimary.withValues(alpha: 0.08),
                         thumbColor: windColor,
                         overlayColor: windColor.withValues(alpha: 0.1),
                       ),
@@ -537,11 +571,12 @@ class SpotDetailsPanel extends StatelessWidget {
   bool _isCloserSpot(Spot nearbySpot) {
     if (currentPosition == null) return false;
     const distance = Distance();
-    final currentLatLng = LatLng(currentPosition!.latitude, currentPosition!.longitude);
-    final distCurrent = distance.as(
-        LengthUnit.Kilometer, currentLatLng, LatLng(spot.latitude, spot.longitude));
-    final distNearby = distance.as(
-        LengthUnit.Kilometer, currentLatLng, LatLng(nearbySpot.latitude, nearbySpot.longitude));
+    final currentLatLng =
+        LatLng(currentPosition!.latitude, currentPosition!.longitude);
+    final distCurrent = distance.as(LengthUnit.Kilometer, currentLatLng,
+        LatLng(spot.latitude, spot.longitude));
+    final distNearby = distance.as(LengthUnit.Kilometer, currentLatLng,
+        LatLng(nearbySpot.latitude, nearbySpot.longitude));
     return distNearby < distCurrent;
   }
 }
@@ -600,7 +635,8 @@ class _NearbySpotCard extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                   decoration: BoxDecoration(
                     color: isCloser
                         ? tc.success.withValues(alpha: 0.12)
@@ -652,7 +688,8 @@ class _NearbySpotCard extends StatelessWidget {
                 Container(
                   width: 4,
                   height: 4,
-                  decoration: BoxDecoration(shape: BoxShape.circle, color: spotColor),
+                  decoration:
+                      BoxDecoration(shape: BoxShape.circle, color: spotColor),
                 ),
                 const SizedBox(width: 3),
                 Expanded(
@@ -692,7 +729,8 @@ class _InfoChip extends StatelessWidget {
   final Color color;
   final IconData icon;
 
-  const _InfoChip({required this.label, required this.color, required this.icon});
+  const _InfoChip(
+      {required this.label, required this.color, required this.icon});
 
   @override
   Widget build(BuildContext context) {
@@ -720,78 +758,6 @@ class _InfoChip extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ──────────────────────────────────────────────
-//  PREMIUM GATE
-// ──────────────────────────────────────────────
-
-class _PremiumGate extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-
-  const _PremiumGate({required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final tc = ThemeColors.of(context);
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: tc.surfaceElevated,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: tc.gold.withValues(alpha: 0.4),
-            width: 1.2,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: tc.gold.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Center(
-                child: Icon(Icons.lock_outline, color: tc.gold, size: 14),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: tc.gold,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: tc.gold.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                'DEBLOQUER',
-                style: TextStyle(
-                  color: tc.gold,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

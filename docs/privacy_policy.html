@@ -9,137 +9,137 @@
   h1 { color: #1E6091; }
   h2 { color: #1A5276; margin-top: 30px; }
   ul { padding-left: 20px; }
-  .last-update { color: #888; font-size: 0.9em; margin-bottom: 30px; }
+  .last-update { color: #666; font-size: 0.9em; margin-bottom: 30px; }
+  .notice { background: #eef7fb; border-left: 4px solid #1E6091; padding: 12px 16px; }
 </style>
 </head>
 <body>
 
 <h1>Politique de confidentialité — BoosterFish</h1>
-<p class="last-update">Dernière mise à jour : 15 juillet 2026</p>
+<p class="last-update">Dernière mise à jour : 21 juillet 2026</p>
 
 <p>
-  La présente politique de confidentialité a pour but d'informer les utilisateurs de l'application
-  <strong>BoosterFish</strong> (« l'Application ») sur la collecte, l'utilisation et la divulgation
-  des données personnelles conformément au Règlement Général sur la Protection des Données (RGPD)
-  et aux lois applicables.
+  La présente politique décrit les traitements de données réalisés par
+  <strong>BoosterFish</strong> (« l'Application »). Le responsable du traitement est
+  <strong>Salim Benmiloud</strong>, éditeur individuel établi au Maroc, joignable à
+  <a href="mailto:booster2fish@gmail.com">booster2fish@gmail.com</a>.
 </p>
 
-<h2>1. Données collectées</h2>
-<p>Nous collectons les données suivantes lorsque vous utilisez BoosterFish :</p>
-<ul>
-  <li><strong>Adresse email</strong> — lors de la connexion via Google Sign-In</li>
-  <li><strong>Nom d'affichage et photo de profil</strong> — fournis par Google</li>
-  <li><strong>Identifiant utilisateur (UID)</strong> — généré par Firebase Auth</li>
-  <li><strong>Données de localisation</strong> — utilisées uniquement en temps réel pour afficher les spots de pêche à proximité et les conditions météo. <strong>Jamais stockées sur nos serveurs.</strong></li>
-  <li><strong>Données d'abonnement</strong> (futur) — plan premium, date d'expiration du trial</li>
-</ul>
-
-<h2>2. Finalités du traitement</h2>
-<p>Vos données sont utilisées pour :</p>
-<ul>
-  <li>Authentifier votre compte via Google Sign-In</li>
-  <li>Synchroniser vos préférences d'abonnement (trial gratuit, futur premium)</li>
-  <li>Afficher les spots de pêche et les prévisions météo (marées, vent, vagues)</li>
-  <li>Améliorer l'expérience utilisateur</li>
-</ul>
-
-<h2>3. Base légale</h2>
-<p>
-  Le traitement de vos données repose sur votre <strong>consentement explicite</strong> (connexion Google),
-  l'<strong>exécution du contrat</strong> (fourniture du service) et notre <strong>intérêt légitime</strong>
-  (amélioration de l'Application).
+<p class="notice">
+  BoosterFish est actuellement gratuite et financée par la publicité. Elle ne propose
+  aucun achat, abonnement, paiement ou avantage Premium et ne collecte aucune donnée bancaire.
 </p>
 
-<h2>4. Partage des données</h2>
-<p>
-  Nous ne vendons <strong>jamais</strong> vos données personnelles à des tiers.
-  Les données sont hébergées sur :
-</p>
+<h2>1. Données traitées</h2>
 <ul>
-  <li><strong>Google Firebase (Firestore)</strong> — stockage des abonnements</li>
-  <li><strong>Google Firebase Auth</strong> — authentification</li>
-  <li><strong>OpenStreetMap / CartoDB</strong> — tuiles de carte (requêtes anonymes)</li>
+  <li><strong>Compte Google facultatif :</strong> adresse e-mail, nom d'affichage, photo de profil et identifiant Firebase (UID), lorsque vous choisissez Google Sign-In.</li>
+  <li><strong>Localisation :</strong> position approximative ou précise après autorisation Android, utilisée sur l'appareil pour centrer la carte, calculer des distances et sélectionner la station de prévisions publiée la plus proche. BoosterFish ne l'enregistre pas dans un profil et ne transmet pas votre position à Open-Meteo.</li>
+  <li><strong>Zones cartographiques et lieux consultés :</strong> les fournisseurs de cartes reçoivent les coordonnées des tuiles nécessaires à la zone affichée. Les coordonnées publiques d'un spot peuvent être transmises à une application de navigation uniquement lorsque vous choisissez explicitement de l'ouvrir. Elles ne sont pas associées à votre compte par BoosterFish.</li>
+  <li><strong>Publicité et consentement :</strong> Google Mobile Ads (AdMob) et la plateforme UMP peuvent traiter des identifiants d'appareil ou publicitaires, l'adresse IP, des informations techniques, les interactions avec les annonces et le choix de consentement, conformément aux paramètres UMP et aux règles de Google.</li>
+  <li><strong>Données locales :</strong> langue, thème, caches de spots et magasins et, si nécessaire, un identifiant anonyme aléatoire stocké dans le stockage sécurisé ou les préférences de l'appareil.</li>
+  <li><strong>Données techniques des fournisseurs :</strong> adresse IP, modèle d'appareil, journaux réseau ou requêtes de tuiles susceptibles d'être traités par les services tiers nécessaires au fonctionnement.</li>
 </ul>
 
-<h2>5. Conservation des données</h2>
+<h2>2. Finalités et bases juridiques</h2>
 <ul>
-  <li>Les données d'abonnement sont conservées jusqu'à la suppression du compte</li>
-  <li>Les données de localisation ne sont <strong>jamais stockées</strong> (utilisation temps réel uniquement)</li>
-</ul>
-
-<h2>6. Vos droits (RGPD)</h2>
-<p>Conformément au RGPD, vous disposez des droits suivants :</p>
-<ul>
-  <li><strong>Droit d'accès</strong> — consulter vos données</li>
-  <li><strong>Droit de rectification</strong> — corriger vos données</li>
-  <li><strong>Droit à l'effacement</strong> — supprimer votre compte (via l'onglet Paramètres de l'Application)</li>
-  <li><strong>Droit à la portabilité</strong> — exporter vos données</li>
-  <li><strong>Droit d'opposition</strong> — vous opposer au traitement</li>
+  <li>fournir l'authentification, les cartes, les spots et les prévisions demandées ;</li>
+  <li>mémoriser les préférences et assurer la sécurité du service ;</li>
+  <li>afficher des annonces pour financer l'Application ;</li>
+  <li>respecter les obligations légales et prévenir les abus.</li>
 </ul>
 <p>
-  Pour exercer ces droits, contactez-nous à :
-  <a href="mailto:support@boosterfish.app">support@boosterfish.app</a>
+  Ces traitements reposent, selon le cas, sur l'exécution du service demandé, votre
+  consentement (notamment pour l'autorisation de localisation et la publicité personnalisée
+  lorsqu'il est requis), l'intérêt légitime à exploiter et sécuriser l'Application, ou une
+  obligation légale. Vous pouvez refuser la localisation ; les fonctions de proximité
+  utiliseront alors une position par défaut ou seront limitées.
 </p>
 
-<h2>7. Cookies et traceurs</h2>
+<h2>3. Services et destinataires</h2>
+<p>BoosterFish utilise les prestataires suivants, qui appliquent leurs propres politiques :</p>
+<ul>
+  <li><strong>Google Firebase Auth et Firestore :</strong> connexion Google et lecture de prévisions. Aucun nouveau droit d'abonnement n'est créé par l'Application.</li>
+  <li><strong>Google AdMob et User Messaging Platform (UMP) :</strong> consentement et diffusion des annonces. Voir la <a href="https://policies.google.com/privacy">Politique de confidentialité de Google</a>.</li>
+  <li><strong>Open-Meteo :</strong> données météo et marines obtenues exclusivement par les tâches serveur utilisant les endpoints commerciaux, puis publiées dans Firestore. L'Application mobile ne contacte pas directement Open-Meteo. Voir les <a href="https://open-meteo.com/en/terms">conditions et informations de confidentialité</a>.</li>
+  <li><strong>OpenStreetMap et Overpass, CARTO et Esri :</strong> cartes, tuiles et informations publiques sur les magasins.</li>
+  <li><strong>Google Maps, Waze, WhatsApp ou l'application téléphonique :</strong> uniquement lorsque vous choisissez d'ouvrir un lien externe.</li>
+</ul>
 <p>
-  BoosterFish n'utilise <strong>aucun cookie</strong> ni traceur publicitaire.
-  Aucun SDK publicitaire n'est intégré dans l'Application.
+  Certains prestataires peuvent traiter des données hors de votre pays. Ces transferts sont
+  régis par leurs mécanismes contractuels et les lois applicables. BoosterFish ne vend pas vos
+  données personnelles.
+</p>
+
+<h2>4. Publicité et choix de consentement</h2>
+<p>
+  Au démarrage de l'interface principale, UMP vérifie si un consentement est requis. Aucune
+  annonce n'est demandée tant que le SDK n'indique pas qu'elle peut l'être. Si vous refusez la
+  publicité personnalisée, Google peut encore diffuser des annonces limitées ou non personnalisées,
+  selon les choix disponibles dans votre région. Si aucun statut UMP valide, actuel ou précédemment
+  mémorisé, ne permet de demander des annonces, celles-ci restent désactivées sans bloquer les
+  autres fonctions de l'Application.
+</p>
+<p>
+  Lorsque UMP l'exige, l'entrée <strong>Préférences publicitaires</strong> apparaît dans
+  Paramètres afin de modifier ou retirer votre choix. Vous pouvez également gérer ou réinitialiser
+  l'identifiant publicitaire dans les paramètres Android.
+</p>
+
+<h2>5. Conservation</h2>
+<ul>
+  <li>Les données du compte Firebase sont conservées jusqu'à la suppression du compte ou selon les délais nécessaires à la sécurité et aux obligations légales.</li>
+  <li>La position n'est pas enregistrée dans un profil serveur par BoosterFish.</li>
+  <li>Les préférences et caches locaux restent sur l'appareil jusqu'à leur effacement, la suppression du compte lorsqu'ils sont concernés, ou la désinstallation.</li>
+  <li>Les données publicitaires et journaux des prestataires sont conservés selon leurs propres politiques et votre choix de consentement.</li>
+</ul>
+
+<h2>6. Vos droits</h2>
+<p>
+  Selon la loi applicable, vous pouvez demander l'accès, la rectification, l'effacement, la
+  limitation, la portabilité ou l'opposition au traitement, et retirer un consentement sans
+  effet rétroactif. Écrivez à
+  <a href="mailto:booster2fish@gmail.com?subject=Droits%20sur%20mes%20donn%C3%A9es%20BoosterFish">booster2fish@gmail.com</a>.
+  Vous pouvez également saisir l'autorité de protection des données compétente.
+</p>
+
+<h2 id="account-deletion">7. Suppression du compte et des données</h2>
+<p><strong>Depuis l'Application :</strong></p>
+<ol>
+  <li>ouvrez BoosterFish et connectez-vous ;</li>
+  <li>ouvrez <strong>Paramètres</strong>, puis la section <strong>Confidentialité</strong> ;</li>
+  <li>appuyez sur <strong>Supprimer mon compte</strong> et confirmez la réauthentification Google.</li>
+</ol>
+<p>
+  Cette opération supprime le compte Firebase Auth, nettoie les données locales liées et demande
+  la suppression de tout ancien enregistrement d'abonnement éventuellement associé au UID.
+</p>
+<p>
+  Si l'Application n'est plus installée, initiez la demande via
+  <a href="mailto:booster2fish@gmail.com?subject=Suppression%20de%20compte%20BoosterFish">ce lien de suppression de compte</a>.
+  Indiquez l'adresse Google utilisée pour le compte. Une vérification d'identité peut être demandée
+  afin d'éviter la suppression frauduleuse d'un compte tiers.
 </p>
 
 <h2>8. Sécurité</h2>
 <p>
-  L'Application utilise :
+  Les échanges réseau utilisent HTTPS/TLS, l'authentification repose sur Google OAuth et Firebase,
+  et les règles Firestore bloquent les écritures du client sur les prévisions et les anciens droits
+  d'abonnement. Aucun mot de passe Google n'est reçu ou stocké par BoosterFish. Aucun système n'étant
+  infaillible, contactez-nous si vous soupçonnez un incident.
 </p>
-<ul>
-  <li>Firebase Auth avec tokens OAuth 2.0</li>
-  <li>Chiffrement TLS pour toutes les communications réseau</li>
-  <li>Firestore Security Rules pour restreindre l'accès aux données</li>
-  <li>ProGuard/R8 pour l'obfuscation du code en production</li>
-  <li>Aucun stockage de mot de passe (authentification Google uniquement)</li>
-</ul>
 
 <h2>9. Enfants</h2>
 <p>
-  BoosterFish n'est pas destinée aux enfants de moins de 13 ans.
-  Nous ne collectons pas sciemment de données auprès d'enfants.
+  BoosterFish n'est pas destinée aux enfants de moins de 16 ans et ne cible pas les enfants avec
+  ses publicités. Si vous pensez qu'un mineur nous a transmis des données, contactez-nous pour en
+  demander la suppression.
 </p>
 
-<h2>10. Modifications</h2>
+<h2>10. Modifications et contact</h2>
 <p>
-  Nous pouvons mettre à jour cette politique de confidentialité.
-  Les modifications seront publiées sur cette page et notifiées dans l'Application.
-</p>
-
-<h2>11. Contact</h2>
-<p>
-  <strong>BoosterFish</strong><br>
-  Email : <a href="mailto:support@boosterfish.app">support@boosterfish.app</a><br>
-</p>
-
-<h2>12. Suppression du compte</h2>
-<p>
-  <strong>Depuis l'application :</strong>
-</p>
-<ol>
-  <li>Ouvrez BoosterFish</li>
-  <li>Allez dans <strong>Paramètres</strong> (icône engrenage)</li>
-  <li>Faites défiler jusqu'à la section <strong>Confidentialité</strong></li>
-  <li>Appuyez sur <strong>Supprimer mon compte</strong></li>
-  <li>Confirmez la suppression</li>
-</ol>
-<p>
-  <strong>Si vous avez désinstallé l'application :</strong><br>
-  Envoyez un email à
-  <a href="mailto:support@boosterfish.app?subject=Suppression%20de%20compte%20BoosterFish">support@boosterfish.app</a>
-  avec pour objet "Suppression de compte BoosterFish".
-  Veuillez inclure votre adresse email Google pour nous permettre d'identifier
-  votre compte. Nous traiterons votre demande sous 30 jours conformément au RGPD.
-</p>
-<p>
-  Cette action supprime définitivement votre compte Firebase Auth,
-  toutes les données d'abonnement Firestore, et nettoie le stockage
-  local de l'application.
+  Cette politique peut être mise à jour pour refléter une modification du service ou de la loi.
+  La date de mise à jour figure en tête de page. Pour toute question :
+  <a href="mailto:booster2fish@gmail.com">booster2fish@gmail.com</a>.
 </p>
 
 </body>

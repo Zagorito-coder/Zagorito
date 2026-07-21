@@ -17,6 +17,7 @@ import '../theme.dart';
 import '../theme_controller.dart';
 import '../l10n/app_localizations.dart';
 import '../widgets/app_back_button.dart';
+import '../widgets/app_tile_layer.dart';
 
 /// 20 images webP locales pour les cartes magasins (bandeau détail).
 const _cardAssets = <String>[
@@ -282,10 +283,8 @@ class _ShopsMapPageState extends State<ShopsMapPage> {
         maxZoom: 18,
       ),
       children: [
-        TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.zagorito.spots_app',
-        ),
+        const AppTileLayer(style: MapStyle.standard),
+        const AppMapAttribution(style: MapStyle.standard),
         MarkerLayer(
           markers: _shopsWithImage.map((shop) {
             return Marker(

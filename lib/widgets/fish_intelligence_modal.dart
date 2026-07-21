@@ -2,8 +2,6 @@
 //  fish_intelligence_modal.dart — Modal fiche intelligence poisson
 // ============================================================
 
-import 'dart:math' as math;
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -125,15 +123,19 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF0D1B2A), Color(0xFF1E6091)],
+          colors: isDark
+              ? [const Color(0xFF0D1B2A), const Color(0xFF1E6091)]
+              : [tc.oceanDeep, tc.oceanMedium],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
       child: Row(
@@ -303,7 +305,7 @@ class _TechniqueBlock extends StatelessWidget {
 class _TideBlock extends StatefulWidget {
   final FishModel fish;
   final Position? currentPosition;
-  static TideData? _cachedTide;
+  static final Map<String, TideData> _cachedTides = <String, TideData>{};
 
   const _TideBlock({required this.fish, this.currentPosition});
 
@@ -322,42 +324,57 @@ class _TideBlockState extends State<_TideBlock> {
   }
 
   Future<void> _fetch() async {
-    if (_TideBlock._cachedTide != null) {
+    final lat = widget.currentPosition?.latitude ?? 33.57;
+    final lon = widget.currentPosition?.longitude ?? -7.59;
+    final cacheKey = '${lat.toStringAsFixed(2)},${lon.toStringAsFixed(2)}';
+    final cached = _TideBlock._cachedTides[cacheKey];
+    if (cached != null) {
       if (!mounted) return;
-      setState(() { _tide = _TideBlock._cachedTide; _loading = false; });
+      setState(() {
+        _tide = cached;
+        _loading = false;
+      });
       return;
     }
     try {
-      final lat = widget.currentPosition?.latitude ?? 33.57;
-      final lon = widget.currentPosition?.longitude ?? -7.59;
       final d = await TideService.fetchTides(latitude: lat, longitude: lon);
-      _TideBlock._cachedTide = d;
+      if (d.hourlyPoints.isNotEmpty) {
+        _TideBlock._cachedTides[cacheKey] = d;
+      }
       if (!mounted) return;
-      setState(() { _tide = d; _loading = false; });
+      setState(() {
+        _tide = d;
+        _loading = false;
+      });
     } catch (_) {
       if (!mounted) return;
-      setState(() { _tide = TideData.fallback(); _loading = false; });
+      setState(() {
+        _tide = TideData.fallback();
+        _loading = false;
+      });
     }
   }
 
   double _getTideActivity(TideData t) {
-    if (t.hourlyPoints.isEmpty) {
-      final now = DateTime.now();
-      final hour = now.hour + now.minute / 60;
-      return 0.5 + 0.5 * math.sin(hour * math.pi / 6);
-    }
+    if (t.hourlyPoints.isEmpty) return 0.0;
     final now = DateTime.now();
     double cur = t.low;
     for (final p in t.hourlyPoints) {
       if (p.time.isAfter(now)) { cur = p.height; break; }
     }
     final range = t.high - t.low;
-    if (range <= 0) return 0.5;
+    if (range <= 0) return 0.0;
     return ((cur - t.low) / range).clamp(0.0, 1.0);
   }
 
-  double _estimateWind(TideData t) => (t.waveHeight * 15).clamp(5.0, 60.0);
-  double _estimateWaterTemp(TideData t) => (16.0 + t.waveHeight * 5).clamp(14.0, 26.0);
+  TidePoint? _currentPoint(TideData t) {
+    if (t.hourlyPoints.isEmpty) return null;
+    final now = DateTime.now();
+    return t.hourlyPoints.firstWhere(
+      (point) => point.time.isAfter(now),
+      orElse: () => t.hourlyPoints.last,
+    );
+  }
 
   String _getTideLabel(BuildContext context, double activity) {
     final l10n = AppLocalizations.of(context);
@@ -387,10 +404,45 @@ class _TideBlockState extends State<_TideBlock> {
       );
     }
 
-    final activity = _getTideActivity(t!);
+    if (t == null || t.hourlyPoints.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: tc.surfaceLight.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: tc.glassBorder),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _BlockTitle(l10n.translate('fishIntelligence.tideBlock')),
+              const SizedBox(height: 10),
+              Text(
+                l10n.translate('fishIntelligence.unavailable'),
+                style: TextStyle(color: tc.textMuted, fontSize: 12),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                l10n.translate('fishIntelligence.simulatedNote'),
+                style: TextStyle(
+                  fontSize: 10,
+                  color: tc.textMuted,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final activity = _getTideActivity(t);
     final isGood = activity > 0.5;
-    final wind = _estimateWind(t);
-    final temp = _estimateWaterTemp(t);
+    final point = _currentPoint(t);
+    final wind = point?.windSpeedKmh;
+    final temp = point?.temperatureC;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -433,8 +485,14 @@ class _TideBlockState extends State<_TideBlock> {
               ],
             ),
             const SizedBox(height: 8),
-            _TextRow(l10n.translate('fishIntelligence.wind'), '${wind.toStringAsFixed(0)} km/h'),
-            _TextRow(l10n.translate('fishIntelligence.waterTemp'), '${temp.toStringAsFixed(1)}°C'),
+            _TextRow(
+              l10n.translate('fishIntelligence.wind'),
+              wind == null ? '--' : '${wind.round()} km/h',
+            ),
+            _TextRow(
+              l10n.translate('fishIntelligence.waterTemp'),
+              temp == null ? '--' : '${temp.toStringAsFixed(1)}°C',
+            ),
             const SizedBox(height: 6),
             Text(
               l10n.translate('fishIntelligence.simulatedNote'),

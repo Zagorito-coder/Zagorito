@@ -11,12 +11,13 @@
 // harvest_forecast.py + GitHub Actions)
 // ============================================================================
 
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:spots_app/services/forecast_firestore_service.dart';
 import 'package:spots_app/widgets/forecast_table.dart';
 import 'package:spots_app/widgets/app_back_button.dart';
+import 'package:spots_app/widgets/open_meteo_attribution.dart';
+import 'package:spots_app/utils/geo_utils.dart';
 
 class ForecastPage extends StatefulWidget {
   /// Si null, utilise la geolocalisation pour trouver le spot le plus proche.
@@ -59,8 +60,8 @@ class _ForecastPageState extends State<ForecastPage> {
 
       if (_availableSpots.isEmpty) {
         setState(() {
-          _error = 'Aucun spot disponible dans Firestore.\n'
-              'Lancez harvest_forecast.py d\'abord.';
+          _error = 'Aucun spot disponible pour le moment.\n'
+              'Veuillez reessayer plus tard.';
           _isLoading = false;
         });
         return;
@@ -108,7 +109,7 @@ class _ForecastPageState extends State<ForecastPage> {
       double minDist = double.infinity;
 
       for (final spot in _availableSpots) {
-        final dist = _haversine(
+        final dist = haversineKm(
           pos.latitude, pos.longitude,
           spot['latitude'] as double, spot['longitude'] as double,
         );
@@ -121,20 +122,6 @@ class _ForecastPageState extends State<ForecastPage> {
     } catch (_) {
       return _availableSpots.first['id'] as String;
     }
-  }
-
-  /// Distance Haversine en km
-  double _haversine(double lat1, double lon1, double lat2, double lon2) {
-    const R = 6371.0;
-    final dLat = (lat2 - lat1) * math.pi / 180;
-    final dLon = (lon2 - lon1) * math.pi / 180;
-    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
-        math.cos(lat1 * math.pi / 180) *
-            math.cos(lat2 * math.pi / 180) *
-            math.sin(dLon / 2) *
-            math.sin(dLon / 2);
-    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
-    return R * c;
   }
 
   Future<void> _loadForecast(String spotId) async {
@@ -188,7 +175,10 @@ class _ForecastPageState extends State<ForecastPage> {
         title: const Text('Previsions Météo/Marée'),
         leading: const AppBackButton(),
       ),
-      body: _buildBody(),
+      body: SafeArea(
+        top: false,
+        child: _buildBody(),
+      ),
     );
   }
 
@@ -241,28 +231,38 @@ class _ForecastPageState extends State<ForecastPage> {
               child: Text('Aucune donnee disponible pour ce spot'));
         }
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildSpotSelector(forecast),
-            _buildHeaderBandeau(forecast),
-            _buildDateBar(forecast),
-            const Divider(height: 1),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(8),
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight,
+                ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildLegacyTable(forecast),
-                    const SizedBox(height: 16),
-                    const Divider(),
-                    const SizedBox(height: 8),
-                    _buildMultiModelTables(forecast),
+                    _buildSpotSelector(forecast),
+                    _buildHeaderBandeau(forecast),
+                    _buildDateBar(forecast),
+                    const Divider(height: 1),
+                    Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Column(
+                        children: [
+                          _buildLegacyTable(forecast),
+                          const SizedBox(height: 16),
+                          const Divider(),
+                          const SizedBox(height: 8),
+                          _buildMultiModelTables(forecast),
+                          const OpenMeteoAttribution(),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ),
-          ],
+            );
+          },
         );
       },
     );

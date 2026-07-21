@@ -54,6 +54,7 @@ class _TechniquesPageState extends State<TechniquesPage> {
           .toSet()
           .toList();
       cats.sort();
+      if (!mounted) return;
       setState(() {
         _all = data;
         _filtered = data;
@@ -64,6 +65,7 @@ class _TechniquesPageState extends State<TechniquesPage> {
     } catch (e, st) {
       debugPrint('[TechniquesPage] Erreur chargement: $e');
       debugPrint('$st');
+      if (!mounted) return;
       setState(() {
         _error = e.toString();
         _loading = false;

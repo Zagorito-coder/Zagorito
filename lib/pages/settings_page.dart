@@ -8,8 +8,8 @@ import 'package:provider/provider.dart';
 import 'package:spots_app/theme.dart';
 import 'package:spots_app/l10n/app_localizations.dart';
 import 'package:spots_app/widgets/app_back_button.dart';
+import 'package:spots_app/services/ad_service.dart';
 import 'package:spots_app/services/auth_service.dart';
-import 'package:spots_app/providers/premium_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class SettingsPage extends StatelessWidget {
@@ -57,7 +57,9 @@ class SettingsPage extends StatelessWidget {
                               ),
                               child: Icon(
                                 Icons.logout,
-                                color: auth.isLoggedIn ? Colors.redAccent : tc.textMuted,
+                                color: auth.isLoggedIn
+                                    ? Colors.redAccent
+                                    : tc.textMuted,
                                 size: 20,
                               ),
                             ),
@@ -74,33 +76,11 @@ class SettingsPage extends StatelessWidget {
                     _buildAccountSection(context, tc),
 
                     const SizedBox(height: 30),
-                    Text(
-                      'Mode test',
-                      style: AppTextStyles.labelMedium(context).copyWith(letterSpacing: 1.5),
-                    ),
-                    const SizedBox(height: 16),
-                    Consumer<PremiumProvider>(
-                      builder: (ctx, provider, _) => _SettingsMenuCard(
-                        icon: Icons.admin_panel_settings,
-                        iconColor: tc.gold,
-                        title: 'Forcer le mode Premium',
-                        subtitle: provider.isForcePremium
-                            ? 'Zoom 16x activé manuellement'
-                            : 'Zoom limité par l\'abonnement',
-                        trailingWidget: Switch(
-                          value: provider.isForcePremium,
-                          onChanged: (_) => provider.toggleForcePremium(),
-                          activeThumbColor: tc.gold,
-                        ),
-                        onTap: null,
-                      ),
-                    ),
-
-                    const SizedBox(height: 30),
                     // ── Section Confidentialité ──
                     Text(
                       'Confidentialité',
-                      style: AppTextStyles.labelMedium(context).copyWith(letterSpacing: 1.5),
+                      style: AppTextStyles.labelMedium(context)
+                          .copyWith(letterSpacing: 1.5),
                     ),
                     const SizedBox(height: 12),
                     _SettingsMenuCard(
@@ -118,13 +98,15 @@ class SettingsPage extends StatelessWidget {
                       subtitle: 'Conditions Générales d\'Utilisation',
                       onTap: () => _openTermsOfService(context),
                     ),
+                    const _AdvertisingPrivacyEntry(),
                     if (context.watch<AuthService>().isLoggedIn) ...[
                       const SizedBox(height: 12),
                       _SettingsMenuCard(
                         icon: Icons.delete_forever,
                         iconColor: Colors.redAccent,
                         title: context.tr('settings.deleteAccount'),
-                        subtitle: 'Supprime définitivement ton compte et toutes tes données',
+                        subtitle:
+                            'Supprime définitivement ton compte et toutes tes données',
                         onTap: () => _confirmDeleteAccount(context),
                       ),
                     ],
@@ -132,7 +114,8 @@ class SettingsPage extends StatelessWidget {
                     const SizedBox(height: 30),
                     Text(
                       context.tr('settings.vesselCrew'),
-                      style: AppTextStyles.labelMedium(context).copyWith(letterSpacing: 1.5),
+                      style: AppTextStyles.labelMedium(context)
+                          .copyWith(letterSpacing: 1.5),
                     ),
                     const SizedBox(height: 16),
 
@@ -184,9 +167,8 @@ class SettingsPage extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 32,
-                backgroundImage: auth.photoUrl != null
-                    ? NetworkImage(auth.photoUrl!)
-                    : null,
+                backgroundImage:
+                    auth.photoUrl != null ? NetworkImage(auth.photoUrl!) : null,
                 child: auth.photoUrl == null
                     ? const Icon(Icons.person, size: 32)
                     : null,
@@ -212,7 +194,8 @@ class SettingsPage extends StatelessWidget {
                         const SizedBox(width: 4),
                         Text(
                           context.tr('settings.member'),
-                          style: AppTextStyles.labelMedium(context).copyWith(color: tc.gold),
+                          style: AppTextStyles.labelMedium(context)
+                              .copyWith(color: tc.gold),
                         ),
                       ],
                     ),
@@ -226,17 +209,23 @@ class SettingsPage extends StatelessWidget {
         // ── Non connecté : bouton Google (désactivé sur web) ──
         final canSignIn = !kIsWeb && !auth.isLoading;
         return GestureDetector(
-          onTap: canSignIn ? () async {
-            final auth = context.read<AuthService>();
-            final ok = await auth.signInWithGoogle();
-            if (ok && auth.uid != null && context.mounted) {
-              await context.read<PremiumProvider>().init(auth.uid!);
-            } else if (!ok && context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(context.tr('settings.signInFailed'))),
-              );
-            }
-          } : null,
+          onTap: canSignIn
+              ? () async {
+                  final auth = context.read<AuthService>();
+                  final ok = await auth.signInWithGoogle();
+                  if (!ok &&
+                      auth.lastSignInFailure != SignInFailure.canceled &&
+                      context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          context.tr(_signInFailureKey(auth.lastSignInFailure)),
+                        ),
+                      ),
+                    );
+                  }
+                }
+              : null,
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 18),
             decoration: BoxDecoration(
@@ -253,7 +242,8 @@ class SettingsPage extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 46, height: 46,
+                  width: 46,
+                  height: 46,
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
@@ -273,8 +263,8 @@ class SettingsPage extends StatelessWidget {
                     children: [
                       Text(
                         context.tr('settings.signInGoogle'),
-                        style: AppTextStyles.titleLarge(context)
-                            .copyWith(fontWeight: FontWeight.w700, fontSize: 15),
+                        style: AppTextStyles.titleLarge(context).copyWith(
+                            fontWeight: FontWeight.w700, fontSize: 15),
                       ),
                       const SizedBox(height: 3),
                       Text(
@@ -295,6 +285,34 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
+  String _signInFailureKey(SignInFailure? failure) {
+    switch (failure) {
+      case SignInFailure.interrupted:
+        return 'settings.signInInterrupted';
+      case SignInFailure.googleClientConfiguration:
+      case SignInFailure.googleProviderConfiguration:
+      case SignInFailure.missingIdToken:
+        return 'settings.signInConfigurationError';
+      case SignInFailure.uiUnavailable:
+        return 'settings.signInUnavailable';
+      case SignInFailure.network:
+        return 'settings.signInNetworkError';
+      case SignInFailure.providerDisabled:
+        return 'settings.signInProviderDisabled';
+      case SignInFailure.credentialRejected:
+        return 'settings.signInCredentialRejected';
+      case SignInFailure.userDisabled:
+        return 'settings.signInUserDisabled';
+      case SignInFailure.tooManyRequests:
+        return 'settings.signInTooManyRequests';
+      case SignInFailure.canceled:
+      case SignInFailure.firebase:
+      case SignInFailure.unexpected:
+      case null:
+        return 'settings.signInFailed';
+    }
+  }
+
   void _confirmLogout(BuildContext context, AuthService auth) {
     final tc = ThemeColors.of(context);
     showDialog(
@@ -313,7 +331,8 @@ class SettingsPage extends StatelessWidget {
               Navigator.of(ctx).pop();
               auth.signOut();
             },
-            child: Text(context.tr('common.confirm'), style: const TextStyle(color: Colors.redAccent)),
+            child: Text(context.tr('common.confirm'),
+                style: const TextStyle(color: Colors.redAccent)),
           ),
         ],
       ),
@@ -327,7 +346,8 @@ class SettingsPage extends StatelessWidget {
   }
 
   Future<void> _openTermsOfService(BuildContext context) async {
-    const url = 'https://zagorito-coder.github.io/boosterfish/terms-of-service/';
+    const url =
+        'https://zagorito-coder.github.io/boosterfish/terms-of-service/';
     final uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -371,7 +391,8 @@ class SettingsPage extends StatelessWidget {
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             child: Text(context.tr('common.confirm'),
-                style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                style: const TextStyle(
+                    color: Colors.redAccent, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -394,37 +415,118 @@ class SettingsPage extends StatelessWidget {
     }
   }
 
-  void _showEditProfileDialog(BuildContext context, ThemeColors tc) {
+  Future<void> _showEditProfileDialog(
+      BuildContext context, ThemeColors tc) async {
     final auth = context.read<AuthService>();
     final nameCtrl = TextEditingController(text: auth.displayName ?? '');
     final email = auth.email ?? '';
     final photoUrl = auth.photoUrl;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: tc.surface,
-        title: const Text('Modifier le profil'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          CircleAvatar(
-            radius: 40,
-            backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
-            child: photoUrl == null ? const Icon(Icons.person, size: 40) : null,
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: nameCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Nom',
-              border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: tc.surface,
+          title: const Text('Modifier le profil'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            CircleAvatar(
+              radius: 40,
+              backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
+              child:
+                  photoUrl == null ? const Icon(Icons.person, size: 40) : null,
             ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Nom',
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(12))),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(email, style: TextStyle(color: tc.textMuted, fontSize: 13)),
+          ]),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Fermer')),
+          ],
+        ),
+      );
+    } finally {
+      nameCtrl.dispose();
+    }
+  }
+}
+
+/// Google impose un accès aux options de confidentialité uniquement lorsque
+/// UMP retourne le statut `required`.
+class _AdvertisingPrivacyEntry extends StatefulWidget {
+  const _AdvertisingPrivacyEntry();
+
+  @override
+  State<_AdvertisingPrivacyEntry> createState() =>
+      _AdvertisingPrivacyEntryState();
+}
+
+class _AdvertisingPrivacyEntryState extends State<_AdvertisingPrivacyEntry> {
+  Future<bool>? _isRequired;
+
+  @override
+  void initState() {
+    super.initState();
+    // SettingsPage est construit même lorsqu'il est masqué par le shell.
+    // Attendre le premier frame garantit que AppShell a d'abord attaché
+    // l'activité et lancé l'initialisation UMP.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() {
+        _isRequired = AdService.instance.isPrivacyOptionsRequired();
+      });
+    });
+  }
+
+  Future<void> _openPrivacyOptions() async {
+    final updated = await AdService.instance.showPrivacyOptionsForm();
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          context.tr(
+            updated ? 'settings.adPrivacyUpdated' : 'settings.adPrivacyError',
           ),
-          const SizedBox(height: 12),
-          Text(email, style: TextStyle(color: tc.textMuted, fontSize: 13)),
-        ]),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fermer')),
-        ],
+        ),
       ),
+    );
+
+    setState(() {
+      _isRequired = AdService.instance.isPrivacyOptionsRequired();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
+    final isRequired = _isRequired;
+    if (isRequired == null) return const SizedBox.shrink();
+    return FutureBuilder<bool>(
+      future: isRequired,
+      builder: (context, snapshot) {
+        if (snapshot.data != true) return const SizedBox.shrink();
+        return Column(
+          children: [
+            const SizedBox(height: 12),
+            _SettingsMenuCard(
+              icon: Icons.ads_click_outlined,
+              iconColor: tc.oceanLight,
+              title: context.tr('settings.adPrivacy'),
+              subtitle: context.tr('settings.adPrivacySubtitle'),
+              onTap: _openPrivacyOptions,
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -435,7 +537,6 @@ class _SettingsMenuCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final String? trailing;
-  final Widget? trailingWidget;
   final VoidCallback? onTap;
 
   const _SettingsMenuCard({
@@ -444,61 +545,76 @@ class _SettingsMenuCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     this.trailing,
-    this.trailingWidget,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: tc.surface.withValues(alpha: 0.9),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: tc.divider),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: iconColor, size: 20),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title,
-                    style: AppTextStyles.titleLarge(context).copyWith(fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 2),
-                  Text(subtitle, style: AppTextStyles.labelMedium(context)),
-                ],
-              ),
-            ),
-            if (trailingWidget != null)
-              trailingWidget!
-            else if (trailing != null)
+    return Semantics(
+      button: onTap != null,
+      enabled: onTap != null,
+      label: title,
+      hint: subtitle,
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: tc.surface.withValues(alpha: 0.9),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: tc.divider),
+          ),
+          child: Row(
+            children: [
               Container(
-                width: 60, height: 60,
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.transparent,
+                  color: iconColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: tc.glassBorder, style: BorderStyle.solid),
                 ),
-                child: Center(
-                  child: Text(trailing!,
-                    style: TextStyle(color: tc.textMuted, fontSize: 10, fontStyle: FontStyle.italic),
-                    textAlign: TextAlign.center),
+                child: Icon(icon, color: iconColor, size: 20),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: AppTextStyles.titleLarge(context)
+                            .copyWith(fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: AppTextStyles.labelMedium(context)),
+                  ],
                 ),
               ),
-          ],
+              if (trailing != null)
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: tc.glassBorder,
+                      style: BorderStyle.solid,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      trailing!,
+                      style: TextStyle(
+                        color: tc.textMuted,
+                        fontSize: 10,
+                        fontStyle: FontStyle.italic,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -567,8 +683,10 @@ class _GoogleLogoPainter extends CustomPainter {
     paint.color = const Color(0xFF4285F4);
     canvas.drawRRect(
       RRect.fromLTRBR(
-        w * 0.5, h * 0.41,
-        w * 0.96, h * 0.59,
+        w * 0.5,
+        h * 0.41,
+        w * 0.96,
+        h * 0.59,
         const Radius.circular(2),
       ),
       paint,

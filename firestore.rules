@@ -2,18 +2,37 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Abonnements : seul le proprietaire peut lire/ecrire
+    // Monétisation désactivée : aucun client ne doit pouvoir créer ou modifier
+    // un droit Premium. La suppression par le propriétaire est conservée pour
+    // permettre le nettoyage d'un ancien compte.
     match /subscriptions/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, create, update: if false;
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Index léger utilisé par ForecastFirestoreService pour afficher les spots.
+    // Les coordonnées de spots sont publiques ; aucune donnée utilisateur
+    // n'est stockée dans cette collection.
+    match /spots_index/{document} {
+      allow read: if true;
+      allow write: if false;
     }
 
     // Previsions meteo/maree (remplies par GitHub Actions)
-    // Securite renforcee : seuls les utilisateurs authentifies peuvent lire.
-    // Le code ForecastFirestoreService gere le cas PERMISSION_DENIED → null.
+    // Ces prévisions ne contiennent aucune donnée personnelle et restent
+    // lisibles sans compte ; seuls les jobs Admin SDK écrivent.
     match /spots_meteo/{document} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null
-                    && request.auth.token.email == 'firebase-adminsdk-fbsvc@zagorito-9a0c4.iam.gserviceaccount.com';
+      allow read: if true;
+      // Les écritures sont réalisées par l'Admin SDK (qui bypass les règles).
+      // Aucun client mobile ne doit pouvoir injecter de prévisions.
+      allow write: if false;
+    }
+
+    // Conditions marines publiques publiées par le job serveur. Elles ne
+    // contiennent pas de données utilisateur ; aucun client ne peut écrire.
+    match /conditions/{document} {
+      allow read: if true;
+      allow write: if false;
     }
 
   }
