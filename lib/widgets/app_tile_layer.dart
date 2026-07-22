@@ -1,17 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:flutter_map_tile_caching/flutter_map_tile_caching.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-/// Fonds de carte supportés.
+/// Fonds de carte supportes.
 enum MapStyle { standard, satellite, dark }
 
-/// Couche reseau avec cache persistant FMTC pour le mode offline.
-///
-/// Garde-fous legaux appliques dans `_initFmtcStores()` du splash :
-/// - 500 tuiles max par store (~25 Mo)
-/// - TTL 7 jours (cache HTTP standard)
-/// - Conforme aux ToS OSM, ArcGIS et CartoDB
+/// Couche reseau sans telechargement hors-ligne.
 class AppTileLayer extends StatelessWidget {
   final MapStyle style;
 
@@ -29,7 +23,6 @@ class AppTileLayer extends StatelessWidget {
         return TileLayer(
           urlTemplate:
               'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-          tileProvider: FMTCTileProvider(stores: {'arcgisSatellite': BrowseStoreStrategy.readUpdateCreate}),
           userAgentPackageName: _userAgentPackageName,
         );
       case MapStyle.dark:
@@ -37,13 +30,11 @@ class AppTileLayer extends StatelessWidget {
           urlTemplate:
               'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
           subdomains: const ['a', 'b', 'c', 'd'],
-          tileProvider: FMTCTileProvider(stores: {'cartoDark': BrowseStoreStrategy.readUpdateCreate}),
           userAgentPackageName: _userAgentPackageName,
         );
       case MapStyle.standard:
         return TileLayer(
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          tileProvider: FMTCTileProvider(stores: {'osmStandard': BrowseStoreStrategy.readUpdateCreate}),
           userAgentPackageName: _userAgentPackageName,
         );
     }
