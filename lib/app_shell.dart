@@ -106,95 +106,103 @@ class AppShellState extends State<AppShell> {
   }
 
   Widget _buildBottomNav(ThemeColors tc) {
-    return Container(
-      decoration: BoxDecoration(
-        color: tc.background.withValues(alpha: 0.95),
-        border: Border(
-          top: BorderSide(
-            color: tc.navOverlay,
-            width: 1,
-          ),
-        ),
-      ),
+    final isDark = ThemeController.instance.isDark;
+    return ColoredBox(
+      color: tc.background,
       child: SafeArea(
         top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: tc.surface.withValues(alpha: 0.9),
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(
-                color: tc.glassBorder.withValues(alpha: 0.75),
-                width: 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: tc.shadowColor.withValues(alpha: 0.18),
-                  blurRadius: 18,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-              child: SizedBox(
+        minimum: const EdgeInsets.fromLTRB(9, 7, 9, 8),
+        child: SizedBox(
+          key: const ValueKey<String>('bottom-navigation-shell'),
+          height: 76,
+          child: Stack(
+            alignment: Alignment.bottomCenter,
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
                 height: 66,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Center(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: tc.surface.withValues(alpha: isDark ? 0.94 : 0.97),
+                    borderRadius: BorderRadius.circular(32),
+                    border: Border.all(
+                      color: isDark
+                          ? tc.oceanLight.withValues(alpha: 0.5)
+                          : tc.oceanDeep.withValues(alpha: 0.24),
+                      width: 1.1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: isDark
+                            ? tc.oceanDeep.withValues(alpha: 0.22)
+                            : tc.shadowColor.withValues(alpha: 0.15),
+                        blurRadius: 18,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Positioned.fill(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
                         child: _NavItem(
+                          itemKey: const ValueKey<String>('bottom-nav-home'),
                           icon: Icons.home_rounded,
                           label: context.tr('bottomNav.home'),
                           isActive: _currentIndex == 0,
                           onTap: () => navigateTo(0),
                         ),
                       ),
-                    ),
-                    Expanded(
-                      child: Center(
+                      Expanded(
                         child: _NavItem(
-                          icon: Icons.set_meal,
+                          itemKey: const ValueKey<String>('bottom-nav-fish'),
+                          icon: Icons.set_meal_rounded,
                           label: context.tr('bottomNav.fish'),
                           isActive: _currentIndex == 1,
                           onTap: () => navigateTo(1),
                         ),
                       ),
-                    ),
-                    Expanded(
-                      child: Center(
+                      Expanded(
                         child: _NavMapButton(
-                          label: context.tr('bottomNav.map'),
+                          key: const ValueKey<String>('bottom-nav-spots'),
+                          label: context.tr('drawer.spots'),
                           isActive: _currentIndex == 3,
                           onTap: () => navigateTo(3),
                         ),
                       ),
-                    ),
-                    Expanded(
-                      child: Center(
+                      Expanded(
                         child: _NavItem(
+                          itemKey:
+                              const ValueKey<String>('bottom-nav-my-spots'),
                           icon: Icons.add_location_alt_rounded,
                           label: context.tr('bottomNav.addSpot'),
                           isActive: _currentIndex == 2,
                           onTap: () => navigateTo(2),
                         ),
                       ),
-                    ),
-                    Expanded(
-                      child: Center(
+                      Expanded(
                         child: _NavItem(
+                          itemKey:
+                              const ValueKey<String>('bottom-nav-settings'),
                           icon: Icons.settings_rounded,
                           label: context.tr('bottomNav.settings'),
                           isActive: _currentIndex == 4,
                           onTap: () => navigateTo(4),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
         ),
       ),
@@ -207,12 +215,14 @@ class AppShellState extends State<AppShell> {
 // ─────────────────────────────────────────────────────────────
 
 class _NavItem extends StatelessWidget {
+  final Key itemKey;
   final IconData icon;
   final String label;
   final bool isActive;
   final VoidCallback onTap;
 
   const _NavItem({
+    required this.itemKey,
     required this.icon,
     required this.label,
     required this.isActive,
@@ -228,39 +238,64 @@ class _NavItem extends StatelessWidget {
       selected: isActive,
       label: label,
       excludeSemantics: true,
-      child: GestureDetector(
+      child: InkResponse(
+        key: itemKey,
         onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          // Equal-width slots keep every label centered, including the
-          // localized strings with different lengths.
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
-          decoration: BoxDecoration(
-            color: isActive
-                ? tc.oceanMedium.withValues(alpha: 0.15)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+        radius: 31,
+        containedInkWell: true,
+        borderRadius: BorderRadius.circular(24),
+        child: SizedBox(
+          height: 66,
+          child: Stack(
+            alignment: Alignment.center,
             children: [
-              Icon(
-                icon,
-                color: isActive ? tc.oceanLight : tc.textMuted,
-                size: 24,
-              ),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                softWrap: false,
-                style: TextStyle(
-                  color: isActive ? tc.oceanLight : tc.textMuted,
-                  fontSize: 9.5,
-                  fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(3, 8, 3, 7),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      icon,
+                      color: isActive ? tc.oceanLight : tc.textMuted,
+                      size: 25,
+                    ),
+                    const SizedBox(height: 3),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        softWrap: false,
+                        style: TextStyle(
+                          color: isActive ? tc.oceanLight : tc.textSecondary,
+                          fontSize: 10.5,
+                          height: 1,
+                          fontWeight:
+                              isActive ? FontWeight.w700 : FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              if (isActive)
+                Positioned(
+                  bottom: 0,
+                  child: Container(
+                    width: 43,
+                    height: 2.5,
+                    decoration: BoxDecoration(
+                      color: tc.oceanLight,
+                      borderRadius: BorderRadius.circular(3),
+                      boxShadow: [
+                        BoxShadow(
+                          color: tc.oceanLight.withValues(alpha: 0.55),
+                          blurRadius: 6,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
@@ -269,109 +304,87 @@ class _NavItem extends StatelessWidget {
   }
 }
 
-class _NavMapButton extends StatefulWidget {
+class _NavMapButton extends StatelessWidget {
   final String label;
   final bool isActive;
   final VoidCallback onTap;
 
   const _NavMapButton({
+    super.key,
     required this.label,
     required this.isActive,
     required this.onTap,
   });
 
   @override
-  State<_NavMapButton> createState() => _NavMapButtonState();
-}
-
-class _NavMapButtonState extends State<_NavMapButton>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _pulseController;
-
-  @override
-  void initState() {
-    super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1900),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
+    final isDark = ThemeController.instance.isDark;
 
     return Semantics(
       button: true,
-      selected: widget.isActive,
-      label: widget.label,
+      selected: isActive,
+      label: label,
       excludeSemantics: true,
-      child: GestureDetector(
-        onTap: widget.onTap,
+      child: InkResponse(
+        onTap: onTap,
+        radius: 38,
+        customBorder: const CircleBorder(),
         child: SizedBox(
-          width: 70,
-          height: 66,
-          child: AnimatedBuilder(
-            animation: _pulseController,
-            builder: (context, _) {
-              final phase = _pulseController.value;
-              return Stack(
-                alignment: Alignment.center,
-                clipBehavior: Clip.none,
-                children: [
-                  if (widget.isActive)
-                    for (final ring in [0.0, 0.46])
-                      Opacity(
-                        opacity: (0.22 * (1 - phase)).clamp(0.0, 1.0),
-                        child: Transform.scale(
-                          scale: 1.0 + ring + phase * 0.16,
-                          child: Container(
-                            width: 54,
-                            height: 54,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: tc.oceanLight,
-                                width: ring == 0 ? 1.3 : 1.0,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                  Container(
-                    width: 58,
-                    height: 58,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [tc.oceanMedium, tc.oceanDeep],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: tc.oceanDeep.withValues(alpha: 0.42),
-                          blurRadius: 13,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+          height: 76,
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: 70,
+              height: 70,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color:
+                    isDark ? tc.background.withValues(alpha: 0.98) : tc.surface,
+                border: Border.all(
+                  color: tc.oceanLight,
+                  width: isActive ? 2.2 : 1.7,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: tc.oceanLight.withValues(
+                      alpha: isActive ? 0.48 : 0.3,
                     ),
-                    alignment: Alignment.center,
-                    child: Icon(
-                      Icons.map_rounded,
-                      color: tc.textPrimary,
-                      size: 30,
+                    blurRadius: isActive ? 15 : 10,
+                  ),
+                  BoxShadow(
+                    color: tc.shadowColor.withValues(alpha: 0.2),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.map_outlined,
+                    color: tc.oceanLight,
+                    size: 30,
+                  ),
+                  const SizedBox(height: 1),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      style: TextStyle(
+                        color: isActive ? tc.oceanLight : tc.textPrimary,
+                        fontSize: 10.5,
+                        height: 1,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ],
-              );
-            },
+              ),
+            ),
           ),
         ),
       ),

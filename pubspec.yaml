@@ -59,6 +59,8 @@ flutter:
     - assets/peche_cotiere_databaseEs.csv
     - assets/peche_Montagestechnique_databaseEs.csv
     - assets/logo.png
+    - assets/home_hero_v3.webp
+    - assets/home_cards/
     - assets/settings_hero.png
     - assets/settings_fishing_banner.png
     - assets/earth_splash.jpg
