@@ -885,8 +885,12 @@ class _MapScreenState extends State<MapScreen>
           initialZoom: 6,
           maxZoom: _maxZoom,
           minZoom: 3.0,
+          // Keep FlutterMap's native one-handed zoom gesture enabled:
+          // double-tap, hold the second tap, then drag vertically.
+          interactionOptions: const InteractionOptions(
+            flags: InteractiveFlag.all,
+          ),
           onPositionChanged: _onPositionChanged,
-          onTap: _onMapTap,
           onMapReady: () {},
         ),
         children: [
@@ -1151,7 +1155,7 @@ class _MapScreenState extends State<MapScreen>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Outils carto',
+                  Text(context.tr('map.tools'),
                       style: TextStyle(
                           color: tc.textPrimary,
                           fontWeight: FontWeight.bold,
@@ -1160,7 +1164,9 @@ class _MapScreenState extends State<MapScreen>
                   _toolItem(
                       icon: _isMeasuring ? Icons.stop : Icons.straighten,
                       label:
-                          _isMeasuring ? 'Arrêter mesure' : 'Mesurer distance',
+                          _isMeasuring
+                              ? context.tr('map.stopMeasure')
+                              : context.tr('map.measureDistance'),
                       color: _isMeasuring ? AppColors.gold : tc.textPrimary,
                       onTap: () {
                         setState(() {

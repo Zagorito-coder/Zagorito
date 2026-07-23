@@ -43,6 +43,11 @@ enum SignInFailure {
 }
 
 class AuthService extends ChangeNotifier {
+  // OAuth client Web du projet Firebase. Il sert uniquement d'audience au
+  // jeton d'identité Google; aucun secret n'est embarqué ici.
+  static const _firebaseWebClientId =
+      '68722970471-pau8krffnjflfskkkfvfnfjhn1bcqto0.apps.googleusercontent.com';
+
   late final StreamSubscription<User?> _authStateSubscription;
   LocalUser? _localUser;
   bool _isLoading = false;
@@ -65,7 +70,7 @@ class AuthService extends ChangeNotifier {
         FirebaseAuth.instance.authStateChanges().listen((firebaseUser) {
       if (firebaseUser != null) {
         _localUser = LocalUser(
-          displayName: firebaseUser.displayName ?? 'Utilisateur',
+          displayName: firebaseUser.displayName ?? '',
           email: firebaseUser.email ?? '',
           photoUrl: firebaseUser.photoURL,
         );
@@ -84,10 +89,11 @@ class AuthService extends ChangeNotifier {
 
   Future<void> _ensureInitialized() async {
     if (_initialized) return;
-    // L'authentification Google utilise uniquement le flux standard (pas de
-    // serverClientId). Le backend Firebase Functions gère la vérification
-    // serveur si nécessaire.
-    await gsi.GoogleSignIn.instance.initialize();
+    // Fournir explicitement l'audience Web attendue par Firebase Auth évite
+    // de dépendre d'une ressource Gradle générée dans chaque variante.
+    await gsi.GoogleSignIn.instance.initialize(
+      serverClientId: _firebaseWebClientId,
+    );
     _initialized = true;
   }
 
@@ -123,9 +129,8 @@ class AuthService extends ChangeNotifier {
       debugPrint('[AuthService] Session Firebase Auth établie');
 
       _localUser = LocalUser(
-        displayName: googleAccount.displayName ??
-            firebaseUser?.displayName ??
-            'Utilisateur',
+        displayName:
+            googleAccount.displayName ?? firebaseUser?.displayName ?? '',
         email: googleAccount.email,
         photoUrl: googleAccount.photoUrl ?? firebaseUser?.photoURL,
       );

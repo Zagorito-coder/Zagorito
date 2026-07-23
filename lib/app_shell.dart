@@ -77,27 +77,28 @@ class AppShellState extends State<AppShell> {
         },
         child: Scaffold(
           body: Column(
-          children: [
-            Expanded(
-              child: Stack(
-                children: List.generate(_pages.length, (index) {
-                  return Visibility(
-                    visible: _currentIndex == index,
-                    maintainState: true,
-                    // Keep each page's state, but stop hidden animations.
-                    // The home mini-map has its own pulse ticker; leaving it
-                    // active while the full map renders thousands of spots
-                    // causes avoidable CPU/GPU pressure on low-end devices.
-                    maintainAnimation: false,
-                    maintainSize: false,
-                    child: _pages[index],
-                  );
-                }),
+            children: [
+              Expanded(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: List.generate(_pages.length, (index) {
+                    return Visibility(
+                      visible: _currentIndex == index,
+                      maintainState: true,
+                      // Keep each page's state, but stop hidden animations.
+                      // The home mini-map has its own pulse ticker; leaving it
+                      // active while the full map renders thousands of spots
+                      // causes avoidable CPU/GPU pressure on low-end devices.
+                      maintainAnimation: false,
+                      maintainSize: false,
+                      child: _pages[index],
+                    );
+                  }),
+                ),
               ),
-            ),
-            const AdaptiveBannerAd(),
-          ],
-        ),
+              const AdaptiveBannerAd(),
+            ],
+          ),
           bottomNavigationBar: _buildBottomNav(tc),
         ),
       ),
@@ -118,60 +119,82 @@ class AppShellState extends State<AppShell> {
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _NavItem(
-                icon: Icons.home_rounded,
-                label: LanguageController.instance.isRtl
-                    ? 'الرئيسية'
-                    : (LanguageController.instance.langCode == 'en'
-                        ? 'Home'
-                        : 'Accueil'),
-                isActive: _currentIndex == 0,
-                onTap: () => navigateTo(0),
+          padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: tc.surface.withValues(alpha: 0.9),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(
+                color: tc.glassBorder.withValues(alpha: 0.75),
+                width: 1,
               ),
-              _NavItem(
-                icon: Icons.set_meal,
-                label: LanguageController.instance.isRtl
-                    ? 'الأسماك'
-                    : (LanguageController.instance.langCode == 'en'
-                        ? 'Fish'
-                        : 'Poissons'),
-                isActive: _currentIndex == 1,
-                onTap: () => navigateTo(1),
+              boxShadow: [
+                BoxShadow(
+                  color: tc.shadowColor.withValues(alpha: 0.18),
+                  blurRadius: 18,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              child: SizedBox(
+                height: 66,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Center(
+                        child: _NavItem(
+                          icon: Icons.home_rounded,
+                          label: context.tr('bottomNav.home'),
+                          isActive: _currentIndex == 0,
+                          onTap: () => navigateTo(0),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: _NavItem(
+                          icon: Icons.set_meal,
+                          label: context.tr('bottomNav.fish'),
+                          isActive: _currentIndex == 1,
+                          onTap: () => navigateTo(1),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: _NavMapButton(
+                          label: context.tr('bottomNav.map'),
+                          isActive: _currentIndex == 3,
+                          onTap: () => navigateTo(3),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: _NavItem(
+                          icon: Icons.add_location_alt_rounded,
+                          label: context.tr('bottomNav.addSpot'),
+                          isActive: _currentIndex == 2,
+                          onTap: () => navigateTo(2),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: _NavItem(
+                          icon: Icons.settings_rounded,
+                          label: context.tr('bottomNav.settings'),
+                          isActive: _currentIndex == 4,
+                          onTap: () => navigateTo(4),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              _NavMapButton(
-                label: LanguageController.instance.isRtl
-                    ? 'الخريطة'
-                    : (LanguageController.instance.langCode == 'en'
-                        ? 'Map'
-                        : 'Carte'),
-                isActive: _currentIndex == 3,
-                onTap: () => navigateTo(3),
-              ),
-              _NavItem(
-                icon: Icons.add_location_alt_rounded,
-                label: LanguageController.instance.isRtl
-                    ? 'إضافة'
-                    : (LanguageController.instance.langCode == 'en'
-                        ? 'Add'
-                        : 'Ajouter'),
-                isActive: _currentIndex == 2,
-                onTap: () => navigateTo(2),
-              ),
-              _NavItem(
-                icon: Icons.settings_rounded,
-                label: LanguageController.instance.isRtl
-                    ? 'الإعدادات'
-                    : (LanguageController.instance.langCode == 'en'
-                        ? 'Settings'
-                        : 'Paramètres'),
-                isActive: _currentIndex == 4,
-                onTap: () => navigateTo(4),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -208,40 +231,45 @@ class _NavItem extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isActive
-              ? tc.oceanMedium.withValues(alpha: 0.15)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: isActive ? tc.oceanLight : tc.textMuted,
-              size: 24,
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
+          duration: const Duration(milliseconds: 200),
+          // Equal-width slots keep every label centered, including the
+          // localized strings with different lengths.
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+          decoration: BoxDecoration(
+            color: isActive
+                ? tc.oceanMedium.withValues(alpha: 0.15)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
                 color: isActive ? tc.oceanLight : tc.textMuted,
-                fontSize: 10,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                size: 24,
               ),
-            ),
-          ],
-        ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+                style: TextStyle(
+                  color: isActive ? tc.oceanLight : tc.textMuted,
+                  fontSize: 9.5,
+                  fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _NavMapButton extends StatelessWidget {
+class _NavMapButton extends StatefulWidget {
   final String label;
   final bool isActive;
   final VoidCallback onTap;
@@ -253,39 +281,98 @@ class _NavMapButton extends StatelessWidget {
   });
 
   @override
+  State<_NavMapButton> createState() => _NavMapButtonState();
+}
+
+class _NavMapButtonState extends State<_NavMapButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulseController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1900),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
 
     return Semantics(
       button: true,
-      selected: isActive,
-      label: label,
+      selected: widget.isActive,
+      label: widget.label,
       excludeSemantics: true,
       child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-        width: 52,
-        height: 52,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [tc.oceanMedium, tc.oceanDeep],
+        onTap: widget.onTap,
+        child: SizedBox(
+          width: 70,
+          height: 66,
+          child: AnimatedBuilder(
+            animation: _pulseController,
+            builder: (context, _) {
+              final phase = _pulseController.value;
+              return Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  if (widget.isActive)
+                    for (final ring in [0.0, 0.46])
+                      Opacity(
+                        opacity: (0.22 * (1 - phase)).clamp(0.0, 1.0),
+                        child: Transform.scale(
+                          scale: 1.0 + ring + phase * 0.16,
+                          child: Container(
+                            width: 54,
+                            height: 54,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: tc.oceanLight,
+                                width: ring == 0 ? 1.3 : 1.0,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  Container(
+                    width: 58,
+                    height: 58,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [tc.oceanMedium, tc.oceanDeep],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: tc.oceanDeep.withValues(alpha: 0.42),
+                          blurRadius: 13,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(
+                      Icons.map_rounded,
+                      color: tc.textPrimary,
+                      size: 30,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: tc.oceanDeep.withValues(alpha: 0.5),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Icon(
-          Icons.map_rounded,
-          color: ThemeColors.of(context).textPrimary,
-          size: 28,
-        ),
         ),
       ),
     );

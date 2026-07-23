@@ -16,7 +16,7 @@
 <body>
 
 <h1>Politique de confidentialité — BoosterFish</h1>
-<p class="last-update">Dernière mise à jour : 21 juillet 2026</p>
+<p class="last-update">Dernière mise à jour : 22 juillet 2026</p>
 
 <p>
   La présente politique décrit les traitements de données réalisés par
@@ -36,6 +36,7 @@
   <li><strong>Localisation :</strong> position approximative ou précise après autorisation Android, utilisée sur l'appareil pour centrer la carte, calculer des distances et sélectionner la station de prévisions publiée la plus proche. BoosterFish ne l'enregistre pas dans un profil et ne transmet pas votre position à Open-Meteo.</li>
   <li><strong>Zones cartographiques et lieux consultés :</strong> les fournisseurs de cartes reçoivent les coordonnées des tuiles nécessaires à la zone affichée. Les coordonnées publiques d'un spot peuvent être transmises à une application de navigation uniquement lorsque vous choisissez explicitement de l'ouvrir. Elles ne sont pas associées à votre compte par BoosterFish.</li>
   <li><strong>Publicité et consentement :</strong> Google Mobile Ads (AdMob) et la plateforme UMP peuvent traiter des identifiants d'appareil ou publicitaires, l'adresse IP, des informations techniques, les interactions avec les annonces et le choix de consentement, conformément aux paramètres UMP et aux règles de Google.</li>
+  <li><strong>Protection de l'application :</strong> Firebase App Check utilise, en version Android Release, l'attestation Google Play Integrity et un jeton d'intégrité transmis à Firebase afin de vérifier que les requêtes proviennent de l'application authentique et de limiter les abus. Ce traitement sert à la sécurité et à la prévention de la fraude, et n'est pas utilisé pour la publicité ou la personnalisation.</li>
   <li><strong>Données locales :</strong> langue, thème, caches de spots et magasins et, si nécessaire, un identifiant anonyme aléatoire stocké dans le stockage sécurisé ou les préférences de l'appareil.</li>
   <li><strong>Données techniques des fournisseurs :</strong> adresse IP, modèle d'appareil, journaux réseau ou requêtes de tuiles susceptibles d'être traités par les services tiers nécessaires au fonctionnement.</li>
 </ul>
@@ -59,6 +60,7 @@
 <p>BoosterFish utilise les prestataires suivants, qui appliquent leurs propres politiques :</p>
 <ul>
   <li><strong>Google Firebase Auth et Firestore :</strong> connexion Google et lecture de prévisions. Aucun nouveau droit d'abonnement n'est créé par l'Application.</li>
+  <li><strong>Firebase App Check et Google Play Integrity :</strong> attestation de l'application et de l'environnement Android pour protéger les ressources Firebase contre les requêtes frauduleuses ou non autorisées. Voir les informations de confidentialité de Google et Firebase.</li>
   <li><strong>Google AdMob et User Messaging Platform (UMP) :</strong> consentement et diffusion des annonces. Voir la <a href="https://policies.google.com/privacy">Politique de confidentialité de Google</a>.</li>
   <li><strong>Open-Meteo :</strong> données météo et marines obtenues exclusivement par les tâches serveur utilisant les endpoints commerciaux, puis publiées dans Firestore. L'Application mobile ne contacte pas directement Open-Meteo. Voir les <a href="https://open-meteo.com/en/terms">conditions et informations de confidentialité</a>.</li>
   <li><strong>OpenStreetMap et Overpass, CARTO et Esri :</strong> cartes, tuiles et informations publiques sur les magasins.</li>

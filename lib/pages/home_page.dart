@@ -818,11 +818,7 @@ class _HomePageState extends State<HomePage>
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          LanguageController.instance.langCode == 'en'
-                              ? 'Tap to open the full map'
-                              : LanguageController.instance.langCode == 'ar'
-                                  ? 'اضغط لفتح الخريطة الكاملة'
-                                  : 'Appuyez pour ouvrir la carte complète',
+                          context.tr('home.openFullMap'),
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.85),
                             fontSize: 12,

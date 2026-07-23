@@ -37,7 +37,8 @@ dependencies:
   google_sign_in: ^7.2.0
   flutter_secure_storage: ^10.3.1
   google_mobile_ads: ^9.0.0
-  
+  firebase_app_check: ^0.4.5+2
+
 
 dev_dependencies:
   flutter_test:
@@ -58,6 +59,8 @@ flutter:
     - assets/peche_cotiere_databaseEs.csv
     - assets/peche_Montagestechnique_databaseEs.csv
     - assets/logo.png
+    - assets/settings_hero.png
+    - assets/settings_fishing_banner.png
     - assets/earth_splash.jpg
     - assets/fish_data.json
     - assets/images/

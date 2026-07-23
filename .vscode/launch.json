@@ -7,7 +7,15 @@
       "type": "dart",
       "deviceId": "192.168.1.10:5555",
       "program": "lib/main.dart",
+      "args": ["--dart-define-from-file=.env"],
       "preLaunchTask": "adb-connect-phone"
+    },
+    {
+      "name": "Flutter: Appareil connecté (catalogue chiffré)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": ["--dart-define-from-file=.env"]
     }
   ]
 }

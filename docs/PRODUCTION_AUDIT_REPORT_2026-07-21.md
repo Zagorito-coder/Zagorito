@@ -4,6 +4,16 @@ Date : **21 juillet 2026**
 Version auditée : **1.0.1 (4)**  
 Package Android : `com.zagorito.spots_app`
 
+## Addendum de contrôle — 22 juillet 2026
+
+Firebase App Check a été intégré dans le bootstrap Flutter. Les builds Android
+Release utilisent Play Integrity, les builds Debug utilisent uniquement le
+fournisseur Debug, et le SHA-256 du certificat Play App Signing est enregistré
+dans Firebase. L'enforcement reste volontairement désactivé jusqu'à la
+validation d'une installation depuis Google Play Internal Testing ; cette
+intégration améliore la protection backend mais ne clôt pas les blocages
+externes Open-Meteo et Play Console décrits ci-dessous.
+
 ## Résumé exécutif
 
 BoosterFish est techniquement stable, signée et fonctionnelle sur appareil réel.

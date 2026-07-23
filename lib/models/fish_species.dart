@@ -153,16 +153,35 @@ class FishSpecies {
   }
 
   static String? _localAssetForId(String id) {
-    // Seulement les espèces qui ont une vraie image dans assets/fish_images/
+    // Correspondance explicite ID CSV -> fichier local.
+    // Les noms de fichiers contiennent parfois des espaces ou des variantes
+    // linguistiques : ne pas tenter de les déduire automatiquement.
     const map = {
-      'bar-europeen': 'bar',
-      'dorade-royale': 'daurade',
-      'mulet': 'mulet',
-      'pageot-rose': 'pageot',
-      'sole': 'sole',
-      'thon-rouge': 'thon',
+      'bar-europeen': 'bar.png',
+      'dorade-royale': 'daurade.png',
+      'maigre': 'maigre corb.png',
+      'sar-commun': 'sar commun.png',
+      'dorade-grise': 'dorade grise.png',
+      'mulet': 'mulet lippu.png',
+      'sardine': 'sardine.png',
+      'thon-rouge': 'thon rouge.png',
+      'bonite': 'bonite a dos raye.png',
+      'lieu-jaune': 'lieu jaune.png',
+      'sole': 'sole commune.png',
+      'turbot': 'turbot.png',
+      'roussette': 'roussette petite roussette.png',
+      'congre': 'congre.png',
+      'mur-loup': 'mur merlan.png',
+      'pageot-rose': 'pageot rose.png',
+      'chinchard': 'chinchard saurel.png',
+      'crabes-ces': 'crabe vert crabe enrage.png',
+      'dorade-rosy': 'dorade des marais pagre.png',
+      'lancon': 'lancons.png',
+      'merou-brun': 'merou brun.png',
+      'oblade': 'oblade.png',
+      'girelle': 'girelle paon.png',
     };
     final file = map[id];
-    return file != null ? 'assets/fish_images/$file.png' : null;
+    return file != null ? 'assets/fish_images/$file' : null;
   }
 }

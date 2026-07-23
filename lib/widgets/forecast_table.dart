@@ -589,7 +589,6 @@ class _ForecastTableState extends State<ForecastTable> {
             m?.wavePeriodS != null ? m!.wavePeriodS!.toStringAsFixed(0) : '-',
             Colors.transparent),
         _arrowCell(m?.waveDirDeg ?? 0),
-        const SizedBox(height: 6),
         // Houle primaire
         _valueCell(
             m?.swellHeightM != null ? m!.swellHeightM!.toStringAsFixed(1) : '-',
@@ -602,7 +601,6 @@ class _ForecastTableState extends State<ForecastTable> {
                 : '-',
             Colors.transparent),
         _arrowCell(m?.swellDirDeg ?? 0),
-        const SizedBox(height: 6),
         // Houle secondaire
         _valueCell(
             m?.swell2HeightM != null
@@ -617,7 +615,6 @@ class _ForecastTableState extends State<ForecastTable> {
                 : '-',
             Colors.transparent),
         _arrowCell(m?.swell2DirDeg ?? 0),
-        const SizedBox(height: 6),
         // Vagues de vent locales
         _valueCell(
             m?.windwaveHeightM != null
@@ -701,4 +698,3 @@ class _ForecastTableState extends State<ForecastTable> {
     return names[d.weekday - 1];
   }
 }
-

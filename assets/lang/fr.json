@@ -5,7 +5,18 @@
     "version": "Abyssal Fishing v1.0"
   },
   "map": {
-    "searchHint": "Rechercher un spot..."
+    "searchHint": "Rechercher un spot...",
+    "tools": "Outils cartographiques",
+    "measureDistance": "Mesurer la distance",
+    "stopMeasure": "Arrêter la mesure"
+  },
+  "splash": {
+    "initializingFirebase": "Initialisation de Firebase…",
+    "loadingData": "Chargement des données…",
+    "ready": "Prêt !",
+    "startupError": "Erreur de démarrage",
+    "startupErrorMessage": "Le démarrage a échoué. Vérifiez votre connexion puis réessayez.",
+    "retry": "Réessayer"
   },
   "drawer": {
     "title": "ABYSSAL",
@@ -29,7 +40,7 @@
     "fish": "Poissons",
     "map": "Carte",
     "settings": "Paramètres",
-    "addSpot": "Ajouter un Spot"
+    "addSpot": "Mes spots"
   },
   "home": {
     "tidesTitle": "Marées",
@@ -55,7 +66,8 @@
     "coefficient": "Coef",
     "transit": "Transit",
     "member": "Membre BoosterFish",
-    "appName": "BoosterFish"
+    "appName": "BoosterFish",
+    "openFullMap": "Appuyez pour ouvrir la carte complète"
   },
   "species": {
     "title": "Encyclopédie",
@@ -146,7 +158,12 @@
     "route": "Itinéraire",
     "call": "Appeler",
     "routeError": "Impossible d'ouvrir l'itinéraire",
-    "callError": "Impossible de lancer l'appel"
+    "callError": "Impossible de lancer l'appel",
+    "closingSoon": "Ferme bientôt",
+    "openingSoon": "Ouvre bientôt",
+    "empty": "Aucun magasin trouvé",
+    "tryOtherSearch": "Essayez une autre recherche",
+    "copied": "Coordonnées copiées"
   },
   "shopsMap": {
     "title": "Carte des Magasins",
@@ -166,12 +183,15 @@
   },
   "settings": {
     "title": "CENTRE DE COMMANDE",
+    "subtitle": "Gérez votre compte et vos préférences",
+    "goodFishingTitle": "Bonne pêche !",
+    "goodFishingSubtitle": "Vérifiez la météo, les marées et partez à la conquête de vos prises.",
     "profile": "Profil",
     "profileSubtitle": "Détails",
     "mySpots": "Mes Spots",
-    "mySpotsSubtitle": "12 coordonnées\nsauvegardées",
-    "crewManagement": "Gestion\nde l'équipage",
-    "crewManagementSubtitle": "Gérer 4\nmatelots",
+    "mySpotsSubtitle": "12 coordonnées sauvegardées",
+    "crewManagement": "Gestion de l'équipage",
+    "crewManagementSubtitle": "Gérer 4 matelots",
     "logout": "Déconnexion",
     "logoutConfirm": "Voulez-vous vraiment vous déconnecter ?",
     "cancel": "Annuler",
@@ -191,12 +211,28 @@
   "signInCredentialRejected": "Google n'a pas pu valider cette connexion. Réessaie.",
   "signInUserDisabled": "Ce compte a été désactivé.",
   "signInTooManyRequests": "Trop de tentatives. Attends un moment puis réessaie.",
-  "signInGoogle": "Se connecter avec Google",
+    "signInGoogle": "Se connecter avec Google",
+    "signInCanceled": "La connexion Google a été annulée ou refusée.",
   "signInGoogleSubtitle": "Synchroniser votre compte",
   "adPrivacy": "Préférences publicitaires",
   "adPrivacySubtitle": "Gérer votre consentement AdMob",
   "adPrivacyUpdated": "Vos préférences publicitaires ont été mises à jour.",
-  "adPrivacyError": "Impossible d'ouvrir les préférences publicitaires."
+  "adPrivacyError": "Impossible d'ouvrir les préférences publicitaires.",
+  "privacyPolicy": "Politique de confidentialité",
+  "privacyPolicySubtitle": "Lire nos engagements",
+  "privacySection": "Confidentialité",
+  "termsOfService": "CGU",
+  "termsOfServiceSubtitle": "Conditions Générales d'Utilisation",
+  "deleteAccount": "Supprimer mon compte",
+  "deleteAccountSubtitle": "Supprime définitivement votre compte et toutes vos données",
+  "deleteAccountConfirm": "Cette action supprimera définitivement votre compte et les données associées. Continuer ?",
+  "deleteAccountSuccess": "Votre compte et vos données associées ont été supprimés.",
+  "deleteAccountError": "Impossible de supprimer le compte. Réessayez.",
+  "userFallback": "Utilisateur",
+  "comingSoon": "{feature} — bientôt disponible",
+  "linkOpenError": "Impossible d'ouvrir le lien",
+  "editProfile": "Modifier le profil",
+  "name": "Nom"
   },
   "language": {
     "title": "Langue",

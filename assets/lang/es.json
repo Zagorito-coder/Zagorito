@@ -5,7 +5,18 @@
     "version": "Abyssal Fishing v1.0"
   },
   "map": {
-    "searchHint": "Buscar un spot..."
+    "searchHint": "Buscar un spot...",
+    "tools": "Herramientas del mapa",
+    "measureDistance": "Medir distancia",
+    "stopMeasure": "Detener medición"
+  },
+  "splash": {
+    "initializingFirebase": "Inicializando Firebase…",
+    "loadingData": "Cargando datos…",
+    "ready": "¡Listo!",
+    "startupError": "Error de inicio",
+    "startupErrorMessage": "El inicio falló. Comprueba tu conexión e inténtalo de nuevo.",
+    "retry": "Reintentar"
   },
   "drawer": {
     "title": "ABYSSAL",
@@ -29,7 +40,7 @@
     "fish": "Peces",
     "map": "Mapa",
     "settings": "Ajustes",
-    "addSpot": "Añadir Spot"
+    "addSpot": "Mis spots"
   },
   "home": {
     "tidesTitle": "Mareas",
@@ -55,7 +66,8 @@
     "coefficient": "Coef",
     "transit": "Tránsito",
     "member": "Miembro BoosterFish",
-    "appName": "BoosterFish"
+    "appName": "BoosterFish",
+    "openFullMap": "Toca para abrir el mapa completo"
   },
   "species": {
     "title": "Enciclopedia",
@@ -146,7 +158,12 @@
     "route": "Ruta",
     "call": "Llamar",
     "routeError": "No se pudo abrir la ruta",
-    "callError": "No se pudo realizar la llamada"
+    "callError": "No se pudo realizar la llamada",
+    "closingSoon": "Cierra pronto",
+    "openingSoon": "Abre pronto",
+    "empty": "No se encontraron tiendas",
+    "tryOtherSearch": "Prueba otra búsqueda",
+    "copied": "Coordenadas copiadas"
   },
   "shopsMap": {
     "title": "Mapa de Tiendas",
@@ -166,12 +183,15 @@
   },
   "settings": {
     "title": "CENTRO DE MANDO",
+    "subtitle": "Gestiona tu cuenta y tus preferencias",
+    "goodFishingTitle": "¡Buena pesca!",
+    "goodFishingSubtitle": "Consulta el tiempo y las mareas antes de salir.",
     "profile": "Perfil",
     "profileSubtitle": "Detalles",
     "mySpots": "Mis Spots",
-    "mySpotsSubtitle": "12 coordenadas\nguardadas",
-    "crewManagement": "Gestión\nde tripulación",
-    "crewManagementSubtitle": "Gestionar 4\nmarineros",
+    "mySpotsSubtitle": "12 coordenadas guardadas",
+    "crewManagement": "Gestión de tripulación",
+    "crewManagementSubtitle": "Gestionar 4 marineros",
     "logout": "Cerrar sesión",
     "logoutConfirm": "¿Realmente desea cerrar sesión?",
     "cancel": "Cancelar",
@@ -192,11 +212,27 @@
     "signInUserDisabled": "Esta cuenta está desactivada.",
     "signInTooManyRequests": "Demasiados intentos. Espera un momento e inténtalo de nuevo.",
     "signInGoogle": "Iniciar sesión con Google",
+    "signInCanceled": "El inicio de sesión de Google fue cancelado o rechazado.",
     "signInGoogleSubtitle": "Sincronizar su cuenta",
     "adPrivacy": "Preferencias publicitarias",
     "adPrivacySubtitle": "Gestionar su consentimiento de AdMob",
     "adPrivacyUpdated": "Sus preferencias publicitarias se han actualizado.",
-    "adPrivacyError": "No se pueden abrir las preferencias publicitarias."
+    "adPrivacyError": "No se pueden abrir las preferencias publicitarias.",
+    "privacyPolicy": "Política de privacidad",
+    "privacyPolicySubtitle": "Consulta nuestros compromisos",
+    "privacySection": "Privacidad",
+    "termsOfService": "Términos de servicio",
+    "termsOfServiceSubtitle": "Condiciones generales de uso",
+    "deleteAccount": "Eliminar mi cuenta",
+    "deleteAccountSubtitle": "Elimina permanentemente tu cuenta y todos tus datos",
+    "deleteAccountConfirm": "Esta acción eliminará permanentemente tu cuenta y los datos asociados. ¿Continuar?",
+    "deleteAccountSuccess": "Tu cuenta y los datos asociados se han eliminado.",
+    "deleteAccountError": "No se pudo eliminar la cuenta. Inténtalo de nuevo.",
+    "userFallback": "Usuario",
+    "comingSoon": "{feature} — próximamente",
+    "linkOpenError": "No se pudo abrir el enlace",
+    "editProfile": "Editar perfil",
+    "name": "Nombre"
   },
   "language": {
     "title": "Idioma",

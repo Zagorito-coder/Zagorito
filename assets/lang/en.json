@@ -5,7 +5,18 @@
     "version": "Abyssal Fishing v1.0"
   },
   "map": {
-    "searchHint": "Search for a spot..."
+    "searchHint": "Search for a spot...",
+    "tools": "Map tools",
+    "measureDistance": "Measure distance",
+    "stopMeasure": "Stop measuring"
+  },
+  "splash": {
+    "initializingFirebase": "Initializing Firebase…",
+    "loadingData": "Loading data…",
+    "ready": "Ready!",
+    "startupError": "Startup error",
+    "startupErrorMessage": "Startup failed. Check your connection and try again.",
+    "retry": "Try again"
   },
   "drawer": {
     "title": "ABYSSAL",
@@ -29,7 +40,7 @@
     "fish": "Fish",
     "map": "Map",
     "settings": "Settings",
-    "addSpot": "Add a Spot"
+    "addSpot": "My Spots"
   },
   "home": {
     "tidesTitle": "Tides",
@@ -55,7 +66,8 @@
     "coefficient": "Coef",
     "transit": "Transit",
     "member": "BoosterFish member",
-    "appName": "BoosterFish"
+    "appName": "BoosterFish",
+    "openFullMap": "Tap to open the full map"
   },
   "species": {
     "title": "Encyclopedia",
@@ -146,7 +158,12 @@
     "route": "Directions",
     "call": "Call",
     "routeError": "Unable to open directions",
-    "callError": "Unable to make a call"
+    "callError": "Unable to make a call",
+    "closingSoon": "Closing soon",
+    "openingSoon": "Opening soon",
+    "empty": "No shops found",
+    "tryOtherSearch": "Try another search",
+    "copied": "Coordinates copied"
   },
   "shopsMap": {
     "title": "Shops Map",
@@ -166,12 +183,15 @@
   },
   "settings": {
     "title": "COMMAND CENTER",
+    "subtitle": "Manage your account and preferences",
+    "goodFishingTitle": "Good fishing!",
+    "goodFishingSubtitle": "Check the weather and tides before heading out.",
     "profile": "Profile",
     "profileSubtitle": "Details",
     "mySpots": "My Spots",
-    "mySpotsSubtitle": "12 saved\ncoordinates",
-    "crewManagement": "Crew\nManagement",
-    "crewManagementSubtitle": "Manage 4\ndeckhands",
+    "mySpotsSubtitle": "12 saved coordinates",
+    "crewManagement": "Crew Management",
+    "crewManagementSubtitle": "Manage 4 deckhands",
     "logout": "Logout",
     "logoutConfirm": "Do you really want to log out?",
     "cancel": "Cancel",
@@ -192,11 +212,27 @@
     "signInUserDisabled": "This account has been disabled.",
     "signInTooManyRequests": "Too many attempts. Wait a moment and try again.",
     "signInGoogle": "Sign in with Google",
+    "signInCanceled": "Google sign-in was cancelled or declined.",
     "signInGoogleSubtitle": "Sync your account",
     "adPrivacy": "Advertising preferences",
     "adPrivacySubtitle": "Manage your AdMob consent",
     "adPrivacyUpdated": "Your advertising preferences have been updated.",
-    "adPrivacyError": "Unable to open advertising preferences."
+    "adPrivacyError": "Unable to open advertising preferences.",
+    "privacyPolicy": "Privacy policy",
+    "privacyPolicySubtitle": "Read our commitments",
+    "privacySection": "Privacy",
+    "termsOfService": "Terms of service",
+    "termsOfServiceSubtitle": "Terms and conditions of use",
+    "deleteAccount": "Delete my account",
+    "deleteAccountSubtitle": "Permanently delete your account and all your data",
+    "deleteAccountConfirm": "This will permanently delete your account and associated data. Continue?",
+    "deleteAccountSuccess": "Your account and associated data were deleted.",
+    "deleteAccountError": "Unable to delete the account. Please try again.",
+    "userFallback": "User",
+    "comingSoon": "{feature} — coming soon",
+    "linkOpenError": "Unable to open the link",
+    "editProfile": "Edit profile",
+    "name": "Name"
   },
   "language": {
     "title": "Language",

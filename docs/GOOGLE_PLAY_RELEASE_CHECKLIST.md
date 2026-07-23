@@ -1,7 +1,7 @@
 # BoosterFish — fiche de publication Google Play
 
 Version auditée : **1.0.1 (4)**  
-Dernière mise à jour : **21 juillet 2026**
+Dernière mise à jour : **22 juillet 2026**
 
 Cette fiche décrit l'état réel de l'application et les réponses à reporter dans
 Google Play Console. Toute modification future des SDK, de l'authentification,
@@ -113,8 +113,13 @@ fournisseur ou un SDK de cartographie est ajouté.
 - **COVID-19 : Non.**
 - **Classement du contenu :** refaire le questionnaire avec la présence de
   publicité et les liens/contacts externes réels.
-- **Play Integrity :** non intégré et non obligatoire pour les fonctions
-  actuelles ; à envisager seulement si un risque d'abus le justifie.
+- **Play Integrity :** intégré via Firebase App Check. En Android Release,
+  l'application utilise `AndroidPlayIntegrityProvider`; le fournisseur Debug
+  n'est utilisé qu'en build de développement. Le SHA-256 du certificat Play
+  App Signing est enregistré dans Firebase. L'enforcement reste désactivé
+  jusqu'à validation d'une installation distribuée par Google Play en Internal
+  Testing, puis doit être activé progressivement sur Firestore, Storage et
+  Functions.
 
 ## Contrôles avant chaque envoi
 
@@ -127,7 +132,9 @@ fournisseur ou un SDK de cartographie est ajouté.
    dans l'App Bundle Explorer les autorisations et SDK détectés.
 4. Installer l'APK release sur un appareil propre, refuser puis accepter les
    choix UMP, tester la localisation refusée/acceptée, la connexion et la
-   suppression du compte.
+   suppression du compte. Pour valider Play Integrity, installer aussi l'AAB
+   depuis Google Play Internal Testing : un APK installé par câble n'est pas une
+   preuve d'attestation Play valide.
 5. Consulter les rapports de pré-lancement, Android vitals, ANR et crashs avant
    de promouvoir la version vers une piste plus large.
 

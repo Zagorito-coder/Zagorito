@@ -60,7 +60,8 @@ class _AdaptiveBannerAdState extends State<AdaptiveBannerAd> {
 
   Future<void> _loadBanner() async {
     if (_isLoading || _bannerAd != null || _requestedWidth <= 0) {
-      debugPrint('[AdaptiveBannerAd] _loadBanner skip: isLoading=$_isLoading hasBanner=${_bannerAd != null} width=$_requestedWidth');
+      debugPrint(
+          '[AdaptiveBannerAd] _loadBanner skip: isLoading=$_isLoading hasBanner=${_bannerAd != null} width=$_requestedWidth');
       return;
     }
     debugPrint('[AdaptiveBannerAd] _loadBanner start');
@@ -82,12 +83,19 @@ class _AdaptiveBannerAdState extends State<AdaptiveBannerAd> {
         return;
       }
 
-      final size = AdSize.banner;
       if (!mounted || generation != _generation) {
-        debugPrint('[AdaptiveBannerAd] _loadBanner aborted: mounted=$mounted gen=$generation currentGen=$_generation');
+        debugPrint(
+            '[AdaptiveBannerAd] _loadBanner aborted: mounted=$mounted gen=$generation currentGen=$_generation');
         _isLoading = false;
         return;
       }
+
+      // Keep this as the standard 320x50 banner.  The large anchored
+      // adaptive format can reserve up to 15% of the screen height on small
+      // phones, leaving a large opaque ad area that hides the map controls.
+      // A standard banner gives the map a predictable 50dp footer while the
+      // ad remains centered and fully compliant with AdMob's declared size.
+      const size = AdSize.banner;
 
       late final BannerAd banner;
       banner = BannerAd(
@@ -128,7 +136,8 @@ class _AdaptiveBannerAdState extends State<AdaptiveBannerAd> {
       _bannerAd = null;
       _isLoaded = false;
     } finally {
-      debugPrint('[AdaptiveBannerAd] _loadBanner end (success=${_bannerAd != null})');
+      debugPrint(
+          '[AdaptiveBannerAd] _loadBanner end (success=${_bannerAd != null})');
       _isLoading = false;
     }
   }
@@ -147,9 +156,15 @@ class _AdaptiveBannerAdState extends State<AdaptiveBannerAd> {
     if (!_isLoaded || banner == null) return const SizedBox.shrink();
 
     return SizedBox(
-      width: banner.size.width.toDouble(),
+      width: double.infinity,
       height: banner.size.height.toDouble(),
-      child: AdWidget(ad: banner),
+      child: Center(
+        child: SizedBox(
+          width: banner.size.width.toDouble(),
+          height: banner.size.height.toDouble(),
+          child: AdWidget(ad: banner),
+        ),
+      ),
     );
   }
 }

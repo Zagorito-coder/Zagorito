@@ -8,7 +8,7 @@
 
 const https = require('https');
 
-const OPEN_METEO_API_KEY = process.env.OPEN_METEO_API_KEY;
+const OPEN_METEO_API_KEY = (process.env.OPEN_METEO_API_KEY ?? '').trim();
 const FORECAST_BASE_URL = 'https://customer-api.open-meteo.com/v1/forecast';
 const MARINE_BASE_URL = 'https://customer-marine-api.open-meteo.com/v1/marine';
 

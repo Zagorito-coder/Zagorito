@@ -11,7 +11,7 @@ const { getFirestore } = require('firebase-admin/firestore');
 const { FISHING_SPOTS, buildConditionsForSpot } = require('./lib/conditions');
 
 async function main() {
-  if (!process.env.OPEN_METEO_API_KEY) {
+  if (!process.env.OPEN_METEO_API_KEY?.trim()) {
     console.error('Erreur : OPEN_METEO_API_KEY est obligatoire pour l\'usage commercial d\'Open-Meteo.');
     process.exit(1);
   }

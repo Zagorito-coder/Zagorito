@@ -54,7 +54,7 @@ from collections import defaultdict
 # URLs commerciales : la clé doit rester côté serveur/GitHub Actions.
 # ---------------------------------------------------------------------------
 # Clé commerciale injectée uniquement par le job serveur/GitHub Actions.
-OPEN_METEO_API_KEY = os.environ.get("OPEN_METEO_API_KEY")
+OPEN_METEO_API_KEY = (os.environ.get("OPEN_METEO_API_KEY") or "").strip() or None
 
 FORECAST_BASE_URL = "https://customer-api.open-meteo.com/v1/forecast"
 MARINE_BASE_URL = "https://customer-marine-api.open-meteo.com/v1/marine"
@@ -691,7 +691,19 @@ def main():
                 time.sleep(0.2)
             continue
 
-        # Construire quand meme avec les modeles disponibles
+        # Ne jamais remplacer un document valide par un document partiel.
+        # Les prévisions existantes restent ainsi servables pendant une panne
+        # transitoire d'un modèle ou de l'API commerciale.
+        if missing_models:
+            partial += 1
+            print(
+                f"  !! Récolte partielle ({', '.join(missing_models)}) pour "
+                f"{spot['name']}; aucune écriture Firestore."
+            )
+            if idx < len(SPOTS) - 1:
+                time.sleep(0.2)
+            continue
+
         daily_json = {}
         if "daily" in wind_json:
             daily = wind_json["daily"]
@@ -700,25 +712,6 @@ def main():
                     "sunrise": daily["sunrise"][i] if i < len(daily.get("sunrise", [])) else None,
                     "sunset": daily["sunset"][i] if i < len(daily.get("sunset", [])) else None,
                 }
-
-        # Si hires ou wave manquent, on passe des json vides pour que build_days_payload
-        # remplisse les slots avec null dans le sous-objet correspondant
-        if hires_json is None:
-            hires_json = {"hourly": {"time": [], "wind_speed_10m": [], "wind_gusts_10m": [],
-                                     "wind_direction_10m": [], "temperature_2m": [],
-                                     "cloud_cover_low": [], "cloud_cover_mid": [],
-                                     "cloud_cover_high": [], "precipitation_probability": [],
-                                     "pressure_msl": [], "relative_humidity_2m": []}}
-        if wave_json is None:
-            wave_json = {"hourly": {"time": [], "wave_height": [], "wave_period": [],
-                                    "wave_direction": [], "swell_wave_height": [],
-                                    "swell_wave_period": [], "swell_wave_direction": [],
-                                    "secondary_swell_wave_height": [],
-                                    "secondary_swell_wave_period": [],
-                                    "secondary_swell_wave_direction": [],
-                                    "wind_wave_height": [], "wind_wave_period": [],
-                                    "wind_wave_direction": [],
-                                    "sea_surface_temperature": []}}
 
         try:
             days_payload, water_temp_c = build_days_payload(wind_json, hires_json, wave_json, daily_json)
@@ -749,11 +742,7 @@ def main():
             })
             print(f"  -> {len(days_payload)} jours envoyes sur Firestore.")
 
-            if missing_models:
-                partial += 1
-                print(f"  -> PARTIEL (modeles manquants: {missing_models})")
-            else:
-                success += 1
+            success += 1
 
         except Exception as e:
             print(f"  !! Erreur build/write pour {spot['name']}: {_error_summary(e)}")

@@ -5,7 +5,18 @@
     "version": "Abyssal Fishing v1.0"
   },
   "map": {
-    "searchHint": "ابحث عن موقع صيد..."
+    "searchHint": "ابحث عن موقع صيد...",
+    "tools": "أدوات الخريطة",
+    "measureDistance": "قياس المسافة",
+    "stopMeasure": "إيقاف القياس"
+  },
+  "splash": {
+    "initializingFirebase": "جارٍ تهيئة Firebase…",
+    "loadingData": "جارٍ تحميل البيانات…",
+    "ready": "تم!",
+    "startupError": "خطأ في بدء التشغيل",
+    "startupErrorMessage": "فشل بدء التشغيل. تحقق من الاتصال وحاول مرة أخرى.",
+    "retry": "إعادة المحاولة"
   },
   "drawer": {
     "title": "ABYSSAL",
@@ -29,7 +40,7 @@
     "fish": "الأسماك",
     "map": "الخريطة",
     "settings": "الإعدادات",
-    "addSpot": "إضافة موقع"
+    "addSpot": "مواقعي"
   },
   "home": {
     "tidesTitle": "المد والجزر",
@@ -55,7 +66,8 @@
     "coefficient": "معامل",
     "transit": "العبور",
     "member": "عضو BoosterFish",
-    "appName": "BoosterFish"
+    "appName": "BoosterFish",
+    "openFullMap": "اضغط لفتح الخريطة الكاملة"
   },
   "species": {
     "title": "الموسوعة",
@@ -146,7 +158,12 @@
     "route": "اتجاهات",
     "call": "اتصال",
     "routeError": "تعذر فتح الاتجاهات",
-    "callError": "تعذر إجراء المكالمة"
+    "callError": "تعذر إجراء المكالمة",
+    "closingSoon": "يغلق قريبًا",
+    "openingSoon": "يفتح قريبًا",
+    "empty": "لم يتم العثور على متاجر",
+    "tryOtherSearch": "جرّب بحثًا آخر",
+    "copied": "تم نسخ الإحداثيات"
   },
   "shopsMap": {
     "title": "خريطة المتاجر",
@@ -166,12 +183,15 @@
   },
   "settings": {
     "title": "مركز القيادة",
+    "subtitle": "أدر حسابك وتفضيلاتك",
+    "goodFishingTitle": "صيدًا موفقًا!",
+    "goodFishingSubtitle": "تحقق من الطقس والمد والجزر قبل الانطلاق.",
     "profile": "الملف الشخصي",
     "profileSubtitle": "التفاصيل",
     "mySpots": "مواقعي",
-    "mySpotsSubtitle": "12 إحداثية\nمحفوظة",
-    "crewManagement": "إدارة\nالطاقم",
-    "crewManagementSubtitle": "إدارة 4\nبحارة",
+    "mySpotsSubtitle": "12 إحداثية محفوظة",
+    "crewManagement": "إدارة الطاقم",
+    "crewManagementSubtitle": "إدارة 4 بحارة",
     "logout": "تسجيل الخروج",
     "logoutConfirm": "هل تريد تسجيل الخروج حقًا؟",
     "cancel": "إلغاء",
@@ -192,11 +212,27 @@
     "signInUserDisabled": "تم تعطيل هذا الحساب.",
     "signInTooManyRequests": "محاولات كثيرة جدًا. انتظر قليلًا ثم حاول مرة أخرى.",
     "signInGoogle": "تسجيل الدخول بـ Google",
+    "signInCanceled": "تم إلغاء تسجيل الدخول إلى Google أو رفضه.",
     "signInGoogleSubtitle": "مزامنة حسابك",
     "adPrivacy": "تفضيلات الإعلانات",
     "adPrivacySubtitle": "إدارة موافقة AdMob",
     "adPrivacyUpdated": "تم تحديث تفضيلات الإعلانات.",
-    "adPrivacyError": "تعذر فتح تفضيلات الإعلانات."
+    "adPrivacyError": "تعذر فتح تفضيلات الإعلانات.",
+    "privacyPolicy": "سياسة الخصوصية",
+    "privacyPolicySubtitle": "اطلع على التزاماتنا",
+    "privacySection": "الخصوصية",
+    "termsOfService": "شروط الخدمة",
+    "termsOfServiceSubtitle": "الشروط العامة للاستخدام",
+    "deleteAccount": "حذف حسابي",
+    "deleteAccountSubtitle": "حذف حسابك وجميع بياناتك نهائيًا",
+    "deleteAccountConfirm": "سيؤدي هذا إلى حذف حسابك والبيانات المرتبطة به نهائيًا. هل تريد المتابعة؟",
+    "deleteAccountSuccess": "تم حذف حسابك والبيانات المرتبطة به.",
+    "deleteAccountError": "تعذر حذف الحساب. حاول مرة أخرى.",
+    "userFallback": "المستخدم",
+    "comingSoon": "{feature} — قريبًا",
+    "linkOpenError": "تعذر فتح الرابط",
+    "editProfile": "تعديل الملف الشخصي",
+    "name": "الاسم"
   },
   "language": {
     "title": "اللغة",

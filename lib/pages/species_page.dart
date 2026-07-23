@@ -83,7 +83,9 @@ class _SpeciesPageState extends State<SpeciesPage> {
       _filtered = _allSpecies.where((s) {
         final matchSearch = _searchQuery.isEmpty ||
             s.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-            s.scientificName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+            s.scientificName
+                .toLowerCase()
+                .contains(_searchQuery.toLowerCase()) ||
             s.family.toLowerCase().contains(_searchQuery.toLowerCase());
         final matchRegion = _regionFilter == null ||
             _regionFilter == context.tr('species.all') ||
@@ -141,7 +143,9 @@ class _SpeciesPageState extends State<SpeciesPage> {
                                   ),
                                 ),
                                 Text(
-                                  context.trArgs('species.speciesCount', args: {'count': _allSpecies.length.toString()}),
+                                  context.trArgs('species.speciesCount', args: {
+                                    'count': _allSpecies.length.toString()
+                                  }),
                                   style: TextStyle(
                                     color: tc.textSecondary,
                                     fontSize: 13,
@@ -170,12 +174,14 @@ class _SpeciesPageState extends State<SpeciesPage> {
                             const SizedBox(width: 10),
                             Expanded(
                               child: TextField(
-                                style: TextStyle(color: tc.textPrimary, fontSize: 15),
+                                style: TextStyle(
+                                    color: tc.textPrimary, fontSize: 15),
                                 decoration: InputDecoration(
                                   hintText: context.tr('species.search'),
                                   hintStyle: TextStyle(color: tc.textMuted),
                                   border: InputBorder.none,
-                                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                                  contentPadding:
+                                      const EdgeInsets.symmetric(vertical: 14),
                                 ),
                                 onChanged: (v) {
                                   _searchQuery = v;
@@ -189,7 +195,8 @@ class _SpeciesPageState extends State<SpeciesPage> {
                                   _searchQuery = '';
                                   _applyFilters();
                                 },
-                                child: Icon(Icons.close, color: tc.textMuted, size: 18),
+                                child: Icon(Icons.close,
+                                    color: tc.textMuted, size: 18),
                               ),
                           ],
                         ),
@@ -206,16 +213,20 @@ class _SpeciesPageState extends State<SpeciesPage> {
                             final regionKey = _regionKeys[index];
                             final regionLabel = context.tr(regionKey);
                             final isActive = _regionFilter == regionLabel ||
-                                (_regionFilter == null && regionKey == 'species.all');
+                                (_regionFilter == null &&
+                                    regionKey == 'species.all');
                             return GestureDetector(
                               onTap: () {
                                 setState(() {
-                                  _regionFilter = regionKey == 'species.all' ? null : regionLabel;
+                                  _regionFilter = regionKey == 'species.all'
+                                      ? null
+                                      : regionLabel;
                                 });
                                 _applyFilters();
                               },
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 8),
                                 decoration: BoxDecoration(
                                   color: isActive
                                       ? tc.oceanLight.withValues(alpha: 0.15)
@@ -224,16 +235,21 @@ class _SpeciesPageState extends State<SpeciesPage> {
                                   border: Border.all(
                                     color: isActive
                                         ? tc.oceanLight.withValues(alpha: 0.5)
-                                        : tc.textPrimary.withValues(alpha: 0.08),
+                                        : tc.textPrimary
+                                            .withValues(alpha: 0.08),
                                     width: 1,
                                   ),
                                 ),
                                 child: Text(
                                   regionLabel,
                                   style: TextStyle(
-                                    color: isActive ? tc.oceanLight : tc.textSecondary,
+                                    color: isActive
+                                        ? tc.oceanLight
+                                        : tc.textSecondary,
                                     fontSize: 12,
-                                    fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                                    fontWeight: isActive
+                                        ? FontWeight.w600
+                                        : FontWeight.w500,
                                   ),
                                 ),
                               ),
@@ -260,17 +276,20 @@ class _SpeciesPageState extends State<SpeciesPage> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(Icons.error_outline,
-                                      color: tc.error.withValues(alpha: 0.6), size: 48),
+                                      color: tc.error.withValues(alpha: 0.6),
+                                      size: 48),
                                   const SizedBox(height: 12),
                                   Text(
                                     context.tr('species.loadingError'),
-                                    style: TextStyle(color: tc.textMuted, fontSize: 15),
+                                    style: TextStyle(
+                                        color: tc.textMuted, fontSize: 15),
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
                                     _error!,
                                     style: TextStyle(
-                                      color: tc.textMuted.withValues(alpha: 0.7),
+                                      color:
+                                          tc.textMuted.withValues(alpha: 0.7),
                                       fontSize: 11,
                                     ),
                                     textAlign: TextAlign.center,
@@ -288,22 +307,26 @@ class _SpeciesPageState extends State<SpeciesPage> {
                                   child: Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.search_off, color: tc.textMuted, size: 48),
+                                      Icon(Icons.search_off,
+                                          color: tc.textMuted, size: 48),
                                       const SizedBox(height: 12),
                                       Text(
                                         context.tr('species.noSpeciesFound'),
-                                        style: TextStyle(color: tc.textMuted, fontSize: 15),
+                                        style: TextStyle(
+                                            color: tc.textMuted, fontSize: 15),
                                       ),
                                     ],
                                   ),
                                 )
                               : ListView.builder(
-                                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                                  padding:
+                                      const EdgeInsets.fromLTRB(16, 0, 16, 16),
                                   itemCount: _filtered.length,
                                   itemBuilder: (context, index) {
                                     return _SpeciesCard(
                                       species: _filtered[index],
-                                      onTap: () => _openDetail(_filtered[index]),
+                                      onTap: () =>
+                                          _openDetail(_filtered[index]),
                                     );
                                   },
                                 ),
@@ -338,6 +361,7 @@ class _SpeciesCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
+    final imageScale = _speciesListImageScale(species.photoUrl);
 
     return GestureDetector(
       onTap: onTap,
@@ -372,6 +396,7 @@ class _SpeciesCard extends StatelessWidget {
                   fit: BoxFit.cover,
                   width: 90,
                   height: 90,
+                  scale: imageScale,
                 ),
               ),
             ),
@@ -443,6 +468,37 @@ class _SpeciesCard extends StatelessWidget {
   }
 }
 
+/// Les fichiers locaux sont tous carrés, mais certains contiennent beaucoup
+/// plus de marge blanche autour du poisson. Ce facteur égalise la taille
+/// visuelle dans les cartes sans modifier les images sources ni les détails.
+double _speciesListImageScale(String path) {
+  final asset = path.split('/').last;
+  return const {
+        'bonite a dos raye.png': 1.55,
+        'chinchard saurel.png': 1.50,
+        'congre.png': 1.53,
+        'crabe vert crabe enrage.png': 1.77,
+        'dorade des marais pagre.png': 1.53,
+        'dorade grise.png': 1.56,
+        'girelle paon.png': 1.56,
+        'lancons.png': 1.61,
+        'lieu jaune.png': 1.46,
+        'maigre corb.png': 1.63,
+        'merou brun.png': 1.56,
+        'mulet lippu.png': 1.56,
+        'mur merlan.png': 1.60,
+        'oblade.png': 1.56,
+        'pageot rose.png': 1.49,
+        'roussette petite roussette.png': 1.60,
+        'sar commun.png': 1.58,
+        'sardine.png': 1.63,
+        'sole commune.png': 1.63,
+        'thon rouge.png': 1.62,
+        'turbot.png': 1.55,
+      }[asset] ??
+      1.0;
+}
+
 class _Tag extends StatelessWidget {
   final String text;
   final Color color;
@@ -509,7 +565,7 @@ class SpeciesDetailPage extends StatelessWidget {
                   ],
                 ),
               ),
-          background: Stack(
+              background: Stack(
                 fit: StackFit.expand,
                 children: [
                   _SpeciesImage(
@@ -555,7 +611,8 @@ class SpeciesDetailPage extends StatelessWidget {
                   const SizedBox(height: 16),
 
                   // ── INFOS RAPIDES ──
-                  _SectionTitle(title: context.tr('species.information'), tc: tc),
+                  _SectionTitle(
+                      title: context.tr('species.information'), tc: tc),
                   const SizedBox(height: 10),
                   Wrap(
                     spacing: 10,
@@ -578,7 +635,8 @@ class SpeciesDetailPage extends StatelessWidget {
                       _InfoTile(
                         icon: Icons.scale,
                         label: context.tr('species.weight'),
-                        value: '${species.weightMinKg}-${species.weightMaxKg} kg',
+                        value:
+                            '${species.weightMinKg}-${species.weightMaxKg} kg',
                         color: tc.success,
                         tc: tc,
                       ),
@@ -630,7 +688,8 @@ class SpeciesDetailPage extends StatelessWidget {
                   const SizedBox(height: 20),
 
                   // ── DESCRIPTION ──
-                  _SectionTitle(title: context.tr('species.description'), tc: tc),
+                  _SectionTitle(
+                      title: context.tr('species.description'), tc: tc),
                   const SizedBox(height: 8),
                   Text(
                     species.description,
@@ -644,9 +703,11 @@ class SpeciesDetailPage extends StatelessWidget {
                   const SizedBox(height: 20),
 
                   // ── TECHNIQUES ET APPÂTS ──
-                  _SectionTitle(title: context.tr('species.techniquesAndBaits'), tc: tc),
+                  _SectionTitle(
+                      title: context.tr('species.techniquesAndBaits'), tc: tc),
                   const SizedBox(height: 10),
-                  ...species.techniques.map((tech) => _TechniqueCard(technique: tech, tc: tc)),
+                  ...species.techniques
+                      .map((tech) => _TechniqueCard(technique: tech, tc: tc)),
 
                   const SizedBox(height: 20),
 
@@ -685,7 +746,8 @@ class SpeciesDetailPage extends StatelessWidget {
                   const SizedBox(height: 20),
 
                   // ── RÉGLEMENTATION ──
-                  _SectionTitle(title: context.tr('species.regulation'), tc: tc),
+                  _SectionTitle(
+                      title: context.tr('species.regulation'), tc: tc),
                   const SizedBox(height: 8),
                   Container(
                     width: double.infinity,
@@ -872,12 +934,14 @@ class _SpeciesImage extends StatelessWidget {
   final BoxFit fit;
   final double? width;
   final double? height;
+  final double scale;
 
   const _SpeciesImage({
     required this.path,
     this.fit = BoxFit.cover,
     this.width,
     this.height,
+    this.scale = 1.0,
   });
 
   bool get _isAsset => path.startsWith('assets/');
@@ -892,33 +956,41 @@ class _SpeciesImage extends StatelessWidget {
       child: Icon(Icons.image_not_supported, color: tc.textMuted),
     );
 
+    Widget image;
     if (_isAsset) {
-      return Image.asset(
+      image = Image.asset(
         path,
         fit: fit,
         width: width,
         height: height,
         errorBuilder: (_, __, ___) => errorWidget,
       );
-    }
-
-    return CachedNetworkImage(
-      imageUrl: path,
-      fit: fit,
-      width: width,
-      height: height,
-      placeholder: (context, url) => Container(
-        color: tc.surfaceElevated,
+    } else {
+      image = CachedNetworkImage(
+        imageUrl: path,
+        fit: fit,
         width: width,
         height: height,
-        child: Center(
-          child: CircularProgressIndicator(
-            color: tc.oceanLight,
-            strokeWidth: 2,
+        placeholder: (context, url) => Container(
+          color: tc.surfaceElevated,
+          width: width,
+          height: height,
+          child: Center(
+            child: CircularProgressIndicator(
+              color: tc.oceanLight,
+              strokeWidth: 2,
+            ),
           ),
         ),
-      ),
-      errorWidget: (context, url, error) => errorWidget,
+        errorWidget: (context, url, error) => errorWidget,
+      );
+    }
+
+    if (scale == 1.0) return image;
+    return Transform.scale(
+      scale: scale,
+      alignment: Alignment.center,
+      child: image,
     );
   }
 }
@@ -987,7 +1059,8 @@ class _TechniqueCard extends StatelessWidget {
               runSpacing: 6,
               children: technique.baits.map((bait) {
                 return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: tc.gold.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),

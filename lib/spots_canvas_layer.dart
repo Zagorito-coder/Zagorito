@@ -27,6 +27,11 @@ class SpotsCanvasLayer extends StatefulWidget {
 class _SpotsCanvasLayerState extends State<SpotsCanvasLayer> {
   StreamSubscription? _mapEventSubscription;
   Timer? _repaintTimer;
+  int? _pointerId;
+  Offset? _pointerDownPosition;
+  bool _pointerMoved = false;
+
+  static const double _tapSlop = 18.0;
 
   @override
   void initState() {
@@ -49,6 +54,68 @@ class _SpotsCanvasLayerState extends State<SpotsCanvasLayer> {
     super.dispose();
   }
 
+  void _onPointerDown(PointerDownEvent event) {
+    // Track only one pointer. Multi-touch remains entirely managed by
+    // flutter_map's scale recognizer.
+    if (_pointerId != null) return;
+    _pointerId = event.pointer;
+    _pointerDownPosition = event.localPosition;
+    _pointerMoved = false;
+  }
+
+  void _onPointerMove(PointerMoveEvent event) {
+    if (event.pointer != _pointerId || _pointerDownPosition == null) return;
+    if ((event.localPosition - _pointerDownPosition!).distance > _tapSlop) {
+      _pointerMoved = true;
+    }
+  }
+
+  void _onPointerUp(PointerUpEvent event) {
+    if (event.pointer != _pointerId || _pointerDownPosition == null) return;
+    final wasTap = !_pointerMoved &&
+        (event.localPosition - _pointerDownPosition!).distance <= _tapSlop;
+    if (wasTap) _handleTap(event.localPosition);
+    _resetPointer();
+  }
+
+  void _onPointerCancel(PointerCancelEvent event) {
+    if (event.pointer == _pointerId) _resetPointer();
+  }
+
+  void _resetPointer() {
+    _pointerId = null;
+    _pointerDownPosition = null;
+    _pointerMoved = false;
+  }
+
+  void _handleTap(Offset localOffset) {
+    final MapCamera camera;
+    try {
+      camera = widget.mapController.camera;
+    } catch (_) {
+      return;
+    }
+
+    Spot? closest;
+    var minDistance = 24.0;
+    for (final spot in widget.visibleSpots) {
+      final point = camera.latLngToScreenOffset(spot.location);
+      final distance = (localOffset - Offset(point.dx, point.dy)).distance;
+      if (distance < minDistance) {
+        minDistance = distance;
+        closest = spot;
+      }
+    }
+    if (closest != null) {
+      widget.onSpotTap(closest);
+    } else if (widget.onMapTap != null) {
+      // Keep map-tap features (for example distance measurement) while
+      // allowing flutter_map to receive the same pointer sequence for
+      // double-tap-drag zoom.
+      widget.onMapTap!(camera.screenOffsetToLatLng(localOffset));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final MapCamera camera;
@@ -59,31 +126,12 @@ class _SpotsCanvasLayerState extends State<SpotsCanvasLayer> {
     }
 
     return SizedBox.expand(
-      child: GestureDetector(
+      child: Listener(
         behavior: HitTestBehavior.translucent,
-        onTapUp: (TapUpDetails details) {
-          final RenderBox box = context.findRenderObject() as RenderBox;
-          final Offset localOffset = box.globalToLocal(details.globalPosition);
-
-          Spot? closest;
-          double minDistance = 24.0;
-
-          for (final spot in widget.visibleSpots) {
-            final point = camera.latLngToScreenOffset(spot.location);
-            final pos = Offset(point.dx, point.dy);
-            final dist = (localOffset - pos).distance;
-            if (dist < minDistance) {
-              minDistance = dist;
-              closest = spot;
-            }
-          }
-          if (closest != null) {
-            widget.onSpotTap(closest);
-          } else if (widget.onMapTap != null) {
-            final latLng = camera.screenOffsetToLatLng(localOffset);
-            widget.onMapTap!(latLng);
-          }
-        },
+        onPointerDown: _onPointerDown,
+        onPointerMove: _onPointerMove,
+        onPointerUp: _onPointerUp,
+        onPointerCancel: _onPointerCancel,
         child: CustomPaint(
           painter: _SpotsPainter(
             visibleSpots: widget.visibleSpots,
@@ -129,9 +177,8 @@ class _SpotsPainter extends CustomPainter {
       // a cheap translucent offset circle for the normal marker set.
       shadowPaint
         ..color = baseColor.withValues(alpha: isSelected ? 0.4 : 0.22)
-        ..maskFilter = isSelected
-            ? const MaskFilter.blur(BlurStyle.normal, 5)
-            : null;
+        ..maskFilter =
+            isSelected ? const MaskFilter.blur(BlurStyle.normal, 5) : null;
       canvas.drawCircle(pos.translate(0, 1.5), radius, shadowPaint);
 
       // Cercle principal avec couleur unie (simplifié pour compatibilité GPU)

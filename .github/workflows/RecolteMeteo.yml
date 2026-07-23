@@ -22,6 +22,15 @@ jobs:
       - name: Installer les dependances
         run: pip install --disable-pip-version-check -r requirements-harvest.txt
 
+      - name: Verifier la cle Open-Meteo commerciale
+        env:
+          OPEN_METEO_API_KEY: ${{ secrets.OPEN_METEO_API_KEY }}
+        run: |
+          if [ -z "${OPEN_METEO_API_KEY//[[:space:]]/}" ]; then
+            echo "::error::Le secret OPEN_METEO_API_KEY est obligatoire pour l'API commerciale."
+            exit 1
+          fi
+
       - name: Recreer la cle Firebase depuis le secret GitHub
         shell: bash
         env:

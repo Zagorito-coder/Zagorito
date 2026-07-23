@@ -23,6 +23,15 @@ jobs:
         working-directory: functions
         run: npm ci
 
+      - name: Vérification du secret Open-Meteo commercial
+        env:
+          OPEN_METEO_API_KEY: ${{ secrets.OPEN_METEO_API_KEY }}
+        run: |
+          if [ -z "${OPEN_METEO_API_KEY//[[:space:]]/}" ]; then
+            echo "::error::Le secret OPEN_METEO_API_KEY est obligatoire pour l'API commerciale."
+            exit 1
+          fi
+
       - name: Récupération des conditions et écriture dans Firestore
         working-directory: functions
         env:
