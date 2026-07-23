@@ -18,6 +18,7 @@ import 'package:spots_app/widgets/forecast_table.dart';
 import 'package:spots_app/widgets/app_back_button.dart';
 import 'package:spots_app/widgets/open_meteo_attribution.dart';
 import 'package:spots_app/utils/geo_utils.dart';
+import 'package:spots_app/theme.dart';
 
 class ForecastPage extends StatefulWidget {
   /// Si null, utilise la geolocalisation pour trouver le spot le plus proche.
@@ -52,7 +53,10 @@ class _ForecastPageState extends State<ForecastPage> {
   }
 
   Future<void> _init() async {
-    setState(() { _isLoading = true; _error = null; });
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
     try {
       // 1. Charger la liste des spots disponibles depuis Firestore
@@ -80,7 +84,10 @@ class _ForecastPageState extends State<ForecastPage> {
     } catch (e) {
       debugPrint('[ForecastPage] Erreur init: $e');
       if (!mounted) return;
-      setState(() { _error = e.toString(); _isLoading = false; });
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
     }
   }
 
@@ -91,7 +98,8 @@ class _ForecastPageState extends State<ForecastPage> {
     if (perm == LocationPermission.denied) {
       perm = await Geolocator.requestPermission();
     }
-    if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
+    if (perm == LocationPermission.denied ||
+        perm == LocationPermission.deniedForever) {
       // GPS refuse → fallback sur le premier spot de la liste
       return _availableSpots.first['id'] as String;
     }
@@ -110,8 +118,10 @@ class _ForecastPageState extends State<ForecastPage> {
 
       for (final spot in _availableSpots) {
         final dist = haversineKm(
-          pos.latitude, pos.longitude,
-          spot['latitude'] as double, spot['longitude'] as double,
+          pos.latitude,
+          pos.longitude,
+          spot['latitude'] as double,
+          spot['longitude'] as double,
         );
         if (dist < minDist) {
           minDist = dist;
@@ -125,12 +135,19 @@ class _ForecastPageState extends State<ForecastPage> {
   }
 
   Future<void> _loadForecast(String spotId) async {
-    setState(() { _isLoading = true; _error = null; _currentSpotId = spotId; });
+    setState(() {
+      _isLoading = true;
+      _error = null;
+      _currentSpotId = spotId;
+    });
     try {
       final forecast = await ForecastFirestoreService.fetchSpot(spotId);
       if (!mounted) return;
       if (forecast == null) {
-        setState(() { _error = 'Connectez-vous pour voir les prévisions météo.'; _isLoading = false; });
+        setState(() {
+          _error = 'Connectez-vous pour voir les prévisions météo.';
+          _isLoading = false;
+        });
         return;
       }
       setState(() {
@@ -141,7 +158,10 @@ class _ForecastPageState extends State<ForecastPage> {
     } catch (e) {
       debugPrint('[ForecastPage] Erreur chargement $spotId: $e');
       if (!mounted) return;
-      setState(() { _error = 'Spot "$spotId": ${e.toString()}'; _isLoading = false; });
+      setState(() {
+        _error = 'Spot "$spotId": ${e.toString()}';
+        _isLoading = false;
+      });
     }
   }
 
@@ -164,7 +184,9 @@ class _ForecastPageState extends State<ForecastPage> {
       }
     }
     if (dayIdx != _selectedDayIndex) {
-      setState(() { _selectedDayIndex = dayIdx; });
+      setState(() {
+        _selectedDayIndex = dayIdx;
+      });
     }
   }
 
@@ -188,13 +210,14 @@ class _ForecastPageState extends State<ForecastPage> {
     }
 
     if (_error != null) {
+      final tc = ThemeColors.of(context);
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.cloud_off, size: 64, color: Colors.grey),
+              Icon(Icons.cloud_off, size: 64, color: tc.textMuted),
               const SizedBox(height: 16),
               const Text(
                 'Aucune donnée disponible',
@@ -204,7 +227,7 @@ class _ForecastPageState extends State<ForecastPage> {
               Text(
                 _error!,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                style: TextStyle(color: tc.textSecondary, fontSize: 14),
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
@@ -284,7 +307,8 @@ class _ForecastPageState extends State<ForecastPage> {
               child: DropdownButton<String>(
                 value: _currentSpotId,
                 isExpanded: true,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                style:
+                    const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                 icon: const Icon(Icons.arrow_drop_down, size: 20),
                 items: _availableSpots.map((spot) {
                   return DropdownMenuItem<String>(
@@ -388,6 +412,8 @@ class _ForecastPageState extends State<ForecastPage> {
   }
 
   Widget _buildDateBar(SpotForecast forecast) {
+    final tc = ThemeColors.of(context);
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return SizedBox(
       height: 64,
       child: ListView.separated(
@@ -409,13 +435,11 @@ class _ForecastPageState extends State<ForecastPage> {
               width: 52,
               decoration: BoxDecoration(
                 color: isSelected
-                    ? const Color(0xFF1E88E5)
-                    : const Color(0xFFF1F3F6),
+                    ? tc.oceanMedium
+                    : (dark ? tc.surfaceLight : const Color(0xFFF1F3F6)),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: isSelected
-                      ? const Color(0xFF1565C0)
-                      : const Color(0xFFE0E0E0),
+                  color: isSelected ? tc.oceanDeep : tc.glassBorder,
                   width: isSelected ? 2 : 1,
                 ),
               ),
@@ -426,12 +450,12 @@ class _ForecastPageState extends State<ForecastPage> {
                   Text(_joursFr[day.weekday - 1],
                       style: TextStyle(
                           fontSize: 11,
-                          color: isSelected ? Colors.white : Colors.grey[700])),
+                          color: isSelected ? Colors.white : tc.textSecondary)),
                   Text('${day.day}',
                       style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: isSelected ? Colors.white : Colors.black87)),
+                          color: isSelected ? Colors.white : tc.textPrimary)),
                 ],
               ),
             ),

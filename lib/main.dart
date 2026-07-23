@@ -764,9 +764,9 @@ class _MapScreenState extends State<MapScreen>
     FocusScope.of(context).unfocus();
     // Active le vent pour le spot selectionne
     context.read<WindAnimationProvider>().enableNearest(
-      spot.latitude,
-      spot.longitude,
-    );
+          spot.latitude,
+          spot.longitude,
+        );
     await _animateToSpot(spot);
   }
 
@@ -847,8 +847,14 @@ class _MapScreenState extends State<MapScreen>
     final nb = camera.visibleBounds;
     var nz = camera.zoom;
     if (!nz.isFinite) return;
-    if (nb.north.isNaN || nb.south.isNaN || nb.east.isNaN || nb.west.isNaN ||
-        !nb.north.isFinite || !nb.south.isFinite || !nb.east.isFinite || !nb.west.isFinite) {
+    if (nb.north.isNaN ||
+        nb.south.isNaN ||
+        nb.east.isNaN ||
+        nb.west.isNaN ||
+        !nb.north.isFinite ||
+        !nb.south.isFinite ||
+        !nb.east.isFinite ||
+        !nb.west.isFinite) {
       return;
     }
     if (nz > _maxZoom) {
@@ -865,272 +871,282 @@ class _MapScreenState extends State<MapScreen>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final tc = ThemeColors.of(context);
-    final hasSel = _selectedSpot != null;
+    return ListenableBuilder(
+      listenable: ThemeController.instance,
+      builder: (context, _) {
+        final tc = ThemeColors.of(context);
+        final hasSel = _selectedSpot != null;
 
-    return Scaffold(
-        body: Stack(children: [
-      if (_isLoadingSpots)
-        Center(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-          CircularProgressIndicator(color: tc.oceanLight),
-          const SizedBox(height: 12),
-          Text('Chargement des spots...',
-              style: TextStyle(color: tc.textSecondary)),
-        ])),
-      FlutterMap(
-        mapController: _mapController,
-        options: MapOptions(
-          initialCenter: const LatLng(30.5, -9.7),
-          initialZoom: 6,
-          maxZoom: _maxZoom,
-          minZoom: 3.0,
-          // Keep FlutterMap's native one-handed zoom gesture enabled:
-          // double-tap, hold the second tap, then drag vertically.
-          interactionOptions: const InteractionOptions(
-            flags: InteractiveFlag.all,
-          ),
-          onPositionChanged: _onPositionChanged,
-          onMapReady: () {},
-        ),
-        children: [
-          AppTileLayer(style: _mapStyle),
-          AppMapAttribution(style: _mapStyle),
-          if (_currentPosition != null)
-            MarkerLayer(markers: [
-              Marker(
-                  width: 20,
-                  height: 20,
-                  point: LatLng(
-                      _currentPosition!.latitude, _currentPosition!.longitude),
-                  child: Container(
-                      decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.blue.withValues(alpha: 0.9),
-                          border: Border.all(color: Colors.white, width: 2.5),
-                          boxShadow: [
-                        BoxShadow(
-                            color: Colors.blue.withValues(alpha: 0.45),
-                            blurRadius: 10)
-                      ])))
-            ]),
-          SpotsCanvasLayer(
-            visibleSpots: _visibleSpots,
+        return Scaffold(
+            body: Stack(children: [
+          if (_isLoadingSpots)
+            Center(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+              CircularProgressIndicator(color: tc.oceanLight),
+              const SizedBox(height: 12),
+              Text('Chargement des spots...',
+                  style: TextStyle(color: tc.textSecondary)),
+            ])),
+          FlutterMap(
             mapController: _mapController,
-            selectedSpot: _selectedSpot,
-            onSpotTap: _selectSpot,
-            onMapTap: (ll) =>
-                _onMapTap(const TapPosition(Offset.zero, Offset.zero), ll),
-          ),
-          // 🌬️ Couche de particules de vent animees (30fps)
-          // IgnorePointer pour ne pas bloquer les taps sur la carte
-          IgnorePointer(
-            child: Consumer<WindAnimationProvider>(
-              builder: (ctx, wind, _) => WindParticleLayer(
-                provider: wind,
+            options: MapOptions(
+              initialCenter: const LatLng(30.5, -9.7),
+              initialZoom: 6,
+              maxZoom: _maxZoom,
+              minZoom: 3.0,
+              // Keep FlutterMap's native one-handed zoom gesture enabled:
+              // double-tap, hold the second tap, then drag vertically.
+              interactionOptions: const InteractionOptions(
+                flags: InteractiveFlag.all,
+              ),
+              onPositionChanged: _onPositionChanged,
+              onMapReady: () {},
+            ),
+            children: [
+              AppTileLayer(style: _mapStyle),
+              AppMapAttribution(style: _mapStyle),
+              if (_currentPosition != null)
+                MarkerLayer(markers: [
+                  Marker(
+                      width: 20,
+                      height: 20,
+                      point: LatLng(_currentPosition!.latitude,
+                          _currentPosition!.longitude),
+                      child: Container(
+                          decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.blue.withValues(alpha: 0.9),
+                              border:
+                                  Border.all(color: Colors.white, width: 2.5),
+                              boxShadow: [
+                            BoxShadow(
+                                color: Colors.blue.withValues(alpha: 0.45),
+                                blurRadius: 10)
+                          ])))
+                ]),
+              SpotsCanvasLayer(
+                visibleSpots: _visibleSpots,
                 mapController: _mapController,
+                selectedSpot: _selectedSpot,
+                onSpotTap: _selectSpot,
+                onMapTap: (ll) =>
+                    _onMapTap(const TapPosition(Offset.zero, Offset.zero), ll),
+              ),
+              // 🌬️ Couche de particules de vent animees (30fps)
+              // IgnorePointer pour ne pas bloquer les taps sur la carte
+              IgnorePointer(
+                child: Consumer<WindAnimationProvider>(
+                  builder: (ctx, wind, _) => WindParticleLayer(
+                    provider: wind,
+                    mapController: _mapController,
+                  ),
+                ),
+              ),
+              if (_selectedSpot != null)
+                MarkerLayer(markers: [
+                  Marker(
+                      width: 52,
+                      height: 56,
+                      point: LatLng(
+                          _selectedSpot!.latitude, _selectedSpot!.longitude),
+                      child: _markerCacheManager.getOrCreateMarker(
+                          _selectedSpot!, true, _isPremium))
+                ]),
+              if (_isMeasuring && _measurePoints.isNotEmpty)
+                PolylineLayer(polylines: [
+                  Polyline(
+                      points: _measurePoints,
+                      color: Colors.redAccent,
+                      strokeWidth: 4.0)
+                ]),
+              if (_isMeasuring && _measurePoints.isNotEmpty)
+                MarkerLayer(
+                    markers: _measurePoints
+                        .map((p) => Marker(
+                            width: 14,
+                            height: 14,
+                            point: p,
+                            child: Container(
+                                decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.white,
+                                    border: Border.all(
+                                        color: Colors.redAccent, width: 2)))))
+                        .toList()),
+            ],
+          ),
+          if (_showToolsPanel) _buildToolsPanel(),
+          if (_isLoadingSpots) const SizedBox.shrink(),
+          Positioned(
+              bottom: 96 + 16 + 8,
+              left: 0,
+              right: 0,
+              child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Consumer<FishProvider>(builder: (ctx, fp, _) {
+                    final df = fp.allFish;
+                    if (df.isEmpty) return const SizedBox.shrink();
+                    return AnimatedSlide(
+                        offset: _isFishBarVisible
+                            ? Offset.zero
+                            : const Offset(0, 2),
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeOutCubic,
+                        child: AnimatedOpacity(
+                            opacity: _isFishBarVisible ? 1.0 : 0.0,
+                            duration: const Duration(milliseconds: 200),
+                            child: _FishVerticalMenu(
+                                fishes: df,
+                                selectedFish: fp.selectedFish,
+                                onFishSelected: (f) =>
+                                    fp.selectFish(f, _spots, _currentPosition),
+                                onFishDeselected: fp.deselectFish)));
+                  }))),
+          Positioned(
+              bottom: 8,
+              left: 8,
+              width: 96,
+              height: 96,
+              child: Directionality(
+                  textDirection: TextDirection.ltr,
+                  child: _buildFishFilterButton())),
+          if (!hasSel)
+            ListenableBuilder(
+                listenable: LanguageController.instance,
+                builder: (ctx, _) {
+                  return Positioned(
+                      bottom: 16,
+                      left: 16,
+                      right: 16,
+                      child: Center(
+                          child: SizedBox(
+                              width: MediaQuery.of(ctx).size.width * 0.45,
+                              child: _SearchBar(
+                                  controller: _searchController,
+                                  results: _searchResults,
+                                  onTap: () {
+                                    if (_isFishBarVisible) {
+                                      setState(() => _isFishBarVisible = false);
+                                    }
+                                  },
+                                  onChanged: (q) => setState(() {
+                                        _searchQuery = q.trim().toLowerCase();
+                                        _selectedSpot = null;
+                                        _isFishBarVisible = false;
+                                      }),
+                                  onClear: () {
+                                    _searchController.clear();
+                                    setState(() {
+                                      _searchQuery = '';
+                                      _selectedSpot = null;
+                                    });
+                                    FocusScope.of(context).unfocus();
+                                  },
+                                  onSelect: _selectSpot,
+                                  distanceText: _distanceText))));
+                }),
+          if (_isCompassEnabled)
+            Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: MediaQuery.removePadding(
+                    context: context,
+                    removeTop: true,
+                    child: _CompassRibbon(
+                        heading: _heading,
+                        courseOverGround: _courseOverGround))),
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 80,
+            right: 16,
+            bottom: 100,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildZoomIn(),
+                  const SizedBox(height: 8),
+                  _buildZoomOut(),
+                  const SizedBox(height: 8),
+                  _buildMyLocationButton(),
+                  const SizedBox(height: 8),
+                  ZoomButton(
+                    heroTag: 'compass_toggle',
+                    icon: _isCompassEnabled ? Icons.explore : Icons.explore_off,
+                    onTap: _toggleCompass,
+                  ),
+                  const SizedBox(height: 8),
+                  _buildToolsPanelToggleButton(),
+                  const SizedBox(height: 8),
+                  _buildWindToggleButton(),
+                ],
               ),
             ),
           ),
-          if (_selectedSpot != null)
-            MarkerLayer(markers: [
-              Marker(
-                  width: 52,
-                  height: 56,
-                  point:
-                      LatLng(_selectedSpot!.latitude, _selectedSpot!.longitude),
-                  child: _markerCacheManager.getOrCreateMarker(
-                      _selectedSpot!, true, _isPremium))
-            ]),
-          if (_isMeasuring && _measurePoints.isNotEmpty)
-            PolylineLayer(polylines: [
-              Polyline(
-                  points: _measurePoints,
-                  color: Colors.redAccent,
-                  strokeWidth: 4.0)
-            ]),
-          if (_isMeasuring && _measurePoints.isNotEmpty)
-            MarkerLayer(
-                markers: _measurePoints
-                    .map((p) => Marker(
-                        width: 14,
-                        height: 14,
-                        point: p,
-                        child: Container(
-                            decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.white,
-                                border: Border.all(
-                                    color: Colors.redAccent, width: 2)))))
-                    .toList()),
-        ],
-      ),
-      if (_showToolsPanel) _buildToolsPanel(),
-      if (_isLoadingSpots) const SizedBox.shrink(),
-      Positioned(
-          bottom: 96 + 16 + 8,
-          left: 0,
-          right: 0,
-          child: Align(
-              alignment: Alignment.centerLeft,
-              child: Consumer<FishProvider>(builder: (ctx, fp, _) {
-                final df = fp.allFish;
-                if (df.isEmpty) return const SizedBox.shrink();
-                return AnimatedSlide(
-                    offset:
-                        _isFishBarVisible ? Offset.zero : const Offset(0, 2),
-                    duration: const Duration(milliseconds: 250),
-                    curve: Curves.easeOutCubic,
-                    child: AnimatedOpacity(
-                        opacity: _isFishBarVisible ? 1.0 : 0.0,
-                        duration: const Duration(milliseconds: 200),
-                        child: _FishVerticalMenu(
-                            fishes: df,
-                            selectedFish: fp.selectedFish,
-                            onFishSelected: (f) =>
-                                fp.selectFish(f, _spots, _currentPosition),
-                            onFishDeselected: fp.deselectFish)));
-              }))),
-      Positioned(
-          bottom: 8,
-          left: 8,
-          width: 96,
-          height: 96,
-          child: Directionality(
-              textDirection: TextDirection.ltr,
-              child: _buildFishFilterButton())),
-      if (!hasSel)
-        ListenableBuilder(
-            listenable: LanguageController.instance,
-            builder: (ctx, _) {
-              return Positioned(
-                  bottom: 16,
-                  left: 16,
-                  right: 16,
-                  child: Center(
+          if (hasSel)
+            ListenableBuilder(
+                listenable: LanguageController.instance,
+                builder: (ctx, _) {
+                  return Align(
+                      alignment: Alignment.bottomCenter,
                       child: SizedBox(
-                          width: MediaQuery.of(ctx).size.width * 0.45,
-                          child: _SearchBar(
-                              controller: _searchController,
-                              results: _searchResults,
-                              onTap: () {
-                                if (_isFishBarVisible) {
-                                  setState(() => _isFishBarVisible = false);
-                                }
-                              },
-                              onChanged: (q) => setState(() {
-                                    _searchQuery = q.trim().toLowerCase();
-                                    _selectedSpot = null;
-                                    _isFishBarVisible = false;
-                                  }),
-                              onClear: () {
-                                _searchController.clear();
-                                setState(() {
-                                  _searchQuery = '';
-                                  _selectedSpot = null;
-                                });
-                                FocusScope.of(context).unfocus();
-                              },
-                              onSelect: _selectSpot,
-                              distanceText: _distanceText))));
-            }),
-      if (_isCompassEnabled)
-        Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: MediaQuery.removePadding(
-                context: context,
-                removeTop: true,
-                child: _CompassRibbon(
-                    heading: _heading, courseOverGround: _courseOverGround))),
-      Positioned(
-        top: MediaQuery.of(context).padding.top + 80,
-        right: 16,
-        bottom: 100,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildZoomIn(),
-              const SizedBox(height: 8),
-              _buildZoomOut(),
-              const SizedBox(height: 8),
-              _buildMyLocationButton(),
-              const SizedBox(height: 8),
-              ZoomButton(
-                heroTag: 'compass_toggle',
-                icon: _isCompassEnabled ? Icons.explore : Icons.explore_off,
-                onTap: _toggleCompass,
-              ),
-              const SizedBox(height: 8),
-              _buildToolsPanelToggleButton(),
-              const SizedBox(height: 8),
-              _buildWindToggleButton(),
-            ],
-          ),
-        ),
-      ),
-      if (hasSel)
-        ListenableBuilder(
-            listenable: LanguageController.instance,
-            builder: (ctx, _) {
-              return Align(
-                  alignment: Alignment.bottomCenter,
-                  child: SizedBox(
-                      width: MediaQuery.of(ctx).size.width * 0.92,
-                      height: MediaQuery.of(ctx).size.height * 0.33,
-                      child: SpotDetailsPanel(
-                          spot: _selectedSpot!,
-                          distanceText: _distanceText(_selectedSpot!),
-                          isPremium: _isPremium,
-                          onClose: _clearSelection,
-                          onPremiumTap: () {},
-                          currentPosition: _currentPosition != null
-                              ? LatLng(_currentPosition!.latitude,
-                                  _currentPosition!.longitude)
-                              : null,
-                          allSpots: _spots,
-                          onSpotSelected: _selectSpot)));
-            }),
-      ListenableBuilder(
-          listenable: LanguageController.instance,
-          builder: (ctx, _) {
-            return Consumer<FishProvider>(builder: (ctx, fp, __) {
-              if (!fp.isFishModalVisible || fp.selectedFish == null) {
-                return const SizedBox.shrink();
-              }
-              return Positioned.fill(
-                  child: GestureDetector(
-                      onTap: fp.closeFishModal,
-                      child: Container(
-                          color: Colors.black.withValues(alpha: 0.45),
-                          child: Center(
-                              child: TweenAnimationBuilder<double>(
-                                  duration: const Duration(milliseconds: 350),
-                                  curve: Curves.easeOutBack,
-                                  tween: Tween(begin: 0.0, end: 1.0),
-                                  builder: (ctx, v, c) => Opacity(
-                                      opacity: v.clamp(0.0, 1.0),
-                                      child: Transform.scale(
-                                          scale: 0.8 + 0.2 * v, child: c)),
-                                  child: GestureDetector(
-                                      onTap: () {},
-                                      child: FishIntelligenceModal(
-                                          fish: fp.selectedFish!,
-                                          nearbySpots: fp.nearbySpots,
-                                          isLoadingNearby: fp.isLoadingNearby,
-                                          distanceText: _distanceText,
-                                          onSpotSelected: (s) {
-                                            fp.closeFishModal();
-                                            _selectSpot(s);
-                                          },
-                                          onClose: fp.closeFishModal,
-                                          currentPosition:
-                                              _currentPosition)))))));
-            });
-          }),
-    ]));
+                          width: MediaQuery.of(ctx).size.width * 0.92,
+                          height: MediaQuery.of(ctx).size.height * 0.33,
+                          child: SpotDetailsPanel(
+                              spot: _selectedSpot!,
+                              distanceText: _distanceText(_selectedSpot!),
+                              isPremium: _isPremium,
+                              onClose: _clearSelection,
+                              onPremiumTap: () {},
+                              currentPosition: _currentPosition != null
+                                  ? LatLng(_currentPosition!.latitude,
+                                      _currentPosition!.longitude)
+                                  : null,
+                              allSpots: _spots,
+                              onSpotSelected: _selectSpot)));
+                }),
+          ListenableBuilder(
+              listenable: LanguageController.instance,
+              builder: (ctx, _) {
+                return Consumer<FishProvider>(builder: (ctx, fp, __) {
+                  if (!fp.isFishModalVisible || fp.selectedFish == null) {
+                    return const SizedBox.shrink();
+                  }
+                  return Positioned.fill(
+                      child: GestureDetector(
+                          onTap: fp.closeFishModal,
+                          child: Container(
+                              color: Colors.black.withValues(alpha: 0.45),
+                              child: Center(
+                                  child: TweenAnimationBuilder<double>(
+                                      duration:
+                                          const Duration(milliseconds: 350),
+                                      curve: Curves.easeOutBack,
+                                      tween: Tween(begin: 0.0, end: 1.0),
+                                      builder: (ctx, v, c) => Opacity(
+                                          opacity: v.clamp(0.0, 1.0),
+                                          child: Transform.scale(
+                                              scale: 0.8 + 0.2 * v, child: c)),
+                                      child: GestureDetector(
+                                          onTap: () {},
+                                          child: FishIntelligenceModal(
+                                              fish: fp.selectedFish!,
+                                              nearbySpots: fp.nearbySpots,
+                                              isLoadingNearby:
+                                                  fp.isLoadingNearby,
+                                              distanceText: _distanceText,
+                                              onSpotSelected: (s) {
+                                                fp.closeFishModal();
+                                                _selectSpot(s);
+                                              },
+                                              onClose: fp.closeFishModal,
+                                              currentPosition:
+                                                  _currentPosition)))))));
+                });
+              }),
+        ]));
+      },
+    );
   }
 
   Widget _buildToolsPanel() {
@@ -1163,10 +1179,9 @@ class _MapScreenState extends State<MapScreen>
                   const Divider(height: 16),
                   _toolItem(
                       icon: _isMeasuring ? Icons.stop : Icons.straighten,
-                      label:
-                          _isMeasuring
-                              ? context.tr('map.stopMeasure')
-                              : context.tr('map.measureDistance'),
+                      label: _isMeasuring
+                          ? context.tr('map.stopMeasure')
+                          : context.tr('map.measureDistance'),
                       color: _isMeasuring ? AppColors.gold : tc.textPrimary,
                       onTap: () {
                         setState(() {

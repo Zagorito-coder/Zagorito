@@ -189,6 +189,20 @@ class _HomePageState extends State<HomePage>
                     childAspectRatio: 1.15,
                     children: [
                       _ExpeditionCard(
+                        title: context.tr('drawer.tides'),
+                        subtitle: context.tr('home.tidesSubtitle'),
+                        icon: Icons.waves_rounded,
+                        iconColor: const Color(0xFF4FC3F7),
+                        onTap: widget.onNavigateToTides,
+                      ),
+                      _ExpeditionCard(
+                        title: context.tr('drawer.tidesPro'),
+                        subtitle: context.tr('home.tidesProSubtitle'),
+                        icon: Icons.show_chart_rounded,
+                        iconColor: const Color(0xFF64B5F6),
+                        onTap: widget.onNavigateToTidesV2,
+                      ),
+                      _ExpeditionCard(
                         title: context.tr('home.fishSpecies'),
                         subtitle: context.tr('home.fishSpeciesSubtitle'),
                         icon: Icons.set_meal_rounded,
@@ -704,9 +718,8 @@ class _HomePageState extends State<HomePage>
         ? _spots
         : List<Spot>.generate(
             maxPreviewSpots,
-            (index) => _spots[
-              index * (_spots.length - 1) ~/ (maxPreviewSpots - 1)
-            ],
+            (index) =>
+                _spots[index * (_spots.length - 1) ~/ (maxPreviewSpots - 1)],
             growable: false,
           );
     final bounds = displaySpots.isEmpty
