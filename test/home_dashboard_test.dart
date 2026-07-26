@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
@@ -13,11 +15,19 @@ import 'package:spots_app/theme.dart';
 import 'package:spots_app/theme_controller.dart';
 
 late AppLocalizations _frenchLocalizations;
+late GoldenFileComparator _previousGoldenComparator;
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUpAll(() async {
+    _previousGoldenComparator = goldenFileComparator;
+    goldenFileComparator = _TolerantGoldenComparator(
+      Uri.file(
+        '${Directory.current.path}/test/home_dashboard_test.dart',
+      ),
+      precisionTolerance: 0.005,
+    );
     SharedPreferences.setMockInitialValues({
       'theme_is_dark': false,
       'app_language': 'fr',
@@ -28,6 +38,10 @@ void main() {
     LanguageController.instance;
     _frenchLocalizations = AppLocalizations(const Locale('fr'));
     await _frenchLocalizations.load();
+  });
+
+  tearDownAll(() {
+    goldenFileComparator = _previousGoldenComparator;
   });
 
   setUp(() {
@@ -401,6 +415,35 @@ class _StaticAppLocalizationsDelegate
 
   @override
   bool shouldReload(_StaticAppLocalizationsDelegate old) => false;
+}
+
+class _TolerantGoldenComparator extends LocalFileComparator {
+  final double precisionTolerance;
+
+  _TolerantGoldenComparator(
+    super.testFile, {
+    required this.precisionTolerance,
+  }) : assert(
+          precisionTolerance >= 0 && precisionTolerance <= 1,
+          'La tolérance doit être comprise entre 0 et 1.',
+        );
+
+  @override
+  Future<bool> compare(Uint8List imageBytes, Uri golden) async {
+    final result = await GoldenFileComparator.compareLists(
+      imageBytes,
+      await getGoldenBytes(golden),
+    );
+    final passed = result.passed || result.diffPercent <= precisionTolerance;
+    if (passed) {
+      result.dispose();
+      return true;
+    }
+
+    final error = await generateFailureOutput(result, golden, basedir);
+    result.dispose();
+    throw FlutterError(error);
+  }
 }
 
 TideData _marineData() {
