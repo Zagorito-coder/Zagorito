@@ -10,6 +10,7 @@ import 'package:spots_app/widgets/app_back_button.dart';
 import 'package:spots_app/widgets/boosterfish_page.dart';
 import 'package:spots_app/services/ad_service.dart';
 import 'package:spots_app/services/auth_service.dart';
+import 'package:spots_app/theme_controller.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class SettingsPage extends StatelessWidget {
@@ -17,102 +18,110 @@ class SettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tc = BoosterFishPagePalette.of(context);
+    return AnimatedBuilder(
+      animation: ThemeController.instance,
+      builder: (context, _) {
+        final tc = BoosterFishPagePalette.of(context);
 
-    return BoosterFishPageShell(
-      child: CustomScrollView(
-        physics: const NeverScrollableScrollPhysics(),
-        slivers: [
-          SliverToBoxAdapter(child: _buildHero(context, tc)),
-          SliverFillRemaining(
-            hasScrollBody: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildAccountSection(context, tc),
-                  _buildSectionHeading(
-                    context,
-                    tc,
-                    Icons.shield_outlined,
-                    context.tr('settings.privacySection'),
-                  ),
-                  _SettingsGroup(
+        return BoosterFishPageShell(
+          child: CustomScrollView(
+            physics: const NeverScrollableScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(child: _buildHero(context, tc)),
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _SettingsRow(
-                        icon: Icons.privacy_tip_outlined,
-                        iconColor: tc.success,
-                        title: context.tr('settings.privacyPolicy'),
-                        subtitle: context.tr('settings.privacyPolicySubtitle'),
-                        onTap: () => _openPrivacyPolicy(context),
+                      _buildAccountSection(context, tc),
+                      _buildSectionHeading(
+                        context,
+                        tc,
+                        Icons.shield_outlined,
+                        context.tr('settings.privacySection'),
                       ),
-                      _SettingsRow(
-                        icon: Icons.description_outlined,
-                        iconColor: tc.textSecondary,
-                        title: context.tr('settings.termsOfService'),
-                        subtitle: context.tr('settings.termsOfServiceSubtitle'),
-                        onTap: () => _openTermsOfService(context),
+                      _SettingsGroup(
+                        children: [
+                          _SettingsRow(
+                            icon: Icons.privacy_tip_outlined,
+                            iconColor: tc.success,
+                            title: context.tr('settings.privacyPolicy'),
+                            subtitle:
+                                context.tr('settings.privacyPolicySubtitle'),
+                            onTap: () => _openPrivacyPolicy(context),
+                          ),
+                          _SettingsRow(
+                            icon: Icons.description_outlined,
+                            iconColor: tc.textSecondary,
+                            title: context.tr('settings.termsOfService'),
+                            subtitle:
+                                context.tr('settings.termsOfServiceSubtitle'),
+                            onTap: () => _openTermsOfService(context),
+                          ),
+                          const _AdvertisingPrivacyEntry(),
+                          if (context.watch<AuthService>().isLoggedIn)
+                            _SettingsRow(
+                              icon: Icons.delete_forever,
+                              iconColor: tc.error,
+                              title: context.tr('settings.deleteAccount'),
+                              subtitle:
+                                  context.tr('settings.deleteAccountSubtitle'),
+                              onTap: () => _confirmDeleteAccount(context),
+                            ),
+                        ],
                       ),
-                      const _AdvertisingPrivacyEntry(),
-                      if (context.watch<AuthService>().isLoggedIn)
-                        _SettingsRow(
-                          icon: Icons.delete_forever,
-                          iconColor: tc.error,
-                          title: context.tr('settings.deleteAccount'),
-                          subtitle:
-                              context.tr('settings.deleteAccountSubtitle'),
-                          onTap: () => _confirmDeleteAccount(context),
-                        ),
+                      _buildSectionHeading(
+                        context,
+                        tc,
+                        Icons.sailing_outlined,
+                        context.tr('settings.vesselCrew'),
+                      ),
+                      _SettingsGroup(
+                        children: [
+                          _SettingsRow(
+                            icon: Icons.person,
+                            iconColor: tc.success,
+                            title: context.tr('settings.profile'),
+                            subtitle: context.tr('settings.profileSubtitle'),
+                            trailing: _UpdatePill(
+                              text: context.tr('settings.updateCredentials'),
+                            ),
+                            onTap: () => _showEditProfileDialog(context, tc),
+                          ),
+                          _SettingsRow(
+                            icon: Icons.anchor,
+                            iconColor: tc.oceanLight,
+                            title: context.tr('settings.mySpots'),
+                            subtitle: context.tr('settings.mySpotsSubtitle'),
+                            onTap: () => _showComingSoon(
+                                context, context.tr('settings.mySpots')),
+                          ),
+                          _SettingsRow(
+                            icon: Icons.people,
+                            iconColor: const Color(0xFF7C3AED),
+                            title: context.tr('settings.crewManagement'),
+                            subtitle:
+                                context.tr('settings.crewManagementSubtitle'),
+                            onTap: () => _showComingSoon(
+                                context, context.tr('settings.crewManagement')),
+                          ),
+                        ],
+                      ),
+                      _GoodFishingBanner(
+                        title: context.tr('settings.goodFishingTitle'),
+                        subtitle: context.tr('settings.goodFishingSubtitle'),
+                      ),
                     ],
                   ),
-                  _buildSectionHeading(
-                    context,
-                    tc,
-                    Icons.sailing_outlined,
-                    context.tr('settings.vesselCrew'),
-                  ),
-                  _SettingsGroup(
-                    children: [
-                      _SettingsRow(
-                        icon: Icons.person,
-                        iconColor: tc.success,
-                        title: context.tr('settings.profile'),
-                        subtitle: context.tr('settings.profileSubtitle'),
-                        trailing: _UpdatePill(
-                          text: context.tr('settings.updateCredentials'),
-                        ),
-                        onTap: () => _showEditProfileDialog(context, tc),
-                      ),
-                      _SettingsRow(
-                        icon: Icons.anchor,
-                        iconColor: tc.oceanLight,
-                        title: context.tr('settings.mySpots'),
-                        subtitle: context.tr('settings.mySpotsSubtitle'),
-                        onTap: () => _showComingSoon(
-                            context, context.tr('settings.mySpots')),
-                      ),
-                      _SettingsRow(
-                        icon: Icons.people,
-                        iconColor: const Color(0xFF7C3AED),
-                        title: context.tr('settings.crewManagement'),
-                        subtitle: context.tr('settings.crewManagementSubtitle'),
-                        onTap: () => _showComingSoon(
-                            context, context.tr('settings.crewManagement')),
-                      ),
-                    ],
-                  ),
-                  _GoodFishingBanner(
-                    title: context.tr('settings.goodFishingTitle'),
-                    subtitle: context.tr('settings.goodFishingSubtitle'),
-                  ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 

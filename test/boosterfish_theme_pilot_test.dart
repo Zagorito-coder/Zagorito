@@ -115,6 +115,7 @@ void main() {
       () {
     final source = File('lib/pages/settings_page.dart').readAsStringSync();
     expect(source, contains('BoosterFishPageShell'));
+    expect(source, contains('animation: ThemeController.instance'));
     expect(source, contains('assets/settings_hero.png'));
     expect(source, contains('assets/settings_fishing_banner.png'));
     expect(source, contains('_openPrivacyPolicy'));
