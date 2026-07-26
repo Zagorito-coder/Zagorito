@@ -1202,7 +1202,7 @@ class _HomeDrawer extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 6),
-                  const _DrawerLanguageButton(),
+                  _DrawerLanguageButton(),
                 ],
               ),
             ),
@@ -1483,6 +1483,11 @@ class _DrawerLanguageButton extends StatelessWidget {
     final current = LanguageController.instance.currentLang;
     return PopupMenuButton<AppLanguage>(
       tooltip: current.label,
+      color: palette.surface,
+      surfaceTintColor: Colors.transparent,
+      shadowColor: palette.isDark
+          ? Colors.black.withValues(alpha: 0.70)
+          : palette.navy.withValues(alpha: 0.18),
       onSelected: (language) {
         LanguageController.instance.setLanguage(language);
       },
@@ -1495,12 +1500,19 @@ class _DrawerLanguageButton extends StatelessWidget {
               children: [
                 Text(language.flag, style: const TextStyle(fontSize: 18)),
                 const SizedBox(width: 8),
-                Text(language.label),
+                Text(
+                  language.label,
+                  style: TextStyle(
+                    color: palette.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
           ),
       ],
       child: Container(
+        key: const ValueKey<String>('home-drawer-language-button'),
         height: 36,
         padding: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(

@@ -274,6 +274,36 @@ void main() {
     );
   });
 
+  testWidgets('le sélecteur de langue suit le thème sombre', (tester) async {
+    await _setViewport(tester, const Size(360, 640));
+    await tester.pumpWidget(_testApp(tideData: _marineData()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.menu_rounded));
+    await tester.pumpAndSettle();
+
+    const languageButtonKey = ValueKey<String>('home-drawer-language-button');
+    Color buttonColor() {
+      final container = tester.widget<Container>(
+        find.byKey(languageButtonKey),
+      );
+      return (container.decoration! as BoxDecoration).color!;
+    }
+
+    expect(buttonColor(), const Color(0xFFFFFFFF));
+
+    ThemeController.instance.setDark(true);
+    await tester.pumpAndSettle();
+
+    expect(buttonColor(), const Color(0xFF07172C));
+    final popup = tester.widget<PopupMenuButton<AppLanguage>>(
+      find.byType(PopupMenuButton<AppLanguage>),
+    );
+    expect(popup.color, const Color(0xFF07172C));
+    expect(popup.surfaceTintColor, Colors.transparent);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('reste sans overflow en petit écran et texte agrandi',
       (tester) async {
     await _setViewport(tester, const Size(320, 568));
