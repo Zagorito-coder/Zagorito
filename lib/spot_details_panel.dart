@@ -10,6 +10,8 @@ import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import 'package:spots_app/models.dart';
+import 'package:spots_app/models/fishing_shop.dart';
+import 'package:spots_app/services/shop_service.dart';
 import 'package:spots_app/theme.dart';
 import 'package:spots_app/providers/wind_animation_provider.dart';
 import 'package:spots_app/widgets/open_meteo_attribution.dart';
@@ -122,271 +124,369 @@ class SpotDetailsPanel extends StatelessWidget {
     final spotColor = spot.type.color;
     final nearbySpots = _getNearbySpots();
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: tc.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: tc.textPrimary.withValues(alpha: 0.08),
-          width: 1,
+    return RepaintBoundary(
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: Theme.of(context).brightness == Brightness.dark
+                ? const [
+                    Color(0xD407192C),
+                    Color(0xC9031020),
+                  ]
+                : const [
+                    Color(0xD6FFFFFF),
+                    Color(0xC4E9F7FC),
+                  ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: tc.oceanLight.withValues(alpha: 0.52),
+            width: 0.8,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: tc.oceanLight.withValues(alpha: 0.10),
+              blurRadius: 12,
+              offset: const Offset(0, -2),
+            ),
+            BoxShadow(
+              color: tc.shadowColor.withValues(alpha: 0.72),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ],
         ),
-        boxShadow: [
-          BoxShadow(
-            color: spotColor.withValues(alpha: 0.15),
-            blurRadius: 20,
-            spreadRadius: 1,
-            offset: const Offset(0, -4),
-          ),
-          BoxShadow(
-            color: tc.shadowColor,
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── HEADER ──
-            Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: spotColor.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: spotColor.withValues(alpha: 0.4),
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Center(
-                    child: Icon(Icons.place, color: spotColor, size: 22),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        spot.name,
-                        style: TextStyle(
-                          color: tc.textPrimary,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        spot.type.label,
-                        style: TextStyle(
-                          color: spotColor.withValues(alpha: 0.9),
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                GestureDetector(
-                  onTap: onClose,
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: tc.textPrimary.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(Icons.close, color: tc.textSecondary, size: 20),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 8),
-
-            // ── CHIPS ROW ──
-            Row(
-              children: [
-                Expanded(
-                  child: _InfoChip(
-                    label: spot.type.label,
-                    color: spotColor,
-                    icon: Icons.place,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _InfoChip(
-                    label: distanceText,
-                    color: tc.oceanLight,
-                    icon: Icons.near_me,
-                  ),
-                ),
-              ],
-            ),
-
-            // ── FISH TYPES ──
-            // Toutes les informations sont disponibles dans la version
-            // gratuite financée par AdMob. Les paramètres Premium sont gardés
-            // uniquement pour compatibilité avec d'anciens appelants.
-            if (spot.fishTypes.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: spot.fishTypes
-                    .map((f) => _InfoChip(
-                        label: f, color: tc.success, icon: Icons.set_meal))
-                    .toList(),
-              ),
-            ],
-
-            // ── NOTES ──
-            if (spot.notes.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: tc.textPrimary.withValues(alpha: 0.04),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: tc.textPrimary.withValues(alpha: 0.08),
-                    width: 1,
-                  ),
-                ),
-                child: Text(
-                  spot.notes,
-                  style: TextStyle(
-                    color: tc.textPrimary.withValues(alpha: 0.7),
-                    fontSize: 12,
-                    height: 1.3,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-
-            const SizedBox(height: 8),
-
-            // ── VENT (affiche des que les donnees sont chargees) ──
-            _buildWindSection(context),
-
-            const OpenMeteoAttribution(
-              padding: EdgeInsets.only(top: 4, bottom: 4),
-            ),
-
-            const SizedBox(height: 8),
-
-            // ── GOOGLE MAPS BUTTON ──
-            GestureDetector(
-              onTap: () => _launchUrl(_googleMapsUrl),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      const Color(0xFF4285F4).withValues(alpha: 0.25),
-                      const Color(0xFF4285F4).withValues(alpha: 0.08),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: const Color(0xFF4285F4).withValues(alpha: 0.5),
-                    width: 1.2,
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 24,
-                      height: 24,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF4285F4),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Center(
-                        child: Icon(Icons.place, color: Colors.white, size: 13),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      'Ouvrir dans Google Maps',
-                      style: TextStyle(
-                        color: const Color(0xFF4285F4).withValues(alpha: 0.95),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // ── SPOTS VOISINS (prend l'espace restant) ──
-            if (nearbySpots.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Divider(color: tc.divider, height: 1),
-              const SizedBox(height: 8),
-              Row(
+            _buildCompactHeader(context, spotColor),
+            const SizedBox(height: 6),
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Icon(Icons.explore_outlined,
-                      color: tc.gold.withValues(alpha: 0.8), size: 13),
+                  Expanded(
+                    flex: 23,
+                    child: _buildSpeciesDashboard(context),
+                  ),
                   const SizedBox(width: 6),
-                  Text(
-                    'SPOTS VOISINS',
-                    style: TextStyle(
-                      color: tc.gold.withValues(alpha: 0.85),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.2,
-                    ),
+                  Expanded(
+                    flex: 39,
+                    child: _buildWindSection(context),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    flex: 32,
+                    child: _buildSpotActions(context),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              SizedBox(
-                height: 82,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  child: Row(
-                    children: nearbySpots.asMap().entries.map((entry) {
-                      final nearbySpot = entry.value;
-                      final isLast = entry.key == nearbySpots.length - 1;
-                      final isCloser = _isCloserSpot(nearbySpot);
-                      return Padding(
-                        padding: EdgeInsets.only(right: isLast ? 0 : 8),
-                        child: _NearbySpotCard(
-                          spot: nearbySpot,
-                          distance: _getSpotDistance(nearbySpot),
-                          isCloser: isCloser,
-                          onTap: () => onSpotSelected(nearbySpot),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ),
-            ],
+            ),
+            const OpenMeteoAttribution(
+              padding: EdgeInsets.fromLTRB(3, 3, 3, 2),
+            ),
+            const SizedBox(height: 3),
+            _buildNearbyDashboard(context, nearbySpots),
           ],
         ),
       ),
     );
   }
 
+  Widget _buildCompactHeader(BuildContext context, Color spotColor) {
+    final tc = ThemeColors.of(context);
+    return SizedBox(
+      height: 38,
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: spotColor.withValues(alpha: 0.14),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: spotColor.withValues(alpha: 0.52),
+                width: 0.8,
+              ),
+            ),
+            child: Icon(Icons.place_rounded, color: spotColor, size: 18),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  spot.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: tc.textPrimary,
+                    fontSize: 14,
+                    height: 1,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Flexible(
+                      child: _DashboardTag(
+                        icon: Icons.circle,
+                        label: spot.type.label,
+                        color: spotColor,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: _DashboardTag(
+                        icon: Icons.near_me_rounded,
+                        label: distanceText,
+                        color: tc.oceanLight,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          Semantics(
+            button: true,
+            label: 'Fermer les détails du spot',
+            child: Material(
+              color: tc.textPrimary.withValues(alpha: 0.055),
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: onClose,
+                child: SizedBox(
+                  width: 34,
+                  height: 34,
+                  child: Icon(
+                    Icons.close_rounded,
+                    color: tc.textSecondary,
+                    size: 18,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSpeciesDashboard(BuildContext context) {
+    final tc = ThemeColors.of(context);
+    final fishTypes = spot.fishTypes;
+    return _DashboardSection(
+      title: 'ESPÈCES',
+      icon: Icons.set_meal_rounded,
+      accent: tc.success,
+      child: fishTypes.isEmpty
+          ? Center(
+              child: Text(
+                'Non renseignées',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: tc.textMuted, fontSize: 8.5),
+              ),
+            )
+          : ListView.separated(
+              padding: EdgeInsets.zero,
+              physics: const BouncingScrollPhysics(),
+              itemCount: fishTypes.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 2),
+              itemBuilder: (context, index) {
+                return Row(
+                  children: [
+                    Icon(
+                      Icons.set_meal_rounded,
+                      size: 12,
+                      color: tc.success.withValues(alpha: 0.92),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        fishTypes[index],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: tc.textPrimary.withValues(alpha: 0.88),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+    );
+  }
+
+  Widget _buildSpotActions(BuildContext context) {
+    final tc = ThemeColors.of(context);
+    return _DashboardSection(
+      title: 'INFORMATIONS',
+      icon: Icons.info_outline_rounded,
+      accent: tc.oceanLight,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.description_outlined,
+                  size: 12,
+                  color: tc.textMuted,
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    spot.notes.isEmpty ? 'Notes indisponibles' : spot.notes,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: tc.textSecondary,
+                      fontSize: 8.5,
+                      height: 1.22,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
+          Semantics(
+            button: true,
+            label: 'Ouvrir ce spot dans Google Maps',
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => _launchUrl(_googleMapsUrl),
+                child: Container(
+                  height: 30,
+                  padding: const EdgeInsets.symmetric(horizontal: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4285F4).withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: const Color(0xFF4285F4).withValues(alpha: 0.48),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.place_rounded,
+                        color: Color(0xFF4285F4),
+                        size: 14,
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          'Google Maps',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                    ? const Color(0xFF63C7FF)
+                                    : const Color(0xFF176BCB),
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNearbyDashboard(
+    BuildContext context,
+    List<Spot> nearbySpots,
+  ) {
+    final tc = ThemeColors.of(context);
+    return SizedBox(
+      height: 46,
+      child: Row(
+        children: [
+          SizedBox(
+            width: 63,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.explore_outlined,
+                  color: tc.oceanLight,
+                  size: 13,
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    'SPOTS\nVOISINS',
+                    style: TextStyle(
+                      color: tc.textSecondary,
+                      fontSize: 7.5,
+                      height: 1.08,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _NearestShopCard(
+            key: ValueKey('nearest-shop-${spot.id}'),
+            spot: spot,
+          ),
+          if (nearbySpots.isNotEmpty) const SizedBox(width: 5),
+          Expanded(
+            child: nearbySpots.isEmpty
+                ? const SizedBox.shrink()
+                : ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    padding: EdgeInsets.zero,
+                    itemCount: nearbySpots.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 5),
+                    itemBuilder: (context, index) {
+                      final nearbySpot = nearbySpots[index];
+                      return _NearbySpotCard(
+                        spot: nearbySpot,
+                        distance: _getSpotDistance(nearbySpot),
+                        isCloser: _isCloserSpot(nearbySpot),
+                        onTap: () => onSpotSelected(nearbySpot),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Section vent: vitesse + direction + slider timeline
+  /// Le slider a exactement 8 positions (0h, 3h, 6h... 21h), une par heure unique.
+  /// Chaque position selectionne le slot le plus proche de maintenant pour cette heure.
   Widget _buildWindSection(BuildContext context) {
     final wind = context.watch<WindAnimationProvider>();
 
@@ -395,24 +495,17 @@ class SpotDetailsPanel extends StatelessWidget {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         wind.fetchForPanel(spot.latitude, spot.longitude);
       });
-      return const SizedBox.shrink();
+      return _buildWindPlaceholder(context, loading: true);
     }
 
     // Loading state
     if (wind.isLoading && wind.forecast == null) {
-      return const SizedBox(
-        height: 40,
-        child: Center(
-          child: SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
-      );
+      return _buildWindPlaceholder(context, loading: true);
     }
 
-    if (wind.currentVector == null) return const SizedBox.shrink();
+    if (wind.currentVector == null) {
+      return _buildWindPlaceholder(context, loading: false);
+    }
 
     final tc = ThemeColors.of(context);
     final vector = wind.currentVector!;
@@ -421,149 +514,191 @@ class SpotDetailsPanel extends StatelessWidget {
     final windColor = WindColors.forKnots(vector.speedKt);
 
     final slots = wind.forecast?.slots ?? [];
-    final maxIndex = (slots.length - 1).clamp(0, 100);
+    if (slots.isEmpty) {
+      return _buildWindPlaceholder(context, loading: false);
+    }
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: tc.textPrimary.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: windColor.withValues(alpha: 0.4),
-          width: 1,
-        ),
-      ),
+    // Construire le mapping: pour chaque heure unique, le slot le plus proche de now
+    final now = DateTime.now();
+    final hourToBestSlot =
+        <int, int>{}; // heure -> index du slot le plus proche
+    for (int i = 0; i < slots.length; i++) {
+      final h = slots[i].dateTime.hour;
+      if (!hourToBestSlot.containsKey(h)) {
+        hourToBestSlot[h] = i;
+      } else {
+        final existingDist =
+            slots[hourToBestSlot[h]!].dateTime.difference(now).abs();
+        final newDist = slots[i].dateTime.difference(now).abs();
+        if (newDist < existingDist) hourToBestSlot[h] = i;
+      }
+    }
+    final sortedHours = hourToBestSlot.keys.toList()..sort();
+    final displaySlots = sortedHours.map((h) => hourToBestSlot[h]!).toList();
+    final displayCount = displaySlots.length;
+
+    // Trouver la position d'affichage correspondant a l'index selectionne
+    int currentDisplayIndex = 0;
+    final selectedHour = wind.selectedHourIndex < slots.length
+        ? slots[wind.selectedHourIndex].dateTime.hour
+        : sortedHours.first;
+    for (int i = 0; i < displayCount; i++) {
+      if (sortedHours[i] == selectedHour) {
+        currentDisplayIndex = i;
+        break;
+      }
+    }
+
+    final selectedSlot = wind.selectedHourIndex < slots.length
+        ? slots[wind.selectedHourIndex]
+        : null;
+
+    return _DashboardSection(
+      title: 'VENT',
+      icon: Icons.air_rounded,
+      accent: windColor,
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Ligne vitesse + direction
           Row(
             children: [
-              Icon(Icons.air, color: windColor, size: 18),
-              const SizedBox(width: 6),
-              Text(
-                '${(vector.speedKt * 1.852).toStringAsFixed(1)} km/h',
-                style: TextStyle(
-                  color: tc.textPrimary,
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: windColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  dirText,
-                  style: TextStyle(
-                    color: windColor,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '${(vector.speedKt * 1.852).toStringAsFixed(1)} km/h',
+                    style: TextStyle(
+                      color: tc.textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
               ),
-              const Spacer(),
-              if (slots.isNotEmpty && wind.selectedHourIndex < slots.length)
-                Text(
-                  '${slots[wind.selectedHourIndex].dateTime.hour}h',
+              const SizedBox(width: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                  color: windColor.withValues(alpha: 0.13),
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(
+                    color: windColor.withValues(alpha: 0.30),
+                    width: 0.6,
+                  ),
+                ),
+                child: Text(
+                  dirText,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: tc.textSecondary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+                    color: windColor,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              if (selectedSlot != null)
+                Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: Text(
+                    '${selectedSlot.dateTime.hour}h',
+                    style: TextStyle(
+                      color: windColor,
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
             ],
           ),
-          // Slider timeline avec labels d'heures
-          if (maxIndex > 0) ...[
-            const SizedBox(height: 6),
+          if (displayCount > 1) ...[
+            const SizedBox(height: 5),
             SizedBox(
-              height: 52,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Labels des heures — distribues uniformement
-                  SizedBox(
-                    height: 14,
-                    child: () {
-                      if (maxIndex == 0) return const SizedBox.shrink();
-                      // Prendre les heures uniques existantes
-                      final uniqueHours = <int>[];
-                      for (final s in slots) {
-                        final h = s.dateTime.hour;
-                        if (!uniqueHours.contains(h)) uniqueHours.add(h);
-                      }
-                      if (uniqueHours.isEmpty) return const SizedBox.shrink();
-
-                      return Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: uniqueHours.map((h) {
-                          final idx =
-                              slots.indexWhere((s) => s.dateTime.hour == h);
-                          final isActive = wind.selectedHourIndex <
-                                  slots.length &&
-                              slots[wind.selectedHourIndex].dateTime.hour == h;
-                          return GestureDetector(
-                            onTap: () {
-                              if (idx >= 0) wind.selectHourIndex(idx);
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 4, vertical: 1),
-                              decoration: BoxDecoration(
-                                color: isActive
-                                    ? windColor.withValues(alpha: 0.2)
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                '${h}h',
-                                style: TextStyle(
-                                  color: isActive ? windColor : tc.textMuted,
-                                  fontSize: 10,
-                                  fontWeight: isActive
-                                      ? FontWeight.bold
-                                      : FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      );
-                    }(),
-                  ),
-                  const SizedBox(height: 2),
-                  // Slider compact
-                  Expanded(
-                    child: SliderTheme(
-                      data: SliderThemeData(
-                        trackHeight: 3,
-                        thumbShape:
-                            const RoundSliderThumbShape(enabledThumbRadius: 7),
-                        activeTrackColor: windColor,
-                        inactiveTrackColor:
-                            tc.textPrimary.withValues(alpha: 0.08),
-                        thumbColor: windColor,
-                        overlayColor: windColor.withValues(alpha: 0.1),
-                      ),
-                      child: Slider(
-                        value: wind.selectedHourIndex.toDouble(),
-                        min: 0,
-                        max: maxIndex.toDouble(),
-                        divisions: maxIndex > 50 ? null : maxIndex,
-                        onChanged: (v) => wind.selectHourIndex(v.round()),
+              height: 13,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: sortedHours.map((h) {
+                  final isActive = h == selectedHour;
+                  return Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        final slotIdx = hourToBestSlot[h]!;
+                        wind.selectHourIndex(slotIdx);
+                      },
+                      behavior: HitTestBehavior.opaque,
+                      child: Center(
+                        child: Text(
+                          '${h}h',
+                          maxLines: 1,
+                          style: TextStyle(
+                            color: isActive ? windColor : tc.textMuted,
+                            fontSize: isActive ? 7 : 6.5,
+                            fontWeight:
+                                isActive ? FontWeight.w800 : FontWeight.w500,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  );
+                }).toList(),
+              ),
+            ),
+            Expanded(
+              child: SliderTheme(
+                data: SliderThemeData(
+                  trackHeight: 2,
+                  thumbShape:
+                      const RoundSliderThumbShape(enabledThumbRadius: 5),
+                  overlayShape:
+                      const RoundSliderOverlayShape(overlayRadius: 10),
+                  activeTrackColor: windColor,
+                  inactiveTrackColor: tc.textPrimary.withValues(alpha: 0.10),
+                  thumbColor: windColor,
+                  overlayColor: windColor.withValues(alpha: 0.08),
+                ),
+                child: Slider(
+                  value: currentDisplayIndex.toDouble(),
+                  min: 0,
+                  max: (displayCount - 1).toDouble(),
+                  divisions: displayCount - 1,
+                  onChanged: (v) {
+                    final slotIdx = displaySlots[v.round()];
+                    wind.selectHourIndex(slotIdx);
+                  },
+                ),
               ),
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildWindPlaceholder(
+    BuildContext context, {
+    required bool loading,
+  }) {
+    final tc = ThemeColors.of(context);
+    return _DashboardSection(
+      title: 'VENT',
+      icon: Icons.air_rounded,
+      accent: tc.warning,
+      child: Center(
+        child: loading
+            ? SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.8,
+                  color: tc.oceanLight,
+                ),
+              )
+            : Text(
+                'Données indisponibles',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: tc.textMuted, fontSize: 8.5),
+              ),
       ),
     );
   }
@@ -578,6 +713,188 @@ class SpotDetailsPanel extends StatelessWidget {
     final distNearby = distance.as(LengthUnit.Kilometer, currentLatLng,
         LatLng(nearbySpot.latitude, nearbySpot.longitude));
     return distNearby < distCurrent;
+  }
+}
+
+// ──────────────────────────────────────────────
+//  NEAREST FISHING SHOP — chargement unique et non bloquant
+// ──────────────────────────────────────────────
+
+class _NearestShopCard extends StatefulWidget {
+  final Spot spot;
+
+  const _NearestShopCard({
+    super.key,
+    required this.spot,
+  });
+
+  @override
+  State<_NearestShopCard> createState() => _NearestShopCardState();
+}
+
+class _NearestShopCardState extends State<_NearestShopCard> {
+  static Future<List<FishingShop>>? _sharedShops;
+
+  late Future<FishingShop?> _nearestShop;
+
+  @override
+  void initState() {
+    super.initState();
+    _nearestShop = _findNearestShop();
+  }
+
+  Future<FishingShop?> _findNearestShop() async {
+    final shops = await (_sharedShops ??= ShopService.loadShops());
+    if (shops.isEmpty) return null;
+
+    FishingShop nearest = shops.first;
+    double nearestDistance = ShopService.distanceBetween(widget.spot, nearest);
+    for (final shop in shops.skip(1)) {
+      final shopDistance = ShopService.distanceBetween(widget.spot, shop);
+      if (shopDistance < nearestDistance) {
+        nearest = shop;
+        nearestDistance = shopDistance;
+      }
+    }
+    return nearest;
+  }
+
+  Future<void> _openDirections(FishingShop shop) async {
+    final destination = '${shop.latitude},${shop.longitude}';
+    final nativeUri = Uri.parse('geo:$destination?q=$destination');
+    try {
+      if (await launchUrl(
+        nativeUri,
+        mode: LaunchMode.externalApplication,
+      )) {
+        return;
+      }
+    } catch (_) {
+      // Le lien web ci-dessous reste disponible si aucun gestionnaire geo.
+    }
+    await launchUrl(
+      Uri.parse(
+        'https://www.google.com/maps/search/?api=1&query=$destination',
+      ),
+      mode: LaunchMode.externalApplication,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
+
+    return FutureBuilder<FishingShop?>(
+      future: _nearestShop,
+      builder: (context, snapshot) {
+        final shop = snapshot.data;
+
+        return Semantics(
+          button: shop != null,
+          label: shop == null
+              ? 'Recherche du magasin de pêche le plus proche'
+              : 'Magasin de pêche le plus proche : ${shop.name}',
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: shop == null ? null : () => _openDirections(shop),
+              borderRadius: BorderRadius.circular(9),
+              child: Container(
+                width: 112,
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                decoration: BoxDecoration(
+                  color: tc.warning.withValues(alpha: 0.055),
+                  borderRadius: BorderRadius.circular(9),
+                  border: Border.all(
+                    color: tc.warning.withValues(alpha: 0.34),
+                    width: 0.7,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: tc.warning.withValues(alpha: 0.13),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.storefront_rounded,
+                        color: tc.warning,
+                        size: 11,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: snapshot.connectionState == ConnectionState.waiting
+                          ? Text(
+                              'Magasin proche…',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: tc.textSecondary,
+                                fontSize: 7.5,
+                                height: 1.1,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            )
+                          : shop == null
+                              ? Text(
+                                  'Aucun magasin',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: tc.textMuted,
+                                    fontSize: 7.5,
+                                    height: 1.1,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                )
+                              : Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'MAGASIN · ${shop.name}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: tc.textPrimary,
+                                        fontSize: 8,
+                                        height: 1.05,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      '${ShopService.distanceBetween(widget.spot, shop).toStringAsFixed(1)} km',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: tc.warning,
+                                        fontSize: 7.5,
+                                        height: 1,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                    ),
+                    if (shop != null)
+                      Icon(
+                        Icons.near_me_rounded,
+                        color: tc.warning,
+                        size: 11,
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 
@@ -603,160 +920,189 @@ class _NearbySpotCard extends StatelessWidget {
     final tc = ThemeColors.of(context);
     final spotColor = spot.type.color;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 150,
-        padding: const EdgeInsets.fromLTRB(10, 6, 10, 4),
-        decoration: BoxDecoration(
-          color: tc.surfaceElevated,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: spotColor.withValues(alpha: 0.35),
-            width: 1,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Semantics(
+      button: true,
+      label: '${spot.name}, $distance',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(9),
+          child: Container(
+            width: 94,
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+            decoration: BoxDecoration(
+              color: tc.textPrimary.withValues(alpha: 0.035),
+              borderRadius: BorderRadius.circular(9),
+              border: Border.all(
+                color: spotColor.withValues(alpha: 0.32),
+                width: 0.7,
+              ),
+            ),
+            child: Row(
               children: [
                 Container(
-                  width: 22,
-                  height: 22,
+                  width: 20,
+                  height: 20,
                   decoration: BoxDecoration(
-                    color: spotColor.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Center(
-                    child: Icon(Icons.place, color: spotColor, size: 11),
-                  ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: isCloser
-                        ? tc.success.withValues(alpha: 0.12)
-                        : tc.textPrimary.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(5),
+                    color: spotColor.withValues(alpha: 0.13),
+                    shape: BoxShape.circle,
                     border: Border.all(
-                      color: isCloser
-                          ? tc.success.withValues(alpha: 0.4)
-                          : tc.textPrimary.withValues(alpha: 0.1),
-                      width: 1,
+                      color: spotColor.withValues(alpha: 0.30),
+                      width: 0.6,
                     ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+                  child: Icon(
+                    isCloser ? Icons.near_me_rounded : Icons.place_outlined,
+                    color: isCloser ? tc.success : spotColor,
+                    size: 11,
+                  ),
+                ),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        isCloser ? Icons.arrow_downward : Icons.arrow_upward,
-                        color: isCloser ? tc.success : tc.textMuted,
-                        size: 8,
-                      ),
-                      const SizedBox(width: 1),
                       Text(
-                        isCloser ? 'Proche' : 'Loin',
+                        spot.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: tc.textPrimary,
+                          fontSize: 8,
+                          height: 1.05,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        distance,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: isCloser ? tc.success : tc.textMuted,
-                          fontSize: 8,
+                          fontSize: 7.5,
+                          height: 1,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              spot.name,
-              style: TextStyle(
-                color: tc.textPrimary,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 2),
-            Row(
-              children: [
-                Container(
-                  width: 4,
-                  height: 4,
-                  decoration:
-                      BoxDecoration(shape: BoxShape.circle, color: spotColor),
-                ),
-                const SizedBox(width: 3),
-                Expanded(
-                  child: Text(
-                    spot.type.label,
-                    style: TextStyle(
-                      color: tc.textSecondary.withValues(alpha: 0.7),
-                      fontSize: 9,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 3),
-                Text(
-                  distance,
-                  style: TextStyle(
-                    color: spotColor.withValues(alpha: 0.9),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                  ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: tc.textMuted,
+                  size: 13,
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-// ──────────────────────────────────────────────
-//  INFO CHIP
-// ──────────────────────────────────────────────
-
-class _InfoChip extends StatelessWidget {
+class _DashboardTag extends StatelessWidget {
+  final IconData icon;
   final String label;
   final Color color;
-  final IconData icon;
 
-  const _InfoChip(
-      {required this.label, required this.color, required this.icon});
+  const _DashboardTag({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      height: 17,
+      padding: const EdgeInsets.symmetric(horizontal: 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.4), width: 1),
+        color: color.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: color.withValues(alpha: 0.32),
+          width: 0.6,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 13, color: color),
-          const SizedBox(width: 6),
+          Icon(icon, color: color, size: icon == Icons.circle ? 5 : 9),
+          const SizedBox(width: 3),
           Flexible(
             child: Text(
               label,
-              style: TextStyle(
-                color: color.withValues(alpha: 0.92),
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 7.5,
+                height: 1,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DashboardSection extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final Color accent;
+  final Widget child;
+
+  const _DashboardSection({
+    required this.title,
+    required this.icon,
+    required this.accent,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(6, 5, 6, 5),
+      decoration: BoxDecoration(
+        color: tc.textPrimary.withValues(alpha: 0.032),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: accent.withValues(alpha: 0.30),
+          width: 0.65,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: accent, size: 10),
+              const SizedBox(width: 3),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: accent,
+                    fontSize: 7,
+                    height: 1,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.55,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Expanded(child: child),
         ],
       ),
     );
