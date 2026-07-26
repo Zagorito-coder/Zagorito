@@ -911,12 +911,12 @@ enum _ExpeditionMotif {
 
 extension on _ExpeditionMotif {
   String get assetStem => switch (this) {
-        _ExpeditionMotif.tides => 'tides',
-        _ExpeditionMotif.forecast => 'advanced_tides',
-        _ExpeditionMotif.fish => 'fish_species',
-        _ExpeditionMotif.techniques => 'techniques',
-        _ExpeditionMotif.community => 'community',
-        _ExpeditionMotif.shops => 'shops',
+        _ExpeditionMotif.tides => 'tides_portrait',
+        _ExpeditionMotif.forecast => 'advanced_tides_portrait',
+        _ExpeditionMotif.fish => 'fish_species_portrait',
+        _ExpeditionMotif.techniques => 'techniques_portrait',
+        _ExpeditionMotif.community => 'community_portrait',
+        _ExpeditionMotif.shops => 'shops_cart_portrait',
       };
 }
 
@@ -943,6 +943,7 @@ class _ExpeditionCard extends StatelessWidget {
     final textScaler = MediaQuery.textScalerOf(
       context,
     ).clamp(maxScaleFactor: 1.15);
+    const cardRadius = 14.0;
 
     return Semantics(
       key: ValueKey<String>('home-expedition-${motif.name}'),
@@ -952,11 +953,11 @@ class _ExpeditionCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(cardRadius),
           child: Ink(
             decoration: BoxDecoration(
               color: palette.surface.withValues(alpha: 0.96),
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(cardRadius),
               border: Border.all(
                 color: palette.isDark
                     ? palette.accent.withValues(alpha: 0.58)
@@ -973,7 +974,13 @@ class _ExpeditionCard extends StatelessWidget {
             ),
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final imageWidth = constraints.maxWidth * 0.36;
+                // La canne (514 × 912) est la largeur visuelle de référence.
+                // Toutes les autres illustrations occupent exactement la même
+                // emprise, tout en conservant leur hauteur intégrale.
+                final imageWidth = math.min(
+                  constraints.maxHeight * (514 / 912),
+                  constraints.maxWidth * 0.36,
+                );
                 final textStart = constraints.maxWidth * 0.37;
                 final textWidth = constraints.maxWidth - textStart - 6;
                 return Stack(
@@ -985,14 +992,17 @@ class _ExpeditionCard extends StatelessWidget {
                       width: imageWidth,
                       child: ClipRRect(
                         borderRadius: const BorderRadiusDirectional.only(
-                          topStart: Radius.circular(17),
-                          bottomStart: Radius.circular(17),
+                          topStart: Radius.circular(cardRadius - 1),
+                          bottomStart: Radius.circular(cardRadius - 1),
                         ),
                         child: Image.asset(
+                          key: ValueKey<String>(
+                            'home-expedition-image-${motif.name}',
+                          ),
                           asset,
-                          fit: BoxFit.cover,
-                          alignment: Alignment.center,
-                          filterQuality: FilterQuality.medium,
+                          fit: BoxFit.fill,
+                          alignment: AlignmentDirectional.centerStart,
+                          filterQuality: FilterQuality.high,
                           errorBuilder: (_, __, ___) => ColoredBox(
                             color: accent.withValues(alpha: 0.1),
                             child: Icon(
@@ -1003,28 +1013,14 @@ class _ExpeditionCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    Positioned.fill(
-                      child: IgnorePointer(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(18),
-                          child: CustomPaint(
-                            painter: _CardMotifPainter(
-                              motif: motif,
-                              color: accent,
-                              isDark: palette.isDark,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
                     PositionedDirectional(
                       start: textStart,
                       end: 6,
-                      top: 6,
-                      bottom: 6,
+                      top: 11,
+                      bottom: 7,
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
-                        alignment: AlignmentDirectional.centerStart,
+                        alignment: AlignmentDirectional.topStart,
                         child: SizedBox(
                           width: textWidth,
                           child: Column(
@@ -1037,18 +1033,18 @@ class _ExpeditionCard extends StatelessWidget {
                                 style: TextStyle(
                                   color: palette.textPrimary,
                                   fontSize: 10,
-                                  height: 1.04,
-                                  fontWeight: FontWeight.w900,
+                                  height: 1.08,
+                                  fontWeight: FontWeight.w800,
                                 ),
                               ),
-                              const SizedBox(height: 3),
+                              const SizedBox(height: 4),
                               Text(
                                 subtitle,
                                 textScaler: textScaler,
                                 style: TextStyle(
                                   color: palette.textSecondary,
-                                  fontSize: 7.4,
-                                  height: 1.18,
+                                  fontSize: 8,
+                                  height: 1.24,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -1058,8 +1054,8 @@ class _ExpeditionCard extends StatelessWidget {
                       ),
                     ),
                     PositionedDirectional(
-                      end: 6,
-                      bottom: 6,
+                      end: 7,
+                      bottom: 8,
                       child: Container(
                         width: 22,
                         height: 24,
@@ -1096,124 +1092,6 @@ class _ExpeditionCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _CardMotifPainter extends CustomPainter {
-  final _ExpeditionMotif motif;
-  final Color color;
-  final bool isDark;
-
-  const _CardMotifPainter({
-    required this.motif,
-    required this.color,
-    required this.isDark,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final line = Paint()
-      ..color = color.withValues(alpha: isDark ? 0.13 : 0.09)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-    final glow = Paint()
-      ..color = color.withValues(alpha: isDark ? 0.09 : 0.055)
-      ..style = PaintingStyle.fill;
-
-    canvas.drawCircle(
-      Offset(size.width * 0.13, size.height * 0.2),
-      size.shortestSide * 0.27,
-      glow,
-    );
-
-    switch (motif) {
-      case _ExpeditionMotif.tides:
-      case _ExpeditionMotif.forecast:
-        for (var i = 0; i < 3; i++) {
-          final path = Path()..moveTo(0, size.height * (0.35 + i * 0.08));
-          for (var x = 0.0; x <= size.width; x += 8) {
-            final y =
-                size.height * (0.35 + i * 0.08) + math.sin(x / 18 + i) * 5;
-            path.lineTo(x, y);
-          }
-          canvas.drawPath(path, line);
-        }
-        break;
-      case _ExpeditionMotif.fish:
-        final body = Rect.fromCenter(
-          center: Offset(size.width * 0.28, size.height * 0.3),
-          width: size.width * 0.32,
-          height: size.height * 0.13,
-        );
-        canvas.drawOval(body, line);
-        final tail = Path()
-          ..moveTo(body.left, body.center.dy)
-          ..lineTo(body.left - 18, body.top - 4)
-          ..lineTo(body.left - 18, body.bottom + 4)
-          ..close();
-        canvas.drawPath(tail, line);
-        break;
-      case _ExpeditionMotif.techniques:
-        final path = Path()
-          ..moveTo(size.width * 0.05, size.height * 0.45)
-          ..quadraticBezierTo(
-            size.width * 0.35,
-            size.height * 0.03,
-            size.width * 0.73,
-            size.height * 0.18,
-          );
-        canvas.drawPath(path, line..strokeWidth = 2);
-        break;
-      case _ExpeditionMotif.community:
-        for (final point in [
-          Offset(size.width * 0.16, size.height * 0.3),
-          Offset(size.width * 0.3, size.height * 0.24),
-          Offset(size.width * 0.43, size.height * 0.31),
-        ]) {
-          canvas.drawCircle(point, 8, line);
-          canvas.drawArc(
-            Rect.fromCenter(
-              center: point.translate(0, 19),
-              width: 27,
-              height: 24,
-            ),
-            math.pi,
-            math.pi,
-            false,
-            line,
-          );
-        }
-        break;
-      case _ExpeditionMotif.shops:
-        final box = RRect.fromRectAndRadius(
-          Rect.fromLTWH(
-            size.width * 0.1,
-            size.height * 0.22,
-            size.width * 0.36,
-            size.height * 0.2,
-          ),
-          const Radius.circular(6),
-        );
-        canvas.drawRRect(box, line);
-        canvas.drawArc(
-          Rect.fromCenter(
-            center: Offset(size.width * 0.28, size.height * 0.22),
-            width: 28,
-            height: 22,
-          ),
-          math.pi,
-          math.pi,
-          false,
-          line,
-        );
-        break;
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _CardMotifPainter oldDelegate) =>
-      oldDelegate.motif != motif ||
-      oldDelegate.color != color ||
-      oldDelegate.isDark != isDark;
 }
 
 class _HomeDrawer extends StatelessWidget {

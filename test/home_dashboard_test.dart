@@ -121,6 +121,33 @@ void main() {
     }
   });
 
+  testWidgets('aligne les six illustrations sur la largeur de la canne',
+      (tester) async {
+    await _setViewport(tester, const Size(360, 640));
+    await tester.pumpWidget(_testApp(tideData: _marineData()));
+    await tester.pumpAndSettle();
+
+    final imageSizes = <Size>[
+      for (final motif in const [
+        'tides',
+        'forecast',
+        'fish',
+        'techniques',
+        'community',
+        'shops',
+      ])
+        tester.getSize(
+          find.byKey(ValueKey<String>('home-expedition-image-$motif')),
+        ),
+    ];
+    final reference = imageSizes[3];
+
+    for (final size in imageSizes) {
+      expect(size.width, closeTo(reference.width, 0.01));
+      expect(size.height, closeTo(reference.height, 0.01));
+    }
+  });
+
   testWidgets('affiche chaque titre et description sans troncature',
       (tester) async {
     await _setViewport(tester, const Size(360, 640));
