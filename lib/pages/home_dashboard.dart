@@ -11,7 +11,6 @@ import '../l10n/app_localizations.dart';
 import '../models.dart';
 import '../models/tide_data.dart';
 import '../theme_controller.dart';
-import '../widgets/language_selector.dart';
 import 'settings_page.dart';
 
 class HomeDashboard extends StatefulWidget {
@@ -329,7 +328,7 @@ class _PremiumIconButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         child: Ink(
           width: 42,
-          height: 42,
+          height: 36,
           decoration: BoxDecoration(
             color: palette.surface.withValues(alpha: 0.82),
             borderRadius: BorderRadius.circular(14),
@@ -1121,19 +1120,24 @@ class _HomeDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = _HomePalette.of(context);
+    final drawerWidth = math.min(
+      MediaQuery.sizeOf(context).width * 0.60,
+      216.0,
+    );
     return Drawer(
+      width: drawerWidth,
       backgroundColor: palette.background,
       child: SafeArea(
         child: Column(
           children: [
             Container(
-              margin: const EdgeInsets.all(12),
-              padding: const EdgeInsets.all(16),
+              margin: const EdgeInsets.fromLTRB(8, 8, 8, 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [palette.navy, palette.blue],
                 ),
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: palette.accent),
                 boxShadow: palette.glowShadow(0.18),
               ),
@@ -1143,41 +1147,47 @@ class _HomeDrawer extends StatelessWidget {
                     borderRadius: BorderRadius.circular(14),
                     child: Image.asset(
                       'assets/logo.png',
-                      width: 52,
-                      height: 52,
+                      width: 38,
+                      height: 38,
                       fit: BoxFit.cover,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
                           'BoosterFish',
+                          maxLines: 1,
+                          overflow: TextOverflow.fade,
+                          softWrap: false,
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 20,
+                            fontSize: 16,
                             fontWeight: FontWeight.w900,
                           ),
                         ),
-                        const SizedBox(height: 3),
+                        const SizedBox(height: 1),
                         Text(
                           context.tr('app.tagline'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.72),
-                            fontSize: 11,
+                            fontSize: 9,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  Icon(Icons.verified_rounded, color: palette.accent, size: 20),
+                  Icon(Icons.verified_rounded, color: palette.accent, size: 16),
                 ],
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Row(
                 children: [
                   Expanded(
@@ -1191,107 +1201,130 @@ class _HomeDrawer extends StatelessWidget {
                       onTap: ThemeController.instance.toggle,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  const CuteLanguageSelector(),
+                  const SizedBox(width: 6),
+                  const _DrawerLanguageButton(),
                 ],
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 5),
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                children: [
-                  _DrawerNavigationItem(
-                    icon: Icons.home_rounded,
-                    label: context.tr('drawer.home'),
-                    selected: true,
-                    onTap: () => Navigator.pop(context),
+              child: LayoutBuilder(
+                builder: (context, constraints) => FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: AlignmentDirectional.topCenter,
+                  child: SizedBox(
+                    width: constraints.maxWidth,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 7),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _DrawerNavigationItem(
+                            icon: Icons.home_rounded,
+                            label: context.tr('drawer.home'),
+                            selected: true,
+                            onTap: () => Navigator.pop(context),
+                          ),
+                          _DrawerNavigationItem(
+                            icon: Icons.waves_rounded,
+                            label: context.tr('drawer.tides'),
+                            onTap: () =>
+                                _closeAndRun(context, onNavigateToTides),
+                          ),
+                          _DrawerNavigationItem(
+                            icon: Icons.show_chart_rounded,
+                            label: context.tr('drawer.tidesPro'),
+                            onTap: () =>
+                                _closeAndRun(context, onNavigateToTidesV2),
+                          ),
+                          _DrawerNavigationItem(
+                            icon: Icons.location_on_rounded,
+                            label: context.tr('drawer.spots'),
+                            onTap: () =>
+                                _closeAndRun(context, onNavigateToSpots),
+                          ),
+                          _DrawerNavigationItem(
+                            icon: Icons.set_meal_rounded,
+                            label: context.tr('drawer.fish'),
+                            onTap: () =>
+                                _closeAndRun(context, onNavigateToSpecies),
+                          ),
+                          _DrawerNavigationItem(
+                            icon: Icons.phishing_rounded,
+                            label: context.tr('drawer.techniques'),
+                            onTap: () =>
+                                _closeAndRun(context, onNavigateToTechniques),
+                          ),
+                          _DrawerNavigationItem(
+                            icon: Icons.storefront_rounded,
+                            label: context.tr('drawer.shops'),
+                            onTap: () =>
+                                _closeAndRun(context, onNavigateToShops),
+                          ),
+                          _DrawerNavigationItem(
+                            icon: Icons.groups_rounded,
+                            label: context.tr('drawer.community'),
+                            onTap: () =>
+                                _closeAndRun(context, onNavigateToCommunity),
+                          ),
+                          Divider(height: 8, color: palette.border),
+                          _DrawerNavigationItem(
+                            icon: Icons.settings_rounded,
+                            label: context.tr('drawer.settings'),
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute<void>(
+                                  builder: (_) => const SettingsPage(),
+                                ),
+                              );
+                            },
+                          ),
+                          _DrawerNavigationItem(
+                            icon: Icons.help_outline_rounded,
+                            label: context.tr('drawer.help'),
+                            onTap: () {
+                              Navigator.pop(context);
+                              showDialog<void>(
+                                context: context,
+                                builder: (dialogContext) => AlertDialog(
+                                  title: Text(context.tr('drawer.help')),
+                                  content:
+                                      Text(context.tr('drawer.helpContent')),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(dialogContext),
+                                      child: Text(context.tr('common.ok')),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  _DrawerNavigationItem(
-                    icon: Icons.waves_rounded,
-                    label: context.tr('drawer.tides'),
-                    onTap: () => _closeAndRun(context, onNavigateToTides),
-                  ),
-                  _DrawerNavigationItem(
-                    icon: Icons.show_chart_rounded,
-                    label: context.tr('drawer.tidesPro'),
-                    onTap: () => _closeAndRun(context, onNavigateToTidesV2),
-                  ),
-                  _DrawerNavigationItem(
-                    icon: Icons.location_on_rounded,
-                    label: context.tr('drawer.spots'),
-                    onTap: () => _closeAndRun(context, onNavigateToSpots),
-                  ),
-                  _DrawerNavigationItem(
-                    icon: Icons.set_meal_rounded,
-                    label: context.tr('drawer.fish'),
-                    onTap: () => _closeAndRun(context, onNavigateToSpecies),
-                  ),
-                  _DrawerNavigationItem(
-                    icon: Icons.phishing_rounded,
-                    label: context.tr('drawer.techniques'),
-                    onTap: () => _closeAndRun(context, onNavigateToTechniques),
-                  ),
-                  _DrawerNavigationItem(
-                    icon: Icons.storefront_rounded,
-                    label: context.tr('drawer.shops'),
-                    onTap: () => _closeAndRun(context, onNavigateToShops),
-                  ),
-                  _DrawerNavigationItem(
-                    icon: Icons.groups_rounded,
-                    label: context.tr('drawer.community'),
-                    onTap: () => _closeAndRun(context, onNavigateToCommunity),
-                  ),
-                  Divider(color: palette.border),
-                  _DrawerNavigationItem(
-                    icon: Icons.settings_rounded,
-                    label: context.tr('drawer.settings'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (_) => const SettingsPage(),
-                        ),
-                      );
-                    },
-                  ),
-                  _DrawerNavigationItem(
-                    icon: Icons.help_outline_rounded,
-                    label: context.tr('drawer.help'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      showDialog<void>(
-                        context: context,
-                        builder: (dialogContext) => AlertDialog(
-                          title: Text(context.tr('drawer.help')),
-                          content: Text(context.tr('drawer.helpContent')),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(dialogContext),
-                              child: Text(context.tr('common.ok')),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ],
+                ),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 7),
               child: Row(
                 children: [
                   Icon(Icons.anchor_rounded,
-                      color: palette.textSecondary, size: 18),
-                  const SizedBox(width: 9),
+                      color: palette.textSecondary, size: 15),
+                  const SizedBox(width: 7),
                   Expanded(
                     child: Text(
                       context.tr('home.member'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: palette.textSecondary,
-                        fontSize: 12,
+                        fontSize: 10,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -1327,7 +1360,7 @@ class _DrawerUtilityButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(13),
         child: Ink(
           height: 42,
-          padding: const EdgeInsets.symmetric(horizontal: 11),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
             color: palette.surface,
             borderRadius: BorderRadius.circular(13),
@@ -1335,8 +1368,8 @@ class _DrawerUtilityButton extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Icon(icon, color: palette.accent, size: 19),
-              const SizedBox(width: 7),
+              Icon(icon, color: palette.accent, size: 17),
+              const SizedBox(width: 5),
               Expanded(
                 child: Text(
                   label,
@@ -1344,13 +1377,64 @@ class _DrawerUtilityButton extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: palette.textPrimary,
-                    fontSize: 12,
+                    fontSize: 10,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DrawerLanguageButton extends StatelessWidget {
+  const _DrawerLanguageButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = _HomePalette.of(context);
+    final current = LanguageController.instance.currentLang;
+    return PopupMenuButton<AppLanguage>(
+      tooltip: current.label,
+      onSelected: (language) {
+        LanguageController.instance.setLanguage(language);
+      },
+      itemBuilder: (context) => [
+        for (final language in AppLanguage.values)
+          PopupMenuItem<AppLanguage>(
+            value: language,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(language.flag, style: const TextStyle(fontSize: 18)),
+                const SizedBox(width: 8),
+                Text(language.label),
+              ],
+            ),
+          ),
+      ],
+      child: Container(
+        height: 36,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(
+          color: palette.surface,
+          borderRadius: BorderRadius.circular(13),
+          border: Border.all(color: palette.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(current.flag, style: const TextStyle(fontSize: 17)),
+            const SizedBox(width: 3),
+            Icon(
+              Icons.expand_more_rounded,
+              size: 15,
+              color: palette.textSecondary,
+            ),
+          ],
         ),
       ),
     );
@@ -1379,25 +1463,30 @@ class _DrawerNavigationItem extends StatelessWidget {
         onTap: onTap,
         selected: selected,
         dense: true,
+        minTileHeight: 38,
+        minLeadingWidth: 20,
+        horizontalTitleGap: 8,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 9),
+        visualDensity: const VisualDensity(horizontal: -3, vertical: -4),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(11),
         ),
         selectedTileColor: palette.accent.withValues(alpha: 0.12),
         leading: Icon(
           icon,
           color: selected ? palette.accent : palette.textSecondary,
-          size: 21,
+          size: 18,
         ),
         title: Text(
           label,
           style: TextStyle(
             color: selected ? palette.accent : palette.textPrimary,
-            fontSize: 13,
+            fontSize: 11.5,
             fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
           ),
         ),
         trailing: selected
-            ? Icon(Icons.circle, color: palette.accent, size: 7)
+            ? Icon(Icons.circle, color: palette.accent, size: 5)
             : null,
       ),
     );

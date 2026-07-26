@@ -216,6 +216,50 @@ void main() {
     expect(find.byType(Drawer), findsNothing);
   });
 
+  testWidgets('le Drawer reste fin et affiche tout sans défilement',
+      (tester) async {
+    const viewport = Size(360, 640);
+    await _setViewport(tester, viewport);
+    await tester.pumpWidget(_testApp(tideData: _marineData()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.menu_rounded));
+    await tester.pumpAndSettle();
+
+    final drawer = find.byType(Drawer);
+    expect(drawer, findsOneWidget);
+    expect(
+        tester.getSize(drawer).width, lessThanOrEqualTo(viewport.width * .62));
+    expect(
+      find.descendant(of: drawer, matching: find.byType(Scrollable)),
+      findsNothing,
+    );
+
+    for (final label in const [
+      'Accueil',
+      'Marées',
+      'Marées avancées',
+      'Spots',
+      'Poissons',
+      'Techniques',
+      'Magasins',
+      'Communauté',
+      'Paramètres',
+      'Aide & Support',
+    ]) {
+      final item = find.descendant(of: drawer, matching: find.text(label));
+      expect(item, findsOneWidget, reason: 'Entrée absente : $label');
+      final bounds = tester.getRect(item);
+      expect(bounds.top, greaterThanOrEqualTo(0));
+      expect(bounds.bottom, lessThanOrEqualTo(viewport.height));
+    }
+    expect(tester.takeException(), isNull);
+    await expectLater(
+      drawer,
+      matchesGoldenFile('goldens/home_drawer_compact.png'),
+    );
+  });
+
   testWidgets('reste sans overflow en petit écran et texte agrandi',
       (tester) async {
     await _setViewport(tester, const Size(320, 568));
