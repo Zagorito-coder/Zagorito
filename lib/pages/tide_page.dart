@@ -1458,7 +1458,7 @@ class _CircularGauge extends StatelessWidget {
                 Text('${(score * animation.value).round()}',
                     style: GoogleFonts.inter(
                         color: _levelColor(level),
-                        fontSize: 26,
+                        fontSize: 22,
                         fontWeight: FontWeight.w800)),
                 Text('/100',
                     style: GoogleFonts.inter(
