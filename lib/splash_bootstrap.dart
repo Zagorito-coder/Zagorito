@@ -52,28 +52,16 @@ class _SplashBootstrapState extends State<SplashBootstrap> {
         rethrow;
       }
 
-      // App Check doit être activé immédiatement après Firebase.initializeApp
-      // et avant toute utilisation d'Auth, Firestore ou Storage. L'enforcement
-      // reste piloté depuis Firebase Console après validation des métriques.
-      try {
-        await _activateAppCheck();
-      } catch (e, st) {
-        // Une attestation indisponible ne doit pas empêcher le démarrage tant
-        // que l'enforcement n'est pas activé. Les règles Firebase restent la
-        // protection obligatoire des données.
-        debugPrint('[SplashBootstrap] App Check activation error: $e\n$st');
-      }
-
       _update('splash.loadingData', 0.3);
       if (!mounted) return;
       final fishProvider = context.read<FishProvider>();
 
-      // Paralléliser spots + fish data (indépendants)
-      final results = await Future.wait([
-        SpotService.loadSpots(),
-        fishProvider.loadFishData(),
-      ]);
-      final spots = results[0] as List<Spot>;
+      // L'attestation réseau et les données locales sont indépendantes. App
+      // Check reste terminé avant l'affichage des écrans utilisant Firebase.
+      final appCheckFuture = _activateAppCheckSafely();
+      final spotsFuture = SpotService.loadSpots();
+      final results = await Future.wait([appCheckFuture, spotsFuture]);
+      final spots = results[1] as List<Spot>;
 
       if (!mounted) return;
 
@@ -85,12 +73,23 @@ class _SplashBootstrapState extends State<SplashBootstrap> {
             builder: (_) => AppShell(key: appShellKey, initialSpots: spots)),
       );
 
-      // Initialiser PremiumProvider en arriere-plan (non-bloquant)
-      // pour ne pas retarder l'affichage de la carte.
+      // Ces données ne sont pas nécessaires à la première frame de la carte.
+      unawaited(fishProvider.loadFishData());
       unawaited(_initPremiumInBackground());
     } catch (e, st) {
       debugPrint('[SplashBootstrap] ERREUR: $e\n$st');
       if (mounted) setState(() => _error = 'splash.startupErrorMessage');
+    }
+  }
+
+  Future<void> _activateAppCheckSafely() async {
+    try {
+      await _activateAppCheck();
+    } catch (e, st) {
+      // Une attestation indisponible ne doit pas empêcher le démarrage tant
+      // que l'enforcement n'est pas activé. Les règles Firebase restent la
+      // protection obligatoire des données.
+      debugPrint('[SplashBootstrap] App Check activation error: $e\n$st');
     }
   }
 

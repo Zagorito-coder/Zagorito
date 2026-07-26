@@ -4,6 +4,8 @@
 //  + Bouton toggle thème Clair/Sombre intégré
 // ============================================================
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:spots_app/theme.dart';
 import 'package:spots_app/theme_controller.dart';
@@ -36,29 +38,41 @@ class AppShell extends StatefulWidget {
 class AppShellState extends State<AppShell> {
   int _currentIndex = 3;
 
-  late final List<Widget> _pages;
+  late final List<Widget?> _pages;
+  bool _showAds = false;
 
   @override
   void initState() {
     super.initState();
-    _pages = [
-      HomePageWrapper(initialSpots: widget.initialSpots),
-      const SpeciesPageWrapper(),
-      const AddSpotPlaceholder(),
-      SpotFinderPage(initialSpots: widget.initialSpots),
-      const SettingsPageWrapper(),
-    ];
+    _pages = List<Widget?>.filled(5, null);
+    _pages[_currentIndex] = _buildPage(_currentIndex);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Le cœur de l'application est déjà chargé et l'activité Android est
-      // attachée avant d'afficher, si nécessaire, le formulaire UMP.
-      AdService.instance.initialize();
+      Future<void>.delayed(const Duration(seconds: 1), () {
+        if (!mounted) return;
+        setState(() => _showAds = true);
+        unawaited(AdService.instance.initialize());
+      });
     });
+  }
+
+  Widget _buildPage(int index) {
+    return switch (index) {
+      0 => HomePageWrapper(initialSpots: widget.initialSpots),
+      1 => const SpeciesPageWrapper(),
+      2 => const AddSpotPlaceholder(),
+      3 => SpotFinderPage(initialSpots: widget.initialSpots),
+      4 => const SettingsPageWrapper(),
+      _ => const SizedBox.shrink(),
+    };
   }
 
   /// Navigue vers un onglet spécifique
   void navigateTo(int index) {
     if (index < 0 || index >= _pages.length) return;
-    setState(() => _currentIndex = index);
+    setState(() {
+      _pages[index] ??= _buildPage(index);
+      _currentIndex = index;
+    });
   }
 
   @override
@@ -91,12 +105,12 @@ class AppShellState extends State<AppShell> {
                       // causes avoidable CPU/GPU pressure on low-end devices.
                       maintainAnimation: false,
                       maintainSize: false,
-                      child: _pages[index],
+                      child: _pages[index] ?? const SizedBox.shrink(),
                     );
                   }),
                 ),
               ),
-              const AdaptiveBannerAd(),
+              if (_showAds) const AdaptiveBannerAd(),
             ],
           ),
           bottomNavigationBar: _buildBottomNav(tc),

@@ -610,11 +610,12 @@ class _MapScreenState extends State<MapScreen>
     super.initState();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _loadSpots();
-    _initLocation();
-    // Compass & position stream démarrés uniquement à la demande.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _updateVisibleSpots();
+      if (!mounted) return;
+      _updateVisibleSpots();
+      unawaited(_initLocation());
     });
+    // Compass & position stream démarrés uniquement à la demande.
   }
 
   void _toggleCompass() {

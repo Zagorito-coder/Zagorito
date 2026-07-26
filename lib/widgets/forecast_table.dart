@@ -633,21 +633,25 @@ class _ForecastTableState extends State<ForecastTable> {
     );
   }
 
-  Widget _valueCell(String text, Color color) => Container(
-        height: _rowHeight,
-        color: color,
-        alignment: Alignment.center,
-        child: Text(
-          text,
-          style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: _textColorForBg(color)),
-        ),
-      );
+  Widget _valueCell(String text, Color color) => Builder(builder: (context) {
+        final dark = _isDark(context);
+        return Container(
+          height: _rowHeight,
+          color: color,
+          alignment: Alignment.center,
+          child: Text(
+            text,
+            style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: _textColorForBg(color, dark)),
+          ),
+        );
+      });
 
   /// Choisit noir ou blanc selon la luminosite du fond
-  Color _textColorForBg(Color bg) {
+  Color _textColorForBg(Color bg, bool dark) {
+    if (bg.a == 0) return dark ? Colors.white70 : Colors.black87;
     final lum = bg.computeLuminance();
     return lum > 0.5 ? Colors.black87 : Colors.white;
   }

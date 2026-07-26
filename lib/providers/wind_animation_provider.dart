@@ -39,6 +39,7 @@ class WindAnimationProvider extends ChangeNotifier {
   String? _spotId;
   SpotForecast? _forecast;
   int _selectedHourIndex = 0;
+  bool _userSelectedHour = false; // true si l'utilisateur a explicitement selectionne une heure
   WindVector? _currentVector;
   bool _isLoading = false;
   String? _error;
@@ -128,7 +129,9 @@ class WindAnimationProvider extends ChangeNotifier {
   Future<void> _loadSpotData(String spotId) async {
     _spotId = spotId;
 
-    if (_cache.containsKey(spotId)) {
+    // Capture si l'entree etait deja en cache avant de potentiellement la supprimer
+    final wasCached = _cache.containsKey(spotId);
+    if (wasCached) {
       final cached = _cache[spotId]!;
       if (DateTime.now().difference(cached.timestamp) < _cacheTtl) {
         _forecast = cached.forecast;
@@ -154,7 +157,13 @@ class WindAnimationProvider extends ChangeNotifier {
       _evictCacheIfNeeded();
       _cache[spotId] = _CachedForecast(forecast: forecast, timestamp: DateTime.now());
       _forecast = forecast;
-      _selectedHourIndex = _findClosestHourIndex(forecast);
+      if (wasCached && _userSelectedHour) {
+        // TTL expire : preserver le choix utilisateur s'il en a fait un
+        _selectedHourIndex = _selectedHourIndex.clamp(0, forecast.slots.length - 1);
+      } else {
+        _selectedHourIndex = _findClosestHourIndex(forecast);
+        _userSelectedHour = false;
+      }
       _computeVector();
       _isLoading = false;
       notifyListeners();
@@ -180,6 +189,7 @@ class WindAnimationProvider extends ChangeNotifier {
     if (_forecast == null || index < 0 || index >= _forecast!.slots.length) return;
     if (index == _selectedHourIndex) return;
     _selectedHourIndex = index;
+    _userSelectedHour = true;
     _computeVector();
     notifyListeners();
   }
