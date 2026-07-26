@@ -66,7 +66,6 @@ void main() {
       'lib/pages/splash_map_page.dart',
       'lib/pages/tide_page.dart',
       'lib/pages/forecast_page.dart',
-      'lib/pages/settings_page.dart',
     ];
 
     for (final path in protectedFiles) {
@@ -82,6 +81,47 @@ void main() {
         reason: 'La page protégée $path doit conserver son rendu actuel',
       );
     }
+  });
+
+  test('les parcours demandés utilisent le thème et leurs bannières dédiées',
+      () {
+    const themedPages = {
+      'lib/pages/species_page.dart':
+          'assets/page_heroes/species_boosterfish_hero.webp',
+      'lib/pages/techniques_page.dart':
+          'assets/page_heroes/techniques_boosterfish_hero.webp',
+      'lib/pages/shops_page.dart':
+          'assets/page_heroes/shops_boosterfish_hero.webp',
+    };
+
+    for (final entry in themedPages.entries) {
+      final source = File(entry.key).readAsStringSync();
+      expect(source, contains('BoosterFishPageShell'));
+      expect(source, contains('BoosterFishPageHeader'));
+      expect(source, contains('BoosterFishPageHero'));
+      expect(source, contains(entry.value));
+
+      final hero = File(entry.value);
+      expect(hero.existsSync(), isTrue);
+      expect(
+        hero.lengthSync(),
+        greaterThan(100 * 1024),
+        reason: 'La bannière ${entry.value} doit rester nette sur téléphone',
+      );
+    }
+  });
+
+  test('Paramètres conserve ses images et adopte uniquement la couche visuelle',
+      () {
+    final source = File('lib/pages/settings_page.dart').readAsStringSync();
+    expect(source, contains('BoosterFishPageShell'));
+    expect(source, contains('assets/settings_hero.png'));
+    expect(source, contains('assets/settings_fishing_banner.png'));
+    expect(source, contains('_openPrivacyPolicy'));
+    expect(source, contains('_openTermsOfService'));
+    expect(source, contains('_showEditProfileDialog'));
+    expect(source, contains('_confirmDeleteAccount'));
+    expect(source, contains('_openPrivacyOptions'));
   });
 }
 

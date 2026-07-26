@@ -5,10 +5,9 @@
 import 'package:flutter/material.dart';
 import 'package:spots_app/models/technique.dart';
 import 'package:spots_app/services/technique_service.dart';
-import 'package:spots_app/theme.dart';
 import 'package:spots_app/theme_controller.dart';
 import 'package:spots_app/l10n/app_localizations.dart';
-import 'package:spots_app/widgets/app_back_button.dart';
+import 'package:spots_app/widgets/boosterfish_page.dart';
 
 class TechniquesPage extends StatefulWidget {
   const TechniquesPage({super.key});
@@ -95,251 +94,211 @@ class _TechniquesPageState extends State<TechniquesPage> {
         LanguageController.instance,
       ]),
       builder: (context, _) {
-        final tc = ThemeColors.of(context);
-        return Scaffold(
-          backgroundColor: tc.background,
-          body: SafeArea(
-            child: Column(
-              children: [
-                // ── HEADER ──
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 0, 16, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const AppBackButton(),
-                      const SizedBox(height: 4),
-                      Row(
+        final tc = BoosterFishPagePalette.of(context);
+        return BoosterFishPageShell(
+          child: Column(
+            children: [
+              // ── HEADER ──
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 8, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    BoosterFishPageHeader(
+                      eyebrow: context.tr('home.expeditionTitle'),
+                      title: context.tr('techniques.title'),
+                      subtitle: context.trArgs(
+                        'techniques.count',
+                        args: {'count': _all.length.toString()},
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const BoosterFishPageHero(
+                      assetPath:
+                          'assets/page_heroes/techniques_boosterfish_hero.webp',
+                      height: 132,
+                    ),
+                    const SizedBox(height: 12),
+                    // Search bar
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: tc.surfaceElevated,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: tc.textPrimary.withValues(alpha: 0.08),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
                         children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: tc.oceanLight.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.linear_scale,
-                              color: tc.oceanLight,
-                              size: 20,
+                          Icon(Icons.search, color: tc.textMuted, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: TextField(
+                              style: TextStyle(
+                                  color: tc.textPrimary, fontSize: 15),
+                              decoration: InputDecoration(
+                                hintText: context.tr('techniques.search'),
+                                hintStyle: TextStyle(color: tc.textMuted),
+                                border: InputBorder.none,
+                                contentPadding:
+                                    const EdgeInsets.symmetric(vertical: 14),
+                              ),
+                              onChanged: (v) {
+                                _searchQuery = v;
+                                _applyFilters();
+                              },
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  context.tr('techniques.title'),
-                                  style: TextStyle(
-                                    color: tc.textPrimary,
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                          if (_searchQuery.isNotEmpty)
+                            GestureDetector(
+                              onTap: () {
+                                _searchQuery = '';
+                                _applyFilters();
+                              },
+                              child: Icon(Icons.close,
+                                  color: tc.textMuted, size: 18),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    // Category filters
+                    SizedBox(
+                      height: 36,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _categories.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        itemBuilder: (context, index) {
+                          final cat = _categories[index];
+                          final isAll = cat == '__all__';
+                          final isActive = _categoryFilter == null
+                              ? isAll
+                              : _categoryFilter == cat;
+                          return GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _categoryFilter = isAll ? null : cat;
+                              });
+                              _applyFilters();
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: isActive
+                                    ? tc.oceanLight.withValues(alpha: 0.15)
+                                    : tc.surfaceElevated,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: isActive
+                                      ? tc.oceanLight.withValues(alpha: 0.5)
+                                      : tc.textPrimary.withValues(alpha: 0.08),
+                                  width: 1,
                                 ),
+                              ),
+                              child: Text(
+                                isAll ? context.tr('techniques.all') : cat,
+                                style: TextStyle(
+                                  color: isActive
+                                      ? tc.oceanLight
+                                      : tc.textSecondary,
+                                  fontSize: 12,
+                                  fontWeight: isActive
+                                      ? FontWeight.w600
+                                      : FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // ── GRID ──
+              Expanded(
+                child: _loading
+                    ? Center(
+                        child: CircularProgressIndicator(
+                          color: tc.oceanLight,
+                          strokeWidth: 2.5,
+                        ),
+                      )
+                    : _error != null
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.error_outline,
+                                    color: tc.error.withValues(alpha: 0.6),
+                                    size: 48),
+                                const SizedBox(height: 12),
                                 Text(
-                                  context.trArgs('techniques.count',
-                                      args: {'count': _all.length.toString()}),
+                                  context.tr('techniques.loadingError'),
                                   style: TextStyle(
-                                    color: tc.textSecondary,
-                                    fontSize: 13,
+                                      color: tc.textMuted, fontSize: 15),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _error!,
+                                  style: TextStyle(
+                                    color: tc.textMuted.withValues(alpha: 0.7),
+                                    fontSize: 11,
                                   ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 16),
+                                TextButton(
+                                  onPressed: _loadData,
+                                  child: Text(context.tr('techniques.retry')),
                                 ),
                               ],
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      // Search bar
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
-                        decoration: BoxDecoration(
-                          color: tc.surfaceElevated,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: tc.textPrimary.withValues(alpha: 0.08),
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.search,
-                                color: tc.textMuted, size: 20),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: TextField(
-                                style: TextStyle(
-                                    color: tc.textPrimary, fontSize: 15),
-                                decoration: InputDecoration(
-                                  hintText: context.tr('techniques.search'),
-                                  hintStyle:
-                                      TextStyle(color: tc.textMuted),
-                                  border: InputBorder.none,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                      vertical: 14),
-                                ),
-                                onChanged: (v) {
-                                  _searchQuery = v;
-                                  _applyFilters();
-                                },
-                              ),
-                            ),
-                            if (_searchQuery.isNotEmpty)
-                              GestureDetector(
-                                onTap: () {
-                                  _searchQuery = '';
-                                  _applyFilters();
-                                },
-                                child: Icon(Icons.close,
-                                    color: tc.textMuted, size: 18),
-                              ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      // Category filters
-                      SizedBox(
-                        height: 36,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: _categories.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(width: 8),
-                          itemBuilder: (context, index) {
-                            final cat = _categories[index];
-                            final isAll = cat == '__all__';
-                            final isActive = _categoryFilter == null
-                                ? isAll
-                                : _categoryFilter == cat;
-                            return GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  _categoryFilter = isAll ? null : cat;
-                                });
-                                _applyFilters();
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 14, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: isActive
-                                      ? tc.oceanLight.withValues(alpha: 0.15)
-                                      : tc.surfaceElevated,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: isActive
-                                        ? tc.oceanLight.withValues(alpha: 0.5)
-                                        : tc.textPrimary
-                                            .withValues(alpha: 0.08),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Text(
-                                  isAll
-                                      ? context.tr('techniques.all')
-                                      : cat,
-                                  style: TextStyle(
-                                    color: isActive
-                                        ? tc.oceanLight
-                                        : tc.textSecondary,
-                                    fontSize: 12,
-                                    fontWeight: isActive
-                                        ? FontWeight.w600
-                                        : FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // ── GRID ──
-                Expanded(
-                  child: _loading
-                      ? Center(
-                          child: CircularProgressIndicator(
-                            color: tc.oceanLight,
-                            strokeWidth: 2.5,
-                          ),
-                        )
-                      : _error != null
-                          ? Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.error_outline,
-                                      color: tc.error.withValues(alpha: 0.6),
-                                      size: 48),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    context.tr('techniques.loadingError'),
-                                    style: TextStyle(
-                                        color: tc.textMuted, fontSize: 15),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _error!,
-                                    style: TextStyle(
-                                      color:
-                                          tc.textMuted.withValues(alpha: 0.7),
-                                      fontSize: 11,
+                          )
+                        : _filtered.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.search_off,
+                                        color: tc.textMuted, size: 48),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      context.tr('techniques.noResults'),
+                                      style: TextStyle(
+                                          color: tc.textMuted, fontSize: 15),
                                     ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  TextButton(
-                                    onPressed: _loadData,
-                                    child: Text(
-                                        context.tr('techniques.retry')),
-                                  ),
-                                ],
-                              ),
-                            )
-                          : _filtered.isEmpty
-                              ? Center(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.search_off,
-                                          color: tc.textMuted, size: 48),
-                                      const SizedBox(height: 12),
-                                      Text(
-                                        context.tr('techniques.noResults'),
-                                        style: TextStyle(
-                                            color: tc.textMuted, fontSize: 15),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              : GridView.builder(
-                                  padding: const EdgeInsets.fromLTRB(
-                                      16, 0, 16, 16),
-                                  gridDelegate:
-                                      const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 2,
-                                    mainAxisSpacing: 12,
-                                    crossAxisSpacing: 12,
-                                    childAspectRatio: 0.72,
-                                  ),
-                                  itemCount: _filtered.length,
-                                  itemBuilder: (context, index) {
-                                    final t = _filtered[index];
-                                    return _TechniqueGridCard(
-                                      key: ValueKey('${t.id}_${LanguageController.instance.langCode}'),
-                                      technique: t,
-                                      onTap: () =>
-                                          _openDetail(t),
-                                    );
-                                  },
+                                  ],
                                 ),
-                ),
-              ],
-            ),
+                              )
+                            : GridView.builder(
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                                gridDelegate:
+                                    const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  mainAxisSpacing: 12,
+                                  crossAxisSpacing: 12,
+                                  childAspectRatio: 0.72,
+                                ),
+                                itemCount: _filtered.length,
+                                itemBuilder: (context, index) {
+                                  final t = _filtered[index];
+                                  return _TechniqueGridCard(
+                                    key: ValueKey(
+                                        '${t.id}_${LanguageController.instance.langCode}'),
+                                    technique: t,
+                                    onTap: () => _openDetail(t),
+                                  );
+                                },
+                              ),
+              ),
+            ],
           ),
         );
       },
@@ -367,7 +326,7 @@ class _TechniqueGridCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tc = ThemeColors.of(context);
+    final tc = BoosterFishPagePalette.of(context);
 
     Color difficultyColor;
     switch (technique.difficulty.toLowerCase()) {
@@ -443,18 +402,29 @@ class _TechniqueGridCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  Text(
+                    technique.name,
+                    style: TextStyle(
+                      color: tc.textPrimary,
+                      fontSize: 14,
+                      height: 1.15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.fade,
+                  ),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
                       Expanded(
                         child: Text(
-                          technique.name,
+                          technique.category,
                           style: TextStyle(
-                            color: tc.textPrimary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
+                            color: tc.textSecondary,
+                            fontSize: 11,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          maxLines: 2,
+                          overflow: TextOverflow.fade,
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -475,16 +445,6 @@ class _TechniqueGridCard extends StatelessWidget {
                         ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    technique.category,
-                    style: TextStyle(
-                      color: tc.textSecondary,
-                      fontSize: 11,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
@@ -526,12 +486,11 @@ class _TechniqueDetailPageState extends State<TechniqueDetailPage>
 
   @override
   Widget build(BuildContext context) {
-    final tc = ThemeColors.of(context);
+    final tc = BoosterFishPagePalette.of(context);
     final t = widget.technique;
 
-    return Scaffold(
-      backgroundColor: tc.background,
-      body: NestedScrollView(
+    return BoosterFishPageShell(
+      child: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           SliverAppBar(
             expandedHeight: 320,
@@ -540,18 +499,10 @@ class _TechniqueDetailPageState extends State<TechniqueDetailPage>
             foregroundColor: tc.textPrimary,
             elevation: 0,
             flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                t.name,
-                style: TextStyle(
-                  color: tc.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
               background: Container(
                 color: tc.surface,
                 padding: const EdgeInsets.only(
-                    top: 80, left: 16, right: 16, bottom: 60),
+                    top: 80, left: 16, right: 16, bottom: 94),
                 child: Center(
                   child: _TechniqueImage(
                     url: t.photoUrl,
@@ -570,7 +521,7 @@ class _TechniqueDetailPageState extends State<TechniqueDetailPage>
               ),
             ),
             bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(48),
+              preferredSize: const Size.fromHeight(90),
               child: Container(
                 decoration: BoxDecoration(
                   color: tc.surface.withValues(alpha: 0.95),
@@ -580,22 +531,49 @@ class _TechniqueDetailPageState extends State<TechniqueDetailPage>
                     ),
                   ),
                 ),
-                child: TabBar(
-                  controller: _tabController,
-                  isScrollable: true,
-                  tabAlignment: TabAlignment.start,
-                  labelColor: tc.oceanLight,
-                  unselectedLabelColor: tc.textMuted,
-                  indicatorColor: tc.oceanLight,
-                  indicatorWeight: 3,
-                  labelStyle: const TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w600),
-                  unselectedLabelStyle: const TextStyle(fontSize: 13),
-              tabs: [
-                Tab(text: context.tr('techniques.tabInfos')),
-                Tab(text: context.tr('techniques.tabMateriel')),
-                Tab(text: context.tr('techniques.tabConseils')),
-              ],
+                child: Column(
+                  children: [
+                    SizedBox(
+                      height: 42,
+                      child: Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Text(
+                            t.name,
+                            maxLines: 2,
+                            overflow: TextOverflow.fade,
+                            style: TextStyle(
+                              color: tc.textPrimary,
+                              fontSize: 17,
+                              height: 1.1,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      height: 48,
+                      child: TabBar(
+                        controller: _tabController,
+                        isScrollable: true,
+                        tabAlignment: TabAlignment.start,
+                        labelColor: tc.oceanLight,
+                        unselectedLabelColor: tc.textMuted,
+                        indicatorColor: tc.oceanLight,
+                        indicatorWeight: 3,
+                        labelStyle: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600),
+                        unselectedLabelStyle: const TextStyle(fontSize: 13),
+                        tabs: [
+                          Tab(text: context.tr('techniques.tabInfos')),
+                          Tab(text: context.tr('techniques.tabMateriel')),
+                          Tab(text: context.tr('techniques.tabConseils')),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -619,7 +597,7 @@ class _TechniqueDetailPageState extends State<TechniqueDetailPage>
 // ═══════════════════════════════════════════════════════════
 class _InfosTab extends StatelessWidget {
   final Technique t;
-  final ThemeColors tc;
+  final BoosterFishPagePalette tc;
 
   const _InfosTab({required this.t, required this.tc});
 
@@ -653,8 +631,7 @@ class _InfosTab extends StatelessWidget {
         children: [
           if (t.category.isNotEmpty)
             Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: tc.oceanLight.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
@@ -721,22 +698,22 @@ class _InfosTab extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════
 class _MaterielTab extends StatelessWidget {
   final Technique t;
-  final ThemeColors tc;
+  final BoosterFishPagePalette tc;
 
   const _MaterielTab({required this.t, required this.tc});
 
   @override
   Widget build(BuildContext context) {
     if (t.requiredMaterial.isEmpty) {
-      return _EmptyTab(
-          message: context.tr('techniques.noMaterial'), tc: tc);
+      return _EmptyTab(message: context.tr('techniques.noMaterial'), tc: tc);
     }
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _SectionTitle(title: context.tr('techniques.requiredMaterial'), tc: tc),
+          _SectionTitle(
+              title: context.tr('techniques.requiredMaterial'), tc: tc),
           const SizedBox(height: 10),
           _TextCard(text: t.requiredMaterial, tc: tc),
           const SizedBox(height: 30),
@@ -751,7 +728,7 @@ class _MaterielTab extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════
 class _ConseilsTab extends StatelessWidget {
   final Technique t;
-  final ThemeColors tc;
+  final BoosterFishPagePalette tc;
 
   const _ConseilsTab({required this.t, required this.tc});
 
@@ -805,7 +782,7 @@ class _ConseilsTab extends StatelessWidget {
 // ── WIDGETS UTILITAIRES PARTAGÉS ──
 class _EmptyTab extends StatelessWidget {
   final String message;
-  final ThemeColors tc;
+  final BoosterFishPagePalette tc;
 
   const _EmptyTab({required this.message, required this.tc});
 
@@ -815,8 +792,7 @@ class _EmptyTab extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.folder_open_outlined,
-              color: tc.textMuted, size: 48),
+          Icon(Icons.folder_open_outlined, color: tc.textMuted, size: 48),
           const SizedBox(height: 12),
           Text(
             message,
@@ -830,7 +806,7 @@ class _EmptyTab extends StatelessWidget {
 
 class _SectionTitle extends StatelessWidget {
   final String title;
-  final ThemeColors tc;
+  final BoosterFishPagePalette tc;
 
   const _SectionTitle({required this.title, required this.tc});
 
@@ -865,7 +841,7 @@ class _InfoTile extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
-  final ThemeColors tc;
+  final BoosterFishPagePalette tc;
 
   const _InfoTile({
     required this.icon,
@@ -879,6 +855,7 @@ class _InfoTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: (MediaQuery.of(context).size.width - 52) / 2,
+      constraints: const BoxConstraints(minHeight: 92),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: tc.surfaceElevated,
@@ -902,8 +879,8 @@ class _InfoTile extends StatelessWidget {
               fontSize: 13,
               fontWeight: FontWeight.w600,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            maxLines: 2,
+            overflow: TextOverflow.fade,
           ),
         ],
       ),
@@ -913,7 +890,7 @@ class _InfoTile extends StatelessWidget {
 
 class _TextCard extends StatelessWidget {
   final String text;
-  final ThemeColors tc;
+  final BoosterFishPagePalette tc;
 
   const _TextCard({required this.text, required this.tc});
 

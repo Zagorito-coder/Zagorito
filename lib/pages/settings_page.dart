@@ -5,9 +5,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:spots_app/theme.dart';
 import 'package:spots_app/l10n/app_localizations.dart';
 import 'package:spots_app/widgets/app_back_button.dart';
+import 'package:spots_app/widgets/boosterfish_page.dart';
 import 'package:spots_app/services/ad_service.dart';
 import 'package:spots_app/services/auth_service.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -17,112 +17,106 @@ class SettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tc = ThemeColors.of(context);
+    final tc = BoosterFishPagePalette.of(context);
 
-    return Scaffold(
-      backgroundColor: tc.background,
-      body: SafeArea(
-        child: CustomScrollView(
-          physics: const NeverScrollableScrollPhysics(),
-          slivers: [
-            SliverToBoxAdapter(child: _buildHero(context, tc)),
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildAccountSection(context, tc),
-                    _buildSectionHeading(
-                      context,
-                      tc,
-                      Icons.shield_outlined,
-                      context.tr('settings.privacySection'),
-                    ),
-                    _SettingsGroup(
-                      children: [
+    return BoosterFishPageShell(
+      child: CustomScrollView(
+        physics: const NeverScrollableScrollPhysics(),
+        slivers: [
+          SliverToBoxAdapter(child: _buildHero(context, tc)),
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildAccountSection(context, tc),
+                  _buildSectionHeading(
+                    context,
+                    tc,
+                    Icons.shield_outlined,
+                    context.tr('settings.privacySection'),
+                  ),
+                  _SettingsGroup(
+                    children: [
+                      _SettingsRow(
+                        icon: Icons.privacy_tip_outlined,
+                        iconColor: tc.success,
+                        title: context.tr('settings.privacyPolicy'),
+                        subtitle: context.tr('settings.privacyPolicySubtitle'),
+                        onTap: () => _openPrivacyPolicy(context),
+                      ),
+                      _SettingsRow(
+                        icon: Icons.description_outlined,
+                        iconColor: tc.textSecondary,
+                        title: context.tr('settings.termsOfService'),
+                        subtitle: context.tr('settings.termsOfServiceSubtitle'),
+                        onTap: () => _openTermsOfService(context),
+                      ),
+                      const _AdvertisingPrivacyEntry(),
+                      if (context.watch<AuthService>().isLoggedIn)
                         _SettingsRow(
-                          icon: Icons.privacy_tip_outlined,
-                          iconColor: tc.success,
-                          title: context.tr('settings.privacyPolicy'),
+                          icon: Icons.delete_forever,
+                          iconColor: tc.error,
+                          title: context.tr('settings.deleteAccount'),
                           subtitle:
-                              context.tr('settings.privacyPolicySubtitle'),
-                          onTap: () => _openPrivacyPolicy(context),
+                              context.tr('settings.deleteAccountSubtitle'),
+                          onTap: () => _confirmDeleteAccount(context),
                         ),
-                        _SettingsRow(
-                          icon: Icons.description_outlined,
-                          iconColor: tc.textSecondary,
-                          title: context.tr('settings.termsOfService'),
-                          subtitle:
-                              context.tr('settings.termsOfServiceSubtitle'),
-                          onTap: () => _openTermsOfService(context),
+                    ],
+                  ),
+                  _buildSectionHeading(
+                    context,
+                    tc,
+                    Icons.sailing_outlined,
+                    context.tr('settings.vesselCrew'),
+                  ),
+                  _SettingsGroup(
+                    children: [
+                      _SettingsRow(
+                        icon: Icons.person,
+                        iconColor: tc.success,
+                        title: context.tr('settings.profile'),
+                        subtitle: context.tr('settings.profileSubtitle'),
+                        trailing: _UpdatePill(
+                          text: context.tr('settings.updateCredentials'),
                         ),
-                        const _AdvertisingPrivacyEntry(),
-                        if (context.watch<AuthService>().isLoggedIn)
-                          _SettingsRow(
-                            icon: Icons.delete_forever,
-                            iconColor: tc.error,
-                            title: context.tr('settings.deleteAccount'),
-                            subtitle:
-                                context.tr('settings.deleteAccountSubtitle'),
-                            onTap: () => _confirmDeleteAccount(context),
-                          ),
-                      ],
-                    ),
-                    _buildSectionHeading(
-                      context,
-                      tc,
-                      Icons.sailing_outlined,
-                      context.tr('settings.vesselCrew'),
-                    ),
-                    _SettingsGroup(
-                      children: [
-                        _SettingsRow(
-                          icon: Icons.person,
-                          iconColor: tc.success,
-                          title: context.tr('settings.profile'),
-                          subtitle: context.tr('settings.profileSubtitle'),
-                          trailing: _UpdatePill(
-                            text: context.tr('settings.updateCredentials'),
-                          ),
-                          onTap: () => _showEditProfileDialog(context, tc),
-                        ),
-                        _SettingsRow(
-                          icon: Icons.anchor,
-                          iconColor: tc.oceanLight,
-                          title: context.tr('settings.mySpots'),
-                          subtitle: context.tr('settings.mySpotsSubtitle'),
-                          onTap: () => _showComingSoon(
-                              context, context.tr('settings.mySpots')),
-                        ),
-                        _SettingsRow(
-                          icon: Icons.people,
-                          iconColor: const Color(0xFF7C3AED),
-                          title: context.tr('settings.crewManagement'),
-                          subtitle:
-                              context.tr('settings.crewManagementSubtitle'),
-                          onTap: () => _showComingSoon(
-                              context, context.tr('settings.crewManagement')),
-                        ),
-                      ],
-                    ),
-                    _GoodFishingBanner(
-                      title: context.tr('settings.goodFishingTitle'),
-                      subtitle: context.tr('settings.goodFishingSubtitle'),
-                    ),
-                  ],
-                ),
+                        onTap: () => _showEditProfileDialog(context, tc),
+                      ),
+                      _SettingsRow(
+                        icon: Icons.anchor,
+                        iconColor: tc.oceanLight,
+                        title: context.tr('settings.mySpots'),
+                        subtitle: context.tr('settings.mySpotsSubtitle'),
+                        onTap: () => _showComingSoon(
+                            context, context.tr('settings.mySpots')),
+                      ),
+                      _SettingsRow(
+                        icon: Icons.people,
+                        iconColor: const Color(0xFF7C3AED),
+                        title: context.tr('settings.crewManagement'),
+                        subtitle: context.tr('settings.crewManagementSubtitle'),
+                        onTap: () => _showComingSoon(
+                            context, context.tr('settings.crewManagement')),
+                      ),
+                    ],
+                  ),
+                  _GoodFishingBanner(
+                    title: context.tr('settings.goodFishingTitle'),
+                    subtitle: context.tr('settings.goodFishingSubtitle'),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildHero(BuildContext context, ThemeColors tc) {
+  Widget _buildHero(BuildContext context, BoosterFishPagePalette tc) {
     return SizedBox(
       height: 125,
       child: Stack(
@@ -138,7 +132,7 @@ class SettingsPage extends StatelessWidget {
                   end: Alignment.bottomRight,
                   colors: [
                     const Color(0xCC071A3A),
-                    tc.oceanDeep.withValues(alpha: 0.58),
+                    tc.navy.withValues(alpha: 0.58),
                     const Color(0xAA073B63),
                   ],
                 ),
@@ -209,18 +203,18 @@ class SettingsPage extends StatelessWidget {
 
   Widget _buildSectionHeading(
     BuildContext context,
-    ThemeColors tc,
+    BoosterFishPagePalette tc,
     IconData icon,
     String title,
   ) {
     return Row(
       children: [
-        Icon(icon, color: tc.oceanDeep, size: 18),
+        Icon(icon, color: tc.accent, size: 18),
         const SizedBox(width: 6),
         Text(
           title,
           style: TextStyle(
-            color: tc.oceanDeep,
+            color: tc.accent,
             fontSize: 11,
             fontWeight: FontWeight.w800,
             letterSpacing: 1.2,
@@ -230,7 +224,7 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildAccountSection(BuildContext context, ThemeColors tc) {
+  Widget _buildAccountSection(BuildContext context, BoosterFishPagePalette tc) {
     return Consumer<AuthService>(
       builder: (ctx, auth, _) {
         if (auth.isLoading) {
@@ -321,12 +315,12 @@ class SettingsPage extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [tc.oceanDeep, const Color(0xFF0A3562)],
+                colors: [tc.navy, const Color(0xFF0A3562)],
               ),
               borderRadius: BorderRadius.circular(22),
               boxShadow: [
                 BoxShadow(
-                  color: tc.oceanDeep.withValues(alpha: 0.22),
+                  color: tc.accent.withValues(alpha: 0.18),
                   blurRadius: 16,
                   offset: const Offset(0, 7),
                 ),
@@ -413,7 +407,7 @@ class SettingsPage extends StatelessWidget {
   }
 
   void _confirmLogout(BuildContext context, AuthService auth) {
-    final tc = ThemeColors.of(context);
+    final tc = BoosterFishPagePalette.of(context);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -478,7 +472,7 @@ class SettingsPage extends StatelessWidget {
   }
 
   Future<void> _confirmDeleteAccount(BuildContext context) async {
-    final tc = ThemeColors.of(context);
+    final tc = BoosterFishPagePalette.of(context);
     final auth = context.read<AuthService>();
     final confirmed = await showDialog<bool>(
       context: context,
@@ -519,7 +513,7 @@ class SettingsPage extends StatelessWidget {
   }
 
   Future<void> _showEditProfileDialog(
-      BuildContext context, ThemeColors tc) async {
+      BuildContext context, BoosterFishPagePalette tc) async {
     final auth = context.read<AuthService>();
     final nameCtrl = TextEditingController(text: auth.displayName ?? '');
     final email = auth.email ?? '';
@@ -569,19 +563,19 @@ class _CommandAccountCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tc = ThemeColors.of(context);
+    final tc = BoosterFishPagePalette.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 10),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
-          colors: [tc.oceanDeep, const Color(0xFF0A3562)],
+          colors: [tc.navy, const Color(0xFF0A3562)],
         ),
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: tc.oceanDeep.withValues(alpha: 0.22),
+            color: tc.accent.withValues(alpha: 0.18),
             blurRadius: 16,
             offset: const Offset(0, 7),
           ),
@@ -599,11 +593,15 @@ class _SettingsGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tc = ThemeColors.of(context);
+    final tc = BoosterFishPagePalette.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: tc.surface,
+        color: tc.surface.withValues(alpha: tc.isDark ? 0.96 : 0.98),
         borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color:
+              tc.isDark ? tc.accent.withValues(alpha: 0.34) : tc.borderStrong,
+        ),
         boxShadow: [
           BoxShadow(
             color: tc.shadowColor,
@@ -651,7 +649,7 @@ class _SettingsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tc = ThemeColors.of(context);
+    final tc = BoosterFishPagePalette.of(context);
     return Semantics(
       button: onTap != null,
       enabled: onTap != null,
@@ -720,7 +718,7 @@ class _UpdatePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tc = ThemeColors.of(context);
+    final tc = BoosterFishPagePalette.of(context);
     return Container(
       constraints: const BoxConstraints(maxWidth: 86),
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
@@ -896,7 +894,7 @@ class _AdvertisingPrivacyEntryState extends State<_AdvertisingPrivacyEntry> {
         if (snapshot.data != true) return const SizedBox.shrink();
         return _SettingsRow(
           icon: Icons.ads_click_outlined,
-          iconColor: ThemeColors.of(context).oceanLight,
+          iconColor: BoosterFishPagePalette.of(context).oceanLight,
           title: context.tr('settings.adPrivacy'),
           subtitle: context.tr('settings.adPrivacySubtitle'),
           onTap: _openPrivacyOptions,

@@ -21,6 +21,8 @@ class BoosterFishPagePalette {
       isDark ? const Color(0xFF020817) : const Color(0xFFF7FAFE);
   Color get surface =>
       isDark ? const Color(0xFF07172C) : const Color(0xFFFFFFFF);
+  Color get surfaceElevated =>
+      isDark ? const Color(0xFF0A203B) : const Color(0xFFF0F7FD);
   Color get navy => isDark ? const Color(0xFF03142B) : const Color(0xFF0B2852);
   Color get accent =>
       isDark ? const Color(0xFF19D7FF) : const Color(0xFF078FF0);
@@ -28,8 +30,24 @@ class BoosterFishPagePalette {
       isDark ? const Color(0xFFF4F8FF) : const Color(0xFF071A3F);
   Color get textSecondary =>
       isDark ? const Color(0xFFA8B9D2) : const Color(0xFF526786);
+  Color get textMuted =>
+      isDark ? const Color(0xFF8095B4) : const Color(0xFF7185A2);
   Color get borderStrong =>
       isDark ? const Color(0xFF3C8CBF) : const Color(0xFFB8D6F1);
+  Color get divider =>
+      isDark ? const Color(0xFF183654) : const Color(0xFFDDEAF5);
+  Color get oceanLight => accent;
+  Color get oceanMedium =>
+      isDark ? const Color(0xFF15BFEA) : const Color(0xFF087FD5);
+  Color get oceanDeep =>
+      isDark ? const Color(0xFF06254A) : const Color(0xFFDCEEFF);
+  Color get gold => const Color(0xFFF2B84B);
+  Color get success =>
+      isDark ? const Color(0xFF38D996) : const Color(0xFF178B63);
+  Color get warning =>
+      isDark ? const Color(0xFFFFB45A) : const Color(0xFFB86500);
+  Color get error => isDark ? const Color(0xFFFF7F8A) : const Color(0xFFCE3344);
+  Color get shadowColor => navy.withValues(alpha: isDark ? 0.34 : 0.10);
 
   List<Color> get backgroundGradient => isDark
       ? const [Color(0xFF020817), Color(0xFF041226), Color(0xFF020817)]
@@ -66,12 +84,14 @@ class BoosterFishPageHeader extends StatelessWidget {
   final String title;
   final String eyebrow;
   final String? subtitle;
+  final bool backToHome;
 
   const BoosterFishPageHeader({
     super.key,
     required this.title,
     required this.eyebrow,
     this.subtitle,
+    this.backToHome = false,
   });
 
   @override
@@ -80,7 +100,10 @@ class BoosterFishPageHeader extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        AppBackButton(color: palette.textSecondary),
+        AppBackButton(
+          color: palette.textSecondary,
+          toHome: backToHome,
+        ),
         const SizedBox(width: 4),
         Container(
           width: 38,
@@ -182,6 +205,99 @@ class BoosterFishGlassCard extends StatelessWidget {
         ],
       ),
       child: Padding(padding: padding, child: child),
+    );
+  }
+}
+
+class BoosterFishPageHero extends StatelessWidget {
+  final String assetPath;
+  final double height;
+  final AlignmentGeometry alignment;
+
+  const BoosterFishPageHero({
+    super.key,
+    required this.assetPath,
+    this.height = 142,
+    this.alignment = Alignment.center,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = BoosterFishPagePalette.of(context);
+    return Container(
+      height: height,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: palette.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: palette.isDark
+              ? palette.accent.withValues(alpha: 0.62)
+              : palette.borderStrong,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color:
+                palette.accent.withValues(alpha: palette.isDark ? 0.20 : 0.12),
+            blurRadius: 22,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            assetPath,
+            fit: BoxFit.cover,
+            alignment: alignment,
+            filterQuality: FilterQuality.high,
+          ),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: palette.isDark
+                    ? [
+                        const Color(0x00020817),
+                        const Color(0x22020817),
+                        const Color(0x66020817),
+                      ]
+                    : [
+                        const Color(0x00FFFFFF),
+                        const Color(0x0AFFFFFF),
+                        const Color(0x24071A3F),
+                      ],
+              ),
+            ),
+          ),
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 10,
+            child: Container(
+              height: 2,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(2),
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.transparent,
+                    palette.accent,
+                    Colors.transparent,
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: palette.accent.withValues(alpha: 0.8),
+                    blurRadius: 8,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

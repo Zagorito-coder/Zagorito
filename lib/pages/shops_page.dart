@@ -14,11 +14,10 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models.dart';
 import '../models/fishing_shop.dart';
 import '../services/shop_service.dart';
-import '../theme.dart';
 import '../theme_controller.dart';
 import '../l10n/app_localizations.dart';
 import '../services/spot_service.dart';
-import '../widgets/app_back_button.dart';
+import '../widgets/boosterfish_page.dart';
 import 'shops_map_page.dart';
 
 /// 37 URLs d'images Unsplash thématiques pêche/matériel/appâts.
@@ -106,16 +105,17 @@ class _ShopsPageState extends State<ShopsPage>
         );
       } catch (_) {}
 
-      var groups = ShopService.groupShopsBySpot(shops, spots, maxDistanceKm: 60.0);
+      var groups =
+          ShopService.groupShopsBySpot(shops, spots, maxDistanceKm: 60.0);
 
       // Trier par distance à l'utilisateur si la position est disponible
       if (userPos != null) {
         final userLatLng = LatLng(userPos.latitude, userPos.longitude);
         groups.sort((a, b) {
-          final dA = const Distance().as(LengthUnit.Kilometer,
-              userLatLng, LatLng(a.spotLat, a.spotLng));
-          final dB = const Distance().as(LengthUnit.Kilometer,
-              userLatLng, LatLng(b.spotLat, b.spotLng));
+          final dA = const Distance().as(
+              LengthUnit.Kilometer, userLatLng, LatLng(a.spotLat, a.spotLng));
+          final dB = const Distance().as(
+              LengthUnit.Kilometer, userLatLng, LatLng(b.spotLat, b.spotLng));
           return dA.compareTo(dB);
         });
       }
@@ -164,135 +164,114 @@ class _ShopsPageState extends State<ShopsPage>
     return ListenableBuilder(
       listenable: ThemeController.instance,
       builder: (context, _) {
-        final tc = ThemeColors.of(context);
-        return Scaffold(
-          backgroundColor: tc.background,
-          body: SafeArea(
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            SliverToBoxAdapter(child: _buildHeader(tc)),
-            SliverToBoxAdapter(child: _buildSearchBar(tc)),
-            if (_isLoading)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(60),
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      color: tc.oceanMedium,
-                      strokeWidth: 2.5,
+        final tc = BoosterFishPagePalette.of(context);
+        return BoosterFishPageShell(
+          child: CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(child: _buildHeader(tc)),
+              SliverToBoxAdapter(child: _buildSearchBar(tc)),
+              if (_isLoading)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(60),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: tc.oceanMedium,
+                        strokeWidth: 2.5,
+                      ),
                     ),
                   ),
+                )
+              else if (_error != null)
+                SliverToBoxAdapter(child: _buildErrorState(tc))
+              else if (_filteredGroups.isEmpty)
+                SliverToBoxAdapter(child: _buildEmptyState(tc))
+              else
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (ctx, index) =>
+                        _buildSpotSection(_filteredGroups[index], index, tc),
+                    childCount: _filteredGroups.length,
+                  ),
                 ),
-              )
-            else if (_error != null)
-              SliverToBoxAdapter(child: _buildErrorState(tc))
-            else if (_filteredGroups.isEmpty)
-              SliverToBoxAdapter(child: _buildEmptyState(tc))
-            else
-              SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (ctx, index) => _buildSpotSection(_filteredGroups[index], index, tc),
-                  childCount: _filteredGroups.length,
-                ),
-              ),
-            const SliverToBoxAdapter(child: SizedBox(height: 40)),
-          ],
-        ),
-      ),
+              const SliverToBoxAdapter(child: SizedBox(height: 40)),
+            ],
+          ),
+        );
+      },
     );
-  },
-);
   }
 
   // ═══════════════════════════════════════════════════════════
   //  HEADER
   // ═══════════════════════════════════════════════════════════
 
-  Widget _buildHeader(ThemeColors tc) {
+  Widget _buildHeader(BoosterFishPagePalette tc) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 20, 8),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(4, 8, 16, 8),
+      child: Column(
         children: [
-          const AppBackButton(),
-          const SizedBox(width: 10),
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFF8C69).withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: const Color(0xFFFF8C69).withValues(alpha: 0.25),
-                width: 1,
-              ),
-            ),
-            child: const Icon(
-              Icons.storefront,
-              color: Color(0xFFFF8C69),
-              size: 22,
+          BoosterFishPageHeader(
+            eyebrow: context.tr('home.expeditionTitle'),
+            title: context.tr('shops.title'),
+            subtitle: context.trArgs(
+              'shops.shopsSynced',
+              args: {'count': _allShops.length.toString()},
             ),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(height: 12),
+          const BoosterFishPageHero(
+            assetPath: 'assets/page_heroes/shops_boosterfish_hero.webp',
+            height: 132,
+          ),
+          if (_allShops.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Text(
-                  context.tr('shops.title'),
-                  style: TextStyle(
-                    color: tc.textPrimary,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
+                GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ShopsMapPage()),
+                  ),
+                  child: Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: tc.accent.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: tc.accent.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: Icon(Icons.map_outlined, color: tc.accent, size: 19),
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  context.trArgs('shops.shopsSynced', args: {'count': _allShops.length.toString()}),
-                  style: TextStyle(
-                    color: tc.textSecondary.withValues(alpha: 0.7),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: tc.accent.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: tc.accent.withValues(alpha: 0.25),
+                    ),
+                  ),
+                  child: Text(
+                    context.trArgs(
+                      'shops.spotsCount',
+                      args: {'count': _groups.length.toString()},
+                    ),
+                    style: TextStyle(
+                      color: tc.accent,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],
-            ),
-          ),
-          if (_allShops.isNotEmpty) ...[
-            GestureDetector(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ShopsMapPage()),
-              ),
-              child: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF8C69).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: const Color(0xFFFF8C69).withValues(alpha: 0.25),
-                    width: 1,
-                  ),
-                ),
-                child: const Icon(Icons.map, color: Color(0xFFFF8C69), size: 20),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFF8C69).withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                context.trArgs('shops.spotsCount', args: {'count': _groups.length.toString()}),
-                style: const TextStyle(
-                  color: Color(0xFFFF8C69),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
             ),
           ],
         ],
@@ -304,7 +283,7 @@ class _ShopsPageState extends State<ShopsPage>
   //  BARRE DE RECHERCHE
   // ═══════════════════════════════════════════════════════════
 
-  Widget _buildSearchBar(ThemeColors tc) {
+  Widget _buildSearchBar(BoosterFishPagePalette tc) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
       child: Container(
@@ -313,7 +292,8 @@ class _ShopsPageState extends State<ShopsPage>
           color: tc.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: tc.textSecondary.withValues(alpha: 0.15),
+            color:
+                tc.isDark ? tc.accent.withValues(alpha: 0.30) : tc.borderStrong,
             width: 1,
           ),
         ),
@@ -321,18 +301,24 @@ class _ShopsPageState extends State<ShopsPage>
           onChanged: (v) => setState(() => _searchQuery = v),
           style: TextStyle(color: tc.textPrimary, fontSize: 14),
           decoration: InputDecoration(
-            prefixIcon: Icon(Icons.search,
-                color: tc.textSecondary.withValues(alpha: 0.5), size: 20),
+            prefixIcon: Icon(
+              Icons.search,
+              color: tc.textMuted.withValues(alpha: 0.90),
+              size: 20,
+            ),
             suffixIcon: _searchQuery.isNotEmpty
                 ? GestureDetector(
                     onTap: () => setState(() => _searchQuery = ''),
-                    child: Icon(Icons.close,
-                        color: tc.textSecondary.withValues(alpha: 0.5), size: 18),
+                    child: Icon(
+                      Icons.close,
+                      color: tc.textMuted.withValues(alpha: 0.90),
+                      size: 18,
+                    ),
                   )
                 : null,
             hintText: context.tr('shops.search'),
             hintStyle: TextStyle(
-              color: tc.textSecondary.withValues(alpha: 0.4),
+              color: tc.textMuted.withValues(alpha: 0.92),
               fontSize: 13,
             ),
             border: InputBorder.none,
@@ -347,7 +333,8 @@ class _ShopsPageState extends State<ShopsPage>
   //  SECTION SPOT — regroupement de magasins
   // ═══════════════════════════════════════════════════════════
 
-  Widget _buildSpotSection(ShopSpotGroup group, int groupIndex, ThemeColors tc) {
+  Widget _buildSpotSection(
+      ShopSpotGroup group, int groupIndex, BoosterFishPagePalette tc) {
     return FadeTransition(
       opacity: Tween<double>(begin: 0, end: 1).animate(
         CurvedAnimation(
@@ -386,7 +373,8 @@ class _ShopsPageState extends State<ShopsPage>
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: tc.oceanDeep.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(8),
@@ -396,7 +384,8 @@ class _ShopsPageState extends State<ShopsPage>
                     ),
                   ),
                   child: Text(
-                    context.trArgs('shops.shopCount', args: {'count': group.shops.length.toString()}),
+                    context.trArgs('shops.shopCount',
+                        args: {'count': group.shops.length.toString()}),
                     style: TextStyle(
                       color: tc.oceanMedium,
                       fontSize: 10,
@@ -418,7 +407,7 @@ class _ShopsPageState extends State<ShopsPage>
   //  CARTE MAGASIN
   // ═══════════════════════════════════════════════════════════
 
-  Widget _buildShopCard(FishingShop shop, ThemeColors tc) {
+  Widget _buildShopCard(FishingShop shop, BoosterFishPagePalette tc) {
     final now = DateTime.now();
     final openParts = shop.openTime.split(':');
     final closeParts = shop.closeTime.split(':');
@@ -429,17 +418,26 @@ class _ShopsPageState extends State<ShopsPage>
     final currentMinutes = now.hour * 60 + now.minute;
     final openMinutes = openH * 60 + openM;
     final closeMinutes = closeH * 60 + closeM;
-    final isOpenNow = currentMinutes >= openMinutes && currentMinutes <= closeMinutes;
+    final isOpenNow =
+        currentMinutes >= openMinutes && currentMinutes <= closeMinutes;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: tc.surface,
+        color: tc.surface.withValues(alpha: tc.isDark ? 0.96 : 0.98),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: tc.textSecondary.withValues(alpha: 0.1),
+          color:
+              tc.isDark ? tc.accent.withValues(alpha: 0.34) : tc.borderStrong,
           width: 1,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: tc.shadowColor,
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -500,7 +498,9 @@ class _ShopsPageState extends State<ShopsPage>
                       ),
                       const SizedBox(width: 5),
                       Text(
-                        isOpenNow ? context.tr('shops.open') : context.tr('shops.closed'),
+                        isOpenNow
+                            ? context.tr('shops.open')
+                            : context.tr('shops.closed'),
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 9,
@@ -517,7 +517,8 @@ class _ShopsPageState extends State<ShopsPage>
                   top: 10,
                   right: 10,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.6),
                       borderRadius: BorderRadius.circular(8),
@@ -529,7 +530,8 @@ class _ShopsPageState extends State<ShopsPage>
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.star, color: Color(0xFFFFD700), size: 12),
+                        const Icon(Icons.star,
+                            color: Color(0xFFFFD700), size: 12),
                         const SizedBox(width: 3),
                         Text(
                           '${shop.rating}',
@@ -562,8 +564,7 @@ class _ShopsPageState extends State<ShopsPage>
                 Row(
                   children: [
                     Icon(Icons.location_on,
-                        color: tc.oceanMedium.withValues(alpha: 0.7),
-                        size: 13),
+                        color: tc.oceanMedium.withValues(alpha: 0.7), size: 13),
                     const SizedBox(width: 5),
                     Expanded(
                       child: Text(
@@ -587,18 +588,17 @@ class _ShopsPageState extends State<ShopsPage>
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFF8C69).withValues(alpha: 0.08),
+                        color: tc.accent.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(
-                          color:
-                              const Color(0xFFFF8C69).withValues(alpha: 0.2),
+                          color: tc.accent.withValues(alpha: 0.24),
                           width: 1,
                         ),
                       ),
                       child: Text(
                         tag,
-                        style: const TextStyle(
-                          color: Color(0xFFFF8C69),
+                        style: TextStyle(
+                          color: tc.accent,
                           fontSize: 9,
                           fontWeight: FontWeight.w600,
                         ),
@@ -610,7 +610,8 @@ class _ShopsPageState extends State<ShopsPage>
                 Row(
                   children: [
                     Icon(Icons.access_time,
-                        color: tc.textSecondary.withValues(alpha: 0.5), size: 13),
+                        color: tc.textSecondary.withValues(alpha: 0.5),
+                        size: 13),
                     const SizedBox(width: 5),
                     Text(
                       '${shop.openTime} — ${shop.closeTime}',
@@ -622,7 +623,8 @@ class _ShopsPageState extends State<ShopsPage>
                     ),
                     const Spacer(),
                     Builder(builder: (context) {
-                      final soonBadge = _buildSoonBadge(openMinutes, closeMinutes, currentMinutes);
+                      final soonBadge = _buildSoonBadge(
+                          openMinutes, closeMinutes, currentMinutes);
                       if (soonBadge != null) return soonBadge;
                       return const SizedBox.shrink();
                     }),
@@ -670,10 +672,15 @@ class _ShopsPageState extends State<ShopsPage>
 
   Widget? _buildSoonBadge(int openMin, int closeMin, int currentMin) {
     if (currentMin < closeMin && (closeMin - currentMin) <= 30) {
-      return _SoonBadge(text: context.tr('shops.closingSoon'), color: const Color(0xFFFF8C69));
+      return _SoonBadge(
+        text: context.tr('shops.closingSoon'),
+        color: BoosterFishPagePalette.of(context).warning,
+      );
     }
     if (currentMin < openMin && (openMin - currentMin) <= 30) {
-      return _SoonBadge(text: context.tr('shops.openingSoon'), color: const Color(0xFFFFD700));
+      return _SoonBadge(
+          text: context.tr('shops.openingSoon'),
+          color: const Color(0xFFFFD700));
     }
     return null;
   }
@@ -682,7 +689,7 @@ class _ShopsPageState extends State<ShopsPage>
   //  ÉTATS VIDES / ERREURS
   // ═══════════════════════════════════════════════════════════
 
-  Widget _buildErrorState(ThemeColors tc) {
+  Widget _buildErrorState(BoosterFishPagePalette tc) {
     return Padding(
       padding: const EdgeInsets.all(40),
       child: Column(
@@ -707,7 +714,7 @@ class _ShopsPageState extends State<ShopsPage>
     );
   }
 
-  Widget _buildEmptyState(ThemeColors tc) {
+  Widget _buildEmptyState(BoosterFishPagePalette tc) {
     return Padding(
       padding: const EdgeInsets.all(60),
       child: Column(
@@ -763,13 +770,14 @@ class _ShopsPageState extends State<ShopsPage>
   }
 
   Future<void> _copyCoords(FishingShop shop) async {
-    final text = '${shop.name}\n${shop.latitude}, ${shop.longitude}\n${shop.address}';
+    final text =
+        '${shop.name}\n${shop.latitude}, ${shop.longitude}\n${shop.address}';
     await Clipboard.setData(ClipboardData(text: text));
     if (mounted) _showSnack(context.tr('shops.copied'));
   }
 
   void _showSnack(String msg) {
-    final tc = ThemeColors.of(context);
+    final tc = BoosterFishPagePalette.of(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg, style: TextStyle(color: tc.textPrimary)),

@@ -61,6 +61,7 @@ flutter:
     - assets/logo.png
     - assets/home_hero_v3.webp
     - assets/home_cards/
+    - assets/page_heroes/
     - assets/settings_hero.png
     - assets/settings_fishing_banner.png
     - assets/earth_splash.jpg

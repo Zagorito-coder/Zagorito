@@ -7,10 +7,9 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:spots_app/models/fish_species.dart';
 import 'package:spots_app/services/species_service.dart';
-import 'package:spots_app/theme.dart';
 import 'package:spots_app/theme_controller.dart';
 import 'package:spots_app/l10n/app_localizations.dart';
-import 'package:spots_app/widgets/app_back_button.dart';
+import 'package:spots_app/widgets/boosterfish_page.dart';
 
 class SpeciesPage extends StatefulWidget {
   const SpeciesPage({super.key});
@@ -100,239 +99,203 @@ class _SpeciesPageState extends State<SpeciesPage> {
     return ListenableBuilder(
       listenable: ThemeController.instance,
       builder: (context, _) {
-        final tc = ThemeColors.of(context);
-        return Scaffold(
-          backgroundColor: tc.background,
-          body: SafeArea(
-            child: Column(
-              children: [
-                // ── HEADER ──
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 0, 16, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const AppBackButton(toHome: true),
-                      const SizedBox(height: 4),
-                      Row(
+        final tc = BoosterFishPagePalette.of(context);
+        return BoosterFishPageShell(
+          child: Column(
+            children: [
+              // ── HEADER ──
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 8, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    BoosterFishPageHeader(
+                      eyebrow: context.tr('home.expeditionTitle'),
+                      title: context.tr('species.title'),
+                      subtitle: context.trArgs('species.speciesCount', args: {
+                        'count': _allSpecies.length.toString(),
+                      }),
+                      backToHome: true,
+                    ),
+                    const SizedBox(height: 12),
+                    const BoosterFishPageHero(
+                      assetPath:
+                          'assets/page_heroes/species_boosterfish_hero.webp',
+                      height: 132,
+                    ),
+                    const SizedBox(height: 12),
+                    // Search bar
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: tc.surfaceElevated,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: tc.textPrimary.withValues(alpha: 0.08),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
                         children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: tc.oceanLight.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.set_meal,
-                              color: tc.oceanLight,
-                              size: 20,
+                          Icon(Icons.search, color: tc.textMuted, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: TextField(
+                              style: TextStyle(
+                                  color: tc.textPrimary, fontSize: 15),
+                              decoration: InputDecoration(
+                                hintText: context.tr('species.search'),
+                                hintStyle: TextStyle(color: tc.textMuted),
+                                border: InputBorder.none,
+                                contentPadding:
+                                    const EdgeInsets.symmetric(vertical: 14),
+                              ),
+                              onChanged: (v) {
+                                _searchQuery = v;
+                                _applyFilters();
+                              },
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  context.tr('species.title'),
-                                  style: TextStyle(
-                                    color: tc.textPrimary,
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                          if (_searchQuery.isNotEmpty)
+                            GestureDetector(
+                              onTap: () {
+                                _searchQuery = '';
+                                _applyFilters();
+                              },
+                              child: Icon(Icons.close,
+                                  color: tc.textMuted, size: 18),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    // Region filters
+                    SizedBox(
+                      height: 36,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _regionKeys.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        itemBuilder: (context, index) {
+                          final regionKey = _regionKeys[index];
+                          final regionLabel = context.tr(regionKey);
+                          final isActive = _regionFilter == regionLabel ||
+                              (_regionFilter == null &&
+                                  regionKey == 'species.all');
+                          return GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _regionFilter = regionKey == 'species.all'
+                                    ? null
+                                    : regionLabel;
+                              });
+                              _applyFilters();
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: isActive
+                                    ? tc.oceanLight.withValues(alpha: 0.15)
+                                    : tc.surfaceElevated,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: isActive
+                                      ? tc.oceanLight.withValues(alpha: 0.5)
+                                      : tc.textPrimary.withValues(alpha: 0.08),
+                                  width: 1,
                                 ),
+                              ),
+                              child: Text(
+                                regionLabel,
+                                style: TextStyle(
+                                  color: isActive
+                                      ? tc.oceanLight
+                                      : tc.textSecondary,
+                                  fontSize: 12,
+                                  fontWeight: isActive
+                                      ? FontWeight.w600
+                                      : FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // ── LISTE ──
+              Expanded(
+                child: _loading
+                    ? Center(
+                        child: CircularProgressIndicator(
+                          color: tc.oceanLight,
+                          strokeWidth: 2.5,
+                        ),
+                      )
+                    : _error != null
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.error_outline,
+                                    color: tc.error.withValues(alpha: 0.6),
+                                    size: 48),
+                                const SizedBox(height: 12),
                                 Text(
-                                  context.trArgs('species.speciesCount', args: {
-                                    'count': _allSpecies.length.toString()
-                                  }),
+                                  context.tr('species.loadingError'),
                                   style: TextStyle(
-                                    color: tc.textSecondary,
-                                    fontSize: 13,
+                                      color: tc.textMuted, fontSize: 15),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _error!,
+                                  style: TextStyle(
+                                    color: tc.textMuted.withValues(alpha: 0.7),
+                                    fontSize: 11,
                                   ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 16),
+                                TextButton(
+                                  onPressed: _loadData,
+                                  child: Text(context.tr('species.retry')),
                                 ),
                               ],
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      // Search bar
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
-                        decoration: BoxDecoration(
-                          color: tc.surfaceElevated,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: tc.textPrimary.withValues(alpha: 0.08),
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.search, color: tc.textMuted, size: 20),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: TextField(
-                                style: TextStyle(
-                                    color: tc.textPrimary, fontSize: 15),
-                                decoration: InputDecoration(
-                                  hintText: context.tr('species.search'),
-                                  hintStyle: TextStyle(color: tc.textMuted),
-                                  border: InputBorder.none,
-                                  contentPadding:
-                                      const EdgeInsets.symmetric(vertical: 14),
-                                ),
-                                onChanged: (v) {
-                                  _searchQuery = v;
-                                  _applyFilters();
-                                },
-                              ),
-                            ),
-                            if (_searchQuery.isNotEmpty)
-                              GestureDetector(
-                                onTap: () {
-                                  _searchQuery = '';
-                                  _applyFilters();
-                                },
-                                child: Icon(Icons.close,
-                                    color: tc.textMuted, size: 18),
-                              ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      // Region filters
-                      SizedBox(
-                        height: 36,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: _regionKeys.length,
-                          separatorBuilder: (_, __) => const SizedBox(width: 8),
-                          itemBuilder: (context, index) {
-                            final regionKey = _regionKeys[index];
-                            final regionLabel = context.tr(regionKey);
-                            final isActive = _regionFilter == regionLabel ||
-                                (_regionFilter == null &&
-                                    regionKey == 'species.all');
-                            return GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  _regionFilter = regionKey == 'species.all'
-                                      ? null
-                                      : regionLabel;
-                                });
-                                _applyFilters();
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 14, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: isActive
-                                      ? tc.oceanLight.withValues(alpha: 0.15)
-                                      : tc.surfaceElevated,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: isActive
-                                        ? tc.oceanLight.withValues(alpha: 0.5)
-                                        : tc.textPrimary
-                                            .withValues(alpha: 0.08),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Text(
-                                  regionLabel,
-                                  style: TextStyle(
-                                    color: isActive
-                                        ? tc.oceanLight
-                                        : tc.textSecondary,
-                                    fontSize: 12,
-                                    fontWeight: isActive
-                                        ? FontWeight.w600
-                                        : FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // ── LISTE ──
-                Expanded(
-                  child: _loading
-                      ? Center(
-                          child: CircularProgressIndicator(
-                            color: tc.oceanLight,
-                            strokeWidth: 2.5,
-                          ),
-                        )
-                      : _error != null
-                          ? Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.error_outline,
-                                      color: tc.error.withValues(alpha: 0.6),
-                                      size: 48),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    context.tr('species.loadingError'),
-                                    style: TextStyle(
-                                        color: tc.textMuted, fontSize: 15),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _error!,
-                                    style: TextStyle(
-                                      color:
-                                          tc.textMuted.withValues(alpha: 0.7),
-                                      fontSize: 11,
+                          )
+                        : _filtered.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.search_off,
+                                        color: tc.textMuted, size: 48),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      context.tr('species.noSpeciesFound'),
+                                      style: TextStyle(
+                                          color: tc.textMuted, fontSize: 15),
                                     ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  TextButton(
-                                    onPressed: _loadData,
-                                    child: Text(context.tr('species.retry')),
-                                  ),
-                                ],
-                              ),
-                            )
-                          : _filtered.isEmpty
-                              ? Center(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.search_off,
-                                          color: tc.textMuted, size: 48),
-                                      const SizedBox(height: 12),
-                                      Text(
-                                        context.tr('species.noSpeciesFound'),
-                                        style: TextStyle(
-                                            color: tc.textMuted, fontSize: 15),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              : ListView.builder(
-                                  padding:
-                                      const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                                  itemCount: _filtered.length,
-                                  itemBuilder: (context, index) {
-                                    return _SpeciesCard(
-                                      species: _filtered[index],
-                                      onTap: () =>
-                                          _openDetail(_filtered[index]),
-                                    );
-                                  },
+                                  ],
                                 ),
-                ),
-              ],
-            ),
+                              )
+                            : ListView.builder(
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                                itemCount: _filtered.length,
+                                itemBuilder: (context, index) {
+                                  return _SpeciesCard(
+                                    species: _filtered[index],
+                                    onTap: () => _openDetail(_filtered[index]),
+                                  );
+                                },
+                              ),
+              ),
+            ],
           ),
         );
       },
@@ -360,7 +323,7 @@ class _SpeciesCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tc = ThemeColors.of(context);
+    final tc = BoosterFishPagePalette.of(context);
     final imageScale = _speciesListImageScale(species.photoUrl);
 
     return GestureDetector(
@@ -537,11 +500,10 @@ class SpeciesDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tc = ThemeColors.of(context);
+    final tc = BoosterFishPagePalette.of(context);
 
-    return Scaffold(
-      backgroundColor: tc.background,
-      body: CustomScrollView(
+    return BoosterFishPageShell(
+      child: CustomScrollView(
         slivers: [
           // ── APP BAR avec photo ──
           SliverAppBar(
@@ -793,7 +755,7 @@ class SpeciesDetailPage extends StatelessWidget {
 
 class _SectionTitle extends StatelessWidget {
   final String title;
-  final ThemeColors tc;
+  final BoosterFishPagePalette tc;
 
   const _SectionTitle({required this.title, required this.tc});
 
@@ -828,7 +790,7 @@ class _InfoTile extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
-  final ThemeColors tc;
+  final BoosterFishPagePalette tc;
 
   const _InfoTile({
     required this.icon,
@@ -842,6 +804,7 @@ class _InfoTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: (MediaQuery.of(context).size.width - 52) / 2,
+      constraints: const BoxConstraints(minHeight: 92),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: tc.surfaceElevated,
@@ -865,8 +828,8 @@ class _InfoTile extends StatelessWidget {
               fontSize: 13,
               fontWeight: FontWeight.w600,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            maxLines: 2,
+            overflow: TextOverflow.fade,
           ),
         ],
       ),
@@ -878,7 +841,7 @@ class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-  final ThemeColors tc;
+  final BoosterFishPagePalette tc;
 
   const _InfoRow({
     required this.icon,
@@ -948,7 +911,7 @@ class _SpeciesImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tc = ThemeColors.of(context);
+    final tc = BoosterFishPagePalette.of(context);
     final errorWidget = Container(
       color: tc.surfaceElevated,
       width: width,
@@ -997,7 +960,7 @@ class _SpeciesImage extends StatelessWidget {
 
 class _TechniqueCard extends StatelessWidget {
   final FishingTechnique technique;
-  final ThemeColors tc;
+  final BoosterFishPagePalette tc;
 
   const _TechniqueCard({required this.technique, required this.tc});
 
