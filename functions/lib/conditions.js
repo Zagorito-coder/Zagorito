@@ -180,7 +180,7 @@ async function buildConditionsForSpot(spot) {
   const marineUrl = apiUrl(MARINE_BASE_URL, {
     latitude: spot.lat,
     longitude: spot.lon,
-    hourly: 'sea_level_height_msl,wave_height,wind_wave_height,wind_wave_direction,wind_wave_period',
+    hourly: 'sea_level_height_msl,wave_height,wave_period,wind_wave_height,wind_wave_direction,wind_wave_period',
     start_date: dateStr,
     end_date: endDateStr,
   });
@@ -222,7 +222,10 @@ async function buildConditionsForSpot(spot) {
     waveHeightM: marineData.hourly?.wave_height?.[index] ?? null,
     windWaveHeightM: marineData.hourly?.wind_wave_height?.[index] ?? null,
     windDirectionDeg: marineData.hourly?.wind_wave_direction?.[index] ?? null,
-    wavePeriodS: marineData.hourly?.wind_wave_period?.[index] ?? null,
+    // La carte "Vagues" présente la houle totale : sa période doit donc
+    // provenir de `wave_period`, pas de la seule composante générée par le vent.
+    wavePeriodS: marineData.hourly?.wave_period?.[index] ?? null,
+    windWavePeriodS: marineData.hourly?.wind_wave_period?.[index] ?? null,
   }));
 
   const weatherHourlyPayload = (weatherHourly?.time ?? []).map((time, index) => ({
