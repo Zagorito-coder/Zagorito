@@ -1491,8 +1491,8 @@ class _GaugePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final c = Offset(size.width / 2, size.height / 2);
-    final r = math.min(size.width, size.height) / 2 - 6;
-    const stroke = 10.0;
+    final r = math.min(size.width, size.height) / 2 - 7;
+    const stroke = 6.0;
     final bg = Paint()
       ..color = _txt(0.06)
       ..style = PaintingStyle.stroke
@@ -1505,7 +1505,7 @@ class _GaugePainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = stroke
       ..strokeCap = StrokeCap.round
-      ..maskFilter = const MaskFilter.blur(BlurStyle.solid, 6);
+      ..maskFilter = const MaskFilter.blur(BlurStyle.solid, 2.5);
     canvas.drawArc(Rect.fromCircle(center: c, radius: r), math.pi * 0.75,
         math.pi * 1.5 * progress, false, fg);
   }
