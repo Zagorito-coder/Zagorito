@@ -41,12 +41,14 @@ class TideEvent {
   final double time; // heure décimale ex: 6.5 = 06h30
   final double height;
   final String label;
+  final DateTime? dateTime;
 
   const TideEvent({
     required this.type,
     required this.time,
     required this.height,
     required this.label,
+    this.dateTime,
   });
 }
 
@@ -106,6 +108,7 @@ class TideData {
   final List<HourlyCard> hourlyCards;
   final List<TidePoint> tidePoints;
   final List<TideEvent> tideEvents;
+  final List<TideEvent> upcomingEvents;
   final int currentHour;
   final MoonInfo moonInfo;
   final SunTimes sunTimes;
@@ -122,6 +125,7 @@ class TideData {
     required this.hourlyCards,
     required this.tidePoints,
     required this.tideEvents,
+    required this.upcomingEvents,
     required this.currentHour,
     required this.moonInfo,
     required this.sunTimes,
