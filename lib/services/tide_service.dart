@@ -9,21 +9,50 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 
 import '../models/tide_data.dart';
-import 'tide_forecast_mapper.dart';
+import 'tide_conditions_mapper.dart';
 
 class TideService {
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
   static const Duration _requestTimeout = Duration(seconds: 15);
-  static const Duration _stationCacheDuration = Duration(hours: 1);
-  static const Duration _maximumForecastAge = Duration(hours: 72);
+  static const Duration _maximumForecastAge = Duration(hours: 36);
+  static const List<_ForecastStation> _publishedStations = [
+    _ForecastStation(
+      id: 'casablanca',
+      name: 'Casablanca, Maroc',
+      latitude: 33.59,
+      longitude: -7.61,
+    ),
+    _ForecastStation(
+      id: 'rabat',
+      name: 'Rabat, Maroc',
+      latitude: 34.02,
+      longitude: -6.84,
+    ),
+    _ForecastStation(
+      id: 'agadir',
+      name: 'Agadir, Maroc',
+      latitude: 30.42,
+      longitude: -9.60,
+    ),
+    _ForecastStation(
+      id: 'tanger',
+      name: 'Tanger, Maroc',
+      latitude: 35.77,
+      longitude: -5.80,
+    ),
+    _ForecastStation(
+      id: 'essaouira',
+      name: 'Essaouira, Maroc',
+      latitude: 31.51,
+      longitude: -9.77,
+    ),
+  ];
 
-  static List<_ForecastStation>? _cachedStations;
-  static DateTime? _stationsCachedAt;
-  static Future<List<_ForecastStation>>? _stationLoadInProgress;
-
-  /// Lit les conditions marines generees par le job serveur avec l'API
-  /// commerciale Open-Meteo. La position sert uniquement a choisir localement
-  /// la station publiee la plus proche et n'est jamais envoyee a Open-Meteo.
+  /// Lit les marées et conditions marines publiées par le job serveur.
+  ///
+  /// La hauteur de marée vient exclusivement de `sea_level_height_msl`.
+  /// La position sert uniquement à choisir localement la station publiée la
+  /// plus proche et n'est jamais envoyée à Open-Meteo depuis le téléphone.
   static Future<TideData> fetchTides({
     double latitude = 33.57,
     double longitude = -7.59,
@@ -33,25 +62,28 @@ class TideService {
       return TideData.fallback(location: locationName);
     }
 
+    final station = _nearestStation(
+      _publishedStations,
+      latitude,
+      longitude,
+    );
+    if (station == null) {
+      return TideData.fallback(location: locationName);
+    }
+
     for (var attempt = 0; attempt < 2; attempt++) {
       try {
-        final stations = await _loadStations();
-        final station = _nearestStation(stations, latitude, longitude);
-        if (station == null) {
-          return TideData.fallback(location: locationName);
-        }
-
         final snapshot = await _db
-            .collection('spots_meteo')
+            .collection('conditions')
             .doc(station.id)
             .get()
             .timeout(_requestTimeout);
         final data = snapshot.data();
-        if (!snapshot.exists || data == null || !_isFresh(data['last_update'])) {
+        if (!snapshot.exists || data == null || !_isFresh(data['timestamp'])) {
           return TideData.fallback(location: station.name);
         }
 
-        return TideForecastMapper.fromDocument(
+        return TideConditionsMapper.fromDocument(
           data,
           fallbackLocation: station.name,
         );
@@ -81,58 +113,12 @@ class TideService {
     final DateTime? updatedAt = switch (value) {
       Timestamp timestamp => timestamp.toDate(),
       DateTime dateTime => dateTime,
+      String raw => DateTime.tryParse(raw),
       _ => null,
     };
     if (updatedAt == null) return false;
     final age = DateTime.now().difference(updatedAt);
     return age <= _maximumForecastAge && age >= const Duration(minutes: -5);
-  }
-
-  static Future<List<_ForecastStation>> _loadStations() async {
-    final now = DateTime.now();
-    final cached = _cachedStations;
-    final cachedAt = _stationsCachedAt;
-    if (cached != null &&
-        cached.isNotEmpty &&
-        cachedAt != null &&
-        now.difference(cachedAt) < _stationCacheDuration) {
-      return cached;
-    }
-
-    final pending = _stationLoadInProgress;
-    if (pending != null) return pending;
-
-    final load = _readStations();
-    _stationLoadInProgress = load;
-    try {
-      final stations = await load;
-      if (stations.isNotEmpty) {
-        _cachedStations = stations;
-        _stationsCachedAt = now;
-      }
-      return stations;
-    } finally {
-      if (identical(_stationLoadInProgress, load)) {
-        _stationLoadInProgress = null;
-      }
-    }
-  }
-
-  static Future<List<_ForecastStation>> _readStations() async {
-    final snapshot =
-        await _db.collection('spots_index').get().timeout(_requestTimeout);
-    return snapshot.docs.map((doc) {
-      final data = doc.data();
-      return _ForecastStation(
-        id: doc.id,
-        name: data['name'] as String? ?? doc.id,
-        latitude: (data['latitude'] as num?)?.toDouble() ?? double.nan,
-        longitude: (data['longitude'] as num?)?.toDouble() ?? double.nan,
-      );
-    }).where((station) {
-      return station.id.isNotEmpty &&
-          _validCoordinates(station.latitude, station.longitude);
-    }).toList(growable: false);
   }
 
   static _ForecastStation? _nearestStation(

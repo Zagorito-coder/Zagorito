@@ -170,6 +170,11 @@ function calculateActivityScore(moon, tideAmplitude, weatherHourly, nowIndex) {
 async function buildConditionsForSpot(spot) {
   const now = new Date();
   const dateStr = now.toISOString().split('T')[0];
+  // Deux jours complets garantissent que la dernière publication reste
+  // exploitable jusqu'au passage du job suivant, même si GitHub Actions
+  // démarre le cron quotidien avec plusieurs heures de retard.
+  const endDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const endDateStr = endDate.toISOString().split('T')[0];
 
   // 1. Données marines (marées)
   const marineUrl = apiUrl(MARINE_BASE_URL, {
@@ -177,13 +182,16 @@ async function buildConditionsForSpot(spot) {
     longitude: spot.lon,
     hourly: 'sea_level_height_msl,wave_height,wind_wave_height,wind_wave_direction,wind_wave_period',
     start_date: dateStr,
-    end_date: dateStr,
+    end_date: endDateStr,
   });
 
   const marineData = await fetchJson(marineUrl);
   const tideTimes = marineData.hourly?.time ?? [];
   const tideHeights = marineData.hourly?.sea_level_height_msl ?? [];
   const tideExtremes = findTideExtremes(tideTimes, tideHeights);
+  const nowHour = now.toISOString().slice(0, 13) + ':00';
+  const nextHigh = tideExtremes.highs.find(item => item.time >= nowHour) ?? null;
+  const nextLow = tideExtremes.lows.find(item => item.time >= nowHour) ?? null;
 
   // 2. Données météo
   const forecastUrl = apiUrl(FORECAST_BASE_URL, {
@@ -191,7 +199,7 @@ async function buildConditionsForSpot(spot) {
     longitude: spot.lon,
     hourly: 'temperature_2m,weathercode,windspeed_10m,winddirection_10m',
     start_date: dateStr,
-    end_date: dateStr,
+    end_date: endDateStr,
   });
 
   const forecastData = await fetchJson(forecastUrl);
@@ -243,8 +251,8 @@ async function buildConditionsForSpot(spot) {
     tide: {
       currentHeight: tideHeights[nowIndex] ?? null,
       amplitudeMeters: Math.round(tideExtremes.amplitude * 100) / 100,
-      nextHigh: tideExtremes.highs[0] ?? null,
-      nextLow: tideExtremes.lows[0] ?? null,
+      nextHigh,
+      nextLow,
       hourly: tideHourly,
     },
     weather: {

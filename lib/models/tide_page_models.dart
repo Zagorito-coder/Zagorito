@@ -102,6 +102,7 @@ class WindInfo {
 
 class TideData {
   final String location;
+  final DateTime? generatedAt;
   final List<HourlyCard> hourlyCards;
   final List<TidePoint> tidePoints;
   final List<TideEvent> tideEvents;
@@ -117,6 +118,7 @@ class TideData {
 
   const TideData({
     required this.location,
+    this.generatedAt,
     required this.hourlyCards,
     required this.tidePoints,
     required this.tideEvents,

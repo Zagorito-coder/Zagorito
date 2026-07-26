@@ -9,8 +9,8 @@ class TidePoint {
   final DateTime time;
   final double height; // en mètres
   final double windDirectionDeg; // degrés météo (direction d'où vient le vent)
-  final double wavePeriod;       // secondes
-  final double windWaveHeight;   // mètres
+  final double wavePeriod; // secondes
+  final double windWaveHeight; // mètres
   final double? temperatureC;
   final double? windSpeedKmh;
 
@@ -28,11 +28,12 @@ class TidePoint {
 /// Données de marées complètes pour affichage, enrichies avec données astronomiques
 class TideData {
   final List<TidePoint> hourlyPoints;
-  final double low;      // Marée basse (minimum)
-  final double high;     // Marée haute (maximum)
-  final double next;     // Prochaine hauteur prévue
+  final double low; // Marée basse (minimum)
+  final double high; // Marée haute (maximum)
+  final double next; // Prochaine hauteur prévue
   final double waveHeight; // Hauteur significative des vagues (m)
   final String location;
+  final DateTime? generatedAt;
   final AstroData astro; // Phase lune, coef, activité, transit...
 
   const TideData({
@@ -42,6 +43,7 @@ class TideData {
     required this.next,
     required this.waveHeight,
     required this.location,
+    this.generatedAt,
     required this.astro,
   });
 
@@ -54,6 +56,7 @@ class TideData {
       next: 0.0,
       waveHeight: 0.0,
       location: location,
+      generatedAt: null,
       astro: AstroData.fallback(),
     );
   }
