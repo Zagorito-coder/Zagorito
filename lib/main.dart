@@ -10,15 +10,18 @@ import 'package:executor_lib/executor_lib.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'
     show SystemChrome, SystemUiMode, SystemUiOverlayStyle;
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/foundation.dart' show ValueListenable, kDebugMode;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:spots_app/models.dart';
 import 'package:spots_app/models/offline_map_region.dart';
+import 'package:spots_app/models/spot_selection_request.dart';
+import 'package:spots_app/models/user_spot.dart';
 import 'package:spots_app/services/spot_service.dart';
 import 'package:spots_app/services/offline_map_service.dart';
+import 'package:spots_app/services/user_spot_service.dart';
 import 'package:spots_app/models/fish_model.dart';
 import 'package:spots_app/spot_details_panel.dart';
 import 'package:spots_app/spots_canvas_layer.dart';
@@ -26,6 +29,7 @@ import 'package:spots_app/theme.dart';
 import 'package:spots_app/theme_controller.dart';
 import 'package:spots_app/widgets/app_tile_layer.dart';
 import 'package:spots_app/widgets/offline_map_manager_sheet.dart';
+import 'package:spots_app/widgets/user_spot_form_sheet.dart';
 import 'package:spots_app/l10n/app_localizations.dart';
 import 'package:spots_app/splash_bootstrap.dart';
 import 'package:spots_app/widgets/fish_intelligence_modal.dart';
@@ -567,7 +571,17 @@ class _FishRow extends StatelessWidget {
 
 class MapScreen extends StatefulWidget {
   final List<Spot>? initialSpots;
-  const MapScreen({super.key, this.initialSpots});
+  final ValueListenable<int>? addSpotRequests;
+  final ValueListenable<SpotSelectionRequest?>? spotSelectionRequests;
+  final VoidCallback? onOpenMySpots;
+
+  const MapScreen({
+    super.key,
+    this.initialSpots,
+    this.addSpotRequests,
+    this.spotSelectionRequests,
+    this.onOpenMySpots,
+  });
   @override
   State<MapScreen> createState() => _MapScreenState();
 }
@@ -593,6 +607,9 @@ class _MapScreenState extends State<MapScreen>
   double _currentZoom = 6.0;
   bool _isLoadingSpots = true;
   bool _isFishBarVisible = false, _showToolsPanel = false, _isMeasuring = false;
+  bool _isAddingSpot = false;
+  int _lastAddSpotRequest = 0;
+  int _lastSpotSelectionRequest = 0;
   final List<LatLng> _measurePoints = [];
   double _measuredDistanceKm = 0.0;
   MapStyle _mapStyle = MapStyle.satellite;
@@ -626,6 +643,11 @@ class _MapScreenState extends State<MapScreen>
   @override
   void initState() {
     super.initState();
+    _lastAddSpotRequest = widget.addSpotRequests?.value ?? 0;
+    widget.addSpotRequests?.addListener(_handleAddSpotRequest);
+    _lastSpotSelectionRequest =
+        widget.spotSelectionRequests?.value?.serial ?? 0;
+    widget.spotSelectionRequests?.addListener(_handleSpotSelectionRequest);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     if (OfflineMapService.instance.hasActiveMap) {
       _mapStyle = MapStyle.offline;
@@ -637,6 +659,37 @@ class _MapScreenState extends State<MapScreen>
       unawaited(_initLocation());
     });
     // Compass & position stream démarrés uniquement à la demande.
+  }
+
+  @override
+  void didUpdateWidget(covariant MapScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.addSpotRequests != widget.addSpotRequests) {
+      oldWidget.addSpotRequests?.removeListener(_handleAddSpotRequest);
+      _lastAddSpotRequest = widget.addSpotRequests?.value ?? 0;
+      widget.addSpotRequests?.addListener(_handleAddSpotRequest);
+    }
+    if (oldWidget.spotSelectionRequests != widget.spotSelectionRequests) {
+      oldWidget.spotSelectionRequests
+          ?.removeListener(_handleSpotSelectionRequest);
+      _lastSpotSelectionRequest =
+          widget.spotSelectionRequests?.value?.serial ?? 0;
+      widget.spotSelectionRequests?.addListener(_handleSpotSelectionRequest);
+    }
+  }
+
+  void _handleAddSpotRequest() {
+    final request = widget.addSpotRequests?.value ?? 0;
+    if (request == _lastAddSpotRequest) return;
+    _lastAddSpotRequest = request;
+    unawaited(_startAddingSpot());
+  }
+
+  void _handleSpotSelectionRequest() {
+    final request = widget.spotSelectionRequests?.value;
+    if (request == null || request.serial == _lastSpotSelectionRequest) return;
+    _lastSpotSelectionRequest = request.serial;
+    unawaited(_selectSpot(request.spot));
   }
 
   void _toggleCompass() {
@@ -683,6 +736,8 @@ class _MapScreenState extends State<MapScreen>
     _debounceTimer?.cancel();
     _compassSubscription?.cancel();
     _positionSubscription?.cancel();
+    widget.addSpotRequests?.removeListener(_handleAddSpotRequest);
+    widget.spotSelectionRequests?.removeListener(_handleSpotSelectionRequest);
     super.dispose();
   }
 
@@ -815,7 +870,105 @@ class _MapScreenState extends State<MapScreen>
     setState(() => _selectedSpot = null);
   }
 
+  Future<void> _startAddingSpot() async {
+    if (!mounted) return;
+    final auth = context.read<AuthService>();
+    if (auth.uid == null) {
+      final shouldSignIn = await showDialog<bool>(
+            context: context,
+            builder: (dialogContext) => AlertDialog(
+              title: Text(context.tr('mySpots.signInTitle')),
+              content: Text(context.tr('mySpots.signInSubtitle')),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: Text(context.tr('common.cancel')),
+                ),
+                FilledButton.icon(
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                  icon: const Icon(Icons.login_rounded),
+                  label: Text(context.tr('settings.signInGoogle')),
+                ),
+              ],
+            ),
+          ) ??
+          false;
+      if (!shouldSignIn || !mounted) return;
+      final signedIn = await auth.signInWithGoogle();
+      if (!mounted) return;
+      if (!signedIn) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.tr('mySpots.signInError'))),
+        );
+        return;
+      }
+    }
+
+    if (_selectedSpot != null) {
+      context.read<WindAnimationProvider>().disable();
+    }
+    setState(() {
+      _isAddingSpot = true;
+      _showToolsPanel = false;
+      _isFishBarVisible = false;
+      _selectedSpot = null;
+      _isMeasuring = false;
+      _measurePoints.clear();
+      _measuredDistanceKm = 0;
+      _searchQuery = '';
+    });
+    _searchController.clear();
+    FocusScope.of(context).unfocus();
+  }
+
+  Future<void> _selectNewSpotLocation(LatLng point) async {
+    if (!_isAddingSpot || !mounted) return;
+    for (final spot in _spots) {
+      final meters = _distance.as(
+        LengthUnit.Meter,
+        point,
+        LatLng(spot.latitude, spot.longitude),
+      );
+      if (meters <= UserSpot.duplicateRadiusMeters) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.tr('mySpots.duplicateOfficial'))),
+        );
+        return;
+      }
+    }
+
+    setState(() => _isAddingSpot = false);
+    final created = await showUserSpotFormSheet(
+      context: context,
+      latitude: point.latitude,
+      longitude: point.longitude,
+      onSubmit: (draft) async {
+        await UserSpotService.instance.createSpot(
+          latitude: point.latitude,
+          longitude: point.longitude,
+          draft: draft,
+        );
+      },
+    );
+    if (!created || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(context.tr('mySpots.created')),
+        action: widget.onOpenMySpots == null
+            ? null
+            : SnackBarAction(
+                label: context.tr('mySpots.openMine'),
+                onPressed: widget.onOpenMySpots!,
+              ),
+      ),
+    );
+  }
+
   void _onMapTap(TapPosition tp, LatLng point) {
+    if (_isAddingSpot) {
+      unawaited(_selectNewSpotLocation(point));
+      return;
+    }
     final fp = FishProvider.instance;
     if (fp.isFishModalVisible) {
       fp.closeFishModal();
@@ -967,7 +1120,9 @@ class _MapScreenState extends State<MapScreen>
                 visibleSpots: _visibleSpots,
                 mapController: _mapController,
                 selectedSpot: _selectedSpot,
-                onSpotTap: _selectSpot,
+                onSpotTap: _isAddingSpot
+                    ? (spot) => _selectNewSpotLocation(spot.location)
+                    : _selectSpot,
                 onMapTap: (ll) =>
                     _onMapTap(const TapPosition(Offset.zero, Offset.zero), ll),
               ),
@@ -1015,6 +1170,7 @@ class _MapScreenState extends State<MapScreen>
             ],
           ),
           if (_showToolsPanel) _buildToolsPanel(),
+          if (_isAddingSpot) _buildAddSpotModeBanner(),
           if (_isLoadingSpots) const SizedBox.shrink(),
           Positioned(
               bottom: 96 + 16 + 8,
@@ -1125,10 +1281,10 @@ class _MapScreenState extends State<MapScreen>
                   final media = MediaQuery.of(ctx);
                   final isPortrait = media.orientation == Orientation.portrait;
                   final panelHeight =
-                      (media.size.height * (isPortrait ? 0.27 : 0.48))
+                      (media.size.height * (isPortrait ? 0.28 : 0.49))
                           .clamp(
-                            isPortrait ? 200.0 : 180.0,
-                            isPortrait ? 230.0 : 210.0,
+                            isPortrait ? 210.0 : 190.0,
+                            isPortrait ? 240.0 : 220.0,
                           )
                           .toDouble();
                   return Align(
@@ -1222,6 +1378,13 @@ class _MapScreenState extends State<MapScreen>
                           fontSize: 14)),
                   const Divider(height: 16),
                   _toolItem(
+                    icon: Icons.add_location_alt_rounded,
+                    label: context.tr('mySpots.addTitle'),
+                    color: tc.oceanMedium,
+                    onTap: () => unawaited(_startAddingSpot()),
+                  ),
+                  const SizedBox(height: 10),
+                  _toolItem(
                       icon: _isMeasuring ? Icons.stop : Icons.straighten,
                       label: _isMeasuring
                           ? context.tr('map.stopMeasure')
@@ -1304,6 +1467,65 @@ class _MapScreenState extends State<MapScreen>
                       color: tc.textPrimary,
                       onTap: () => unawaited(_openOfflineMaps())),
                 ])));
+  }
+
+  Widget _buildAddSpotModeBanner() {
+    final tc = ThemeColors.of(context);
+    return Positioned(
+      top: MediaQuery.paddingOf(context).top + (_isCompassEnabled ? 92 : 12),
+      left: 14,
+      right: 76,
+      child: Material(
+        color: tc.surface.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(8),
+        elevation: 7,
+        shadowColor: tc.shadowColor,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 54),
+          padding: const EdgeInsets.fromLTRB(10, 7, 4, 7),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: tc.oceanMedium.withValues(alpha: 0.6),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: tc.oceanMedium.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: Icon(
+                  Icons.touch_app_rounded,
+                  color: tc.oceanMedium,
+                  size: 21,
+                ),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  context.tr('mySpots.tapLocation'),
+                  style: TextStyle(
+                    color: tc.textPrimary,
+                    fontSize: 12,
+                    height: 1.25,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: context.tr('common.cancel'),
+                onPressed: () => setState(() => _isAddingSpot = false),
+                icon: const Icon(Icons.close_rounded, size: 20),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _openOfflineMaps() async {

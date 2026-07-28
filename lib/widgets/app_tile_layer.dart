@@ -11,10 +11,12 @@ enum MapStyle { standard, satellite, dark, offline }
 /// Couche reseau sans telechargement hors-ligne.
 class AppTileLayer extends StatefulWidget {
   final MapStyle style;
+  final TileProvider Function()? networkTileProviderFactory;
 
   const AppTileLayer({
     super.key,
     this.style = MapStyle.standard,
+    this.networkTileProviderFactory,
   });
 
   @override
@@ -23,9 +25,25 @@ class AppTileLayer extends StatefulWidget {
 
 class _AppTileLayerState extends State<AppTileLayer> {
   static const _userAgentPackageName = 'com.zagorito.spots_app';
-  late final TileProvider _tileProvider = NetworkTileProvider(
-    cachingProvider: const DisabledMapCachingProvider(),
-  );
+  TileProvider? _networkTileProvider;
+
+  TileProvider get _tileProvider {
+    return _networkTileProvider ??= widget.networkTileProviderFactory?.call() ??
+        NetworkTileProvider(
+          cachingProvider: const DisabledMapCachingProvider(),
+        );
+  }
+
+  @override
+  void didUpdateWidget(covariant AppTileLayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.style != MapStyle.offline &&
+        widget.style == MapStyle.offline) {
+      // TileLayer disposes its provider when the raster layer is removed.
+      // Drop our reference so returning online creates a fresh HTTP client.
+      _networkTileProvider = null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

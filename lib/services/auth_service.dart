@@ -14,6 +14,8 @@ import 'package:google_sign_in/google_sign_in.dart' as gsi;
 import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:spots_app/services/user_spot_service.dart';
+import 'package:spots_app/services/favorite_spot_service.dart';
 
 class LocalUser {
   final String displayName;
@@ -210,15 +212,20 @@ class AuthService extends ChangeNotifier {
       return false;
     }
 
-    // 1. Supprimer les données contrôlées par l'utilisateur. Les règles
-    // autorisent uniquement ce delete, jamais les créations/modifications.
+    // 1. Supprimer les spots privés, propositions, photos et ancien droit
+    // d'abonnement avant de supprimer l'identité Firebase.
     try {
+      await UserSpotService.instance.deleteAllForCurrentUser();
+      await FavoriteSpotService.instance.deleteAllForCurrentUser();
       await FirebaseFirestore.instance
           .collection('subscriptions')
           .doc(user.uid)
           .delete();
     } on FirebaseException catch (e) {
       debugPrint('[AuthService] Suppression Firestore échouée: ${e.code}');
+      return false;
+    } catch (e) {
+      debugPrint('[AuthService] Nettoyage des données échoué: $e');
       return false;
     }
 

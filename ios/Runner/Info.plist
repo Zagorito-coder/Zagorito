@@ -4,6 +4,10 @@
 <dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Cette application utilise votre position pour afficher les spots de pêche à proximité.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>BoosterFish utilise la photo choisie pour illustrer votre spot de pêche.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>BoosterFish utilise l’appareil photo pour illustrer votre spot de pêche.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

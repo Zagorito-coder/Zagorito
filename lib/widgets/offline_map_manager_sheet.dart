@@ -194,7 +194,7 @@ class _OfflineMapManagerSheetState extends State<OfflineMapManagerSheet> {
                         const Spacer(),
                         Text(
                           '${_service.installedRegionIds.length}/'
-                          '${_service.regions.length}',
+                          '${OfflineMapInstallPolicy.maximumInstalledRegions}',
                           style: TextStyle(
                             color: tc.oceanMedium,
                             fontSize: 11,
@@ -213,6 +213,32 @@ class _OfflineMapManagerSheetState extends State<OfflineMapManagerSheet> {
                       ],
                     ),
                   ),
+                  if (_service.installedRegionIds.isNotEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.fromLTRB(18, 8, 18, 8),
+                      color: tc.oceanMedium.withValues(alpha: 0.06),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline_rounded,
+                            color: tc.oceanMedium,
+                            size: 17,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              context.tr('offlineMaps.limitReached'),
+                              style: TextStyle(
+                                color: tc.textSecondary,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   Expanded(child: _buildContent(context, tc)),
                 ],
               ),
@@ -293,6 +319,7 @@ class _OfflineMapManagerSheetState extends State<OfflineMapManagerSheet> {
     final installed = _service.isInstalled(region);
     final active = _service.activeRegionId == region.id;
     final downloading = _service.downloadingRegionId == region.id;
+    final downloadBlocked = !installed && !_service.canDownload(region);
     final locale = Localizations.localeOf(context).languageCode;
 
     return AnimatedContainer(
@@ -412,11 +439,22 @@ class _OfflineMapManagerSheetState extends State<OfflineMapManagerSheet> {
           ] else
             _actionButton(
               tc: tc,
-              tooltip: context.tr('offlineMaps.download'),
-              icon: Icons.download_rounded,
+              tooltip: context.tr(
+                downloadBlocked
+                    ? 'offlineMaps.limitReached'
+                    : 'offlineMaps.download',
+              ),
+              icon: downloadBlocked
+                  ? Icons.lock_outline_rounded
+                  : Icons.download_rounded,
               color: tc.oceanMedium,
               onPressed: _service.downloadingRegionId == null
-                  ? () => _download(region)
+                  ? downloadBlocked
+                      ? () => _showError(
+                            context,
+                            'offlineMaps.limitReached',
+                          )
+                      : () => _download(region)
                   : null,
             ),
         ],
@@ -535,6 +573,7 @@ class _OfflineMapManagerSheetState extends State<OfflineMapManagerSheet> {
       OfflineMapFailure.downloadFailed => 'offlineMaps.downloadFailed',
       OfflineMapFailure.checksumMismatch => 'offlineMaps.checksumMismatch',
       OfflineMapFailure.invalidArchive => 'offlineMaps.invalidArchive',
+      OfflineMapFailure.installLimitReached => 'offlineMaps.limitReached',
     };
   }
 

@@ -17,6 +17,7 @@ enum OfflineMapFailure {
   downloadFailed,
   checksumMismatch,
   invalidArchive,
+  installLimitReached,
 }
 
 class OfflineMapException implements Exception {
@@ -145,10 +146,22 @@ class OfflineMapService extends ChangeNotifier {
     return _installedRegionIds.contains(region.id);
   }
 
+  bool canDownload(OfflineMapRegion region) {
+    return OfflineMapInstallPolicy.canInstall(
+      installedRegionIds: _installedRegionIds,
+      requestedRegionId: region.id,
+    );
+  }
+
   Future<void> download(OfflineMapRegion region) async {
     await initialize();
     if (!region.isAllowed) {
       throw const OfflineMapException(OfflineMapFailure.invalidCatalog);
+    }
+    if (!canDownload(region)) {
+      throw const OfflineMapException(
+        OfflineMapFailure.installLimitReached,
+      );
     }
     final baseUri = _baseUri;
     if (baseUri == null) {

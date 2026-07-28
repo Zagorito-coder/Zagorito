@@ -1,6 +1,143 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function hasValidSpotFields() {
+      return request.resource.data.keys().hasOnly([
+        'schemaVersion',
+        'ownerUid',
+        'name',
+        'latitude',
+        'longitude',
+        'locationKey',
+        'notes',
+        'dangerNotes',
+        'photoUrl',
+        'photoObjectKey',
+        'status',
+        'moderationNote',
+        'createdAt',
+        'updatedAt'
+      ]);
+    }
+
+    function hasValidPhoto() {
+      return request.resource.data.photoUrl is string
+        && request.resource.data.photoObjectKey is string
+        && request.resource.data.photoUrl.size() <= 1024
+        && request.resource.data.photoObjectKey.size() <= 96
+        && (
+          (
+            request.resource.data.photoUrl == ''
+            && request.resource.data.photoObjectKey == ''
+          )
+          || (
+            request.resource.data.photoUrl.matches(
+              '^https://boosterfish-offline-maps\\.boosterfish-maps\\.workers\\.dev/spot-photos/[A-Za-z0-9_-]{20,96}(\\?v=[0-9]+)?$'
+            )
+            && request.resource.data.photoObjectKey.matches(
+              '^[A-Za-z0-9_-]{20,96}$'
+            )
+          )
+        );
+    }
+
+    function hasValidSpotData(ownerUid) {
+      return hasValidSpotFields()
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.ownerUid == ownerUid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 80
+        && request.resource.data.latitude is number
+        && request.resource.data.latitude >= -85
+        && request.resource.data.latitude <= 85
+        && request.resource.data.longitude is number
+        && request.resource.data.longitude >= -180
+        && request.resource.data.longitude <= 180
+        && request.resource.data.locationKey is string
+        && request.resource.data.locationKey.size() >= 7
+        && request.resource.data.locationKey.size() <= 32
+        && request.resource.data.notes is string
+        && request.resource.data.notes.size() <= 1000
+        && request.resource.data.dangerNotes is string
+        && request.resource.data.dangerNotes.size() <= 500
+        && (
+          !request.resource.data.keys().hasAny(['moderationNote'])
+          || (
+            request.resource.data.moderationNote is string
+            && request.resource.data.moderationNote.size() <= 500
+          )
+        )
+        && hasValidPhoto()
+        && request.resource.data.status in ['pending', 'approved', 'rejected']
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp;
+    }
+
+    function keepsImmutableLocation() {
+      return request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.latitude == resource.data.latitude
+        && request.resource.data.longitude == resource.data.longitude
+        && request.resource.data.locationKey == resource.data.locationKey
+        && request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    function hasValidOwnerStatusChange() {
+      return request.resource.data.status == resource.data.status
+        || (
+          resource.data.status in ['pending', 'rejected']
+          && request.resource.data.status == 'pending'
+        );
+    }
+
+    function hasValidFavoriteData(ownerUid) {
+      return request.resource.data.keys().hasOnly([
+          'schemaVersion',
+          'ownerUid',
+          'spotId',
+          'name',
+          'latitude',
+          'longitude',
+          'type',
+          'fishTypes',
+          'notes',
+          'createdAt'
+        ])
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.ownerUid == ownerUid
+        && request.resource.data.spotId is string
+        && request.resource.data.spotId.size() > 0
+        && request.resource.data.spotId.size() <= 256
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 300
+        && request.resource.data.latitude is number
+        && request.resource.data.latitude >= -85
+        && request.resource.data.latitude <= 85
+        && request.resource.data.longitude is number
+        && request.resource.data.longitude >= -180
+        && request.resource.data.longitude <= 180
+        && request.resource.data.type in [
+          'sandyBeach',
+          'rockySpot',
+          'cliffTop',
+          'mixedSandRock',
+          'remoteSpot'
+        ]
+        && request.resource.data.fishTypes is list
+        && request.resource.data.fishTypes.size() <= 50
+        && request.resource.data.notes is string
+        && request.resource.data.notes.size() <= 2000
+        && request.resource.data.createdAt is timestamp;
+    }
 
     // Monétisation désactivée : aucun client ne doit pouvoir créer ou modifier
     // un droit Premium. La suppression par le propriétaire est conservée pour
@@ -33,6 +170,47 @@ service cloud.firestore {
     match /conditions/{document} {
       allow read: if true;
       allow write: if false;
+    }
+
+    // Chaque spot personnel reste privé dans le sous-espace du compte Google.
+    // Les coordonnées y sont stockées pour la synchronisation, mais aucun autre
+    // utilisateur ne peut lire, modifier ou supprimer ces documents.
+    match /users/{userId}/spots/{spotId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId)
+        && hasValidSpotData(userId)
+        && request.resource.data.status == 'pending';
+      allow update: if isOwner(userId)
+        && hasValidSpotData(userId)
+        && keepsImmutableLocation()
+        && hasValidOwnerStatusChange();
+      allow delete: if isOwner(userId);
+    }
+
+    // Favoris officiels privés, synchronisés avec le compte Google.
+    match /users/{userId}/favorites/{favoriteId} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && hasValidFavoriteData(userId);
+    }
+
+    // File privée de modération. Le propriétaire peut suivre sa proposition
+    // et corriger une proposition en attente/refusée. Il ne peut jamais
+    // s'auto-valider ni modifier une proposition déjà approuvée.
+    match /spot_submissions/{spotId} {
+      allow read: if isSignedIn()
+        && resource.data.ownerUid == request.auth.uid;
+      allow create: if isSignedIn()
+        && hasValidSpotData(request.auth.uid)
+        && request.resource.data.status == 'pending';
+      allow update: if isSignedIn()
+        && resource.data.ownerUid == request.auth.uid
+        && resource.data.status in ['pending', 'rejected']
+        && hasValidSpotData(request.auth.uid)
+        && keepsImmutableLocation()
+        && request.resource.data.status == 'pending';
+      allow delete: if isSignedIn()
+        && resource.data.ownerUid == request.auth.uid;
     }
 
   }

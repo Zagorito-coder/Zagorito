@@ -26,6 +26,38 @@ Map<String, dynamic> _region({
 }
 
 void main() {
+  group('limite des cartes hors ligne', () {
+    test('autorise la premiere carte', () {
+      expect(
+        OfflineMapInstallPolicy.canInstall(
+          installedRegionIds: const {},
+          requestedRegionId: 'ma',
+        ),
+        isTrue,
+      );
+    });
+
+    test('refuse une autre carte tant que la premiere est installee', () {
+      expect(
+        OfflineMapInstallPolicy.canInstall(
+          installedRegionIds: const {'ma'},
+          requestedRegionId: 'tn',
+        ),
+        isFalse,
+      );
+    });
+
+    test('autorise la carte deja installee', () {
+      expect(
+        OfflineMapInstallPolicy.canInstall(
+          installedRegionIds: const {'ma'},
+          requestedRegionId: 'ma',
+        ),
+        isTrue,
+      );
+    });
+  });
+
   test('le catalogue exclut toujours les packs europeens', () {
     final catalog = OfflineMapCatalog.fromJson({
       'schemaVersion': 1,

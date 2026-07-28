@@ -11,6 +11,7 @@ import 'package:spots_app/theme.dart';
 import 'package:spots_app/theme_controller.dart';
 import 'package:spots_app/l10n/app_localizations.dart';
 import 'package:spots_app/pages/home_page.dart';
+import 'package:spots_app/pages/my_spots_page.dart';
 import 'package:spots_app/pages/species_page.dart';
 import 'package:spots_app/pages/settings_page.dart';
 import 'package:spots_app/pages/spot_finder_page.dart';
@@ -20,6 +21,7 @@ import 'package:spots_app/pages/shops_page.dart';
 import 'package:spots_app/pages/tide_page.dart';
 import 'package:spots_app/pages/forecast_page.dart';
 import 'package:spots_app/models.dart';
+import 'package:spots_app/models/spot_selection_request.dart';
 import 'package:spots_app/services/ad_service.dart';
 import 'package:spots_app/widgets/adaptive_banner_ad.dart';
 
@@ -39,11 +41,16 @@ class AppShellState extends State<AppShell> {
   int _currentIndex = 3;
 
   late final List<Widget?> _pages;
+  late final ValueNotifier<int> _addSpotRequests;
+  late final ValueNotifier<SpotSelectionRequest?> _spotSelectionRequests;
+  int _spotSelectionSerial = 0;
   bool _showAds = false;
 
   @override
   void initState() {
     super.initState();
+    _addSpotRequests = ValueNotifier<int>(0);
+    _spotSelectionRequests = ValueNotifier<SpotSelectionRequest?>(null);
     _pages = List<Widget?>.filled(5, null);
     _pages[_currentIndex] = _buildPage(_currentIndex);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -59,8 +66,16 @@ class AppShellState extends State<AppShell> {
     return switch (index) {
       0 => HomePageWrapper(initialSpots: widget.initialSpots),
       1 => const SpeciesPageWrapper(),
-      2 => const AddSpotPlaceholder(),
-      3 => SpotFinderPage(initialSpots: widget.initialSpots),
+      2 => MySpotsPage(
+          onAddSpot: openSpotCreation,
+          onOpenFavorite: openFavoriteSpot,
+        ),
+      3 => SpotFinderPage(
+          initialSpots: widget.initialSpots,
+          addSpotRequests: _addSpotRequests,
+          spotSelectionRequests: _spotSelectionRequests,
+          onOpenMySpots: () => navigateTo(2),
+        ),
       4 => const SettingsPageWrapper(),
       _ => const SizedBox.shrink(),
     };
@@ -73,6 +88,30 @@ class AppShellState extends State<AppShell> {
       _pages[index] ??= _buildPage(index);
       _currentIndex = index;
     });
+  }
+
+  void openSpotCreation() {
+    navigateTo(3);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _addSpotRequests.value += 1;
+    });
+  }
+
+  void openFavoriteSpot(Spot spot) {
+    navigateTo(3);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _spotSelectionRequests.value = SpotSelectionRequest(
+        serial: ++_spotSelectionSerial,
+        spot: spot,
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _addSpotRequests.dispose();
+    _spotSelectionRequests.dispose();
+    super.dispose();
   }
 
   @override
@@ -451,52 +490,5 @@ class SettingsPageWrapper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const SettingsPage();
-  }
-}
-
-class AddSpotPlaceholder extends StatelessWidget {
-  const AddSpotPlaceholder({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: ThemeController.instance,
-      builder: (context, child) {
-        final tc = ThemeColors.of(context);
-
-        return Scaffold(
-          backgroundColor: tc.background,
-          body: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: tc.surface,
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Icon(
-                    Icons.add_location_alt,
-                    size: 48,
-                    color: tc.oceanMedium,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'Ajouter un Spot',
-                  style: AppTextStyles.headlineMedium(context),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Fonctionnalité à venir...',
-                  style: AppTextStyles.bodyMedium(context),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
   }
 }

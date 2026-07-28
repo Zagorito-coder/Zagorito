@@ -36,8 +36,8 @@ migrate_working_dir/
 # Offline map binaries are generated and hosted outside the APK repository.
 *.pmtiles
 
-# Local Cloudflare CLI account cache
-/.wrangler/
+# Local Cloudflare CLI account caches
+**/.wrangler/
 
 # Generated Flutter golden-test diagnostics
 /test/failures/

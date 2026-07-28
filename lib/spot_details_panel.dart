@@ -9,8 +9,11 @@ import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
+import 'package:spots_app/l10n/app_localizations.dart';
 import 'package:spots_app/models.dart';
 import 'package:spots_app/models/fishing_shop.dart';
+import 'package:spots_app/services/auth_service.dart';
+import 'package:spots_app/services/favorite_spot_service.dart';
 import 'package:spots_app/services/shop_service.dart';
 import 'package:spots_app/theme.dart';
 import 'package:spots_app/providers/wind_animation_provider.dart';
@@ -126,7 +129,7 @@ class SpotDetailsPanel extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final dense = constraints.maxHeight < 195;
+        final dense = constraints.maxHeight < 220;
         return RepaintBoundary(
           child: Container(
             padding: dense
@@ -169,27 +172,23 @@ class SpotDetailsPanel extends StatelessWidget {
               children: [
                 _buildCompactHeader(context, spotColor, dense: dense),
                 SizedBox(height: dense ? 3 : 4),
-                Expanded(
+                SizedBox(
+                  height: dense ? 46 : 50,
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Expanded(
-                        flex: 23,
                         child: _buildSpeciesDashboard(context),
                       ),
                       const SizedBox(width: 6),
                       Expanded(
-                        flex: 39,
-                        child: _buildWindSection(context),
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        flex: 32,
-                        child: _buildSpotActions(context),
+                        child: _buildSpotActions(context, dense: dense),
                       ),
                     ],
                   ),
                 ),
+                SizedBox(height: dense ? 4 : 5),
+                Expanded(child: _buildWindSection(context)),
                 OpenMeteoAttribution(
                   padding: dense
                       ? const EdgeInsets.fromLTRB(2, 0, 2, 0)
@@ -212,7 +211,7 @@ class SpotDetailsPanel extends StatelessWidget {
   }) {
     final tc = ThemeColors.of(context);
     return SizedBox(
-      height: dense ? 30 : 34,
+      height: dense ? 38 : 40,
       child: Row(
         children: [
           Container(
@@ -244,7 +243,7 @@ class SpotDetailsPanel extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: tc.textPrimary,
-                    fontSize: dense ? 12.5 : 13.5,
+                    fontSize: dense ? 13.5 : 14.5,
                     height: 1,
                     fontWeight: FontWeight.w800,
                   ),
@@ -273,6 +272,8 @@ class SpotDetailsPanel extends StatelessWidget {
             ),
           ),
           SizedBox(width: dense ? 4 : 5),
+          _FavoriteButton(spot: spot, dense: dense),
+          SizedBox(width: dense ? 2 : 3),
           Semantics(
             button: true,
             label: 'Fermer les détails du spot',
@@ -311,7 +312,7 @@ class SpotDetailsPanel extends StatelessWidget {
               child: Text(
                 'Non renseignées',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: tc.textMuted, fontSize: 8.5),
+                style: TextStyle(color: tc.textMuted, fontSize: 9.5),
               ),
             )
           : ListView.separated(
@@ -335,7 +336,7 @@ class SpotDetailsPanel extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: tc.textPrimary.withValues(alpha: 0.88),
-                          fontSize: 9,
+                          fontSize: 10,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -347,14 +348,16 @@ class SpotDetailsPanel extends StatelessWidget {
     );
   }
 
-  Widget _buildSpotActions(BuildContext context) {
+  Widget _buildSpotActions(
+    BuildContext context, {
+    required bool dense,
+  }) {
     final tc = ThemeColors.of(context);
     return _DashboardSection(
       title: 'INFORMATIONS',
       icon: Icons.info_outline_rounded,
       accent: tc.oceanLight,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Row(
         children: [
           Expanded(
             child: Row(
@@ -373,7 +376,7 @@ class SpotDetailsPanel extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: tc.textSecondary,
-                      fontSize: 8.5,
+                      fontSize: 9.5,
                       height: 1.22,
                       fontWeight: FontWeight.w500,
                     ),
@@ -382,7 +385,7 @@ class SpotDetailsPanel extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(width: 4),
           Semantics(
             button: true,
             label: 'Ouvrir ce spot dans Google Maps',
@@ -392,8 +395,9 @@ class SpotDetailsPanel extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
                 onTap: () => _launchUrl(_googleMapsUrl),
                 child: Container(
+                  width: dense ? 52 : 58,
                   height: 27,
-                  padding: const EdgeInsets.symmetric(horizontal: 5),
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
                   decoration: BoxDecoration(
                     color: const Color(0xFF4285F4).withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(8),
@@ -410,10 +414,10 @@ class SpotDetailsPanel extends StatelessWidget {
                         color: Color(0xFF4285F4),
                         size: 14,
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 3),
                       Flexible(
                         child: Text(
-                          'Google Maps',
+                          'Maps',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -421,7 +425,7 @@ class SpotDetailsPanel extends StatelessWidget {
                                 Theme.of(context).brightness == Brightness.dark
                                     ? const Color(0xFF63C7FF)
                                     : const Color(0xFF176BCB),
-                            fontSize: 9,
+                            fontSize: 9.5,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
@@ -447,6 +451,11 @@ class SpotDetailsPanel extends StatelessWidget {
       height: dense ? 36 : 40,
       child: Row(
         children: [
+          _NearestShopCard(
+            key: ValueKey('nearest-shop-${spot.id}'),
+            spot: spot,
+          ),
+          if (nearbySpots.isNotEmpty) const SizedBox(width: 5),
           SizedBox(
             width: dense ? 56 : 60,
             child: Row(
@@ -462,7 +471,7 @@ class SpotDetailsPanel extends StatelessWidget {
                     'SPOTS\nVOISINS',
                     style: TextStyle(
                       color: tc.textSecondary,
-                      fontSize: dense ? 7 : 7.5,
+                      fontSize: dense ? 8 : 8.5,
                       height: 1.08,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 0.5,
@@ -471,10 +480,6 @@ class SpotDetailsPanel extends StatelessWidget {
                 ),
               ],
             ),
-          ),
-          _NearestShopCard(
-            key: ValueKey('nearest-shop-${spot.id}'),
-            spot: spot,
           ),
           if (nearbySpots.isNotEmpty) const SizedBox(width: 5),
           Expanded(
@@ -571,30 +576,44 @@ class SpotDetailsPanel extends StatelessWidget {
         ? slots[wind.selectedHourIndex]
         : null;
 
-    return _DashboardSection(
-      title: 'VENT',
-      icon: Icons.air_rounded,
-      accent: windColor,
+    return Container(
+      padding: const EdgeInsets.fromLTRB(5, 4, 5, 3),
+      decoration: BoxDecoration(
+        color: tc.textPrimary.withValues(alpha: 0.032),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: windColor.withValues(alpha: 0.30),
+          width: 0.65,
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              Expanded(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    '${(vector.speedKt * 1.852).toStringAsFixed(1)} km/h',
-                    style: TextStyle(
-                      color: tc.textPrimary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
+              Icon(Icons.air_rounded, color: windColor, size: 11),
+              const SizedBox(width: 3),
+              Text(
+                'VENT',
+                style: TextStyle(
+                  color: windColor,
+                  fontSize: 8,
+                  height: 1,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.55,
                 ),
               ),
-              const SizedBox(width: 4),
+              const Spacer(),
+              Text(
+                '${(vector.speedKt * 1.852).toStringAsFixed(1)} km/h',
+                style: TextStyle(
+                  color: tc.textPrimary,
+                  fontSize: 15,
+                  height: 1,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(width: 5),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                 decoration: BoxDecoration(
@@ -611,19 +630,21 @@ class SpotDetailsPanel extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: windColor,
-                    fontSize: 8,
+                    fontSize: 9,
+                    height: 1,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
               if (selectedSlot != null)
                 Padding(
-                  padding: const EdgeInsets.only(left: 4),
+                  padding: const EdgeInsets.only(left: 5),
                   child: Text(
                     '${selectedSlot.dateTime.hour}h',
                     style: TextStyle(
                       color: windColor,
-                      fontSize: 8.5,
+                      fontSize: 10,
+                      height: 1,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -631,11 +652,10 @@ class SpotDetailsPanel extends StatelessWidget {
             ],
           ),
           if (displayCount > 1) ...[
-            const SizedBox(height: 5),
+            const SizedBox(height: 3),
             SizedBox(
-              height: 13,
+              height: 14,
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: sortedHours.map((h) {
                   final isActive = h == selectedHour;
                   return Expanded(
@@ -651,9 +671,10 @@ class SpotDetailsPanel extends StatelessWidget {
                           maxLines: 1,
                           style: TextStyle(
                             color: isActive ? windColor : tc.textMuted,
-                            fontSize: isActive ? 7 : 6.5,
+                            fontSize: isActive ? 11 : 10.5,
+                            height: 1,
                             fontWeight:
-                                isActive ? FontWeight.w800 : FontWeight.w500,
+                                isActive ? FontWeight.w800 : FontWeight.w600,
                           ),
                         ),
                       ),
@@ -665,9 +686,9 @@ class SpotDetailsPanel extends StatelessWidget {
             Expanded(
               child: SliderTheme(
                 data: SliderThemeData(
-                  trackHeight: 2,
+                  trackHeight: 3,
                   thumbShape:
-                      const RoundSliderThumbShape(enabledThumbRadius: 5),
+                      const RoundSliderThumbShape(enabledThumbRadius: 6),
                   overlayShape:
                       const RoundSliderOverlayShape(overlayRadius: 10),
                   activeTrackColor: windColor,
@@ -715,7 +736,7 @@ class SpotDetailsPanel extends StatelessWidget {
             : Text(
                 'Données indisponibles',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: tc.textMuted, fontSize: 8.5),
+                style: TextStyle(color: tc.textMuted, fontSize: 9.5),
               ),
       ),
     );
@@ -731,6 +752,142 @@ class SpotDetailsPanel extends StatelessWidget {
     final distNearby = distance.as(LengthUnit.Kilometer, currentLatLng,
         LatLng(nearbySpot.latitude, nearbySpot.longitude));
     return distNearby < distCurrent;
+  }
+}
+
+class _FavoriteButton extends StatefulWidget {
+  const _FavoriteButton({required this.spot, required this.dense});
+
+  final Spot spot;
+  final bool dense;
+
+  @override
+  State<_FavoriteButton> createState() => _FavoriteButtonState();
+}
+
+class _FavoriteButtonState extends State<_FavoriteButton> {
+  bool _isSaving = false;
+
+  Future<void> _toggle({required bool isFavorite}) async {
+    if (_isSaving) return;
+    final auth = context.read<AuthService>();
+    if (auth.uid == null) {
+      final shouldSignIn = await showDialog<bool>(
+            context: context,
+            builder: (dialogContext) => AlertDialog(
+              title: Text(context.tr('mySpots.signInTitle')),
+              content: Text(context.tr('mySpots.favoriteSignIn')),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: Text(context.tr('common.cancel')),
+                ),
+                FilledButton.icon(
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                  icon: const Icon(Icons.login_rounded),
+                  label: Text(context.tr('settings.signInGoogle')),
+                ),
+              ],
+            ),
+          ) ??
+          false;
+      if (!shouldSignIn || !mounted) return;
+      final signedIn = await auth.signInWithGoogle();
+      if (!signedIn || !mounted) return;
+    }
+
+    setState(() => _isSaving = true);
+    try {
+      if (isFavorite) {
+        await FavoriteSpotService.instance.remove(widget.spot.id);
+      } else {
+        await FavoriteSpotService.instance.add(widget.spot);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              context.tr(
+                isFavorite
+                    ? 'mySpots.favoriteRemoved'
+                    : 'mySpots.favoriteAdded',
+              ),
+            ),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.tr('mySpots.favoriteError'))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
+    return Consumer<AuthService>(
+      builder: (context, auth, _) {
+        final uid = auth.uid;
+        if (uid == null) {
+          return _button(context, tc, isFavorite: false);
+        }
+        return StreamBuilder<bool>(
+          stream:
+              FavoriteSpotService.instance.watchIsFavorite(uid, widget.spot.id),
+          builder: (context, snapshot) {
+            return _button(
+              context,
+              tc,
+              isFavorite: snapshot.data ?? false,
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _button(
+    BuildContext context,
+    ThemeColors tc, {
+    required bool isFavorite,
+  }) {
+    final size = widget.dense ? 28.0 : 31.0;
+    return Tooltip(
+      message: context.tr(
+        isFavorite ? 'mySpots.removeFavorite' : 'mySpots.addFavorite',
+      ),
+      child: Material(
+        color: tc.textPrimary.withValues(alpha: 0.055),
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: _isSaving ? null : () => _toggle(isFavorite: isFavorite),
+          child: SizedBox.square(
+            dimension: size,
+            child: _isSaving
+                ? Padding(
+                    padding: const EdgeInsets.all(7),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: tc.oceanMedium,
+                    ),
+                  )
+                : Icon(
+                    isFavorite
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                    color: isFavorite ? tc.error : tc.textSecondary,
+                    size: widget.dense ? 17 : 18,
+                  ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -852,7 +1009,7 @@ class _NearestShopCardState extends State<_NearestShopCard> {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 color: tc.textSecondary,
-                                fontSize: 7.5,
+                                fontSize: 8.5,
                                 height: 1.1,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -864,7 +1021,7 @@ class _NearestShopCardState extends State<_NearestShopCard> {
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     color: tc.textMuted,
-                                    fontSize: 7.5,
+                                    fontSize: 8.5,
                                     height: 1.1,
                                     fontWeight: FontWeight.w700,
                                   ),
@@ -879,7 +1036,7 @@ class _NearestShopCardState extends State<_NearestShopCard> {
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         color: tc.textPrimary,
-                                        fontSize: 8,
+                                        fontSize: 9,
                                         height: 1.05,
                                         fontWeight: FontWeight.w700,
                                       ),
@@ -891,7 +1048,7 @@ class _NearestShopCardState extends State<_NearestShopCard> {
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         color: tc.warning,
-                                        fontSize: 7.5,
+                                        fontSize: 8.5,
                                         height: 1,
                                         fontWeight: FontWeight.w700,
                                       ),
@@ -988,7 +1145,7 @@ class _NearbySpotCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: tc.textPrimary,
-                          fontSize: 8,
+                          fontSize: 9,
                           height: 1.05,
                           fontWeight: FontWeight.w700,
                         ),
@@ -1000,7 +1157,7 @@ class _NearbySpotCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: isCloser ? tc.success : tc.textMuted,
-                          fontSize: 7.5,
+                          fontSize: 8.5,
                           height: 1,
                           fontWeight: FontWeight.w600,
                         ),
@@ -1036,7 +1193,7 @@ class _DashboardTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 17,
+      height: 19,
       padding: const EdgeInsets.symmetric(horizontal: 5),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.09),
@@ -1058,7 +1215,7 @@ class _DashboardTag extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: color,
-                fontSize: 7.5,
+                fontSize: 8.5,
                 height: 1,
                 fontWeight: FontWeight.w700,
               ),
@@ -1110,7 +1267,7 @@ class _DashboardSection extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: accent,
-                    fontSize: 7,
+                    fontSize: 8,
                     height: 1,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.55,

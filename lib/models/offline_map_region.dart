@@ -14,6 +14,18 @@ enum OfflineMapContinent {
   }
 }
 
+abstract final class OfflineMapInstallPolicy {
+  static const maximumInstalledRegions = 1;
+
+  static bool canInstall({
+    required Set<String> installedRegionIds,
+    required String requestedRegionId,
+  }) {
+    return installedRegionIds.contains(requestedRegionId) ||
+        installedRegionIds.length < maximumInstalledRegions;
+  }
+}
+
 class OfflineMapRegion {
   const OfflineMapRegion({
     required this.id,

@@ -8,6 +8,10 @@
     {
       "binding": "OFFLINE_MAPS",
       "bucket_name": "boosterfish-offline-maps"
+    },
+    {
+      "binding": "SPOT_PHOTOS",
+      "bucket_name": "boosterfish-spot-photos"
     }
   ]
 }
