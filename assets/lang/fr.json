@@ -16,6 +16,7 @@
     "ready": "Prêt !",
     "startupError": "Erreur de démarrage",
     "startupErrorMessage": "Le démarrage a échoué. Vérifiez votre connexion puis réessayez.",
+    "installationErrorMessage": "Cette installation est incomplète. Réinstallez l’application avec l’APK officiel.",
     "retry": "Réessayer"
   },
   "drawer": {
@@ -286,6 +287,24 @@
     "rising": "montante",
     "falling": "descendante",
     "ngf": "{height}m NGF"
+  },
+  "offlineMaps": {
+    "title": "Cartes hors ligne",
+    "manage": "Gérer les cartes",
+    "offlineStyle": "Hors ligne",
+    "refresh": "Actualiser",
+    "storageUsed": "Stockage utilisé",
+    "download": "Télécharger",
+    "activate": "Activer",
+    "active": "Carte active",
+    "deleteTitle": "Supprimer la carte",
+    "deleteConfirm": "Supprimer cette carte du téléphone ?",
+    "notConfigured": "Le serveur des cartes hors ligne n'est pas encore configuré pour cette version.",
+    "catalogUnavailable": "Le catalogue des cartes est temporairement indisponible.",
+    "invalidCatalog": "Le catalogue des cartes n'est pas valide.",
+    "downloadFailed": "Le téléchargement a échoué. Vous pourrez le reprendre.",
+    "checksumMismatch": "Le fichier téléchargé est corrompu et a été supprimé.",
+    "invalidArchive": "Cette carte hors ligne n'est pas valide."
   },
   "common": {
     "ok": "OK",

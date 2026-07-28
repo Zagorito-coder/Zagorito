@@ -33,6 +33,15 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Offline map binaries are generated and hosted outside the APK repository.
+*.pmtiles
+
+# Local Cloudflare CLI account cache
+/.wrangler/
+
+# Generated Flutter golden-test diagnostics
+/test/failures/
+
 # Symbolication related
 app.*.symbols
 

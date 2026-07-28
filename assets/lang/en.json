@@ -16,6 +16,7 @@
     "ready": "Ready!",
     "startupError": "Startup error",
     "startupErrorMessage": "Startup failed. Check your connection and try again.",
+    "installationErrorMessage": "This installation is incomplete. Reinstall the app using the official APK.",
     "retry": "Try again"
   },
   "drawer": {
@@ -286,6 +287,24 @@
     "rising": "rising",
     "falling": "falling",
     "ngf": "{height}m NGF"
+  },
+  "offlineMaps": {
+    "title": "Offline maps",
+    "manage": "Manage maps",
+    "offlineStyle": "Offline",
+    "refresh": "Refresh",
+    "storageUsed": "Storage used",
+    "download": "Download",
+    "activate": "Activate",
+    "active": "Active map",
+    "deleteTitle": "Delete map",
+    "deleteConfirm": "Delete this map from the phone?",
+    "notConfigured": "The offline map server is not configured for this version yet.",
+    "catalogUnavailable": "The map catalog is temporarily unavailable.",
+    "invalidCatalog": "The map catalog is invalid.",
+    "downloadFailed": "The download failed. You can resume it.",
+    "checksumMismatch": "The downloaded file was corrupted and has been deleted.",
+    "invalidArchive": "This offline map is invalid."
   },
   "common": {
     "ok": "OK",

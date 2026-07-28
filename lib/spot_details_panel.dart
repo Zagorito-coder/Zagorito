@@ -1,6 +1,6 @@
 // ============================================================
-//  spot_details_panel.dart — Panneau de détails grand format
-//  Layout stable sans overflow
+//  spot_details_panel.dart — Panneau de détails compact et adaptatif
+//  Layout stable sans overflow en portrait et paysage
 //  ✅ CORRIGÉ : adaptatif clair/sombre via ThemeColors
 //  ✅ VENT : vitesse + direction + slider timeline
 // ============================================================
@@ -124,87 +124,100 @@ class SpotDetailsPanel extends StatelessWidget {
     final spotColor = spot.type.color;
     final nearbySpots = _getNearbySpots();
 
-    return RepaintBoundary(
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: Theme.of(context).brightness == Brightness.dark
-                ? const [
-                    Color(0xD407192C),
-                    Color(0xC9031020),
-                  ]
-                : const [
-                    Color(0xD6FFFFFF),
-                    Color(0xC4E9F7FC),
-                  ],
-          ),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: tc.oceanLight.withValues(alpha: 0.52),
-            width: 0.8,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: tc.oceanLight.withValues(alpha: 0.10),
-              blurRadius: 12,
-              offset: const Offset(0, -2),
-            ),
-            BoxShadow(
-              color: tc.shadowColor.withValues(alpha: 0.72),
-              blurRadius: 14,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildCompactHeader(context, spotColor),
-            const SizedBox(height: 6),
-            Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    flex: 23,
-                    child: _buildSpeciesDashboard(context),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    flex: 39,
-                    child: _buildWindSection(context),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    flex: 32,
-                    child: _buildSpotActions(context),
-                  ),
-                ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final dense = constraints.maxHeight < 195;
+        return RepaintBoundary(
+          child: Container(
+            padding: dense
+                ? const EdgeInsets.fromLTRB(7, 5, 7, 5)
+                : const EdgeInsets.fromLTRB(8, 6, 8, 6),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: Theme.of(context).brightness == Brightness.dark
+                    ? const [
+                        Color(0xD407192C),
+                        Color(0xC9031020),
+                      ]
+                    : const [
+                        Color(0xD6FFFFFF),
+                        Color(0xC4E9F7FC),
+                      ],
               ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: tc.oceanLight.withValues(alpha: 0.52),
+                width: 0.8,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: tc.oceanLight.withValues(alpha: 0.10),
+                  blurRadius: 12,
+                  offset: const Offset(0, -2),
+                ),
+                BoxShadow(
+                  color: tc.shadowColor.withValues(alpha: 0.72),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
-            const OpenMeteoAttribution(
-              padding: EdgeInsets.fromLTRB(3, 3, 3, 2),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildCompactHeader(context, spotColor, dense: dense),
+                SizedBox(height: dense ? 3 : 4),
+                Expanded(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        flex: 23,
+                        child: _buildSpeciesDashboard(context),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        flex: 39,
+                        child: _buildWindSection(context),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        flex: 32,
+                        child: _buildSpotActions(context),
+                      ),
+                    ],
+                  ),
+                ),
+                OpenMeteoAttribution(
+                  padding: dense
+                      ? const EdgeInsets.fromLTRB(2, 0, 2, 0)
+                      : const EdgeInsets.fromLTRB(3, 1, 3, 1),
+                ),
+                SizedBox(height: dense ? 1 : 2),
+                _buildNearbyDashboard(context, nearbySpots, dense: dense),
+              ],
             ),
-            const SizedBox(height: 3),
-            _buildNearbyDashboard(context, nearbySpots),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildCompactHeader(BuildContext context, Color spotColor) {
+  Widget _buildCompactHeader(
+    BuildContext context,
+    Color spotColor, {
+    required bool dense,
+  }) {
     final tc = ThemeColors.of(context);
     return SizedBox(
-      height: 38,
+      height: dense ? 30 : 34,
       child: Row(
         children: [
           Container(
-            width: 34,
-            height: 34,
+            width: dense ? 28 : 31,
+            height: dense ? 28 : 31,
             decoration: BoxDecoration(
               color: spotColor.withValues(alpha: 0.14),
               shape: BoxShape.circle,
@@ -213,9 +226,13 @@ class SpotDetailsPanel extends StatelessWidget {
                 width: 0.8,
               ),
             ),
-            child: Icon(Icons.place_rounded, color: spotColor, size: 18),
+            child: Icon(
+              Icons.place_rounded,
+              color: spotColor,
+              size: dense ? 16 : 17,
+            ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: dense ? 6 : 7),
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -227,12 +244,12 @@ class SpotDetailsPanel extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: tc.textPrimary,
-                    fontSize: 14,
+                    fontSize: dense ? 12.5 : 13.5,
                     height: 1,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: dense ? 2 : 3),
                 Row(
                   children: [
                     Flexible(
@@ -255,7 +272,7 @@ class SpotDetailsPanel extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 6),
+          SizedBox(width: dense ? 4 : 5),
           Semantics(
             button: true,
             label: 'Fermer les détails du spot',
@@ -266,12 +283,12 @@ class SpotDetailsPanel extends StatelessWidget {
                 customBorder: const CircleBorder(),
                 onTap: onClose,
                 child: SizedBox(
-                  width: 34,
-                  height: 34,
+                  width: dense ? 28 : 31,
+                  height: dense ? 28 : 31,
                   child: Icon(
                     Icons.close_rounded,
                     color: tc.textSecondary,
-                    size: 18,
+                    size: dense ? 17 : 18,
                   ),
                 ),
               ),
@@ -352,7 +369,7 @@ class SpotDetailsPanel extends StatelessWidget {
                 Expanded(
                   child: Text(
                     spot.notes.isEmpty ? 'Notes indisponibles' : spot.notes,
-                    maxLines: 3,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: tc.textSecondary,
@@ -375,7 +392,7 @@ class SpotDetailsPanel extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
                 onTap: () => _launchUrl(_googleMapsUrl),
                 child: Container(
-                  height: 30,
+                  height: 27,
                   padding: const EdgeInsets.symmetric(horizontal: 5),
                   decoration: BoxDecoration(
                     color: const Color(0xFF4285F4).withValues(alpha: 0.10),
@@ -422,15 +439,16 @@ class SpotDetailsPanel extends StatelessWidget {
 
   Widget _buildNearbyDashboard(
     BuildContext context,
-    List<Spot> nearbySpots,
-  ) {
+    List<Spot> nearbySpots, {
+    required bool dense,
+  }) {
     final tc = ThemeColors.of(context);
     return SizedBox(
-      height: 46,
+      height: dense ? 36 : 40,
       child: Row(
         children: [
           SizedBox(
-            width: 63,
+            width: dense ? 56 : 60,
             child: Row(
               children: [
                 Icon(
@@ -438,13 +456,13 @@ class SpotDetailsPanel extends StatelessWidget {
                   color: tc.oceanLight,
                   size: 13,
                 ),
-                const SizedBox(width: 4),
+                SizedBox(width: dense ? 3 : 4),
                 Expanded(
                   child: Text(
                     'SPOTS\nVOISINS',
                     style: TextStyle(
                       color: tc.textSecondary,
-                      fontSize: 7.5,
+                      fontSize: dense ? 7 : 7.5,
                       height: 1.08,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 0.5,
@@ -1069,7 +1087,7 @@ class _DashboardSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
     return Container(
-      padding: const EdgeInsets.fromLTRB(6, 5, 6, 5),
+      padding: const EdgeInsets.fromLTRB(5, 4, 5, 4),
       decoration: BoxDecoration(
         color: tc.textPrimary.withValues(alpha: 0.032),
         borderRadius: BorderRadius.circular(10),
@@ -1101,7 +1119,7 @@ class _DashboardSection extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 3),
           Expanded(child: child),
         ],
       ),

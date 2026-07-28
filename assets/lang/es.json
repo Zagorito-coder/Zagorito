@@ -16,6 +16,7 @@
     "ready": "¡Listo!",
     "startupError": "Error de inicio",
     "startupErrorMessage": "El inicio falló. Comprueba tu conexión e inténtalo de nuevo.",
+    "installationErrorMessage": "Esta instalación está incompleta. Reinstala la aplicación con el APK oficial.",
     "retry": "Reintentar"
   },
   "drawer": {
@@ -286,6 +287,24 @@
     "rising": "subiendo",
     "falling": "bajando",
     "ngf": "{height}m NGF"
+  },
+  "offlineMaps": {
+    "title": "Mapas sin conexión",
+    "manage": "Gestionar mapas",
+    "offlineStyle": "Sin conexión",
+    "refresh": "Actualizar",
+    "storageUsed": "Almacenamiento utilizado",
+    "download": "Descargar",
+    "activate": "Activar",
+    "active": "Mapa activo",
+    "deleteTitle": "Eliminar mapa",
+    "deleteConfirm": "¿Eliminar este mapa del teléfono?",
+    "notConfigured": "El servidor de mapas sin conexión aún no está configurado para esta versión.",
+    "catalogUnavailable": "El catálogo de mapas no está disponible temporalmente.",
+    "invalidCatalog": "El catálogo de mapas no es válido.",
+    "downloadFailed": "La descarga falló. Podrás reanudarla.",
+    "checksumMismatch": "El archivo descargado estaba dañado y se ha eliminado.",
+    "invalidArchive": "Este mapa sin conexión no es válido."
   },
   "common": {
     "ok": "OK",

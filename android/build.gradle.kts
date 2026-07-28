@@ -16,7 +16,7 @@ subprojects {
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
 subprojects {
-    // Force compileSdk >= 34 pour tous les subprojects/plugins (ex: objectbox_flutter_libs)
+    // Force compileSdk >= 34 pour tous les subprojects/plugins.
     if (project.name != "app" && project.name != "gradle") {
         afterEvaluate {
             if (project.plugins.hasPlugin("com.android.library") || project.plugins.hasPlugin("com.android.application")) {

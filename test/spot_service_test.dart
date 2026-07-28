@@ -4,6 +4,17 @@ import 'package:spots_app/services/spot_service.dart';
 const _releaseKey = String.fromEnvironment('CSV_ENCRYPTION_KEY');
 
 void main() {
+  test(
+    'un build sans clé échoue avant de pouvoir réutiliser un cache',
+    () async {
+      await expectLater(
+        SpotService.loadSpots(),
+        throwsA(isA<SpotCatalogConfigurationException>()),
+      );
+    },
+    skip: _releaseKey.isNotEmpty,
+  );
+
   testWidgets(
     'le catalogue release embarqué se déchiffre intégralement',
     (tester) async {

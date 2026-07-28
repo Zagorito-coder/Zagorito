@@ -16,6 +16,7 @@
     "ready": "تم!",
     "startupError": "خطأ في بدء التشغيل",
     "startupErrorMessage": "فشل بدء التشغيل. تحقق من الاتصال وحاول مرة أخرى.",
+    "installationErrorMessage": "هذا التثبيت غير مكتمل. أعد تثبيت التطبيق باستخدام ملف APK الرسمي.",
     "retry": "إعادة المحاولة"
   },
   "drawer": {
@@ -286,6 +287,24 @@
     "rising": "متصاعد",
     "falling": "متناقص",
     "ngf": "{height}م NGF"
+  },
+  "offlineMaps": {
+    "title": "خرائط دون اتصال",
+    "manage": "إدارة الخرائط",
+    "offlineStyle": "دون اتصال",
+    "refresh": "تحديث",
+    "storageUsed": "مساحة التخزين المستخدمة",
+    "download": "تنزيل",
+    "activate": "تفعيل",
+    "active": "الخريطة النشطة",
+    "deleteTitle": "حذف الخريطة",
+    "deleteConfirm": "هل تريد حذف هذه الخريطة من الهاتف؟",
+    "notConfigured": "خادم الخرائط دون اتصال غير مهيأ لهذا الإصدار بعد.",
+    "catalogUnavailable": "دليل الخرائط غير متاح مؤقتا.",
+    "invalidCatalog": "دليل الخرائط غير صالح.",
+    "downloadFailed": "فشل التنزيل. يمكنك استئنافه لاحقا.",
+    "checksumMismatch": "الملف الذي تم تنزيله تالف وتم حذفه.",
+    "invalidArchive": "هذه الخريطة دون اتصال غير صالحة."
   },
   "common": {
     "ok": "موافق",

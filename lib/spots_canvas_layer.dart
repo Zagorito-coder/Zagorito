@@ -4,6 +4,10 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:spots_app/models.dart';
 
+class _MapRepaintNotifier extends ChangeNotifier {
+  void repaint() => notifyListeners();
+}
+
 class SpotsCanvasLayer extends StatefulWidget {
   final List<Spot> visibleSpots;
   final MapController mapController;
@@ -26,7 +30,7 @@ class SpotsCanvasLayer extends StatefulWidget {
 
 class _SpotsCanvasLayerState extends State<SpotsCanvasLayer> {
   StreamSubscription? _mapEventSubscription;
-  Timer? _repaintTimer;
+  final _MapRepaintNotifier _repaintNotifier = _MapRepaintNotifier();
   int? _pointerId;
   Offset? _pointerDownPosition;
   bool _pointerMoved = false;
@@ -37,20 +41,14 @@ class _SpotsCanvasLayerState extends State<SpotsCanvasLayer> {
   void initState() {
     super.initState();
     _mapEventSubscription = widget.mapController.mapEventStream.listen((_) {
-      // During a pan/zoom flutter_map emits many events per frame. Rebuilding
-      // the painter for each one starves the UI thread on low-end devices.
-      // Keep the marker layer responsive while coalescing those events.
-      if (_repaintTimer?.isActive ?? false) return;
-      _repaintTimer = Timer(const Duration(milliseconds: 40), () {
-        if (mounted) setState(() {});
-      });
+      if (mounted) _repaintNotifier.repaint();
     });
   }
 
   @override
   void dispose() {
     _mapEventSubscription?.cancel();
-    _repaintTimer?.cancel();
+    _repaintNotifier.dispose();
     super.dispose();
   }
 
@@ -118,13 +116,6 @@ class _SpotsCanvasLayerState extends State<SpotsCanvasLayer> {
 
   @override
   Widget build(BuildContext context) {
-    final MapCamera camera;
-    try {
-      camera = widget.mapController.camera;
-    } catch (_) {
-      return const SizedBox.shrink();
-    }
-
     return SizedBox.expand(
       child: Listener(
         behavior: HitTestBehavior.translucent,
@@ -135,8 +126,9 @@ class _SpotsCanvasLayerState extends State<SpotsCanvasLayer> {
         child: CustomPaint(
           painter: _SpotsPainter(
             visibleSpots: widget.visibleSpots,
-            camera: camera,
+            mapController: widget.mapController,
             selectedSpot: widget.selectedSpot,
+            repaint: _repaintNotifier,
           ),
         ),
       ),
@@ -146,17 +138,25 @@ class _SpotsCanvasLayerState extends State<SpotsCanvasLayer> {
 
 class _SpotsPainter extends CustomPainter {
   final List<Spot> visibleSpots;
-  final MapCamera camera;
+  final MapController mapController;
   final Spot? selectedSpot;
 
   _SpotsPainter({
     required this.visibleSpots,
-    required this.camera,
+    required this.mapController,
     this.selectedSpot,
-  });
+    required Listenable repaint,
+  }) : super(repaint: repaint);
 
   @override
   void paint(Canvas canvas, Size size) {
+    final MapCamera camera;
+    try {
+      camera = mapController.camera;
+    } catch (_) {
+      return;
+    }
+
     // Reuse Paint instances for the whole frame. Allocating and configuring
     // four Paints for every spot creates significant garbage at wide zooms.
     final shadowPaint = Paint()..style = PaintingStyle.fill;
@@ -209,6 +209,6 @@ class _SpotsPainter extends CustomPainter {
   bool shouldRepaint(_SpotsPainter oldDelegate) {
     return oldDelegate.visibleSpots != visibleSpots ||
         oldDelegate.selectedSpot != selectedSpot ||
-        oldDelegate.camera != camera;
+        oldDelegate.mapController != mapController;
   }
 }

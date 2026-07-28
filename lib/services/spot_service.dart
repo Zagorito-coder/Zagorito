@@ -35,6 +35,10 @@ class SpotService {
   /// Charge le catalogue embarque et n'utilise le cache que s'il correspond
   /// exactement a l'asset de cette version de l'application.
   static Future<List<Spot>> loadSpots() async {
+    if (_encKey.isEmpty) {
+      throw const SpotCatalogConfigurationException();
+    }
+
     final asset = await _loadBundledAsset();
     final cached = await _loadFromCache(asset.sha256);
     if (cached.isNotEmpty) return cached;
@@ -158,4 +162,8 @@ class _BundledSpotAsset {
   final String sha256;
 
   const _BundledSpotAsset({required this.bytes, required this.sha256});
+}
+
+class SpotCatalogConfigurationException implements Exception {
+  const SpotCatalogConfigurationException();
 }

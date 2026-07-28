@@ -1,0 +1,261 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-27T07:43:59.879Z",
+  "source": "Protomaps Basemap daily build 20260722",
+  "attribution": "OpenStreetMap contributors, Protomaps",
+  "regions": [
+    {
+      "id": "ae",
+      "countryCode": "AE",
+      "continent": "asia",
+      "names": {
+        "ar": "الإمارات العربية المتحدة",
+        "en": "United Arab Emirates",
+        "es": "Emiratos Árabes Unidos",
+        "fr": "Émirats arabes unis"
+      },
+      "file": "ae.pmtiles",
+      "sizeBytes": 39474361,
+      "sha256": "80ab6a3e94dcc40beea1bc49e794bda24e4406f900c2903561e69c29884eca73",
+      "minZoom": 0,
+      "maxZoom": 14,
+      "bounds": [
+        53.439250589907175,
+        23.716906269489815,
+        56.72040402740239,
+        26.380557922842165
+      ],
+      "spotCount": 33
+    },
+    {
+      "id": "bh",
+      "countryCode": "BH",
+      "continent": "asia",
+      "names": {
+        "ar": "البحرين",
+        "en": "Bahrain",
+        "es": "Baréin",
+        "fr": "Bahreïn"
+      },
+      "file": "bh.pmtiles",
+      "sizeBytes": 8777092,
+      "sha256": "afe4246f5b83d6997dfbb8c5806c1d6418cc63644739dd59e1bca9220ec8885e",
+      "minZoom": 0,
+      "maxZoom": 14,
+      "bounds": [
+        49.97465998083352,
+        25.506076434304738,
+        50.97591530382633,
+        26.684229111513122
+      ],
+      "spotCount": 32
+    },
+    {
+      "id": "dz",
+      "countryCode": "DZ",
+      "continent": "africa",
+      "names": {
+        "ar": "الجزائر",
+        "en": "Algeria",
+        "es": "Argelia",
+        "fr": "Algérie"
+      },
+      "file": "dz.pmtiles",
+      "sizeBytes": 198276848,
+      "sha256": "fde4444ddadf5cacc0326f5e37d635ad1e530aa6d8b1fd57b2ca5abe06aff5e6",
+      "minZoom": 0,
+      "maxZoom": 14,
+      "bounds": [
+        -3.13333567082882,
+        31.16292725819353,
+        8.9501481488347,
+        37.43906998831053
+      ],
+      "spotCount": 1145
+    },
+    {
+      "id": "eg",
+      "countryCode": "EG",
+      "continent": "africa",
+      "names": {
+        "ar": "مصر",
+        "en": "Egypt",
+        "es": "Egipto",
+        "fr": "Égypte"
+      },
+      "file": "eg.pmtiles",
+      "sizeBytes": 173686584,
+      "sha256": "660293e6368a68f78e9e6ac2297ae421e0f95d5ad48c281a84a19dd2cc3e7d86",
+      "minZoom": 0,
+      "maxZoom": 14,
+      "bounds": [
+        26.28364484906197,
+        22.05103401777636,
+        36.77135646194219,
+        31.951526907288372
+      ],
+      "spotCount": 752
+    },
+    {
+      "id": "ly",
+      "countryCode": "LY",
+      "continent": "africa",
+      "names": {
+        "ar": "ليبيا",
+        "en": "Libya",
+        "es": "Libia",
+        "fr": "Libye"
+      },
+      "file": "ly.pmtiles",
+      "sizeBytes": 47395168,
+      "sha256": "f8675c730328dcfd09bf457b72c5df26318ba75de1e1b4e7820f211230361201",
+      "minZoom": 0,
+      "maxZoom": 14,
+      "bounds": [
+        11.280907207727433,
+        30.02545825052937,
+        25.446998251974584,
+        33.477645597569946
+      ],
+      "spotCount": 402
+    },
+    {
+      "id": "ma",
+      "countryCode": "MA",
+      "continent": "africa",
+      "names": {
+        "ar": "المغرب",
+        "en": "Morocco",
+        "es": "Marruecos",
+        "fr": "Maroc"
+      },
+      "file": "ma.pmtiles",
+      "sizeBytes": 257972213,
+      "sha256": "0b34b4bcccdac15d46713c4be69b41a6d6931e555bfedeff94534022cb67a852",
+      "minZoom": 0,
+      "maxZoom": 14,
+      "bounds": [
+        -17.357083371281625,
+        21.10141914149087,
+        -1.8888539463281608,
+        36.27247383486953
+      ],
+      "spotCount": 2794
+    },
+    {
+      "id": "om",
+      "countryCode": "OM",
+      "continent": "asia",
+      "names": {
+        "ar": "سلطنة عمان",
+        "en": "Oman",
+        "es": "Omán",
+        "fr": "Oman"
+      },
+      "file": "om.pmtiles",
+      "sizeBytes": 77772169,
+      "sha256": "73883bdcc28c6dc9ea081b0fd8f4fe736039b89c6a7dd64293a392ffab8b290c",
+      "minZoom": 0,
+      "maxZoom": 14,
+      "bounds": [
+        52.900654637813574,
+        16.35371213176542,
+        60.164674556255335,
+        26.70049214164132
+      ],
+      "spotCount": 58
+    },
+    {
+      "id": "sa",
+      "countryCode": "SA",
+      "continent": "asia",
+      "names": {
+        "ar": "السعودية",
+        "en": "Saudi Arabia",
+        "es": "Arabia Saudita",
+        "fr": "Arabie saoudite"
+      },
+      "file": "sa.pmtiles",
+      "sizeBytes": 232748265,
+      "sha256": "788f1cf1bc6dee9a6f24e96d3f5c49c3aa4f3e31df9170284fda352911c27998",
+      "minZoom": 0,
+      "maxZoom": 14,
+      "bounds": [
+        34.23613138645887,
+        16.090181680833158,
+        51.83140083998442,
+        28.875452666620813
+      ],
+      "spotCount": 198
+    },
+    {
+      "id": "sy",
+      "countryCode": "SY",
+      "continent": "asia",
+      "names": {
+        "ar": "سوريا",
+        "en": "Syria",
+        "es": "Siria",
+        "fr": "Syrie"
+      },
+      "file": "sy.pmtiles",
+      "sizeBytes": 104382104,
+      "sha256": "a6533e0de4d1469d8d0bb4571a84447c63664980c9fed760ba8d7335f6c254e8",
+      "minZoom": 0,
+      "maxZoom": 14,
+      "bounds": [
+        35.385824406147,
+        32.464924296279634,
+        38.074553644657136,
+        37.05105242846936
+      ],
+      "spotCount": 43
+    },
+    {
+      "id": "tn",
+      "countryCode": "TN",
+      "continent": "africa",
+      "names": {
+        "ar": "تونس",
+        "en": "Tunisia",
+        "es": "Túnez",
+        "fr": "Tunisie"
+      },
+      "file": "tn.pmtiles",
+      "sizeBytes": 64244047,
+      "sha256": "d9c18542b283b1858a20af09328514827934383d10f7ba0c6d03c5a5922b0038",
+      "minZoom": 0,
+      "maxZoom": 14,
+      "bounds": [
+        8.259607629477971,
+        32.857829999999986,
+        11.709610818326471,
+        37.69695768678937
+      ],
+      "spotCount": 465
+    },
+    {
+      "id": "ye",
+      "countryCode": "YE",
+      "continent": "asia",
+      "names": {
+        "ar": "اليمن",
+        "en": "Yemen",
+        "es": "Yemen",
+        "fr": "Yémen"
+      },
+      "file": "ye.pmtiles",
+      "sizeBytes": 72508121,
+      "sha256": "e38cd4445a3de9beaa9ac7fed9f4598f3c831fefa9f899b2ed3ed96c3449e8cb",
+      "minZoom": 0,
+      "maxZoom": 14,
+      "bounds": [
+        42.331736573576926,
+        12.260575737478613,
+        54.20978899896146,
+        16.974010954414794
+      ],
+      "spotCount": 70
+    }
+  ]
+}

@@ -6,6 +6,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:executor_lib/executor_lib.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'
     show SystemChrome, SystemUiMode, SystemUiOverlayStyle;
@@ -15,13 +16,16 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:spots_app/models.dart';
+import 'package:spots_app/models/offline_map_region.dart';
 import 'package:spots_app/services/spot_service.dart';
+import 'package:spots_app/services/offline_map_service.dart';
 import 'package:spots_app/models/fish_model.dart';
 import 'package:spots_app/spot_details_panel.dart';
 import 'package:spots_app/spots_canvas_layer.dart';
 import 'package:spots_app/theme.dart';
 import 'package:spots_app/theme_controller.dart';
 import 'package:spots_app/widgets/app_tile_layer.dart';
+import 'package:spots_app/widgets/offline_map_manager_sheet.dart';
 import 'package:spots_app/l10n/app_localizations.dart';
 import 'package:spots_app/splash_bootstrap.dart';
 import 'package:spots_app/widgets/fish_intelligence_modal.dart';
@@ -35,7 +39,19 @@ import 'package:spots_app/providers/wind_animation_provider.dart';
 import 'package:spots_app/widgets/wind_particle_layer.dart';
 
 void main() {
+  runZonedGuarded(_bootstrap, (error, stackTrace) {
+    // Expected when vector tiles discard stale work during pan or zoom.
+    if (error is CancellationException) return;
+    Error.throwWithStackTrace(error, stackTrace);
+  });
+}
+
+void _bootstrap() {
   WidgetsFlutterBinding.ensureInitialized();
+  final imageCache = PaintingBinding.instance.imageCache;
+  imageCache
+    ..maximumSize = 200
+    ..maximumSizeBytes = 48 * 1024 * 1024;
   if (!kDebugMode) {
     // Securite : neutralise tous les logs en release pour eviter la fuite
     // d'uid, emails, tokens dans logcat. Conserve la signature exacte de
@@ -565,6 +581,8 @@ class _MapScreenState extends State<MapScreen>
   final TextEditingController _searchController = TextEditingController();
   final Distance _distance = const Distance();
   Timer? _debounceTimer;
+  LatLngBounds? _pendingBounds;
+  double? _pendingZoom;
 
   List<Spot> _spots = [];
   LatLngBounds? _lastBounds;
@@ -577,7 +595,7 @@ class _MapScreenState extends State<MapScreen>
   bool _isFishBarVisible = false, _showToolsPanel = false, _isMeasuring = false;
   final List<LatLng> _measurePoints = [];
   double _measuredDistanceKm = 0.0;
-  MapStyle _mapStyle = MapStyle.standard;
+  MapStyle _mapStyle = MapStyle.satellite;
   // Toutes les fonctions sont gratuites dans la version financée par AdMob.
   static const bool _isPremium = true;
   static const double _maxZoom = 16.0;
@@ -609,6 +627,9 @@ class _MapScreenState extends State<MapScreen>
   void initState() {
     super.initState();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    if (OfflineMapService.instance.hasActiveMap) {
+      _mapStyle = MapStyle.offline;
+    }
     _loadSpots();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -844,7 +865,6 @@ class _MapScreenState extends State<MapScreen>
   final MarkerCacheManager _markerCacheManager = MarkerCacheManager();
 
   void _onPositionChanged(MapCamera camera, bool gesture) {
-    _debounceTimer?.cancel();
     final nb = camera.visibleBounds;
     var nz = camera.zoom;
     if (!nz.isFinite) return;
@@ -862,10 +882,23 @@ class _MapScreenState extends State<MapScreen>
       nz = _maxZoom;
       _mapController.move(camera.center, nz);
     }
-    if (nz == _currentZoom && nb == _lastBounds) return;
-    setState(() {
-      _currentZoom = nz;
-      _applyBoundsFilter(nb);
+
+    _pendingBounds = nb;
+    _pendingZoom = nz;
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 80), () {
+      final pendingBounds = _pendingBounds;
+      final pendingZoom = _pendingZoom;
+      _pendingBounds = null;
+      _pendingZoom = null;
+
+      if (!mounted || pendingBounds == null || pendingZoom == null) return;
+      if (pendingZoom == _currentZoom && pendingBounds == _lastBounds) return;
+
+      setState(() {
+        _currentZoom = pendingZoom;
+        _applyBoundsFilter(pendingBounds);
+      });
     });
   }
 
@@ -901,7 +934,12 @@ class _MapScreenState extends State<MapScreen>
                 flags: InteractiveFlag.all,
               ),
               onPositionChanged: _onPositionChanged,
-              onMapReady: () {},
+              onMapReady: () {
+                final region = OfflineMapService.instance.activeRegion;
+                if (_mapStyle == MapStyle.offline && region != null) {
+                  _showOfflineRegion(region);
+                }
+              },
             ),
             children: [
               AppTileLayer(style: _mapStyle),
@@ -1051,12 +1089,8 @@ class _MapScreenState extends State<MapScreen>
                 top: 0,
                 left: 0,
                 right: 0,
-                child: MediaQuery.removePadding(
-                    context: context,
-                    removeTop: true,
-                    child: _CompassRibbon(
-                        heading: _heading,
-                        courseOverGround: _courseOverGround))),
+                child: _CompassRibbon(
+                    heading: _heading, courseOverGround: _courseOverGround)),
           Positioned(
             top: MediaQuery.of(context).padding.top + 80,
             right: 16,
@@ -1088,11 +1122,20 @@ class _MapScreenState extends State<MapScreen>
             ListenableBuilder(
                 listenable: LanguageController.instance,
                 builder: (ctx, _) {
+                  final media = MediaQuery.of(ctx);
+                  final isPortrait = media.orientation == Orientation.portrait;
+                  final panelHeight =
+                      (media.size.height * (isPortrait ? 0.27 : 0.48))
+                          .clamp(
+                            isPortrait ? 200.0 : 180.0,
+                            isPortrait ? 230.0 : 210.0,
+                          )
+                          .toDouble();
                   return Align(
                       alignment: Alignment.bottomCenter,
                       child: SizedBox(
                           width: MediaQuery.of(ctx).size.width * 0.92,
-                          height: MediaQuery.of(ctx).size.height * 0.33,
+                          height: panelHeight,
                           child: SpotDetailsPanel(
                               spot: _selectedSpot!,
                               distanceText: _distanceText(_selectedSpot!),
@@ -1234,7 +1277,64 @@ class _MapScreenState extends State<MapScreen>
                           ? tc.oceanMedium
                           : tc.textPrimary,
                       onTap: () => setState(() => _mapStyle = MapStyle.dark)),
+                  const SizedBox(height: 6),
+                  _toolItem(
+                      icon: Icons.map_outlined,
+                      label: context.tr('offlineMaps.offlineStyle'),
+                      color: _mapStyle == MapStyle.offline
+                          ? tc.oceanMedium
+                          : tc.textPrimary,
+                      onTap: () {
+                        final service = OfflineMapService.instance;
+                        if (service.hasActiveMap) {
+                          final region = service.activeRegion;
+                          if (region == null) {
+                            setState(() => _mapStyle = MapStyle.offline);
+                          } else {
+                            _showOfflineRegion(region);
+                          }
+                        } else {
+                          unawaited(_openOfflineMaps());
+                        }
+                      }),
+                  const SizedBox(height: 6),
+                  _toolItem(
+                      icon: Icons.download_for_offline,
+                      label: context.tr('offlineMaps.manage'),
+                      color: tc.textPrimary,
+                      onTap: () => unawaited(_openOfflineMaps())),
                 ])));
+  }
+
+  Future<void> _openOfflineMaps() async {
+    await showOfflineMapManager(
+      context,
+      onActivated: _showOfflineRegion,
+    );
+    if (!mounted) return;
+    if (_mapStyle == MapStyle.offline &&
+        !OfflineMapService.instance.hasActiveMap) {
+      setState(() => _mapStyle = MapStyle.satellite);
+    }
+  }
+
+  void _showOfflineRegion(OfflineMapRegion region) {
+    if (!mounted) return;
+    setState(() => _mapStyle = MapStyle.offline);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final bounds = region.bounds;
+      _mapController.fitCamera(
+        CameraFit.bounds(
+          bounds: LatLngBounds(
+            LatLng(bounds.minLatitude, bounds.minLongitude),
+            LatLng(bounds.maxLatitude, bounds.maxLongitude),
+          ),
+          padding: const EdgeInsets.fromLTRB(28, 120, 28, 180),
+          maxZoom: 10,
+        ),
+      );
+    });
   }
 
   Widget _toolItem(
@@ -1386,156 +1486,176 @@ class _CompassRibbon extends StatelessWidget {
         ? 0.0
         : courseOverGround;
     final head = heading.isNaN ? 0.0 : heading;
-    return Padding(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
-        child: ClipRRect(
-            borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(12),
-                bottomRight: Radius.circular(12)),
-            child: Container(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.85),
-                    borderRadius: const BorderRadius.only(
-                        bottomLeft: Radius.circular(12),
-                        bottomRight: Radius.circular(12)),
-                    border: Border.all(
-                        color: Colors.black.withValues(alpha: 0.08), width: 1),
-                    boxShadow: [
-                      BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
-                          blurRadius: 12,
-                          offset: const Offset(0, 3))
-                    ]),
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  SizedBox(
-                      height: 38,
-                      child: LayoutBuilder(builder: (ctx, cons) {
-                        final w = cons.maxWidth;
-                        final cs = <Widget>[];
-                        for (int d = 0; d < 360; d += 45) {
-                          var del = (d - head) % 360;
-                          if (del > 180) del -= 360;
-                          if (del.abs() > 90) continue;
-                          final x = w / 2 + (del / 90.0) * (w / 2);
-                          cs.add(Positioned(
-                              left: x - 10,
-                              child: SizedBox(
-                                  width: 20,
-                                  child: Text(_rl(d),
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.bold,
-                                          color: d % 90 == 0
-                                              ? Colors.black
-                                              : Colors.black54)))));
-                        }
-                        return Stack(alignment: Alignment.center, children: [
-                          const Positioned(
-                              top: 0,
-                              child: Icon(Icons.arrow_drop_down,
-                                  color: Color(0xFFFF2D55), size: 16)),
-                          ...cs
-                        ]);
-                      })),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                      height: 14,
-                      child: LayoutBuilder(builder: (ctx, cons) {
-                        final w = cons.maxWidth;
-                        final ms = <Widget>[];
-                        for (int d = 0; d < 360; d += 45) {
-                          var del = (d - head) % 360;
-                          if (del > 180) del -= 360;
-                          if (del.abs() > 90) continue;
-                          final x = w / 2 + (del / 90.0) * (w / 2);
-                          final isC = d % 90 == 0;
-                          ms.add(Positioned(
-                              left: x - 1,
-                              top: 0,
-                              bottom: 0,
-                              child: Center(
-                                  child: Container(
-                                      width: isC ? 3.5 : 2.5,
-                                      height: isC ? 22.0 : 14.0,
-                                      decoration: BoxDecoration(
-                                          color: isC
-                                              ? Colors.black
-                                                  .withValues(alpha: 0.65)
-                                              : Colors.black
-                                                  .withValues(alpha: 0.45),
-                                          borderRadius:
-                                              BorderRadius.circular(1))))));
-                        }
-                        return Stack(alignment: Alignment.center, children: [
-                          Container(
-                              height: 2,
-                              color: Colors.black.withValues(alpha: 0.3)),
-                          ...ms,
-                          Transform.rotate(
-                              angle: head * (math.pi / 180),
-                              child: Icon(Icons.arrow_upward_rounded,
-                                  color: const Color(0xFFFF2D55),
-                                  size: 34,
-                                  shadows: [
-                                    Shadow(
-                                        color:
-                                            Colors.black.withValues(alpha: 0.3),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 2))
-                                  ]))
-                        ]);
-                      })),
-                  const SizedBox(height: 12),
-                  Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Heading',
-                                  style: TextStyle(
-                                      fontSize: 12.5,
-                                      color: Colors.grey,
-                                      fontWeight: FontWeight.bold)),
-                              Text(
-                                  head == 0
-                                      ? '--'
-                                      : '${head.toInt()}° ${_gd(head)}',
-                                  style: const TextStyle(
-                                      fontSize: 17.5,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 0.3)),
-                            ]),
-                        Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              const Text('Course over ground',
-                                  style: TextStyle(
-                                      fontSize: 12.5,
-                                      color: Colors.grey,
-                                      fontWeight: FontWeight.bold)),
-                              Text(
-                                  cog == 0
-                                      ? '--'
-                                      : '${cog.toInt()}° ${_gd(cog)}',
-                                  style: const TextStyle(
-                                      fontSize: 17.5,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 0.3)),
-                            ]),
-                      ]),
-                ]))));
+    final topInset = MediaQuery.paddingOf(context).top;
+
+    return Semantics(
+      container: true,
+      label:
+          'Boussole, cap ${_valueText(head)}, route suivie ${_valueText(cog)}',
+      child: Container(
+        padding: EdgeInsets.fromLTRB(16, topInset + 5, 16, 8),
+        decoration: BoxDecoration(
+          color: const Color(0xEED6FBFA),
+          borderRadius: const BorderRadius.only(
+            bottomLeft: Radius.circular(20),
+            bottomRight: Radius.circular(20),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.10),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              height: 39,
+              width: double.infinity,
+              child: CustomPaint(
+                painter: _CompassScalePainter(heading: head),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
+                  child: _CompassValue(
+                    label: 'Course over ground',
+                    value: _valueText(cog),
+                  ),
+                ),
+                Expanded(
+                  child: _CompassValue(
+                    label: 'Heading',
+                    value: _valueText(head),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
+
+  String _valueText(double value) =>
+      value == 0 ? '--' : '${value.round()}° ${_gd(value)}';
 
   String _gd(double d) {
     const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
     return dirs[((((d < 0 ? d + 360 : d) + 22.5) % 360) ~/ 45).clamp(0, 7)];
   }
+}
 
-  String _rl(int d) {
-    switch (d % 360) {
+class _CompassValue extends StatelessWidget {
+  const _CompassValue({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Color(0xFF101820),
+            fontSize: 12,
+            height: 1,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Color(0xFF05090C),
+            fontSize: 19,
+            height: 1,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CompassScalePainter extends CustomPainter {
+  const _CompassScalePainter({required this.heading});
+
+  final double heading;
+
+  static const _labelStyle = TextStyle(
+    color: Color(0xFF11191E),
+    fontSize: 12,
+    height: 1,
+    fontWeight: FontWeight.w600,
+  );
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final pixelsPerDegree = size.width / 270;
+    final visibleDegrees = size.width / pixelsPerDegree / 2;
+    final normalizedHeading = ((heading % 360) + 360) % 360;
+    final firstTick = ((normalizedHeading - visibleDegrees) / 5).floor() * 5;
+    final lastTick = normalizedHeading + visibleDegrees;
+    final tickPaint = Paint()
+      ..color = const Color(0xFF12191D)
+      ..strokeCap = StrokeCap.square;
+
+    for (var degree = firstTick; degree <= lastTick; degree += 5) {
+      final x = size.width / 2 + (degree - normalizedHeading) * pixelsPerDegree;
+      final normalizedDegree = ((degree % 360) + 360) % 360;
+      final isDirection = normalizedDegree % 45 == 0;
+      final isMedium = normalizedDegree % 15 == 0;
+
+      tickPaint.strokeWidth = isDirection ? 1.35 : 1;
+      final tickTop = isDirection
+          ? 24.0
+          : isMedium
+              ? 27.0
+              : 29.0;
+      canvas.drawLine(
+        Offset(x, tickTop),
+        Offset(x, 34),
+        tickPaint,
+      );
+
+      if (isDirection) {
+        final labelPainter = TextPainter(
+          text: TextSpan(
+            text: _directionLabel(normalizedDegree),
+            style: _labelStyle,
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        labelPainter.paint(
+          canvas,
+          Offset(x - labelPainter.width / 2, 2),
+        );
+      }
+    }
+
+    final markerPaint = Paint()..color = const Color(0xFFFF453A);
+    final marker = ui.Path()
+      ..moveTo(size.width / 2, 24)
+      ..lineTo(size.width / 2 - 4.5, 34)
+      ..lineTo(size.width / 2 + 4.5, 34)
+      ..close();
+    canvas.drawPath(marker, markerPaint);
+  }
+
+  static String _directionLabel(int degree) {
+    switch (degree) {
       case 0:
         return 'N';
       case 45:
@@ -1556,4 +1676,8 @@ class _CompassRibbon extends StatelessWidget {
         return '';
     }
   }
+
+  @override
+  bool shouldRepaint(covariant _CompassScalePainter oldDelegate) =>
+      oldDelegate.heading != heading;
 }

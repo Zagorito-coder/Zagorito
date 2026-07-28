@@ -17,7 +17,7 @@ import 'package:spots_app/firebase_options.dart';
 import 'package:spots_app/app_shell.dart';
 import 'package:spots_app/providers/fish_provider.dart';
 import 'package:spots_app/providers/premium_provider.dart';
-import 'package:spots_app/models.dart';
+import 'package:spots_app/services/offline_map_service.dart';
 import 'package:spots_app/services/spot_service.dart';
 import 'package:spots_app/theme.dart';
 import 'package:spots_app/l10n/app_localizations.dart';
@@ -56,12 +56,11 @@ class _SplashBootstrapState extends State<SplashBootstrap> {
       if (!mounted) return;
       final fishProvider = context.read<FishProvider>();
 
-      // L'attestation réseau et les données locales sont indépendantes. App
-      // Check reste terminé avant l'affichage des écrans utilisant Firebase.
-      final appCheckFuture = _activateAppCheckSafely();
-      final spotsFuture = SpotService.loadSpots();
-      final results = await Future.wait([appCheckFuture, spotsFuture]);
-      final spots = results[1] as List<Spot>;
+      // Les deux lectures sont locales. App Check peut nécessiter le réseau et
+      // ne doit donc jamais bloquer le mode hors ligne.
+      final offlineMapsFuture = _initializeOfflineMapsSafely();
+      final spots = await SpotService.loadSpots();
+      await offlineMapsFuture;
 
       if (!mounted) return;
 
@@ -73,9 +72,15 @@ class _SplashBootstrapState extends State<SplashBootstrap> {
             builder: (_) => AppShell(key: appShellKey, initialSpots: spots)),
       );
 
-      // Ces données ne sont pas nécessaires à la première frame de la carte.
+      // Ces initialisations ne sont pas nécessaires à la première frame.
       unawaited(fishProvider.loadFishData());
+      unawaited(_activateAppCheckSafely());
       unawaited(_initPremiumInBackground());
+    } on SpotCatalogConfigurationException catch (e, st) {
+      debugPrint('[SplashBootstrap] CONFIGURATION APK INVALIDE: $e\n$st');
+      if (mounted) {
+        setState(() => _error = 'splash.installationErrorMessage');
+      }
     } catch (e, st) {
       debugPrint('[SplashBootstrap] ERREUR: $e\n$st');
       if (mounted) setState(() => _error = 'splash.startupErrorMessage');
@@ -90,6 +95,14 @@ class _SplashBootstrapState extends State<SplashBootstrap> {
       // que l'enforcement n'est pas activé. Les règles Firebase restent la
       // protection obligatoire des données.
       debugPrint('[SplashBootstrap] App Check activation error: $e\n$st');
+    }
+  }
+
+  Future<void> _initializeOfflineMapsSafely() async {
+    try {
+      await OfflineMapService.instance.initialize();
+    } catch (e, st) {
+      debugPrint('[SplashBootstrap] Offline maps init error: $e\n$st');
     }
   }
 

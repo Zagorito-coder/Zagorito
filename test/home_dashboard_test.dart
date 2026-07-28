@@ -236,6 +236,15 @@ void main() {
     await _setViewport(tester, viewport);
     await tester.pumpWidget(_testApp(tideData: _marineData()));
     await tester.pumpAndSettle();
+    final imageContext = tester.element(find.byType(HomeDashboard));
+    await tester.runAsync(
+      () => precacheImage(
+        const AssetImage(
+          'assets/home_cards/drawer_fisherman_banner_v1.webp',
+        ),
+        imageContext,
+      ),
+    );
 
     await tester.tap(find.byIcon(Icons.menu_rounded));
     await tester.pumpAndSettle();

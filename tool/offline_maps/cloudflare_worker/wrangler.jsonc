@@ -1,0 +1,13 @@
+{
+  "name": "boosterfish-offline-maps",
+  "main": "src/index.mjs",
+  "compatibility_date": "2026-07-27",
+  "workers_dev": true,
+  "preview_urls": false,
+  "r2_buckets": [
+    {
+      "binding": "OFFLINE_MAPS",
+      "bucket_name": "boosterfish-offline-maps"
+    }
+  ]
+}
