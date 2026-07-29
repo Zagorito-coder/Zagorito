@@ -260,6 +260,65 @@ class PrivateCatchRepository extends ChangeNotifier {
     await _reloadFromDatabase();
   }
 
+  /// Supprime de manière stricte toutes les prises locales du compte courant.
+  ///
+  /// Contrairement à [clearAll], cette opération est utilisée avant la
+  /// suppression définitive d'un compte. Le dossier photo est d'abord renommé
+  /// atomiquement, puis les lignes SQLite sont supprimées. En cas d'échec de
+  /// la base, le dossier est restauré. Si la suppression physique finale
+  /// échoue, le dossier en attente est conservé et la méthode échoue : un
+  /// nouvel essai pourra donc terminer le nettoyage avant de supprimer le
+  /// compte Firebase.
+  Future<void> deleteAllForAccount() async {
+    await _ensureInitialized();
+    final ownerUid = _ownerUid!;
+    final photoDirectory = _photoDirectory!;
+    final pendingDirectory =
+        Directory('${photoDirectory.path}.pending_deletion');
+
+    // Termine d'abord un éventuel nettoyage interrompu lors d'un essai
+    // précédent. Une erreur est volontairement propagée.
+    if (await pendingDirectory.exists()) {
+      await pendingDirectory.delete(recursive: true);
+    }
+
+    var photosMoved = false;
+    if (await photoDirectory.exists()) {
+      await photoDirectory.rename(pendingDirectory.path);
+      photosMoved = true;
+    }
+
+    try {
+      await _database!.transaction((transaction) async {
+        await transaction.delete(
+          _table,
+          where: 'owner_uid = ?',
+          whereArgs: [ownerUid],
+        );
+      });
+    } catch (error) {
+      if (photosMoved && await pendingDirectory.exists()) {
+        try {
+          await pendingDirectory.rename(photoDirectory.path);
+        } catch (restoreError, stackTrace) {
+          debugPrint(
+            '[PrivateCatchRepository] Photo rollback failed: '
+            '$restoreError\n$stackTrace',
+          );
+        }
+      }
+      rethrow;
+    }
+
+    await _reloadFromDatabase();
+    if (photosMoved && await pendingDirectory.exists()) {
+      await pendingDirectory.delete(recursive: true);
+    }
+    // Si Firebase Auth refuse ensuite la suppression (par exemple session
+    // expirée), le compte reste utilisable avec une galerie vide.
+    await photoDirectory.create(recursive: true);
+  }
+
   Future<Uint8List> readPhoto(PrivateCatch item) async {
     final bytes = await File(item.photoPath).readAsBytes();
     if (bytes.isEmpty || bytes.lengthInBytes > PrivateCatch.maximumPhotoBytes) {

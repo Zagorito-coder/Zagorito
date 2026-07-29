@@ -17,6 +17,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:spots_app/services/user_spot_service.dart';
 import 'package:spots_app/services/favorite_spot_service.dart';
 import 'package:spots_app/features/community/services/community_repository.dart';
+import 'package:spots_app/features/community/services/private_catch_repository.dart';
 
 class LocalUser {
   final String displayName;
@@ -223,6 +224,10 @@ class AuthService extends ChangeNotifier {
           .collection('subscriptions')
           .doc(user.uid)
           .delete();
+      // La galerie "Mes prises" est locale et peut contenir une photo ainsi
+      // que les coordonnées exactes du pêcheur. Le compte Firebase ne doit
+      // être supprimé qu'après confirmation de son effacement physique.
+      await PrivateCatchRepository.instance.deleteAllForAccount();
     } on FirebaseException catch (e) {
       debugPrint('[AuthService] Suppression Firestore échouée: ${e.code}');
       return false;
@@ -246,6 +251,7 @@ class AuthService extends ChangeNotifier {
     // déjà réussi : une panne du stockage local ne doit pas faire croire à
     // l'utilisateur que son compte existe encore.
     _localUser = null;
+    PrivateCatchRepository.instance.lock();
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('anonymous_user_id');
