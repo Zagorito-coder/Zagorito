@@ -172,5 +172,35 @@ class StationCollectionTests(unittest.TestCase):
         self.assertGreater(maximum_active, 1)
 
 
+class SpotCatalogTests(unittest.TestCase):
+    def test_spot_ids_are_unique_and_coordinates_are_valid(self):
+        ids = [spot["id"] for spot in harvest_forecast.SPOTS]
+
+        self.assertEqual(123, len(ids))
+        self.assertEqual(len(ids), len(set(ids)))
+        for spot in harvest_forecast.SPOTS:
+            self.assertGreaterEqual(spot["lat"], -90)
+            self.assertLessEqual(spot["lat"], 90)
+            self.assertGreaterEqual(spot["lon"], -180)
+            self.assertLessEqual(spot["lon"], 180)
+
+    def test_known_inland_cells_keep_their_validated_coastal_coordinates(self):
+        by_id = {spot["id"]: spot for spot in harvest_forecast.SPOTS}
+        expected = {
+            "tunis_tunisie": (36.82, 10.30),
+            "basra_irak": (29.97, 48.47),
+            "tetouan_maroc": (35.62, -5.27),
+            "portharcourt_nigeria": (4.45, 7.17),
+            "aqaba_jordanie": (29.45, 35.00),
+            "eilat_israel": (29.48, 34.94),
+        }
+
+        for spot_id, coordinates in expected.items():
+            self.assertEqual(
+                coordinates,
+                (by_id[spot_id]["lat"], by_id[spot_id]["lon"]),
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

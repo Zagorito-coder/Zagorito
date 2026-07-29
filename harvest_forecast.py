@@ -78,7 +78,8 @@ SPOTS = [
     {"id": "safi_maroc", "name": "Safi, Maroc", "lat": 32.30, "lon": -9.24},
     {"id": "eljadida_maroc", "name": "El Jadida, Maroc", "lat": 33.23, "lon": -8.50},
     {"id": "mohammedia_maroc", "name": "Mohammedia, Maroc", "lat": 33.69, "lon": -7.38},
-    {"id": "tetouan_maroc", "name": "Tetouan, Maroc", "lat": 35.57, "lon": -5.37},
+    # Martil est le point côtier de Tétouan couvert par le modèle de vagues.
+    {"id": "tetouan_maroc", "name": "Martil (Tétouan), Maroc", "lat": 35.62, "lon": -5.27},
     {"id": "alhoceima_maroc", "name": "Al Hoceima, Maroc", "lat": 35.25, "lon": -3.93},
     {"id": "nador_maroc", "name": "Nador, Maroc", "lat": 35.17, "lon": -2.93},
     {"id": "larache_maroc", "name": "Larache, Maroc", "lat": 35.19, "lon": -6.15},
@@ -122,7 +123,9 @@ SPOTS = [
     {"id": "lome_togo", "name": "Lomé, Togo", "lat": 6.13, "lon": 1.22},
     {"id": "cotonou_benin", "name": "Cotonou, Bénin", "lat": 6.37, "lon": 2.43},
     {"id": "lagos_nigeria", "name": "Lagos, Nigéria", "lat": 6.45, "lon": 3.40},
-    {"id": "portharcourt_nigeria", "name": "Port Harcourt, Nigéria", "lat": 4.82, "lon": 7.05},
+    # Bonny est l'accès maritime de Port Harcourt, hors des cellules du delta
+    # qui sont classées terrestres par le modèle marin.
+    {"id": "portharcourt_nigeria", "name": "Bonny (Port Harcourt), Nigéria", "lat": 4.45, "lon": 7.17},
     {"id": "douala_cameroun", "name": "Douala, Cameroun", "lat": 4.05, "lon": 9.70},
     {"id": "limbe_cameroun", "name": "Limbé, Cameroun", "lat": 4.02, "lon": 9.22},
     {"id": "malabo_guinee_equatoriale", "name": "Malabo, Guinée Équatoriale", "lat": 3.75, "lon": 8.78},
@@ -183,8 +186,10 @@ SPOTS = [
     {"id": "mukalla_yemen", "name": "Mukalla, Yémen", "lat": 14.54, "lon": 49.13},
     {"id": "hodeidah_yemen", "name": "Al Hudaydah, Yémen", "lat": 14.80, "lon": 42.95},
     {"id": "port_soudan_soudan", "name": "Port-Soudan, Soudan", "lat": 19.62, "lon": 37.22},
-    {"id": "aqaba_jordanie", "name": "Aqaba, Jordanie", "lat": 29.53, "lon": 35.01},
-    {"id": "eilat_israel", "name": "Eilat, Israël", "lat": 29.56, "lon": 34.95},
+    # Le nord du golfe est plus étroit que la grille GFS-Wave. Ces points,
+    # toujours proches des deux villes, sont associés à une cellule marine.
+    {"id": "aqaba_jordanie", "name": "Aqaba, Jordanie", "lat": 29.45, "lon": 35.00},
+    {"id": "eilat_israel", "name": "Eilat, Israël", "lat": 29.48, "lon": 34.94},
     {"id": "telaviv_israel", "name": "Tel Aviv, Israël", "lat": 32.09, "lon": 34.78},
     {"id": "haifa_israel", "name": "Haïfa, Israël", "lat": 32.82, "lon": 34.99},
     {"id": "beyrouth_liban", "name": "Beyrouth, Liban", "lat": 33.89, "lon": 35.50},
