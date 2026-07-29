@@ -21,10 +21,14 @@ jobs:
     timeout-minutes: 120
     steps:
       - name: Recuperer le code du depot
-        # v7.0.1 — SHA immuable pour éviter le remplacement d'un tag.
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
+        # Dépôt public : aucun jeton ni credential Git persistant. Le checkout
+        # natif évite aussi d'interpréter le gitlink historique
+        # spots_app_temp, qui n'est utilisé par aucun job.
+        run: |
+          git init .
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git -c protocol.version=2 fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach FETCH_HEAD
 
       - name: Installer Python
         # v7.0.0 — SHA immuable vérifié depuis le dépôt officiel.
