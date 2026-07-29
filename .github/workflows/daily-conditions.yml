@@ -5,15 +5,28 @@ on:
     - cron: '0 4 * * *'
   workflow_dispatch: {}
 
+# Ce job ne doit jamais pouvoir modifier le dépôt.
+permissions:
+  contents: read
+
+concurrency:
+  group: daily-fishing-conditions-production
+  cancel-in-progress: false
+
 jobs:
   update-conditions:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout du dépôt
-        uses: actions/checkout@v4
+        # SHA immuable du tag officiel actions/checkout v4.
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
 
       - name: Installation de Node.js
-        uses: actions/setup-node@v4
+        # SHA immuable du tag officiel actions/setup-node v4.
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
           cache: npm
@@ -21,7 +34,9 @@ jobs:
 
       - name: Installation des dépendances
         working-directory: functions
-        run: npm ci
+        run: |
+          npm ci --ignore-scripts
+          npm audit --omit=dev --audit-level=high
 
       - name: Vérification du secret Open-Meteo commercial
         env:
