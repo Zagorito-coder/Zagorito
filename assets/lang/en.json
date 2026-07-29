@@ -224,7 +224,7 @@
     "publicationCooldown": "Only one publication is allowed every 24 hours.",
     "locationRequiredToPublish": "Add a private location before publishing; only an approximate area will be public.",
     "communityRules": "Community rules",
-    "communityRulesBody": "I confirm that I own the photo, that it shows a genuine catch and contains no illegal, violent or privacy-infringing content. I agree that my public name, profile photo, fishing details and an approximate area may be visible for 7 days. I understand that content may be reported, moderated or removed.",
+    "communityRulesBody": "I confirm that I own the photo, that it shows a genuine catch and contains no illegal, violent, sexual, child-exploitative or privacy-infringing content. I agree that my public name, profile photo, fishing details and an approximate area may be visible for 7 days. I understand that content may be reported, moderated or removed.",
     "acceptAndContinue": "Accept and continue",
     "signInRequired": "Sign in with your account to perform this action.",
     "privateAccountHelp": "Each private gallery is separated by account so no other user of this phone can see your catches.",
@@ -245,6 +245,7 @@
     "ownPostLike": "You cannot like your own publication.",
     "reportPost": "Report catch",
     "reportReason": {
+      "child_safety": "Child safety or exploitation concern",
       "false_catch": "Fake or misleading catch",
       "inappropriate": "Inappropriate content",
       "privacy": "Privacy violation",

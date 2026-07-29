@@ -12,6 +12,7 @@ import 'package:spots_app/features/community/services/private_catch_repository.d
 import 'package:spots_app/features/community/widgets/private_catch_form_sheet.dart';
 import 'package:spots_app/l10n/app_localizations.dart';
 import 'package:spots_app/widgets/boosterfish_page.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class PrivateCatchesView extends StatefulWidget {
   const PrivateCatchesView({super.key});
@@ -425,7 +426,19 @@ class _PrivateCatchesViewState extends State<PrivateCatchesView> {
           builder: (context) => AlertDialog(
             title: Text(context.tr('community.communityRules')),
             content: SingleChildScrollView(
-              child: Text(context.tr('community.communityRulesBody')),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(context.tr('community.communityRulesBody')),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: _openCommunityTerms,
+                    icon: const Icon(Icons.open_in_new_rounded),
+                    label: Text(context.tr('termsOfService')),
+                  ),
+                ],
+              ),
             ),
             actions: [
               TextButton(
@@ -441,6 +454,21 @@ class _PrivateCatchesViewState extends State<PrivateCatchesView> {
           ),
         ) ??
         false;
+  }
+
+  Future<void> _openCommunityTerms() async {
+    final uri = Uri.parse(
+      'https://zagorito-coder.github.io/boosterfish/terms-of-service/',
+    );
+    try {
+      final opened = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!opened) _showMessage('settings.linkOpenError');
+    } catch (_) {
+      _showMessage('settings.linkOpenError');
+    }
   }
 
   Future<void> _run(Future<void> Function() action) async {

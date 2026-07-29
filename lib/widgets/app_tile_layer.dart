@@ -30,7 +30,17 @@ class _AppTileLayerState extends State<AppTileLayer> {
   TileProvider get _tileProvider {
     return _networkTileProvider ??= widget.networkTileProviderFactory?.call() ??
         NetworkTileProvider(
-          cachingProvider: const DisabledMapCachingProvider(),
+          headers: {
+            'User-Agent': 'BoosterFish Android '
+                '(+https://zagorito-coder.github.io/boosterfish/; '
+                'contact: booster2fish@gmail.com)',
+          },
+          // Respecte les en-têtes HTTP des fournisseurs (obligatoire pour
+          // tile.openstreetmap.org), évite les téléchargements répétés et
+          // borne l'empreinte disque du cache partagé entre les fonds.
+          cachingProvider: BuiltInMapCachingProvider.getOrCreateInstance(
+            maxCacheSize: 256 * 1024 * 1024,
+          ),
         );
   }
 

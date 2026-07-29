@@ -224,7 +224,7 @@
     "publicationCooldown": "Solo se permite una publicación cada 24 horas.",
     "locationRequiredToPublish": "Añade una ubicación privada antes de publicar; solo una zona aproximada será pública.",
     "communityRules": "Normas de la comunidad",
-    "communityRulesBody": "Confirmo que la foto me pertenece, que muestra una captura real y que no contiene material ilegal, violento ni que vulnere la privacidad. Acepto que mi nombre público, foto de perfil, datos de pesca y una zona aproximada sean visibles durante 7 días. Entiendo que el contenido puede ser denunciado, moderado o eliminado.",
+    "communityRulesBody": "Confirmo que la foto me pertenece, que muestra una captura real y que no contiene material ilegal, violento, sexual, que explote a un menor ni que vulnere la privacidad. Acepto que mi nombre público, foto de perfil, datos de pesca y una zona aproximada sean visibles durante 7 días. Entiendo que el contenido puede ser denunciado, moderado o eliminado.",
     "acceptAndContinue": "Aceptar y continuar",
     "signInRequired": "Inicia sesión para realizar esta acción.",
     "privateAccountHelp": "Cada galería privada está separada por cuenta para que ningún otro usuario de este teléfono pueda ver tus capturas.",
@@ -245,6 +245,7 @@
     "ownPostLike": "No puedes indicar que te gusta tu propia publicación.",
     "reportPost": "Denunciar captura",
     "reportReason": {
+      "child_safety": "Seguridad o explotación de un menor",
       "false_catch": "Captura falsa o engañosa",
       "inappropriate": "Contenido inapropiado",
       "privacy": "Violación de privacidad",

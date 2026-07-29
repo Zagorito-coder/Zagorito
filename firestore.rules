@@ -507,6 +507,7 @@ service cloud.firestore {
           ).data.ownerUid
         && request.resource.data.postOwnerUid != request.auth.uid
         && request.resource.data.reason in [
+          'child_safety',
           'false_catch',
           'inappropriate',
           'privacy',

@@ -31,11 +31,18 @@ leur contenu corresponde aux fichiers `docs/` de cette version.
   UMP.
 - **Achats intégrés / abonnements : Non.** Aucun produit Play Billing n'est
   proposé et aucune bibliothèque Billing n'est intégrée.
-- **Accès à l'application :** les fonctions principales sont accessibles sans
-  compte. La galerie privée, les spots personnels et la publication
-  communautaire nécessitent Google Sign-In. Le fil public reste lisible sans
-  compte ; ne fournir aucun identifiant de test dans la section « Accès à
-  l'application ».
+- **Accès à l'application :** sélectionner que **tout ou partie des
+  fonctionnalités est restreinte**. Les fonctions principales et le fil public
+  sont accessibles sans compte, mais la galerie privée, les spots personnels
+  et la publication communautaire nécessitent Google Sign-In.
+- Avant l'envoi en examen, créer un **compte Google dédié aux reviewers**,
+  réutilisable, valide depuis tout pays, sans validation en deux étapes, OTP,
+  appareil de confiance ni mot de passe expirant. Saisir ses identifiants
+  uniquement dans le champ sécurisé « Accès à l'application » de Play Console
+  et fournir en anglais les étapes : ouvrir l'application, accéder à
+  Communauté/Mes prises ou Mes spots, choisir Google Sign-In, puis utiliser le
+  compte fourni. Ne jamais enregistrer ces identifiants dans Git, un ticket, un
+  rapport ou cette checklist.
 - **Création de compte : Oui, facultative**, via Google Sign-In et Firebase Auth.
 - **Suppression de compte : Oui**, dans Paramètres > Confidentialité, avec
   réauthentification Google ; demande externe possible depuis l'URL publique.
@@ -63,13 +70,13 @@ leur contenu corresponde aux fichiers `docs/` de cette version.
 | Informations personnelles — adresse e-mail | Adresse du compte Google | Oui | Non¹ | Facultatif, seulement avec connexion | Fonctionnalité de l'application ; gestion du compte |
 | Identifiants utilisateur | UID Firebase | Oui | Non¹ | Facultatif, seulement avec connexion | Fonctionnalité de l'application ; gestion du compte ; sécurité/prévention des abus |
 | Photos et vidéos — photos | Photo de profil Google ; photo de prise publiée volontairement | Oui | Oui pour une publication volontaire | Facultatif | Fonctionnalité de l'application ; gestion du compte |
-| Localisation précise | Coordonnées d'un spot personnel choisi sur la carte et synchronisé dans l'espace privé du compte | Oui | Non¹ | Facultatif | Fonctionnalité de l'application |
-| Localisation approximative | Zone d'environ 5 km d'une prise publiée ; estimation IP du SDK Google Mobile Ads | Oui | Oui | Facultative pour la communauté ; requise lorsque les annonces sont diffusées | Fonctionnalité de l'application ; publicité ou marketing ; analyses ; prévention de la fraude, sécurité et conformité |
+| Localisation précise | Coordonnées d'un spot personnel synchronisé dans l'espace privé ; coordonnées des tuiles de la zone affichée lorsqu'une carte en ligne est centrée sur la position de l'appareil | Oui | Oui pour les fournisseurs de cartes en ligne ; non¹ pour Firestore | Facultatif, après autorisation ou action de l'utilisateur | Fonctionnalité de l'application |
+| Localisation approximative | Zone d'environ 5 km d'une prise publiée ; estimation par adresse IP de Google Mobile Ads, Firebase Auth et Cloud Functions | Oui | Oui pour Google Mobile Ads ; non¹ pour Firebase | Facultative pour la communauté ; requise lors de l'authentification, des appels serveur ou de la diffusion d'annonces | Fonctionnalité de l'application ; gestion du compte ; publicité ou marketing ; analyses ; prévention de la fraude, sécurité et conformité |
 | Activité dans l'application — interactions | Likes, blocages, signalements, lancements et interactions avec l'application ou les annonces | Oui | Oui pour les signaux publicitaires ; seul le total des likes est public | Facultatif pour la communauté ; requis lorsque les annonces sont diffusées | Fonctionnalité de l'application ; analyses ; sécurité/prévention des abus ; publicité ou marketing |
 | Autres contenus générés par les utilisateurs | Espèce, poids, zone, montage, appât, notes et conseil associés à une prise publiée ; informations d'un spot personnel | Oui | Oui pour une publication volontaire | Facultatif | Fonctionnalité de l'application ; sécurité/prévention des abus |
 | Informations sur l'application et performances — journaux de plantage | Piles de crash et ANR Firebase Crashlytics, état technique pertinent de l'application | Oui | Non¹ | Requise dans la version Release | Analyses |
 | Informations sur l'application et performances — diagnostics | Métadonnées techniques Crashlytics ; temps de lancement, blocages, consommation d'énergie et diagnostics du SDK publicitaire | Oui | Oui pour les signaux publicitaires ; non¹ pour Crashlytics | Requise dans la version Release et lorsque les annonces sont diffusées | Analyses ; prévention de la fraude, sécurité et conformité ; publicité ou marketing |
-| Appareil ou autres identifiants | Identifiant publicitaire Android, App Set ID et identifiants apparentés | Oui | Oui | Requise lorsque les annonces sont autorisées/diffusées | Publicité ou marketing ; analyses ; prévention de la fraude, sécurité et conformité |
+| Appareil ou autres identifiants | Identifiant publicitaire Android, App Set ID et identifiants de compte publicitaire ; jeton FCM transmis par le client Cloud Functions ; UUID d'installation Crashlytics et jeton d'intégrité App Check/Play Integrity | Oui | Oui pour Google Mobile Ads ; non¹ pour Firebase | Requise lorsque les annonces, le diagnostic Release, l'attestation ou les appels serveur sont utilisés | Fonctionnalité de l'application ; publicité ou marketing ; analyses ; prévention de la fraude, sécurité et conformité |
 
 ¹ Firebase Auth, Google Sign-In et Firebase Crashlytics sont utilisés comme
 prestataires de service respectivement pour l'authentification et le diagnostic.
@@ -88,7 +95,11 @@ destinataire pour ses propres finalités, la déclarer aussi comme partagée.
   localement une station de prévisions n'est pas envoyée à Open-Meteo. Les
   coordonnées d'un spot personnel sont toutefois synchronisées dans Firestore
   lorsque l'utilisateur choisit de créer ce spot ; c'est pourquoi la
-  localisation précise doit être déclarée comme collecte facultative.
+  localisation précise doit être déclarée comme collecte facultative. Lorsqu'une
+  carte en ligne est centrée sur la position, les coordonnées des tuiles
+  nécessaires à la zone affichée sont transmises au fournisseur cartographique ;
+  par prudence, déclarer aussi la localisation précise comme partagée pour la
+  fonctionnalité de l'application.
 - Aucun mot de passe Google, donnée bancaire, contact, message, donnée de santé,
   fichier personnel ou historique d'achat n'est collecté par l'application.
 - Firebase Crashlytics collecte les crashs et ANR techniques uniquement dans la
@@ -131,6 +142,15 @@ fournisseur ou un SDK de cartographie est ajouté.
 - **Contenu généré par les utilisateurs : Oui.** Déclarer le partage de photos
   et d'informations de pêche, les likes, le signalement intégré, le blocage, la
   modération et le retrait par l'auteur.
+- **Standards de sécurité des mineurs :** même si l'application reste classée
+  dans la catégorie Sports, sa fonction communautaire publie des photos et
+  profils. Utiliser l'ancre publique
+  `https://zagorito-coder.github.io/boosterfish/terms-of-service/#child-safety`,
+  certifier le signalement intégré (motif dédié « Sécurité ou exploitation d'un
+  mineur »), le retrait des contenus CSAM connus et leur signalement aux
+  autorités compétentes selon le droit applicable. Désigner dans Play Console
+  un responsable nominatif capable de traiter ces alertes ; l'adresse de
+  contact actuelle est `booster2fish@gmail.com`.
 - **Classement du contenu :** refaire le questionnaire en déclarant le contenu
   généré par les utilisateurs, la présence de publicité et les
   liens/contacts externes réels.
@@ -152,11 +172,16 @@ fournisseur ou un SDK de cartographie est ajouté.
 1. Vérifier que les deux URLs légales publiques répondent sans connexion et
    affichent la même date, les mêmes SDK et la même adresse que les fichiers du
    dépôt.
-2. Vérifier que la fiche « Sécurité des données », la déclaration publicitaire
-   et le public cible correspondent exactement à cette fiche.
-3. Télécharger l'AAB signé correspondant au `versionCode` attendu, puis vérifier
+2. Vérifier que le compte Google reviewer dédié fonctionne sans 2FA/OTP sur un
+   appareil ou profil où il n'était pas déjà connecté, puis renseigner
+   « Accès à l'application » en anglais.
+3. Vérifier que la fiche « Sécurité des données », la déclaration publicitaire
+   et le public cible correspondent exactement à cette fiche. Si Play Console
+   affiche la déclaration « Standards de sécurité des mineurs », renseigner
+   l'URL ancrée, le contact nominatif et les certifications décrites ci-dessus.
+4. Télécharger l'AAB signé correspondant au `versionCode` attendu, puis vérifier
    dans l'App Bundle Explorer les autorisations et SDK détectés.
-4. Installer l'APK release sur un appareil propre, refuser puis accepter les
+5. Installer l'APK release sur un appareil propre, refuser puis accepter les
    choix UMP, tester la localisation refusée/acceptée, la connexion et la
    suppression du compte. Tester aussi l'import privé, la publication avec une
    photo de moins de 2 Mo, le like depuis un second compte, le signalement, le
@@ -164,7 +189,7 @@ fournisseur ou un SDK de cartographie est ajouté.
    Cloudflare protégé par App Check, installer l'AAB depuis Google Play Internal
    Testing : un APK installé par câble n'est pas une preuve d'attestation Play
    valide.
-5. Consulter les rapports de pré-lancement, Android vitals, ANR et crashs avant
+6. Consulter les rapports de pré-lancement, Android vitals, ANR et crashs avant
    de promouvoir la version vers une piste plus large.
 
 ## Sources officielles
@@ -175,6 +200,10 @@ fournisseur ou un SDK de cartographie est ajouté.
   <https://support.google.com/googleplay/android-developer/answer/13327111>
 - Google Play — contenu généré par les utilisateurs :
   <https://support.google.com/googleplay/android-developer/answer/9876937>
+- Google Play — standards de sécurité des mineurs :
+  <https://support.google.com/googleplay/android-developer/answer/14747720>
+- Google Play — identifiants et instructions d'accès pour la revue :
+  <https://support.google.com/googleplay/android-developer/answer/15748846>
 - Google Mobile Ads — divulgation des données :
   <https://developers.google.com/admob/android/privacy/play-data-disclosure>
 - Firebase Android — divulgation des données :

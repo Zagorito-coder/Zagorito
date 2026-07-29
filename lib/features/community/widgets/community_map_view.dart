@@ -1158,6 +1158,7 @@ class _CatchDetailsSheetState extends State<_CatchDetailsSheet> {
         title: Text(context.tr('community.reportReason')),
         children: [
           for (final reason in const [
+            'child_safety',
             'false_catch',
             'inappropriate',
             'privacy',

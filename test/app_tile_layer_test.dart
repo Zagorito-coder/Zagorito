@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -39,6 +40,15 @@ Widget _mapWithStyle(MapStyle style) {
 }
 
 void main() {
+  test('les tuiles réseau conservent le cache HTTP requis par OSM', () {
+    final source = File('lib/widgets/app_tile_layer.dart').readAsStringSync();
+
+    expect(source, contains('BuiltInMapCachingProvider.getOrCreateInstance'));
+    expect(source, isNot(contains('DisabledMapCachingProvider')));
+    expect(source, contains('BoosterFish Android'));
+    expect(source, contains('contact: booster2fish@gmail.com'));
+  });
+
   testWidgets(
     'recree le fournisseur reseau apres le mode hors ligne',
     (tester) async {
