@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import worker, {
   createWorker,
+  hasExpectedAppCheckClaims,
   indexFirebaseJwks,
 } from '../src/index.mjs';
 
@@ -56,30 +57,40 @@ function environment() {
 
 function photoEnvironment() {
   const photos = new Map();
+  const bucket = {
+    async get(key) {
+      return photos.get(key) ?? null;
+    },
+    async head(key) {
+      return photos.get(key) ?? null;
+    },
+    async put(key, bytes, options) {
+      const body = new Uint8Array(bytes);
+      photos.set(key, {
+        ...storedObject(body, options.httpMetadata.contentType),
+        customMetadata: options.customMetadata,
+      });
+    },
+    async delete(key) {
+      photos.delete(key);
+    },
+  };
   return {
     photos,
     env: {
-      SPOT_PHOTOS: {
-        async get(key) {
-          return photos.get(key) ?? null;
-        },
-        async head(key) {
-          return photos.get(key) ?? null;
-        },
-        async put(key, bytes, options) {
-          const body = new Uint8Array(bytes);
-          photos.set(key, {
-            ...storedObject(body, options.httpMetadata.contentType),
-            customMetadata: options.customMetadata,
-          });
-        },
-        async delete(key) {
-          photos.delete(key);
-        },
-      },
+      SPOT_PHOTOS: bucket,
+      COMMUNITY_PHOTOS: bucket,
+      COMMUNITY_ADMIN_KEY: 'test-secret-key-with-at-least-32-characters',
     },
   };
 }
+
+const jpegBytes = Uint8Array.of(0xff, 0xd8, 0xff, 0xdb, 0, 1, 0xff, 0xd9);
+const webpBytes = Uint8Array.from([
+  ...new TextEncoder().encode('RIFF'),
+  4, 0, 0, 0,
+  ...new TextEncoder().encode('WEBP'),
+]);
 
 test('serves only the explicit offline map files', async () => {
   const response = await worker.fetch(
@@ -126,7 +137,7 @@ test('requires Firebase authentication for photo uploads', async () => {
       {
         method: 'PUT',
         headers: {'Content-Type': 'image/jpeg'},
-        body: Uint8Array.of(1, 2, 3),
+        body: jpegBytes,
       },
     ),
     env,
@@ -143,6 +154,23 @@ test('indexes the Firebase public JWKS response by key id', () => {
   });
 });
 
+test('accepts App Check claims only for the official Android app', () => {
+  const header = {alg: 'RS256', typ: 'JWT', kid: 'firebase-key'};
+  const officialClaims = {
+    aud: ['projects/68722970471'],
+    iss: 'https://firebaseappcheck.googleapis.com/68722970471',
+    sub: '1:68722970471:android:22dce79885650fc112e9c2',
+  };
+  assert.equal(hasExpectedAppCheckClaims(header, officialClaims), true);
+  assert.equal(
+    hasExpectedAppCheckClaims(header, {
+      ...officialClaims,
+      sub: '1:68722970471:android:another-app',
+    }),
+    false,
+  );
+});
+
 test('stores one photo and serves it only to its owner', async () => {
   const photoWorker = createWorker({authenticate: async () => 'owner-1'});
   const {env, photos} = photoEnvironment();
@@ -152,7 +180,7 @@ test('stores one photo and serves it only to its owner', async () => {
     new Request(url, {
       method: 'PUT',
       headers: {'Content-Type': 'image/webp'},
-      body: Uint8Array.of(1, 2, 3, 4),
+      body: webpBytes,
     }),
     env,
   );
@@ -165,7 +193,7 @@ test('stores one photo and serves it only to its owner', async () => {
   assert.equal(download.headers.get('content-type'), 'image/webp');
   assert.deepEqual(
     new Uint8Array(await download.arrayBuffer()),
-    Uint8Array.of(1, 2, 3, 4),
+    webpBytes,
   );
 
   const otherUserWorker = createWorker({
@@ -190,4 +218,128 @@ test('rejects a photo larger than 2 MB', async () => {
     env,
   );
   assert.equal(response.status, 413);
+});
+
+test('rejects a photo whose bytes do not match its declared type', async () => {
+  const photoWorker = createWorker({authenticate: async () => 'owner-1'});
+  const {env} = photoEnvironment();
+  const response = await photoWorker.fetch(
+    new Request(
+      'https://maps.example/spot-photos/abcdefghijklmnopqrst-1234567890',
+      {
+        method: 'PUT',
+        headers: {'Content-Type': 'image/jpeg'},
+        body: Uint8Array.of(1, 2, 3, 4),
+      },
+    ),
+    env,
+  );
+  assert.equal(response.status, 415);
+});
+
+test('community photos require auth and App Check to upload, then are public', async () => {
+  const photoWorker = createWorker({
+    authenticate: async () => 'owner-1',
+    authenticateAppCheck: async () => 'android-app-id',
+  });
+  const {env} = photoEnvironment();
+  const url =
+    'https://maps.example/community-photos/owner-1_abcdefghijklmnopqrstuvwx';
+  const upload = await photoWorker.fetch(
+    new Request(url, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'image/jpeg',
+        'X-Firebase-AppCheck': 'verified-by-test',
+      },
+      body: jpegBytes,
+    }),
+    env,
+  );
+  assert.equal(upload.status, 201);
+
+  const publicWorker = createWorker({
+    authenticate: async () => null,
+    authenticateAppCheck: async () => null,
+  });
+  const download = await publicWorker.fetch(new Request(url), env);
+  assert.equal(download.status, 200);
+  assert.equal(download.headers.get('content-type'), 'image/jpeg');
+  assert.deepEqual(
+    new Uint8Array(await download.arrayBuffer()),
+    jpegBytes,
+  );
+});
+
+test('community photo upload rejects a missing App Check token', async () => {
+  const photoWorker = createWorker({
+    authenticate: async () => 'owner-1',
+    authenticateAppCheck: async () => null,
+  });
+  const {env} = photoEnvironment();
+  const response = await photoWorker.fetch(
+    new Request(
+      'https://maps.example/community-photos/owner-1_abcdefghijklmnopqrstuvwx',
+      {
+        method: 'PUT',
+        headers: {'Content-Type': 'image/jpeg'},
+        body: jpegBytes,
+      },
+    ),
+    env,
+  );
+  assert.equal(response.status, 401);
+});
+
+test('community photo upload rejects a key outside the owner namespace',
+    async () => {
+  const photoWorker = createWorker({
+    authenticate: async () => 'owner-1',
+    authenticateAppCheck: async () => 'android-app-id',
+  });
+  const {env, photos} = photoEnvironment();
+  const response = await photoWorker.fetch(
+    new Request(
+      'https://maps.example/community-photos/owner-2_abcdefghijklmnopqrstuvwx',
+      {
+        method: 'PUT',
+        headers: {'Content-Type': 'image/jpeg'},
+        body: jpegBytes,
+      },
+    ),
+    env,
+  );
+  assert.equal(response.status, 403);
+  assert.equal(photos.size, 0);
+});
+
+test('community admin deletion requires the server secret', async () => {
+  const photoWorker = createWorker({
+    authenticate: async () => 'owner-1',
+    authenticateAppCheck: async () => 'android-app-id',
+  });
+  const {env, photos} = photoEnvironment();
+  const key = 'owner-1_abcdefghijklmnopqrstuvwx';
+  photos.set(key, {
+    ...storedObject(jpegBytes, 'image/jpeg'),
+    customMetadata: {ownerUid: 'owner-1'},
+  });
+  const url = `https://maps.example/community-admin/photos/${key}`;
+
+  const unauthorized = await photoWorker.fetch(
+    new Request(url, {method: 'DELETE'}),
+    env,
+  );
+  assert.equal(unauthorized.status, 401);
+  assert.equal(photos.has(key), true);
+
+  const deleted = await photoWorker.fetch(
+    new Request(url, {
+      method: 'DELETE',
+      headers: {'X-Community-Admin-Key': env.COMMUNITY_ADMIN_KEY},
+    }),
+    env,
+  );
+  assert.equal(deleted.status, 204);
+  assert.equal(photos.has(key), false);
 });

@@ -16,6 +16,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:spots_app/services/user_spot_service.dart';
 import 'package:spots_app/services/favorite_spot_service.dart';
+import 'package:spots_app/features/community/services/community_repository.dart';
 
 class LocalUser {
   final String displayName;
@@ -217,6 +218,7 @@ class AuthService extends ChangeNotifier {
     try {
       await UserSpotService.instance.deleteAllForCurrentUser();
       await FavoriteSpotService.instance.deleteAllForCurrentUser();
+      await CommunityRepository.instance.deleteAllForCurrentUser();
       await FirebaseFirestore.instance
           .collection('subscriptions')
           .doc(user.uid)

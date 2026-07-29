@@ -139,6 +139,117 @@ service cloud.firestore {
         && request.resource.data.createdAt is timestamp;
     }
 
+    function communityProfileAccepted(userId) {
+      return exists(/databases/$(database)/documents/community_profiles/$(userId))
+        && get(
+          /databases/$(database)/documents/community_profiles/$(userId)
+        ).data.termsVersion == 1
+        && get(
+          /databases/$(database)/documents/community_profiles/$(userId)
+        ).data.termsAcceptedAt is timestamp;
+    }
+
+    function hasValidCommunityPhoto(userId) {
+      return request.resource.data.photoUrl is string
+        && request.resource.data.photoUrl.matches(
+          '^https://boosterfish-offline-maps\\.boosterfish-maps\\.workers\\.dev/community-photos/[A-Za-z0-9_-]{20,225}$'
+        )
+        && request.resource.data.photoObjectKey is string
+        && request.resource.data.photoObjectKey.matches(
+          '^' + userId + '_[A-Za-z0-9_-]{20,128}$'
+        );
+    }
+
+    function hasValidCommunityCatch(userId) {
+      return request.resource.data.keys().hasOnly([
+          'schemaVersion',
+          'ownerUid',
+          'anglerName',
+          'avatarUrl',
+          'photoUrl',
+          'photoObjectKey',
+          'species',
+          'weightKg',
+          'zoneName',
+          'publicLatitude',
+          'publicLongitude',
+          'montage',
+          'bait',
+          'notes',
+          'advice',
+          'status',
+          'likeCount',
+          'reportCount',
+          'createdAt',
+          'expiresAt'
+        ])
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.ownerUid == userId
+        && request.resource.data.anglerName is string
+        && request.resource.data.anglerName.size() > 0
+        && request.resource.data.anglerName.size() <= 80
+        && request.resource.data.avatarUrl is string
+        && request.resource.data.avatarUrl.size() <= 1024
+        && (
+          request.resource.data.avatarUrl == ''
+          || request.resource.data.avatarUrl.matches('^https://.+$')
+        )
+        && hasValidCommunityPhoto(userId)
+        && request.resource.data.species is string
+        && request.resource.data.species.size() > 0
+        && request.resource.data.species.size() <= 80
+        && request.resource.data.weightKg is number
+        && request.resource.data.weightKg >= 0.01
+        && request.resource.data.weightKg <= 1000
+        && request.resource.data.zoneName is string
+        && request.resource.data.zoneName.size() > 0
+        && request.resource.data.zoneName.size() <= 100
+        && request.resource.data.publicLatitude is number
+        && request.resource.data.publicLatitude >= -85
+        && request.resource.data.publicLatitude <= 85
+        && request.resource.data.publicLongitude is number
+        && request.resource.data.publicLongitude >= -180
+        && request.resource.data.publicLongitude <= 180
+        && request.resource.data.montage is string
+        && request.resource.data.montage.size() <= 160
+        && request.resource.data.bait is string
+        && request.resource.data.bait.size() <= 120
+        && request.resource.data.notes is string
+        && request.resource.data.notes.size() <= 600
+        && request.resource.data.advice is string
+        && request.resource.data.advice.size() <= 400
+        && request.resource.data.status == 'published'
+        && request.resource.data.likeCount == 0
+        && request.resource.data.reportCount == 0
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt
+          > request.time + duration.value(167, 'h')
+        && request.resource.data.expiresAt
+          <= request.time + duration.value(169, 'h');
+    }
+
+    function communityPublishStateAllows(userId, postId) {
+      return getAfter(
+          /databases/$(database)/documents/community_publish_state/$(userId)
+        ).data.ownerUid == userId
+        && getAfter(
+          /databases/$(database)/documents/community_publish_state/$(userId)
+        ).data.lastPostId == postId
+        && getAfter(
+          /databases/$(database)/documents/community_publish_state/$(userId)
+        ).data.lastPublishedAt == request.time
+        && (
+          !exists(
+            /databases/$(database)/documents/community_publish_state/$(userId)
+          )
+          || get(
+            /databases/$(database)/documents/community_publish_state/$(userId)
+          ).data.lastPublishedAt
+            <= request.time - duration.value(24, 'h')
+        );
+    }
+
     // Monétisation désactivée : aucun client ne doit pouvoir créer ou modifier
     // un droit Premium. La suppression par le propriétaire est conservée pour
     // permettre le nettoyage d'un ancien compte.
@@ -211,6 +322,222 @@ service cloud.firestore {
         && request.resource.data.status == 'pending';
       allow delete: if isSignedIn()
         && resource.data.ownerUid == request.auth.uid;
+    }
+
+    // Galerie communautaire publique. Les coordonnées sont déjà réduites à
+    // une cellule approximative côté appareil ; aucune coordonnée privée ne
+    // figure dans ces documents.
+    match /community_catches/{postId} {
+      // Range queries cannot safely compare their literal cutoff with the
+      // dynamic request.time. Expiration is therefore enforced by the client
+      // query and by the five-minute trusted cleanup job, which changes the
+      // status or deletes the document.
+      allow read: if resource.data.status == 'published';
+      allow create: if isSignedIn()
+        && communityProfileAccepted(request.auth.uid)
+        && hasValidCommunityCatch(request.auth.uid)
+        && communityPublishStateAllows(request.auth.uid, postId);
+      allow update: if isSignedIn()
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['likeCount'])
+        && request.resource.data.likeCount is int
+        && request.resource.data.likeCount >= 0
+        && (
+          (
+            request.resource.data.likeCount == resource.data.likeCount + 1
+            && !exists(
+              /databases/$(database)/documents/community_catches/$(postId)/likes/$(request.auth.uid)
+            )
+            && existsAfter(
+              /databases/$(database)/documents/community_catches/$(postId)/likes/$(request.auth.uid)
+            )
+          )
+          || (
+            request.resource.data.likeCount == resource.data.likeCount - 1
+            && resource.data.likeCount > 0
+            && exists(
+              /databases/$(database)/documents/community_catches/$(postId)/likes/$(request.auth.uid)
+            )
+            && !existsAfter(
+              /databases/$(database)/documents/community_catches/$(postId)/likes/$(request.auth.uid)
+            )
+          )
+        );
+      allow delete: if isSignedIn()
+        && resource.data.ownerUid == request.auth.uid;
+
+      // Un seul like par compte et par prise. Une écriture de like doit
+      // obligatoirement être couplée à l'incrément transactionnel du compteur.
+      match /likes/{likerId} {
+        allow get: if isSignedIn();
+        allow list: if isSignedIn()
+          && resource.data.likerUid == request.auth.uid;
+        allow create: if isSignedIn()
+          && likerId == request.auth.uid
+          && request.resource.data.keys().hasOnly([
+            'schemaVersion',
+            'likerUid',
+            'postOwnerUid',
+            'createdAt'
+          ])
+          && request.resource.data.schemaVersion == 1
+          && request.resource.data.likerUid == request.auth.uid
+          && request.resource.data.postOwnerUid
+            == get(
+              /databases/$(database)/documents/community_catches/$(postId)
+            ).data.ownerUid
+          && request.resource.data.postOwnerUid != request.auth.uid
+          && request.resource.data.createdAt == request.time
+          && get(
+            /databases/$(database)/documents/community_catches/$(postId)
+          ).data.status == 'published'
+          && get(
+            /databases/$(database)/documents/community_catches/$(postId)
+          ).data.expiresAt > request.time
+          && getAfter(
+            /databases/$(database)/documents/community_catches/$(postId)
+          ).data.likeCount
+            == get(
+              /databases/$(database)/documents/community_catches/$(postId)
+            ).data.likeCount + 1;
+        allow update: if false;
+        allow delete: if isSignedIn()
+          && (
+            (
+              likerId == request.auth.uid
+              && getAfter(
+                /databases/$(database)/documents/community_catches/$(postId)
+              ).data.likeCount
+                == get(
+                  /databases/$(database)/documents/community_catches/$(postId)
+                ).data.likeCount - 1
+            )
+            || (
+              get(
+                /databases/$(database)/documents/community_catches/$(postId)
+              ).data.ownerUid == request.auth.uid
+              && !existsAfter(
+                /databases/$(database)/documents/community_catches/$(postId)
+              )
+            )
+          );
+      }
+    }
+
+    // Autorisation explicite requise par les requêtes collectionGroup. La
+    // contrainte likerUid du client est vérifiée par les règles : un compte ne
+    // peut lister que ses propres likes, jamais ceux d'un autre pêcheur.
+    match /{documentPath=**}/likes/{likerId} {
+      allow list: if isSignedIn()
+        && resource.data.likerUid == request.auth.uid;
+    }
+
+    // Consentement UGC versionné, visible et modifiable uniquement par le
+    // propriétaire du compte.
+    match /community_profiles/{userId} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.keys().hasOnly([
+          'schemaVersion',
+          'ownerUid',
+          'termsVersion',
+          'termsAcceptedAt',
+          'updatedAt'
+        ])
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.ownerUid == userId
+        && request.resource.data.termsVersion == 1
+        && request.resource.data.termsAcceptedAt == request.time
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    // Verrou serveur de la limite d'une publication toutes les 24 heures.
+    match /community_publish_state/{userId} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.keys().hasOnly([
+          'schemaVersion',
+          'ownerUid',
+          'lastPostId',
+          'lastPublishedAt'
+        ])
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.ownerUid == userId
+        && request.resource.data.lastPostId is string
+        && request.resource.data.lastPostId.size() > 0
+        && request.resource.data.lastPostId.size() <= 128
+        && request.resource.data.lastPublishedAt == request.time
+        && existsAfter(
+          /databases/$(database)/documents/community_catches/$(request.resource.data.lastPostId)
+        )
+        && getAfter(
+          /databases/$(database)/documents/community_catches/$(request.resource.data.lastPostId)
+        ).data.ownerUid == userId
+        && (
+          !exists(
+            /databases/$(database)/documents/community_publish_state/$(userId)
+          )
+          || resource.data.lastPublishedAt
+            <= request.time - duration.value(24, 'h')
+        );
+    }
+
+    // Signalements distincts, non modifiables après envoi. Les modérateurs
+    // les lisent via l'Admin SDK qui contourne ces règles.
+    match /community_reports/{reportId} {
+      allow read, delete: if isSignedIn()
+        && resource.data.reporterUid == request.auth.uid;
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly([
+          'schemaVersion',
+          'reporterUid',
+          'postId',
+          'postOwnerUid',
+          'reason',
+          'status',
+          'createdAt'
+        ])
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.reporterUid == request.auth.uid
+        && request.resource.data.postId is string
+        && reportId == request.auth.uid + '_' + request.resource.data.postId
+        && request.resource.data.postOwnerUid
+          == get(
+            /databases/$(database)/documents/community_catches/$(request.resource.data.postId)
+          ).data.ownerUid
+        && request.resource.data.postOwnerUid != request.auth.uid
+        && request.resource.data.reason in [
+          'false_catch',
+          'inappropriate',
+          'privacy',
+          'other'
+        ]
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt == request.time;
+      allow update: if false;
+    }
+
+    // Blocages privés. Ils sont volontairement séparés des signalements.
+    match /community_blocks/{userId}/users/{blockedUserId} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && blockedUserId != userId
+        && request.resource.data.keys().hasOnly([
+          'schemaVersion',
+          'ownerUid',
+          'blockedUid',
+          'createdAt'
+        ])
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.ownerUid == userId
+        && request.resource.data.blockedUid == blockedUserId
+        && request.resource.data.createdAt == request.time;
+    }
+
+    // Résultat calculé exclusivement par une fonction serveur.
+    match /community_state/{documentId} {
+      allow read: if documentId == 'weekly_winner';
+      allow write: if false;
     }
 
   }

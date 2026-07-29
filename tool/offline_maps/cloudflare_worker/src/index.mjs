@@ -14,7 +14,8 @@ const allowedObjects = new Set([
 ]);
 
 const commonHeaders = {
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type, Range',
+  'Access-Control-Allow-Headers':
+    'Authorization, Content-Type, Range, X-Firebase-AppCheck',
   'Access-Control-Allow-Methods': 'GET, HEAD, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Expose-Headers':
@@ -23,8 +24,13 @@ const commonHeaders = {
 };
 
 const firebaseProjectId = 'zagorito-9a0c4';
+const firebaseProjectNumber = '68722970471';
+const firebaseAndroidAppId =
+  '1:68722970471:android:22dce79885650fc112e9c2';
 const firebaseJwksUrl =
   'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
+const firebaseAppCheckJwksUrl =
+  'https://firebaseappcheck.googleapis.com/v1/jwks';
 const maximumPhotoBytes = 2 * 1024 * 1024;
 const photoContentTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const textEncoder = new TextEncoder();
@@ -71,6 +77,19 @@ function offlineObjectKey(request) {
 function photoObjectKey(request) {
   const path = new URL(request.url).pathname;
   const match = /^\/spot-photos\/([A-Za-z0-9_-]{20,96})$/.exec(path);
+  return match?.[1] ?? null;
+}
+
+function communityPhotoObjectKey(request) {
+  const path = new URL(request.url).pathname;
+  const match = /^\/community-photos\/([A-Za-z0-9_-]{20,225})$/.exec(path);
+  return match?.[1] ?? null;
+}
+
+function communityAdminPhotoObjectKey(request) {
+  const path = new URL(request.url).pathname;
+  const match =
+    /^\/community-admin\/photos\/([A-Za-z0-9_-]{20,225})$/.exec(path);
   return match?.[1] ?? null;
 }
 
@@ -238,6 +257,85 @@ async function defaultAuthenticate(request, getJwks) {
   }
 }
 
+export function hasExpectedAppCheckClaims(header, payload) {
+  if (
+    header == null
+    || typeof header !== 'object'
+    || payload == null
+    || typeof payload !== 'object'
+  ) {
+    return false;
+  }
+  const audience = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
+  return !(
+    header.alg !== 'RS256'
+    || header.typ !== 'JWT'
+    || typeof header.kid !== 'string'
+    || payload.iss
+      !== `https://firebaseappcheck.googleapis.com/${firebaseProjectNumber}`
+    || !audience.includes(`projects/${firebaseProjectNumber}`)
+    || typeof payload.sub !== 'string'
+    || payload.sub !== firebaseAndroidAppId
+  );
+}
+
+function isOwnerScopedCommunityPhotoKey(key, ownerUid) {
+  return typeof ownerUid === 'string'
+    && ownerUid.length > 0
+    && ownerUid.length <= 128
+    && key.startsWith(`${ownerUid}_`)
+    && key.length > ownerUid.length + 20;
+}
+
+async function defaultAuthenticateAppCheck(request, getJwks) {
+  const token = request.headers.get('X-Firebase-AppCheck') ?? '';
+  const sections = token.split('.');
+  if (sections.length !== 3) return null;
+
+  let header;
+  let payload;
+  try {
+    header = decodeJwtSection(sections[0]);
+    payload = decodeJwtSection(sections[1]);
+  } catch {
+    return null;
+  }
+  if (!hasExpectedAppCheckClaims(header, payload)) {
+    return null;
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  if (
+    typeof payload.exp !== 'number'
+    || payload.exp <= now
+    || typeof payload.iat !== 'number'
+    || payload.iat > now + 300
+  ) {
+    return null;
+  }
+  try {
+    const jwks = await getJwks();
+    const jwk = jwks[header.kid];
+    if (jwk == null) return null;
+    const key = await crypto.subtle.importKey(
+      'jwk',
+      jwk,
+      {name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256'},
+      false,
+      ['verify'],
+    );
+    const valid = await crypto.subtle.verify(
+      'RSASSA-PKCS1-v1_5',
+      key,
+      decodeBase64Url(sections[2]),
+      textEncoder.encode(`${sections[0]}.${sections[1]}`),
+    );
+    return valid ? payload.sub : null;
+  } catch {
+    return null;
+  }
+}
+
 function createJwksLoader() {
   let cachedJwks = null;
   let expiresAt = 0;
@@ -249,6 +347,21 @@ function createJwksLoader() {
     if (!response.ok) throw new Error('Firebase keys unavailable');
     cachedJwks = indexFirebaseJwks(await response.json());
     expiresAt = Date.now() + 60 * 60 * 1000;
+    return cachedJwks;
+  };
+}
+
+function createAppCheckJwksLoader() {
+  let cachedJwks = null;
+  let expiresAt = 0;
+  return async () => {
+    if (cachedJwks != null && Date.now() < expiresAt) return cachedJwks;
+    const response = await fetch(firebaseAppCheckJwksUrl, {
+      cf: {cacheEverything: true, cacheTtl: 21600},
+    });
+    if (!response.ok) throw new Error('Firebase App Check keys unavailable');
+    cachedJwks = indexFirebaseJwks(await response.json());
+    expiresAt = Date.now() + 6 * 60 * 60 * 1000;
     return cachedJwks;
   };
 }
@@ -312,6 +425,9 @@ async function handlePhotoPut(request, bucket, key, ownerUid) {
   if (bytes.byteLength === 0 || bytes.byteLength > maximumPhotoBytes) {
     return errorResponse(413, 'Image exceeds 2 MB');
   }
+  if (!hasExpectedImageSignature(new Uint8Array(bytes), contentType)) {
+    return errorResponse(415, 'Image content does not match its type');
+  }
   await bucket.put(key, bytes, {
     httpMetadata: {contentType},
     customMetadata: {ownerUid},
@@ -320,6 +436,61 @@ async function handlePhotoPut(request, bucket, key, ownerUid) {
   const url = new URL(request.url);
   url.search = `?v=${Date.now()}`;
   return jsonResponse(201, {photoUrl: url.toString()});
+}
+
+function hasExpectedImageSignature(bytes, contentType) {
+  if (contentType === 'image/jpeg') {
+    return bytes.length >= 4
+      && bytes[0] === 0xff
+      && bytes[1] === 0xd8
+      && bytes[2] === 0xff;
+  }
+  if (contentType === 'image/png') {
+    const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+    return bytes.length >= signature.length
+      && signature.every((value, index) => bytes[index] === value);
+  }
+  if (contentType === 'image/webp') {
+    return bytes.length >= 12
+      && String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF'
+      && String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP';
+  }
+  return false;
+}
+
+async function handlePublicPhotoGet(request, bucket, key) {
+  const object = request.method === 'HEAD'
+    ? await bucket.head(key)
+    : await bucket.get(key);
+  if (object == null) return errorResponse(404, 'Not found');
+  const headers = responseHeaders(object, key, object.size);
+  headers.set('Cache-Control', 'public, max-age=86400, must-revalidate');
+  return new Response(request.method === 'HEAD' ? null : object.body, {
+    status: 200,
+    headers,
+  });
+}
+
+async function hasValidAdminKey(request, configuredKey) {
+  const supplied = request.headers.get('X-Community-Admin-Key') ?? '';
+  if (
+    typeof configuredKey !== 'string'
+    || configuredKey.length < 32
+    || supplied.length !== configuredKey.length
+  ) {
+    return false;
+  }
+  const [suppliedDigest, configuredDigest] = await Promise.all([
+    crypto.subtle.digest('SHA-256', textEncoder.encode(supplied)),
+    crypto.subtle.digest('SHA-256', textEncoder.encode(configuredKey)),
+  ]);
+  const suppliedBytes = new Uint8Array(suppliedDigest);
+  const configuredBytes = new Uint8Array(configuredDigest);
+  let difference = 0;
+  for (let index = 0; index < suppliedBytes.length; index += 1) {
+    difference |= suppliedBytes[index] ^ configuredBytes[index];
+  }
+  return difference === 0;
 }
 
 async function handlePhotoDelete(bucket, key, ownerUid) {
@@ -334,15 +505,84 @@ async function handlePhotoDelete(bucket, key, ownerUid) {
 
 export function createWorker({
   authenticate,
+  authenticateAppCheck,
   getJwks = createJwksLoader(),
+  getAppCheckJwks = createAppCheckJwksLoader(),
 } = {}) {
   const authenticateRequest = authenticate
     ?? ((request) => defaultAuthenticate(request, getJwks));
+  const authenticateAppRequest = authenticateAppCheck
+    ?? ((request) => defaultAuthenticateAppCheck(request, getAppCheckJwks));
 
   return {
     async fetch(request, env) {
     if (request.method === 'OPTIONS') {
       return new Response(null, {status: 204, headers: commonHeaders});
+    }
+
+    const adminPhotoKey = communityAdminPhotoObjectKey(request);
+    if (adminPhotoKey != null) {
+      if (request.method !== 'DELETE') {
+        return errorResponse(405, 'Method not allowed', {Allow: 'DELETE'});
+      }
+      if (!await hasValidAdminKey(request, env.COMMUNITY_ADMIN_KEY)) {
+        return errorResponse(401, 'Unauthorized');
+      }
+      try {
+        await env.COMMUNITY_PHOTOS.delete(adminPhotoKey);
+        return new Response(null, {status: 204});
+      } catch {
+        return errorResponse(503, 'Storage temporarily unavailable');
+      }
+    }
+
+    const communityPhotoKey = communityPhotoObjectKey(request);
+    if (communityPhotoKey != null) {
+      try {
+        if (
+          request.method !== 'GET'
+          && request.method !== 'HEAD'
+          && request.method !== 'PUT'
+          && request.method !== 'DELETE'
+        ) {
+          return errorResponse(405, 'Method not allowed', {
+            Allow: 'GET, HEAD, PUT, DELETE',
+          });
+        }
+        if (request.method === 'GET' || request.method === 'HEAD') {
+          return await handlePublicPhotoGet(
+            request,
+            env.COMMUNITY_PHOTOS,
+            communityPhotoKey,
+          );
+        }
+        const authentication = await authenticateRequest(request);
+        if (authentication == null) return errorResponse(401, 'Unauthorized');
+        const appId = await authenticateAppRequest(request);
+        if (appId == null) {
+          return errorResponse(401, 'Invalid Firebase App Check token');
+        }
+        const actor = typeof authentication === 'string'
+          ? {uid: authentication}
+          : authentication;
+        if (!isOwnerScopedCommunityPhotoKey(communityPhotoKey, actor.uid)) {
+          return errorResponse(403, 'Forbidden');
+        }
+        return request.method === 'PUT'
+          ? await handlePhotoPut(
+              request,
+              env.COMMUNITY_PHOTOS,
+              communityPhotoKey,
+              actor.uid,
+            )
+          : await handlePhotoDelete(
+              env.COMMUNITY_PHOTOS,
+              communityPhotoKey,
+              actor.uid,
+            );
+      } catch {
+        return errorResponse(503, 'Storage temporarily unavailable');
+      }
     }
 
     const photoKey = photoObjectKey(request);

@@ -16,7 +16,7 @@
 <body>
 
 <h1>Politique de confidentialité — BoosterFish</h1>
-<p class="last-update">Dernière mise à jour : 22 juillet 2026</p>
+<p class="last-update">Dernière mise à jour : 29 juillet 2026</p>
 
 <p>
   La présente politique décrit les traitements de données réalisés par
@@ -33,7 +33,11 @@
 <h2>1. Données traitées</h2>
 <ul>
   <li><strong>Compte Google facultatif :</strong> adresse e-mail, nom d'affichage, photo de profil et identifiant Firebase (UID), lorsque vous choisissez Google Sign-In.</li>
-  <li><strong>Localisation :</strong> position approximative ou précise après autorisation Android, utilisée sur l'appareil pour centrer la carte, calculer des distances et sélectionner la station de prévisions publiée la plus proche. BoosterFish ne l'enregistre pas dans un profil et ne transmet pas votre position à Open-Meteo.</li>
+  <li><strong>Localisation de l'appareil :</strong> position approximative ou précise après autorisation Android, utilisée pour centrer la carte, calculer des distances, sélectionner localement la station de prévisions publiée la plus proche et, uniquement à votre demande, renseigner l'emplacement d'une prise privée. BoosterFish ne transmet pas cette position à Open-Meteo.</li>
+  <li><strong>Spots personnels :</strong> nom, notes, photo facultative et coordonnées du point que vous choisissez sur la carte. Ces éléments sont synchronisés dans l'espace Firestore privé de votre compte afin de les retrouver sur vos appareils et d'alimenter une file privée de vérification. Ils ne sont pas rendus publics automatiquement.</li>
+  <li><strong>Galerie privée « Mes prises » :</strong> photo, espèce, poids, zone, montage, appât, notes, conseil, date et, si vous la renseignez, position exacte. Ces données restent dans le stockage privé de l'Application sur votre appareil, séparé par compte, dans la limite de 20 prises. Elles ne sont jamais publiées automatiquement.</li>
+  <li><strong>Publication communautaire facultative :</strong> lorsque vous choisissez explicitement « Publier », BoosterFish envoie la photo sélectionnée, votre nom public et votre photo de profil éventuelle, l'espèce, le poids, la zone, le montage, l'appât, les notes et le conseil. La position exacte n'est pas envoyée : l'Application publie uniquement le centre d'une grille d'environ 5 km. La publication, ces informations et le compteur de mentions J'aime sont visibles par les autres utilisateurs.</li>
+  <li><strong>Interactions et modération :</strong> identifiant du compte, mentions J'aime, blocages et signalements (motif et publication concernée) nécessaires au fonctionnement et à la sécurité de la communauté. L'identité des personnes qui aiment, bloquent ou signalent n'est pas affichée publiquement.</li>
   <li><strong>Zones cartographiques et lieux consultés :</strong> les fournisseurs de cartes reçoivent les coordonnées des tuiles nécessaires à la zone affichée. Les coordonnées publiques d'un spot peuvent être transmises à une application de navigation uniquement lorsque vous choisissez explicitement de l'ouvrir. Elles ne sont pas associées à votre compte par BoosterFish.</li>
   <li><strong>Publicité et consentement :</strong> Google Mobile Ads (AdMob) et la plateforme UMP peuvent traiter des identifiants d'appareil ou publicitaires, l'adresse IP, des informations techniques, les interactions avec les annonces et le choix de consentement, conformément aux paramètres UMP et aux règles de Google.</li>
   <li><strong>Protection de l'application :</strong> Firebase App Check utilise, en version Android Release, l'attestation Google Play Integrity et un jeton d'intégrité transmis à Firebase afin de vérifier que les requêtes proviennent de l'application authentique et de limiter les abus. Ce traitement sert à la sécurité et à la prévention de la fraude, et n'est pas utilisé pour la publicité ou la personnalisation.</li>
@@ -44,6 +48,8 @@
 <h2>2. Finalités et bases juridiques</h2>
 <ul>
   <li>fournir l'authentification, les cartes, les spots et les prévisions demandées ;</li>
+  <li>enregistrer la galerie privée choisie par l'utilisateur et afficher les prises communautaires publiées volontairement ;</li>
+  <li>faire respecter la limite d'une publication par 24 heures, calculer la meilleure prise hebdomadaire et traiter les likes, blocages et signalements ;</li>
   <li>mémoriser les préférences et assurer la sécurité du service ;</li>
   <li>afficher des annonces pour financer l'Application ;</li>
   <li>respecter les obligations légales et prévenir les abus.</li>
@@ -59,8 +65,9 @@
 <h2>3. Services et destinataires</h2>
 <p>BoosterFish utilise les prestataires suivants, qui appliquent leurs propres politiques :</p>
 <ul>
-  <li><strong>Google Firebase Auth et Firestore :</strong> connexion Google et lecture de prévisions. Aucun nouveau droit d'abonnement n'est créé par l'Application.</li>
+  <li><strong>Google Firebase Auth, Firestore et Cloud Functions :</strong> connexion Google, données privées de compte, spots personnels, publication communautaire, likes, blocages, signalements, classement hebdomadaire, modération et suppression des données. Aucun nouveau droit d'abonnement n'est créé par l'Application.</li>
   <li><strong>Firebase App Check et Google Play Integrity :</strong> attestation de l'application et de l'environnement Android pour protéger les ressources Firebase contre les requêtes frauduleuses ou non autorisées. Voir les informations de confidentialité de Google et Firebase.</li>
+  <li><strong>Cloudflare Workers et R2 :</strong> distribution des cartes hors ligne et stockage des photos de spots ou de prises publiées. Les photos communautaires sont accessibles publiquement par une URL non devinable pendant leur période de publication ou de classement ; les écritures sont protégées par Firebase Auth et App Check.</li>
   <li><strong>Google AdMob et User Messaging Platform (UMP) :</strong> consentement et diffusion des annonces. Voir la <a href="https://policies.google.com/privacy">Politique de confidentialité de Google</a>.</li>
   <li><strong>Open-Meteo :</strong> données météo et marines obtenues exclusivement par les tâches serveur utilisant les endpoints commerciaux, puis publiées dans Firestore. L'Application mobile ne contacte pas directement Open-Meteo. Voir les <a href="https://open-meteo.com/en/terms">conditions et informations de confidentialité</a>.</li>
   <li><strong>OpenStreetMap et Overpass, CARTO et Esri :</strong> cartes, tuiles et informations publiques sur les magasins.</li>
@@ -90,7 +97,10 @@
 <h2>5. Conservation</h2>
 <ul>
   <li>Les données du compte Firebase sont conservées jusqu'à la suppression du compte ou selon les délais nécessaires à la sécurité et aux obligations légales.</li>
-  <li>La position n'est pas enregistrée dans un profil serveur par BoosterFish.</li>
+  <li>Les coordonnées exactes d'une prise de la galerie privée restent sur l'appareil. Les coordonnées d'un spot personnel choisi sur la carte sont conservées dans l'espace privé du compte jusqu'à sa suppression.</li>
+  <li>Une prise communautaire ordinaire reste active au maximum 7 jours. Les éléments nécessaires à l'annonce de la meilleure prise et à ses remplaçantes limitées peuvent être conservés jusqu'au classement hebdomadaire suivant. Une publication retirée par son auteur, supprimée par modération ou liée à un compte supprimé est effacée avec sa photo publique.</li>
+  <li>Les likes, signalements et éléments de modération associés sont supprimés avec la publication ou le compte concerné, sous réserve d'une conservation plus longue strictement nécessaire à une obligation légale ou à la prévention d'un abus grave.</li>
+  <li>Les photos et fiches de la galerie privée restent sur l'appareil jusqu'à leur suppression par l'utilisateur, la suppression du compte lorsqu'elle peut être exécutée, l'effacement des données de l'Application ou sa désinstallation.</li>
   <li>Les préférences et caches locaux restent sur l'appareil jusqu'à leur effacement, la suppression du compte lorsqu'ils sont concernés, ou la désinstallation.</li>
   <li>Les données publicitaires et journaux des prestataires sont conservés selon leurs propres politiques et votre choix de consentement.</li>
 </ul>
@@ -112,8 +122,10 @@
   <li>appuyez sur <strong>Supprimer mon compte</strong> et confirmez la réauthentification Google.</li>
 </ol>
 <p>
-  Cette opération supprime le compte Firebase Auth, nettoie les données locales liées et demande
-  la suppression de tout ancien enregistrement d'abonnement éventuellement associé au UID.
+  Cette opération supprime les publications communautaires et leurs photos, likes, signalements,
+  blocages, consentement communautaire, spots personnels, galerie privée locale, ancien
+  enregistrement d'abonnement éventuellement associé au UID, puis le compte Firebase Auth.
+  Une publication peut aussi être retirée séparément depuis sa fiche dans la Communauté.
 </p>
 <p>
   Si l'Application n'est plus installée, initiez la demande via
@@ -125,9 +137,11 @@
 <h2>8. Sécurité</h2>
 <p>
   Les échanges réseau utilisent HTTPS/TLS, l'authentification repose sur Google OAuth et Firebase,
-  et les règles Firestore bloquent les écritures du client sur les prévisions et les anciens droits
-  d'abonnement. Aucun mot de passe Google n'est reçu ou stocké par BoosterFish. Aucun système n'étant
-  infaillible, contactez-nous si vous soupçonnez un incident.
+  les règles Firestore isolent les données privées, valident les publications et bloquent les
+  écritures du client sur les prévisions et les anciens droits d'abonnement. Les photos sont
+  limitées à 2 Mo, réencodées sans métadonnées EXIF avant stockage et protégées à l'écriture par
+  Firebase Auth et App Check. Aucun mot de passe Google n'est reçu ou stocké par BoosterFish.
+  Aucun système n'étant infaillible, contactez-nous si vous soupçonnez un incident.
 </p>
 
 <h2>9. Enfants</h2>

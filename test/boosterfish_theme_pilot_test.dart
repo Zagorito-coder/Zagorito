@@ -30,22 +30,16 @@ void main() {
 
     expect(find.byType(BoosterFishPageShell), findsOneWidget);
     expect(find.byType(BoosterFishPageHeader), findsOneWidget);
-    expect(find.byType(BoosterFishGlassCard), findsNWidgets(2));
+    expect(find.byType(BoosterFishGlassCard), findsOneWidget);
     expect(find.text('Communauté'), findsWidgets);
-    expect(find.text('Fonctionnalité à venir...'), findsOneWidget);
-    expect(
-      _assetPaths(tester),
-      contains('assets/home_cards/community_portrait_light.webp'),
-    );
+    expect(find.text('Mes prises'), findsOneWidget);
+    expect(find.text('Fonctionnalité à venir...'), findsNothing);
     expect(tester.takeException(), isNull);
 
     ThemeController.instance.setDark(true);
     await tester.pumpAndSettle();
 
-    expect(
-      _assetPaths(tester),
-      contains('assets/home_cards/community_portrait_dark.webp'),
-    );
+    expect(find.text('Mes prises'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     await tester.binding.setSurfaceSize(const Size(320, 568));
@@ -148,13 +142,4 @@ Widget _communityApp({
     },
     home: CommunityPage(key: UniqueKey()),
   );
-}
-
-List<String> _assetPaths(WidgetTester tester) {
-  return tester
-      .widgetList<Image>(find.byType(Image))
-      .map((image) => image.image)
-      .whereType<AssetImage>()
-      .map((image) => image.assetName)
-      .toList();
 }

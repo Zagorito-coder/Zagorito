@@ -1,7 +1,7 @@
 # BoosterFish — fiche de publication Google Play
 
-Version auditée : **1.0.1 (4)**  
-Dernière mise à jour : **22 juillet 2026**
+Version auditée : **1.0.2 (5)**
+Dernière mise à jour : **29 juillet 2026**
 
 Cette fiche décrit l'état réel de l'application et les réponses à reporter dans
 Google Play Console. Toute modification future des SDK, de l'authentification,
@@ -32,6 +32,8 @@ leur contenu corresponde aux fichiers `docs/` de cette version.
 - **Achats intégrés / abonnements : Non.** Aucun produit Play Billing n'est
   proposé et aucune bibliothèque Billing n'est intégrée.
 - **Accès à l'application :** les fonctions principales sont accessibles sans
+  compte. La galerie privée, les spots personnels et la publication
+  communautaire nécessitent Google Sign-In. Le fil public reste lisible sans
   compte ; ne fournir aucun identifiant de test dans la section « Accès à
   l'application ».
 - **Création de compte : Oui, facultative**, via Google Sign-In et Firebase Auth.
@@ -57,12 +59,14 @@ leur contenu corresponde aux fichiers `docs/` de cette version.
 
 | Catégorie Play | Données réellement concernées | Collectées | Partagées | Obligatoire / facultatif | Finalités à cocher |
 |---|---|---:|---:|---|---|
-| Informations personnelles — nom | Nom d'affichage Google | Oui | Non¹ | Facultatif, seulement avec connexion | Fonctionnalité de l'application ; gestion du compte |
+| Informations personnelles — nom | Nom d'affichage Google, affiché avec une prise publiée | Oui | Oui pour une publication volontaire | Facultatif, seulement avec connexion/publication | Fonctionnalité de l'application ; gestion du compte |
 | Informations personnelles — adresse e-mail | Adresse du compte Google | Oui | Non¹ | Facultatif, seulement avec connexion | Fonctionnalité de l'application ; gestion du compte |
 | Identifiants utilisateur | UID Firebase | Oui | Non¹ | Facultatif, seulement avec connexion | Fonctionnalité de l'application ; gestion du compte ; sécurité/prévention des abus |
-| Photos et vidéos — photos | Photo de profil Google ou son URL | Oui | Non¹ | Facultatif, seulement avec connexion | Personnalisation/fonctionnalité de l'application ; gestion du compte |
-| Localisation approximative | Estimation par l'adresse IP du SDK Google Mobile Ads | Oui | Oui | Requise lorsque les annonces sont autorisées/diffusées | Publicité ou marketing ; analyses ; prévention de la fraude, sécurité et conformité |
-| Activité dans l'application — interactions | Lancements, interactions avec l'application et les annonces | Oui | Oui | Requise lorsque les annonces sont autorisées/diffusées | Publicité ou marketing ; analyses ; prévention de la fraude, sécurité et conformité |
+| Photos et vidéos — photos | Photo de profil Google ; photo de prise publiée volontairement | Oui | Oui pour une publication volontaire | Facultatif | Fonctionnalité de l'application ; gestion du compte |
+| Localisation précise | Coordonnées d'un spot personnel choisi sur la carte et synchronisé dans l'espace privé du compte | Oui | Non¹ | Facultatif | Fonctionnalité de l'application |
+| Localisation approximative | Zone d'environ 5 km d'une prise publiée ; estimation IP du SDK Google Mobile Ads | Oui | Oui | Facultative pour la communauté ; requise lorsque les annonces sont diffusées | Fonctionnalité de l'application ; publicité ou marketing ; analyses ; prévention de la fraude, sécurité et conformité |
+| Activité dans l'application — interactions | Likes, blocages, signalements, lancements et interactions avec l'application ou les annonces | Oui | Oui pour les signaux publicitaires ; seul le total des likes est public | Facultatif pour la communauté ; requis lorsque les annonces sont diffusées | Fonctionnalité de l'application ; analyses ; sécurité/prévention des abus ; publicité ou marketing |
+| Autres contenus générés par les utilisateurs | Espèce, poids, zone, montage, appât, notes et conseil associés à une prise publiée ; informations d'un spot personnel | Oui | Oui pour une publication volontaire | Facultatif | Fonctionnalité de l'application ; sécurité/prévention des abus |
 | Informations sur l'application et performances — diagnostics | Temps de lancement, blocages, consommation d'énergie et diagnostics du SDK publicitaire | Oui | Oui | Requise lorsque les annonces sont autorisées/diffusées | Analyses ; prévention de la fraude, sécurité et conformité ; publicité ou marketing |
 | Appareil ou autres identifiants | Identifiant publicitaire Android, App Set ID et identifiants apparentés | Oui | Oui | Requise lorsque les annonces sont autorisées/diffusées | Publicité ou marketing ; analyses ; prévention de la fraude, sécurité et conformité |
 
@@ -73,13 +77,17 @@ la configuration contractuelle du compte développeur. Si une donnée est
 réutilisée par un destinataire pour ses propres finalités, la déclarer aussi
 comme partagée.
 
-### Données à ne pas déclarer comme transmises par BoosterFish
+### Données locales ou non transmises
 
-- La position GPS précise reste sur l'appareil : elle sert à centrer la carte,
-  calculer les distances et choisir localement la station de prévisions. Elle
-  n'est ni envoyée à Open-Meteo ni enregistrée dans Firestore.
-- Les coordonnées des spots et des stations sont des données publiques, pas la
-  position personnelle de l'utilisateur.
+- La position exacte associée à une prise de la galerie privée reste sur
+  l'appareil. Lors d'une publication, seule une cellule d'environ 5 km est
+  envoyée. La galerie privée de 20 prises n'est jamais synchronisée ni publiée
+  automatiquement.
+- La position utilisée pour centrer la carte, calculer les distances et choisir
+  localement une station de prévisions n'est pas envoyée à Open-Meteo. Les
+  coordonnées d'un spot personnel sont toutefois synchronisées dans Firestore
+  lorsque l'utilisateur choisit de créer ce spot ; c'est pourquoi la
+  localisation précise doit être déclarée comme collecte facultative.
 - Aucun mot de passe Google, donnée bancaire, contact, message, donnée de santé,
   fichier personnel ou historique d'achat n'est collecté par l'application.
 
@@ -92,15 +100,18 @@ fournisseur ou un SDK de cartographie est ajouté.
 
 - `INTERNET` : cartes, Firestore, authentification et publicité.
 - `ACCESS_COARSE_LOCATION` et `ACCESS_FINE_LOCATION` : uniquement lorsque
-  l'utilisateur demande le centrage ou une fonction de proximité ; aucune
-  localisation en arrière-plan.
+  l'utilisateur demande le centrage, une fonction de proximité ou
+  l'enregistrement privé du lieu d'une prise ; aucune localisation en
+  arrière-plan.
 - Ne pas déclarer de localisation en arrière-plan, de caméra, microphone,
   contacts, téléphone, stockage partagé ou notifications : ces autorisations ne
-  figurent pas dans le manifeste source.
+  figurent pas dans le manifeste source. Les images sont choisies avec le
+  sélecteur système sans autorisation générale sur le stockage.
 - Si Play Console demande la justification de la localisation, indiquer :
   « Centrer la carte sur l'utilisateur, calculer la distance aux spots et choisir
-  localement la station météo/marine publique la plus proche. La position n'est
-  pas stockée dans un profil serveur. »
+  localement la station météo/marine publique la plus proche. L'utilisateur peut
+  aussi enregistrer le lieu exact d'une prise dans sa galerie privée ; seule une
+  zone d'environ 5 km est envoyée s'il décide de publier cette prise. »
 
 ## Déclarations supplémentaires
 
@@ -111,8 +122,12 @@ fournisseur ou un SDK de cartographie est ajouté.
 - **Fonctionnalités financières : Non.**
 - **Application gouvernementale : Non.**
 - **COVID-19 : Non.**
-- **Classement du contenu :** refaire le questionnaire avec la présence de
-  publicité et les liens/contacts externes réels.
+- **Contenu généré par les utilisateurs : Oui.** Déclarer le partage de photos
+  et d'informations de pêche, les likes, le signalement intégré, le blocage, la
+  modération et le retrait par l'auteur.
+- **Classement du contenu :** refaire le questionnaire en déclarant le contenu
+  généré par les utilisateurs, la présence de publicité et les
+  liens/contacts externes réels.
 - **Play Integrity :** intégré via Firebase App Check. En Android Release,
   l'application utilise `AndroidPlayIntegrityProvider`; le fournisseur Debug
   n'est utilisé qu'en build de développement. Le SHA-256 du certificat Play
@@ -132,9 +147,12 @@ fournisseur ou un SDK de cartographie est ajouté.
    dans l'App Bundle Explorer les autorisations et SDK détectés.
 4. Installer l'APK release sur un appareil propre, refuser puis accepter les
    choix UMP, tester la localisation refusée/acceptée, la connexion et la
-   suppression du compte. Pour valider Play Integrity, installer aussi l'AAB
-   depuis Google Play Internal Testing : un APK installé par câble n'est pas une
-   preuve d'attestation Play valide.
+   suppression du compte. Tester aussi l'import privé, la publication avec une
+   photo de moins de 2 Mo, le like depuis un second compte, le signalement, le
+   blocage et le retrait par l'auteur. Pour valider Play Integrity et l'envoi
+   Cloudflare protégé par App Check, installer l'AAB depuis Google Play Internal
+   Testing : un APK installé par câble n'est pas une preuve d'attestation Play
+   valide.
 5. Consulter les rapports de pré-lancement, Android vitals, ANR et crashs avant
    de promouvoir la version vers une piste plus large.
 
@@ -144,6 +162,8 @@ fournisseur ou un SDK de cartographie est ajouté.
   <https://support.google.com/googleplay/android-developer/answer/10787469>
 - Google Play — suppression de compte :
   <https://support.google.com/googleplay/android-developer/answer/13327111>
+- Google Play — contenu généré par les utilisateurs :
+  <https://support.google.com/googleplay/android-developer/answer/9876937>
 - Google Mobile Ads — divulgation des données :
   <https://developers.google.com/admob/android/privacy/play-data-disclosure>
 - Firebase Android — divulgation des données :

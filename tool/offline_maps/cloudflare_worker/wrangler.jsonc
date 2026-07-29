@@ -12,6 +12,10 @@
     {
       "binding": "SPOT_PHOTOS",
       "bucket_name": "boosterfish-spot-photos"
+    },
+    {
+      "binding": "COMMUNITY_PHOTOS",
+      "bucket_name": "boosterfish-community-photos"
     }
   ]
 }

@@ -1,10 +1,20 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:spots_app/features/community/widgets/community_map_view.dart';
+import 'package:spots_app/features/community/widgets/private_catches_view.dart';
 import 'package:spots_app/l10n/app_localizations.dart';
 import 'package:spots_app/theme_controller.dart';
 import 'package:spots_app/widgets/boosterfish_page.dart';
 
-class CommunityPage extends StatelessWidget {
+class CommunityPage extends StatefulWidget {
   const CommunityPage({super.key});
+
+  @override
+  State<CommunityPage> createState() => _CommunityPageState();
+}
+
+class _CommunityPageState extends State<CommunityPage> {
+  int _section = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -12,142 +22,151 @@ class CommunityPage extends StatelessWidget {
       listenable: ThemeController.instance,
       builder: (context, _) {
         final palette = BoosterFishPagePalette.of(context);
-        final imageAsset =
-            'assets/home_cards/community_portrait_${palette.isDark ? 'dark' : 'light'}.webp';
         return BoosterFishPageShell(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
-            child: Column(
-              children: [
-                BoosterFishPageHeader(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+                child: BoosterFishPageHeader(
                   eyebrow: context.tr('home.expeditionTitle'),
                   title: context.tr('community.title'),
-                  subtitle: context.tr('home.communitySubtitle'),
                 ),
-                const SizedBox(height: 14),
-                Expanded(
-                  child: BoosterFishGlassCard(
-                    padding: EdgeInsets.zero,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(19),
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          Image.asset(
-                            imageAsset,
-                            fit: BoxFit.cover,
-                            alignment: Alignment.center,
-                            filterQuality: FilterQuality.high,
-                          ),
-                          DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  Colors.transparent,
-                                  palette.navy.withValues(alpha: 0.26),
-                                  palette.navy.withValues(alpha: 0.94),
-                                ],
-                                stops: const [0.35, 0.68, 1],
-                              ),
-                            ),
-                          ),
-                          PositionedDirectional(
-                            start: 18,
-                            end: 18,
-                            bottom: 18,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  width: 42,
-                                  height: 42,
-                                  decoration: BoxDecoration(
-                                    color: palette.accent,
-                                    borderRadius: BorderRadius.circular(13),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: palette.accent
-                                            .withValues(alpha: 0.38),
-                                        blurRadius: 14,
-                                      ),
-                                    ],
-                                  ),
-                                  child: const Icon(
-                                    Icons.groups_rounded,
-                                    color: Colors.white,
-                                    size: 25,
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                Text(
-                                  context.tr('community.title'),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 25,
-                                    height: 1,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                                const SizedBox(height: 7),
-                                Text(
-                                  context
-                                      .tr('home.communitySubtitle')
-                                      .replaceAll('\n', ' '),
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.84),
-                                    fontSize: 12.5,
-                                    height: 1.35,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 9),
+                child: Container(
+                  height: 40,
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: palette.surfaceElevated,
+                    borderRadius: BorderRadius.circular(99),
+                    border: Border.all(color: palette.divider),
                   ),
-                ),
-                const SizedBox(height: 12),
-                BoosterFishGlassCard(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
                   child: Row(
                     children: [
-                      Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: palette.accent.withValues(alpha: 0.13),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          Icons.auto_awesome_rounded,
-                          color: palette.accent,
-                          size: 21,
-                        ),
+                      _SectionButton(
+                        label: context.tr('community.publicFeed'),
+                        icon: Icons.public_rounded,
+                        selected: _section == 0,
+                        palette: palette,
+                        onTap: () => setState(() => _section = 0),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          context.tr('community.comingSoon'),
-                          style: TextStyle(
-                            color: palette.textPrimary,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                      _SectionButton(
+                        label: context.tr('community.myCatches'),
+                        icon: Icons.photo_library_rounded,
+                        selected: _section == 1,
+                        palette: palette,
+                        onTap: () => setState(() => _section = 1),
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
+              ),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(22)),
+                  child: Firebase.apps.isEmpty
+                      ? _CommunityUnavailableState(palette: palette)
+                      : IndexedStack(
+                          index: _section,
+                          children: const [
+                            CommunityMapView(),
+                            PrivateCatchesView(),
+                          ],
+                        ),
+                ),
+              ),
+            ],
           ),
         );
       },
+    );
+  }
+}
+
+class _CommunityUnavailableState extends StatelessWidget {
+  const _CommunityUnavailableState({required this.palette});
+
+  final BoosterFishPagePalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: BoosterFishGlassCard(
+          child: Row(
+            children: [
+              Icon(Icons.cloud_off_rounded, color: palette.textMuted),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Text(
+                  context.tr('community.unavailable'),
+                  style: TextStyle(
+                    color: palette.textSecondary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionButton extends StatelessWidget {
+  const _SectionButton({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.palette,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final BoosterFishPagePalette palette;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Material(
+        color: selected ? palette.accent : Colors.transparent,
+        borderRadius: BorderRadius.circular(99),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(99),
+          onTap: onTap,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 17,
+                color: selected ? Colors.white : palette.textSecondary,
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: selected ? Colors.white : palette.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
