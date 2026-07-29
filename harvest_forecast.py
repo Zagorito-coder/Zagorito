@@ -43,12 +43,16 @@
 # ============================================================================
 
 import os
+import random
+import threading
 import time
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from datetime import datetime
+from collections import defaultdict
+
 import requests
 import firebase_admin
 from firebase_admin import credentials, firestore
-from datetime import datetime
-from collections import defaultdict
 
 # ---------------------------------------------------------------------------
 # URLs commerciales : la clé doit rester côté serveur/GitHub Actions.
@@ -86,7 +90,9 @@ SPOTS = [
     {"id": "skikda_algerie", "name": "Skikda, Algérie", "lat": 36.88, "lon": 6.90},
     {"id": "mostaganem_algerie", "name": "Mostaganem, Algérie", "lat": 35.93, "lon": 0.09},
     {"id": "tipaza_algerie", "name": "Tipaza, Algérie", "lat": 36.59, "lon": 2.44},
-    {"id": "tunis_tunisie", "name": "Tunis, Tunisie", "lat": 36.80, "lon": 10.18},
+    # Coordonnée côtière : le centre de Tunis est une cellule terrestre sans
+    # données de vagues exploitables dans le modèle marin.
+    {"id": "tunis_tunisie", "name": "Tunis, Tunisie", "lat": 36.82, "lon": 10.30},
     {"id": "sfax_tunisie", "name": "Sfax, Tunisie", "lat": 34.74, "lon": 10.76},
     {"id": "sousse_tunisie", "name": "Sousse, Tunisie", "lat": 35.83, "lon": 10.64},
     {"id": "bizerte_tunisie", "name": "Bizerte, Tunisie", "lat": 37.27, "lon": 9.87},
@@ -170,7 +176,9 @@ SPOTS = [
     {"id": "doha_qatar", "name": "Doha, Qatar", "lat": 25.29, "lon": 51.53},
     {"id": "manama_bahrein", "name": "Manama, Bahreïn", "lat": 26.22, "lon": 50.59},
     {"id": "koweit_city_koweit", "name": "Koweït City, Koweït", "lat": 29.37, "lon": 47.98},
-    {"id": "basra_irak", "name": "Bassorah, Irak", "lat": 30.50, "lon": 47.82},
+    # Al-Faw est l'accès maritime de la province de Bassorah. La coordonnée du
+    # centre-ville de Bassorah est trop éloignée de la mer pour GFS-Wave.
+    {"id": "basra_irak", "name": "Al-Faw (Bassorah), Irak", "lat": 29.97, "lon": 48.47},
     {"id": "aden_yemen", "name": "Aden, Yémen", "lat": 12.78, "lon": 45.03},
     {"id": "mukalla_yemen", "name": "Mukalla, Yémen", "lat": 14.54, "lon": 49.13},
     {"id": "hodeidah_yemen", "name": "Al Hudaydah, Yémen", "lat": 14.80, "lon": 42.95},
@@ -200,6 +208,11 @@ SPOTS = [
 FORECAST_DAYS = 15
 STEP_HOURS = 3  # on garde 1 creneau toutes les 3h, comme sur le tableau Windguru
 MS_TO_KNOTS = 1.94384
+MAX_HTTP_ATTEMPTS = 3
+HTTP_TIMEOUT = (10, 60)  # secondes : connexion, puis lecture
+MAX_STATION_WORKERS = 6
+RETRYABLE_HTTP_STATUSES = {408, 425, 429, 500, 502, 503, 504}
+_HTTP_LOCAL = threading.local()
 
 
 # ---------------------------------------------------------------------------
@@ -252,11 +265,40 @@ def _safe_num(v, default=None):
 
 def _error_summary(error):
     """Résumé sûr pour les logs : ne jamais imprimer une URL avec apikey."""
+    if isinstance(error, ValueError):
+        # Les messages de validation sont générés localement et ne contiennent
+        # ni URL ni clé API. Ils sont indispensables au diagnostic des données.
+        return f"ValueError: {error}"
+    status = getattr(error, "status_code", None)
+    if status is not None:
+        return f"HTTP {status} ({type(error).__name__})"
     response = getattr(error, "response", None)
     status = getattr(response, "status_code", None)
     if status is not None:
         return f"HTTP {status} ({type(error).__name__})"
     return type(error).__name__
+
+
+class OpenMeteoHttpError(RuntimeError):
+    """Erreur HTTP volontairement dépourvue d'URL et de paramètres secrets."""
+
+    def __init__(self, status_code):
+        super().__init__(f"Open-Meteo HTTP {status_code}")
+        self.status_code = status_code
+
+
+def _http_session():
+    """Retourne une Session propre au thread pour réutiliser les connexions."""
+    session = getattr(_HTTP_LOCAL, "session", None)
+    if session is None:
+        session = requests.Session()
+        adapter = requests.adapters.HTTPAdapter(
+            pool_connections=3,
+            pool_maxsize=3,
+        )
+        session.mount("https://", adapter)
+        _HTTP_LOCAL.session = session
+    return session
 
 
 # ---------------------------------------------------------------------------
@@ -278,12 +320,60 @@ HOURLY_WAVE = (
 )
 
 
-def _fetch_json(url, params):
-    """Appel HTTP sans laisser la clé apikey apparaître dans les erreurs."""
-    response = requests.get(url, params=params, timeout=30)
-    if not response.ok:
-        raise RuntimeError(f"Open-Meteo HTTP {response.status_code}")
-    return response.json()
+def _fetch_json(
+    url,
+    params,
+    *,
+    requester=None,
+    sleeper=None,
+    jitter=None,
+    max_attempts=MAX_HTTP_ATTEMPTS,
+):
+    """
+    Appel HTTP résilient sans exposer la clé apikey dans les erreurs.
+
+    Les délais réseau et les erreurs temporaires (429/5xx) sont retentés avec
+    un recul exponentiel borné. Les erreurs client permanentes (autres 4xx)
+    échouent immédiatement.
+    """
+    if requester is None:
+        requester = _http_session().get
+    if sleeper is None:
+        sleeper = time.sleep
+    if jitter is None:
+        jitter = lambda: random.uniform(0.0, 0.25)
+    if max_attempts < 1:
+        raise ValueError("max_attempts doit être supérieur ou égal à 1.")
+
+    last_error = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            response = requester(url, params=params, timeout=HTTP_TIMEOUT)
+            if response.ok:
+                return response.json()
+
+            error = OpenMeteoHttpError(response.status_code)
+            if response.status_code not in RETRYABLE_HTTP_STATUSES:
+                raise error
+            last_error = error
+        except (requests.Timeout, requests.ConnectionError) as error:
+            last_error = error
+        except ValueError as error:
+            # Une réponse temporairement tronquée peut produire un JSON
+            # invalide. Elle est retentée comme une erreur réseau.
+            last_error = error
+        except requests.RequestException:
+            # Une autre erreur requests est considérée permanente : cela évite
+            # de masquer une mauvaise configuration ou une requête invalide.
+            raise
+
+        if attempt == max_attempts:
+            raise last_error
+
+        delay_seconds = (2 ** (attempt - 1)) + jitter()
+        sleeper(delay_seconds)
+
+    raise RuntimeError("État de reprise HTTP inattendu.")
 
 
 def fetch_wind_model(lat, lon):
@@ -319,6 +409,75 @@ def fetch_wave_model(lat, lon):
         "hourly": HOURLY_WAVE,
     })
     return _fetch_json(url, params)
+
+
+def _fetch_station_models(spot, fetchers=None):
+    """Récupère les trois modèles d'un spot dans un thread de travail."""
+    if fetchers is None:
+        fetchers = (
+            ("wind", fetch_wind_model),
+            ("hires", fetch_hires_model),
+            ("wave", fetch_wave_model),
+        )
+
+    results = {}
+    errors = {}
+    for model_name, fetcher in fetchers:
+        try:
+            results[model_name] = fetcher(spot["lat"], spot["lon"])
+        except Exception as error:
+            results[model_name] = None
+            errors[model_name] = error
+    return {
+        "spot": spot,
+        "models": results,
+        "errors": errors,
+    }
+
+
+def _iter_station_results(spots, max_workers=MAX_STATION_WORKERS):
+    """
+    Exécute un nombre borné de stations en parallèle.
+
+    Seuls ``max_workers`` payloads complets sont conservés simultanément afin
+    d'éviter une hausse de mémoire avec les réponses horaires sur 15 jours.
+    """
+    if max_workers < 1:
+        raise ValueError("max_workers doit être supérieur ou égal à 1.")
+
+    spots_iterator = iter(spots)
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        pending = {}
+
+        def submit_next():
+            try:
+                next_spot = next(spots_iterator)
+            except StopIteration:
+                return False
+            future = executor.submit(_fetch_station_models, next_spot)
+            pending[future] = next_spot
+            return True
+
+        for _ in range(max_workers):
+            if not submit_next():
+                break
+
+        while pending:
+            completed, _ = wait(pending, return_when=FIRST_COMPLETED)
+            for future in completed:
+                spot = pending.pop(future)
+                try:
+                    yield future.result()
+                except Exception as error:
+                    # Garde-fou : _fetch_station_models capture déjà les erreurs
+                    # modèle par modèle, mais un défaut inattendu ne doit pas
+                    # interrompre les autres stations.
+                    yield {
+                        "spot": spot,
+                        "models": {},
+                        "errors": {"station": error},
+                    }
+                submit_next()
 
 
 # ---------------------------------------------------------------------------
@@ -633,13 +792,12 @@ def main_test_single_spot(spot_id, spots_list=None):
 # 7. Main (utilise pour la recolte normale — Phase 3 uniquement)
 # ---------------------------------------------------------------------------
 def main():
-    import time as time_module
     if not OPEN_METEO_API_KEY:
         raise SystemExit(
             "OPEN_METEO_API_KEY est obligatoire pour l'usage commercial d'Open-Meteo. "
             "Ajoutez-le aux secrets GitHub Actions."
         )
-    start_time = time_module.time()
+    start_time = time.time()
 
     cred = credentials.Certificate("firebase-key.json")
     try:
@@ -652,43 +810,37 @@ def main():
     partial = 0
     failed = 0
 
-    for idx, spot in enumerate(SPOTS):
-        missing_models = []
-        wind_json = None
-        hires_json = None
-        wave_json = None
-
+    for station_result in _iter_station_results(SPOTS):
+        spot = station_result["spot"]
+        models = station_result["models"]
+        errors = station_result["errors"]
         print(f"Recolte pour {spot['name']}...")
-        lat, lon = spot["lat"], spot["lon"]
 
-        # --- try/except PAR MODELE ---
-        try:
-            wind_json = fetch_wind_model(lat, lon)
-            print(f"  [wind] OK ({len(wind_json['hourly']['time'])} slots)")
-        except Exception as e:
-            print(f"  [wind] ECHEC: {_error_summary(e)}")
-            missing_models.append("wind")
+        missing_models = []
+        for model_name in ("wind", "hires", "wave"):
+            model_json = models.get(model_name)
+            if model_json is None:
+                error = errors.get(model_name) or errors.get("station")
+                error_text = (
+                    _error_summary(error)
+                    if error is not None
+                    else "réponse absente"
+                )
+                print(f"  [{model_name}] ECHEC: {error_text}")
+                missing_models.append(model_name)
+                continue
 
-        try:
-            hires_json = fetch_hires_model(lat, lon)
-            print(f"  [hires] OK ({len(hires_json['hourly']['time'])} slots)")
-        except Exception as e:
-            print(f"  [hires] ECHEC: {_error_summary(e)}")
-            missing_models.append("hires")
+            slot_count = len(model_json.get("hourly", {}).get("time", []))
+            print(f"  [{model_name}] OK ({slot_count} slots)")
 
-        try:
-            wave_json = fetch_wave_model(lat, lon)
-            print(f"  [wave] OK ({len(wave_json['hourly']['time'])} slots)")
-        except Exception as e:
-            print(f"  [wave] ECHEC: {_error_summary(e)}")
-            missing_models.append("wave")
+        wind_json = models.get("wind")
+        hires_json = models.get("hires")
+        wave_json = models.get("wave")
 
         # Si aucun modele vent (obligatoire), on skip ce spot
         if wind_json is None:
             print(f"  !! Aucun modele vent disponible pour {spot['name']}, spot ignore.")
             failed += 1
-            if idx < len(SPOTS) - 1:
-                time.sleep(0.2)
             continue
 
         # Ne jamais remplacer un document valide par un document partiel.
@@ -700,8 +852,6 @@ def main():
                 f"  !! Récolte partielle ({', '.join(missing_models)}) pour "
                 f"{spot['name']}; aucune écriture Firestore."
             )
-            if idx < len(SPOTS) - 1:
-                time.sleep(0.2)
             continue
 
         daily_json = {}
@@ -748,11 +898,7 @@ def main():
             print(f"  !! Erreur build/write pour {spot['name']}: {_error_summary(e)}")
             failed += 1
 
-        # Delai entre spots pour rester sous 600 appels/minute
-        if idx < len(SPOTS) - 1:
-            time.sleep(0.2)
-
-    elapsed = time_module.time() - start_time
+    elapsed = time.time() - start_time
     print(f"\n{'='*60}")
     print(f"Termine en {elapsed:.0f}s.")
     print(f"Reussis: {success}, Partiels: {partial}, Echoues: {failed}")

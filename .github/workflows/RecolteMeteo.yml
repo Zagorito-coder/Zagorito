@@ -5,9 +5,16 @@ on:
     - cron: '0 0,6,12,18 * * *'   # 4x/jour : 00h, 06h, 12h, 18h UTC (donnees fraiches toutes les 6h)
   workflow_dispatch:       # bouton "Run workflow" manuel dans GitHub
 
+# Une récolte lente ne doit jamais chevaucher la suivante et doubler les appels
+# API/écritures Firestore. La seconde exécution attend la première.
+concurrency:
+  group: recolte-meteo-production
+  cancel-in-progress: false
+
 jobs:
   run-script:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     steps:
       - name: Recuperer le code du depot
         uses: actions/checkout@v4
@@ -21,6 +28,9 @@ jobs:
 
       - name: Installer les dependances
         run: pip install --disable-pip-version-check -r requirements-harvest.txt
+
+      - name: Tester la résilience du script
+        run: python -m unittest discover -s tests_python -p 'test_*.py'
 
       - name: Verifier la cle Open-Meteo commerciale
         env:
@@ -42,7 +52,7 @@ jobs:
       - name: Executer le script de recolte
         env:
           OPEN_METEO_API_KEY: ${{ secrets.OPEN_METEO_API_KEY }}
-        run: python harvest_forecast.py
+        run: python -u harvest_forecast.py
 
       - name: Nettoyer la cle (securite)
         if: always()
