@@ -5,6 +5,10 @@ on:
     - cron: '0 0,6,12,18 * * *'   # 4x/jour : 00h, 06h, 12h, 18h UTC (donnees fraiches toutes les 6h)
   workflow_dispatch:       # bouton "Run workflow" manuel dans GitHub
 
+# Le workflow lit le dépôt mais ne doit jamais pouvoir pousser de code.
+permissions:
+  contents: read
+
 # Une récolte lente ne doit jamais chevaucher la suivante et doubler les appels
 # API/écritures Firestore. La seconde exécution attend la première.
 concurrency:
@@ -17,17 +21,29 @@ jobs:
     timeout-minutes: 120
     steps:
       - name: Recuperer le code du depot
-        uses: actions/checkout@v4
+        # v7.0.1 — SHA immuable pour éviter le remplacement d'un tag.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
 
       - name: Installer Python
-        uses: actions/setup-python@v5
+        # v7.0.0 — SHA immuable vérifié depuis le dépôt officiel.
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: '3.11'
           cache: pip
           cache-dependency-path: requirements-harvest.txt
 
+      - name: Auditer les dependances Python
+        # pypa/gh-action-pip-audit v1.1.0 — action PyPA officielle épinglée.
+        uses: pypa/gh-action-pip-audit@1220774d901786e6f652ae159f7b6bc8fea6d266
+        with:
+          inputs: requirements-harvest.txt
+
       - name: Installer les dependances
-        run: pip install --disable-pip-version-check -r requirements-harvest.txt
+        run: |
+          python -m pip install --disable-pip-version-check -r requirements-harvest.txt
+          python -m pip check
 
       - name: Tester la résilience du script
         run: python -m unittest discover -s tests_python -p 'test_*.py'
