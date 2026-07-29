@@ -31,6 +31,7 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+/artifacts/release_backups/
 /coverage/
 
 # Offline map binaries are generated and hosted outside the APK repository.
