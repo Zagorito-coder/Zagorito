@@ -124,6 +124,15 @@ fournisseur ou un SDK de cartographie est ajouté.
   contacts, téléphone, stockage partagé ou notifications : ces autorisations ne
   figurent pas dans le manifeste source. Les images sont choisies avec le
   sélecteur système sans autorisation générale sur le stockage.
+- Le manifeste fusionné contient la permission générique `FOREGROUND_SERVICE`
+  via WorkManager, dépendance transitive du SDK Google Mobile Ads. Geolocator
+  apporte aussi une classe de service avec le type `location`, mais BoosterFish
+  n'active jamais son `ForegroundNotificationConfig` : le flux de position
+  démarre après une action visible sur la carte et est annulé à la fermeture de
+  la page. L'APK ne contient ni `FOREGROUND_SERVICE_LOCATION` ni
+  `ACCESS_BACKGROUND_LOCATION`. Si Play Console demande malgré tout une
+  déclaration FGS, ne pas la soumettre au hasard : contrôler la liste détectée
+  dans l'App Bundle Explorer avant de répondre.
 - Si Play Console demande la justification de la localisation, indiquer :
   « Centrer la carte sur l'utilisateur, calculer la distance aux spots et choisir
   localement la station météo/marine publique la plus proche. L'utilisateur peut
@@ -204,6 +213,10 @@ fournisseur ou un SDK de cartographie est ajouté.
   <https://support.google.com/googleplay/android-developer/answer/14747720>
 - Google Play — identifiants et instructions d'accès pour la revue :
   <https://support.google.com/googleplay/android-developer/answer/15748846>
+- Google Play — déclarations des services au premier plan :
+  <https://support.google.com/googleplay/android-developer/answer/13392821>
+- Android — types de services au premier plan :
+  <https://developer.android.com/develop/background-work/services/fgs/service-types>
 - Google Mobile Ads — divulgation des données :
   <https://developers.google.com/admob/android/privacy/play-data-disclosure>
 - Firebase Android — divulgation des données :
