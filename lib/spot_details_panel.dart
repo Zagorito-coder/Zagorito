@@ -816,6 +816,20 @@ class _FavoriteButtonState extends State<_FavoriteButton> {
           ),
         );
       }
+    } on FavoriteSpotException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              context.tr(
+                error.failure == FavoriteSpotFailure.limitReached
+                    ? 'mySpots.favoriteLimitReached'
+                    : 'mySpots.favoriteError',
+              ),
+            ),
+          ),
+        );
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

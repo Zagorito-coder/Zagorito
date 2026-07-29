@@ -19,6 +19,7 @@ import 'package:spots_app/models.dart';
 import 'package:spots_app/models/offline_map_region.dart';
 import 'package:spots_app/models/spot_selection_request.dart';
 import 'package:spots_app/models/user_spot.dart';
+import 'package:spots_app/models/user_spot_selection_request.dart';
 import 'package:spots_app/services/spot_service.dart';
 import 'package:spots_app/services/offline_map_service.dart';
 import 'package:spots_app/services/user_spot_service.dart';
@@ -28,7 +29,10 @@ import 'package:spots_app/spots_canvas_layer.dart';
 import 'package:spots_app/theme.dart';
 import 'package:spots_app/theme_controller.dart';
 import 'package:spots_app/widgets/app_tile_layer.dart';
+import 'package:spots_app/widgets/finite_map_controller.dart';
+import 'package:spots_app/widgets/finite_marker_layer.dart';
 import 'package:spots_app/widgets/offline_map_manager_sheet.dart';
+import 'package:spots_app/widgets/personal_spots_map_layer.dart';
 import 'package:spots_app/widgets/user_spot_form_sheet.dart';
 import 'package:spots_app/l10n/app_localizations.dart';
 import 'package:spots_app/splash_bootstrap.dart';
@@ -573,6 +577,7 @@ class MapScreen extends StatefulWidget {
   final List<Spot>? initialSpots;
   final ValueListenable<int>? addSpotRequests;
   final ValueListenable<SpotSelectionRequest?>? spotSelectionRequests;
+  final ValueListenable<UserSpotSelectionRequest?>? userSpotSelectionRequests;
   final VoidCallback? onOpenMySpots;
 
   const MapScreen({
@@ -580,6 +585,7 @@ class MapScreen extends StatefulWidget {
     this.initialSpots,
     this.addSpotRequests,
     this.spotSelectionRequests,
+    this.userSpotSelectionRequests,
     this.onOpenMySpots,
   });
   @override
@@ -591,7 +597,7 @@ class _MapScreenState extends State<MapScreen>
   @override
   bool get wantKeepAlive => true;
 
-  final MapController _mapController = MapController();
+  final MapController _mapController = FiniteMapController();
   final TextEditingController _searchController = TextEditingController();
   final Distance _distance = const Distance();
   Timer? _debounceTimer;
@@ -604,12 +610,16 @@ class _MapScreenState extends State<MapScreen>
   String _searchQuery = '';
   Position? _currentPosition;
   Spot? _selectedSpot;
+  UserSpot? _selectedUserSpot;
   double _currentZoom = 6.0;
   bool _isLoadingSpots = true;
   bool _isFishBarVisible = false, _showToolsPanel = false, _isMeasuring = false;
   bool _isAddingSpot = false;
+  LatLng? _pendingPersonalSpot;
+  bool _ignoreNextCanvasTap = false;
   int _lastAddSpotRequest = 0;
   int _lastSpotSelectionRequest = 0;
+  int _lastUserSpotSelectionRequest = 0;
   final List<LatLng> _measurePoints = [];
   double _measuredDistanceKm = 0.0;
   MapStyle _mapStyle = MapStyle.satellite;
@@ -648,6 +658,10 @@ class _MapScreenState extends State<MapScreen>
     _lastSpotSelectionRequest =
         widget.spotSelectionRequests?.value?.serial ?? 0;
     widget.spotSelectionRequests?.addListener(_handleSpotSelectionRequest);
+    _lastUserSpotSelectionRequest =
+        widget.userSpotSelectionRequests?.value?.serial ?? 0;
+    widget.userSpotSelectionRequests
+        ?.addListener(_handleUserSpotSelectionRequest);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     if (OfflineMapService.instance.hasActiveMap) {
       _mapStyle = MapStyle.offline;
@@ -676,13 +690,22 @@ class _MapScreenState extends State<MapScreen>
           widget.spotSelectionRequests?.value?.serial ?? 0;
       widget.spotSelectionRequests?.addListener(_handleSpotSelectionRequest);
     }
+    if (oldWidget.userSpotSelectionRequests !=
+        widget.userSpotSelectionRequests) {
+      oldWidget.userSpotSelectionRequests
+          ?.removeListener(_handleUserSpotSelectionRequest);
+      _lastUserSpotSelectionRequest =
+          widget.userSpotSelectionRequests?.value?.serial ?? 0;
+      widget.userSpotSelectionRequests
+          ?.addListener(_handleUserSpotSelectionRequest);
+    }
   }
 
   void _handleAddSpotRequest() {
     final request = widget.addSpotRequests?.value ?? 0;
     if (request == _lastAddSpotRequest) return;
     _lastAddSpotRequest = request;
-    unawaited(_startAddingSpot());
+    _startAddingSpot();
   }
 
   void _handleSpotSelectionRequest() {
@@ -690,6 +713,15 @@ class _MapScreenState extends State<MapScreen>
     if (request == null || request.serial == _lastSpotSelectionRequest) return;
     _lastSpotSelectionRequest = request.serial;
     unawaited(_selectSpot(request.spot));
+  }
+
+  void _handleUserSpotSelectionRequest() {
+    final request = widget.userSpotSelectionRequests?.value;
+    if (request == null || request.serial == _lastUserSpotSelectionRequest) {
+      return;
+    }
+    _lastUserSpotSelectionRequest = request.serial;
+    unawaited(_selectUserSpot(request.spot));
   }
 
   void _toggleCompass() {
@@ -738,6 +770,8 @@ class _MapScreenState extends State<MapScreen>
     _positionSubscription?.cancel();
     widget.addSpotRequests?.removeListener(_handleAddSpotRequest);
     widget.spotSelectionRequests?.removeListener(_handleSpotSelectionRequest);
+    widget.userSpotSelectionRequests
+        ?.removeListener(_handleUserSpotSelectionRequest);
     super.dispose();
   }
 
@@ -817,8 +851,11 @@ class _MapScreenState extends State<MapScreen>
   }
 
   Future<void> _animateToSpot(Spot spot) async {
-    if (!spot.latitude.isFinite || !spot.longitude.isFinite) return;
-    final target = LatLng(spot.latitude, spot.longitude);
+    await _animateToPoint(LatLng(spot.latitude, spot.longitude));
+  }
+
+  Future<void> _animateToPoint(LatLng target) async {
+    if (!_isValidMapPoint(target)) return;
     final tz = (_currentZoom < _maxZoom ? _maxZoom : _currentZoom)
         .clamp(3.0, _maxZoom);
     if (!tz.isFinite) return;
@@ -835,6 +872,8 @@ class _MapScreenState extends State<MapScreen>
   Future<void> _selectSpot(Spot spot) async {
     setState(() {
       _selectedSpot = spot;
+      _selectedUserSpot = null;
+      _pendingPersonalSpot = null;
       _searchQuery = '';
     });
     _searchController.clear();
@@ -845,6 +884,22 @@ class _MapScreenState extends State<MapScreen>
           spot.longitude,
         );
     await _animateToSpot(spot);
+  }
+
+  Future<void> _selectUserSpot(UserSpot spot) async {
+    if (!spot.latitude.isFinite || !spot.longitude.isFinite) return;
+    context.read<WindAnimationProvider>().disable();
+    setState(() {
+      _selectedUserSpot = spot;
+      _selectedSpot = null;
+      _pendingPersonalSpot = null;
+      _searchQuery = '';
+      _isFishBarVisible = false;
+      _showToolsPanel = false;
+    });
+    _searchController.clear();
+    FocusScope.of(context).unfocus();
+    await _animateToPoint(LatLng(spot.latitude, spot.longitude));
   }
 
   void _clearSelection() {
@@ -870,8 +925,66 @@ class _MapScreenState extends State<MapScreen>
     setState(() => _selectedSpot = null);
   }
 
-  Future<void> _startAddingSpot() async {
+  void _startAddingSpot() {
     if (!mounted) return;
+    if (_selectedSpot != null) {
+      context.read<WindAnimationProvider>().disable();
+    }
+    setState(() {
+      _isAddingSpot = true;
+      _pendingPersonalSpot = null;
+      _showToolsPanel = false;
+      _isFishBarVisible = false;
+      _selectedSpot = null;
+      _selectedUserSpot = null;
+      _isMeasuring = false;
+      _measurePoints.clear();
+      _measuredDistanceKm = 0;
+      _searchQuery = '';
+    });
+    _searchController.clear();
+    FocusScope.of(context).unfocus();
+  }
+
+  void _onMapLongPress(TapPosition _, LatLng point) {
+    if (!mounted || _isMeasuring || !_isValidMapPoint(point)) return;
+    if (_selectedSpot != null) {
+      context.read<WindAnimationProvider>().disable();
+    }
+    _ignoreNextCanvasTap = true;
+    setState(() {
+      _pendingPersonalSpot = point;
+      _isAddingSpot = false;
+      _selectedSpot = null;
+      _selectedUserSpot = null;
+      _showToolsPanel = false;
+      _isFishBarVisible = false;
+      _searchQuery = '';
+    });
+    _searchController.clear();
+    FocusScope.of(context).unfocus();
+  }
+
+  void _onCanvasSpotTap(Spot spot) {
+    if (_ignoreNextCanvasTap) {
+      _ignoreNextCanvasTap = false;
+      return;
+    }
+    if (_pendingPersonalSpot != null) {
+      setState(() => _pendingPersonalSpot = null);
+      return;
+    }
+    if (_selectedUserSpot != null) {
+      setState(() => _selectedUserSpot = null);
+      return;
+    }
+    unawaited(_selectSpot(spot));
+  }
+
+  Future<void> _confirmNewSpotLocation(LatLng point) async {
+    if (!mounted || _pendingPersonalSpot != point) return;
+    setState(() => _pendingPersonalSpot = null);
+
     final auth = context.read<AuthService>();
     if (auth.uid == null) {
       final shouldSignIn = await showDialog<bool>(
@@ -904,25 +1017,6 @@ class _MapScreenState extends State<MapScreen>
       }
     }
 
-    if (_selectedSpot != null) {
-      context.read<WindAnimationProvider>().disable();
-    }
-    setState(() {
-      _isAddingSpot = true;
-      _showToolsPanel = false;
-      _isFishBarVisible = false;
-      _selectedSpot = null;
-      _isMeasuring = false;
-      _measurePoints.clear();
-      _measuredDistanceKm = 0;
-      _searchQuery = '';
-    });
-    _searchController.clear();
-    FocusScope.of(context).unfocus();
-  }
-
-  Future<void> _selectNewSpotLocation(LatLng point) async {
-    if (!_isAddingSpot || !mounted) return;
     for (final spot in _spots) {
       final meters = _distance.as(
         LengthUnit.Meter,
@@ -937,7 +1031,6 @@ class _MapScreenState extends State<MapScreen>
       }
     }
 
-    setState(() => _isAddingSpot = false);
     final created = await showUserSpotFormSheet(
       context: context,
       latitude: point.latitude,
@@ -965,8 +1058,16 @@ class _MapScreenState extends State<MapScreen>
   }
 
   void _onMapTap(TapPosition tp, LatLng point) {
+    if (!_isValidMapPoint(point)) return;
+    if (_ignoreNextCanvasTap) {
+      _ignoreNextCanvasTap = false;
+      return;
+    }
+    if (_pendingPersonalSpot != null) {
+      setState(() => _pendingPersonalSpot = null);
+      return;
+    }
     if (_isAddingSpot) {
-      unawaited(_selectNewSpotLocation(point));
       return;
     }
     final fp = FishProvider.instance;
@@ -974,13 +1075,17 @@ class _MapScreenState extends State<MapScreen>
       fp.closeFishModal();
     }
     // Si overlays ouverts (hors recherche seule), les fermer
-    if (_selectedSpot != null || _isFishBarVisible || _showToolsPanel) {
+    if (_selectedSpot != null ||
+        _selectedUserSpot != null ||
+        _isFishBarVisible ||
+        _showToolsPanel) {
       // Desactive le vent quand on ferme le spot
       if (_selectedSpot != null) {
         context.read<WindAnimationProvider>().disable();
       }
       setState(() {
         _selectedSpot = null;
+        _selectedUserSpot = null;
         _isFishBarVisible = false;
         _showToolsPanel = false;
         _searchQuery = '';
@@ -1016,6 +1121,14 @@ class _MapScreenState extends State<MapScreen>
   }
 
   final MarkerCacheManager _markerCacheManager = MarkerCacheManager();
+
+  bool _isValidMapPoint(LatLng point) =>
+      point.latitude.isFinite &&
+      point.longitude.isFinite &&
+      point.latitude >= -90 &&
+      point.latitude <= 90 &&
+      point.longitude >= -180 &&
+      point.longitude <= 180;
 
   void _onPositionChanged(MapCamera camera, bool gesture) {
     final nb = camera.visibleBounds;
@@ -1081,12 +1194,17 @@ class _MapScreenState extends State<MapScreen>
               initialZoom: 6,
               maxZoom: _maxZoom,
               minZoom: 3.0,
-              // Keep FlutterMap's native one-handed zoom gesture enabled:
-              // double-tap, hold the second tap, then drag vertically.
               interactionOptions: const InteractionOptions(
-                flags: InteractiveFlag.all,
+                // Pinch zoom is essential. Pinch-move and rotation remain
+                // disabled so two fingers only change the finite, clamped zoom.
+                flags: InteractiveFlag.drag |
+                    InteractiveFlag.flingAnimation |
+                    InteractiveFlag.pinchZoom |
+                    InteractiveFlag.doubleTapZoom |
+                    InteractiveFlag.doubleTapDragZoom,
               ),
               onPositionChanged: _onPositionChanged,
+              onLongPress: _onMapLongPress,
               onMapReady: () {
                 final region = OfflineMapService.instance.activeRegion;
                 if (_mapStyle == MapStyle.offline && region != null) {
@@ -1098,7 +1216,7 @@ class _MapScreenState extends State<MapScreen>
               AppTileLayer(style: _mapStyle),
               AppMapAttribution(style: _mapStyle),
               if (_currentPosition != null)
-                MarkerLayer(markers: [
+                FiniteMarkerLayer(markers: [
                   Marker(
                       width: 20,
                       height: 20,
@@ -1120,12 +1238,33 @@ class _MapScreenState extends State<MapScreen>
                 visibleSpots: _visibleSpots,
                 mapController: _mapController,
                 selectedSpot: _selectedSpot,
-                onSpotTap: _isAddingSpot
-                    ? (spot) => _selectNewSpotLocation(spot.location)
-                    : _selectSpot,
+                onSpotTap: _onCanvasSpotTap,
                 onMapTap: (ll) =>
                     _onMapTap(const TapPosition(Offset.zero, Offset.zero), ll),
               ),
+              PersonalSpotsMapLayer(
+                selectedSpotId: _selectedUserSpot?.id,
+                onSpotTap: (spot) => unawaited(_selectUserSpot(spot)),
+              ),
+              if (_selectedUserSpot != null)
+                FiniteMarkerLayer(
+                  markers: [
+                    Marker(
+                      width: 172,
+                      height: 86,
+                      point: LatLng(
+                        _selectedUserSpot!.latitude,
+                        _selectedUserSpot!.longitude,
+                      ),
+                      alignment: Alignment.topCenter,
+                      child: PersonalSpotMapMarker(
+                        spot: _selectedUserSpot!,
+                        selected: true,
+                        onTap: () {},
+                      ),
+                    ),
+                  ],
+                ),
               // 🌬️ Couche de particules de vent animees (30fps)
               // IgnorePointer pour ne pas bloquer les taps sur la carte
               IgnorePointer(
@@ -1137,7 +1276,7 @@ class _MapScreenState extends State<MapScreen>
                 ),
               ),
               if (_selectedSpot != null)
-                MarkerLayer(markers: [
+                FiniteMarkerLayer(markers: [
                   Marker(
                       width: 52,
                       height: 56,
@@ -1146,6 +1285,23 @@ class _MapScreenState extends State<MapScreen>
                       child: _markerCacheManager.getOrCreateMarker(
                           _selectedSpot!, true, _isPremium))
                 ]),
+              if (_pendingPersonalSpot != null)
+                FiniteMarkerLayer(
+                  markers: [
+                    Marker(
+                      width: 210,
+                      height: 96,
+                      point: _pendingPersonalSpot!,
+                      // In flutter_map, topCenter places the whole marker
+                      // above its geographic point. The pin tip at the bottom
+                      // therefore lands exactly on the long-pressed location.
+                      alignment: Alignment.topCenter,
+                      child: _buildPendingPersonalSpotMarker(
+                        _pendingPersonalSpot!,
+                      ),
+                    ),
+                  ],
+                ),
               if (_isMeasuring && _measurePoints.isNotEmpty)
                 PolylineLayer(polylines: [
                   Polyline(
@@ -1154,7 +1310,7 @@ class _MapScreenState extends State<MapScreen>
                       strokeWidth: 4.0)
                 ]),
               if (_isMeasuring && _measurePoints.isNotEmpty)
-                MarkerLayer(
+                FiniteMarkerLayer(
                     markers: _measurePoints
                         .map((p) => Marker(
                             width: 14,
@@ -1205,7 +1361,7 @@ class _MapScreenState extends State<MapScreen>
               child: Directionality(
                   textDirection: TextDirection.ltr,
                   child: _buildFishFilterButton())),
-          if (!hasSel)
+          if (!hasSel && _selectedUserSpot == null)
             ListenableBuilder(
                 listenable: LanguageController.instance,
                 builder: (ctx, _) {
@@ -1227,6 +1383,7 @@ class _MapScreenState extends State<MapScreen>
                                   onChanged: (q) => setState(() {
                                         _searchQuery = q.trim().toLowerCase();
                                         _selectedSpot = null;
+                                        _selectedUserSpot = null;
                                         _isFishBarVisible = false;
                                       }),
                                   onClear: () {
@@ -1234,6 +1391,7 @@ class _MapScreenState extends State<MapScreen>
                                     setState(() {
                                       _searchQuery = '';
                                       _selectedSpot = null;
+                                      _selectedUserSpot = null;
                                     });
                                     FocusScope.of(context).unfocus();
                                   },
@@ -1381,7 +1539,7 @@ class _MapScreenState extends State<MapScreen>
                     icon: Icons.add_location_alt_rounded,
                     label: context.tr('mySpots.addTitle'),
                     color: tc.oceanMedium,
-                    onTap: () => unawaited(_startAddingSpot()),
+                    onTap: _startAddingSpot,
                   ),
                   const SizedBox(height: 10),
                   _toolItem(
@@ -1525,6 +1683,69 @@ class _MapScreenState extends State<MapScreen>
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildPendingPersonalSpotMarker(LatLng point) {
+    final tc = ThemeColors.of(context);
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        Material(
+          color: tc.surface.withValues(alpha: 0.98),
+          elevation: 8,
+          shadowColor: tc.shadowColor,
+          borderRadius: BorderRadius.circular(9),
+          child: InkWell(
+            key: const ValueKey<String>('confirm-personal-spot'),
+            borderRadius: BorderRadius.circular(9),
+            onTap: () => unawaited(_confirmNewSpotLocation(point)),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(9),
+                border: Border.all(
+                  color: tc.oceanMedium.withValues(alpha: 0.65),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.add_location_alt_rounded,
+                    color: tc.oceanMedium,
+                    size: 19,
+                  ),
+                  const SizedBox(width: 7),
+                  Flexible(
+                    child: Text(
+                      context.tr('mySpots.addToMine'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: tc.textPrimary,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        Icon(
+          Icons.location_on_rounded,
+          color: tc.oceanMedium,
+          size: 34,
+          shadows: [
+            Shadow(
+              color: tc.shadowColor.withValues(alpha: 0.45),
+              blurRadius: 5,
+            ),
+          ],
+        ),
+      ],
     );
   }
 

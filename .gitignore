@@ -42,6 +42,11 @@ migrate_working_dir/
 # Generated Flutter golden-test diagnostics
 /test/failures/
 
+# Captures et mesures ponctuelles de validation sur appareil, conservées
+# localement à la racine mais jamais publiées dans le dépôt de production.
+/*.png
+/phone_*.txt
+
 # Symbolication related
 app.*.symbols
 

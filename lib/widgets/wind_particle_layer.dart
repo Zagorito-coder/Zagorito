@@ -51,7 +51,7 @@ class _WindParticleLayerState extends State<WindParticleLayer>
     _ticker = createTicker(_onTick);
     widget.provider.addListener(_onProviderChanged);
     if (widget.provider.isEnabled) {
-      _ticker.start();
+      _startTicker();
     }
   }
 
@@ -62,11 +62,10 @@ class _WindParticleLayerState extends State<WindParticleLayer>
       oldWidget.provider.removeListener(_onProviderChanged);
       widget.provider.addListener(_onProviderChanged);
     }
-    // Si isEnabled vient de passer a true et que le Ticker ne tourne pas
-    if (widget.provider.isEnabled && !_ticker.isActive) {
-      _ticker.start();
-    } else if (!widget.provider.isEnabled && _ticker.isActive) {
-      _ticker.stop();
+    if (widget.provider.isEnabled) {
+      _startTicker();
+    } else {
+      _stopTicker();
     }
   }
 
@@ -86,13 +85,30 @@ class _WindParticleLayerState extends State<WindParticleLayer>
 
   void _onProviderChanged() {
     if (!mounted) return;
-    if (widget.provider.isEnabled && !_ticker.isActive) {
-      _ticker.start();
-    } else if (!widget.provider.isEnabled && _ticker.isActive) {
-      _ticker.stop();
-      _particles = [];
-      _animPhase = 0.0;
+    if (widget.provider.isEnabled) {
+      _startTicker();
+    } else {
+      _stopTicker();
     }
+    setState(() {});
+  }
+
+  void _startTicker() {
+    if (_ticker.isActive) return;
+    // Ticker.elapsed repart de zéro à chaque start(). Le filtre 30 fps doit
+    // donc repartir du même référentiel, sinon toutes les trames d'un second
+    // démarrage sont rejetées jusqu'à rattraper la durée du premier.
+    _lastFrameMs = 0;
+    _ticker.start();
+  }
+
+  void _stopTicker() {
+    if (_ticker.isActive) {
+      _ticker.stop();
+    }
+    _lastFrameMs = 0;
+    _particles = [];
+    _animPhase = 0.0;
   }
 
   void _computeLOD() {
@@ -158,8 +174,10 @@ class _WindParticleLayerState extends State<WindParticleLayer>
 
       // Deplacement le long de la direction du vent
       final phaseDist = (_animPhase + rng.nextDouble() * 0.3) * screenW;
-      final px = (baseX + math.cos(windAngle) * phaseDist * lineLength * 0.15) % screenW;
-      final py = (baseY + math.sin(windAngle) * phaseDist * lineLength * 0.15) % screenH;
+      final px = (baseX + math.cos(windAngle) * phaseDist * lineLength * 0.15) %
+          screenW;
+      final py = (baseY + math.sin(windAngle) * phaseDist * lineLength * 0.15) %
+          screenH;
 
       final wrappedX = px < 0 ? px + screenW : px;
       final wrappedY = py < 0 ? py + screenH : py;

@@ -11,6 +11,7 @@ import 'package:spots_app/models/user_spot.dart';
 enum UserSpotFailure {
   authenticationRequired,
   duplicateSpot,
+  limitReached,
   invalidPhoto,
   photoUploadFailed,
   permissionDenied,
@@ -131,8 +132,14 @@ class UserSpotService {
       throw const UserSpotException(UserSpotFailure.authenticationRequired);
     }
     _validateDraft(draft);
-    if (await hasNearbyPrivateSpot(
-      uid: user.uid,
+    final privateSnapshot = await _privateSpots(user.uid)
+        .limit(UserSpot.maximumPersonalSpots + 1)
+        .get();
+    if (privateSnapshot.docs.length >= UserSpot.maximumPersonalSpots) {
+      throw const UserSpotException(UserSpotFailure.limitReached);
+    }
+    if (_hasNearbySpot(
+      documents: privateSnapshot.docs,
       latitude: latitude,
       longitude: longitude,
     )) {
@@ -336,8 +343,22 @@ class UserSpotService {
     String? excludingSpotId,
   }) async {
     final snapshot = await _privateSpots(uid).get();
+    return _hasNearbySpot(
+      documents: snapshot.docs,
+      latitude: latitude,
+      longitude: longitude,
+      excludingSpotId: excludingSpotId,
+    );
+  }
+
+  bool _hasNearbySpot({
+    required Iterable<QueryDocumentSnapshot<Map<String, dynamic>>> documents,
+    required double latitude,
+    required double longitude,
+    String? excludingSpotId,
+  }) {
     final point = LatLng(latitude, longitude);
-    for (final document in snapshot.docs) {
+    for (final document in documents) {
       if (document.id == excludingSpotId) continue;
       final data = document.data();
       final otherLatitude = (data['latitude'] as num?)?.toDouble();

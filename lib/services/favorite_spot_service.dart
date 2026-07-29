@@ -5,6 +5,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:spots_app/models.dart';
 
+enum FavoriteSpotFailure {
+  authenticationRequired,
+  limitReached,
+  unavailable,
+}
+
 class FavoriteSpotService {
   FavoriteSpotService({
     FirebaseFirestore? firestore,
@@ -13,6 +19,7 @@ class FavoriteSpotService {
         _auth = auth ?? FirebaseAuth.instance;
 
   static final FavoriteSpotService instance = FavoriteSpotService();
+  static const maximumFavorites = 30;
 
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
@@ -40,26 +47,47 @@ class FavoriteSpotService {
 
   Future<void> add(Spot spot) async {
     final user = _auth.currentUser;
-    if (user == null) throw const FavoriteSpotException();
-    await _favorites(user.uid).doc(_documentId(spot.id)).set({
-      'schemaVersion': 1,
-      'ownerUid': user.uid,
-      'spotId': spot.id,
-      'name': spot.name,
-      'latitude': spot.latitude,
-      'longitude': spot.longitude,
-      'type': spot.type.name,
-      'fishTypes': spot.fishTypes.take(50).toList(),
-      'notes': spot.notes.length <= 2000
-          ? spot.notes
-          : spot.notes.substring(0, 2000),
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+    if (user == null) {
+      throw const FavoriteSpotException(
+        FavoriteSpotFailure.authenticationRequired,
+      );
+    }
+    final favorite = _favorites(user.uid).doc(_documentId(spot.id));
+    try {
+      if ((await favorite.get()).exists) return;
+      final existing =
+          await _favorites(user.uid).limit(maximumFavorites + 1).get();
+      if (existing.docs.length >= maximumFavorites) {
+        throw const FavoriteSpotException(FavoriteSpotFailure.limitReached);
+      }
+      await favorite.set({
+        'schemaVersion': 1,
+        'ownerUid': user.uid,
+        'spotId': spot.id,
+        'name': spot.name,
+        'latitude': spot.latitude,
+        'longitude': spot.longitude,
+        'type': spot.type.name,
+        'fishTypes': spot.fishTypes.take(50).toList(),
+        'notes': spot.notes.length <= 2000
+            ? spot.notes
+            : spot.notes.substring(0, 2000),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } on FavoriteSpotException {
+      rethrow;
+    } on FirebaseException {
+      throw const FavoriteSpotException(FavoriteSpotFailure.unavailable);
+    }
   }
 
   Future<void> remove(String spotId) async {
     final user = _auth.currentUser;
-    if (user == null) throw const FavoriteSpotException();
+    if (user == null) {
+      throw const FavoriteSpotException(
+        FavoriteSpotFailure.authenticationRequired,
+      );
+    }
     await _favorites(user.uid).doc(_documentId(spotId)).delete();
   }
 
@@ -113,5 +141,7 @@ class FavoriteSpotService {
 }
 
 class FavoriteSpotException implements Exception {
-  const FavoriteSpotException();
+  const FavoriteSpotException(this.failure);
+
+  final FavoriteSpotFailure failure;
 }

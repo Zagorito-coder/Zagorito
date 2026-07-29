@@ -54,6 +54,31 @@ Avant le build, le script confirme que la cle, le CSV chiffre et sa source
 locale correspondent. Flutter recoit ensuite `.env` via
 `--dart-define-from-file`.
 
+Le module Android possède en plus un verrou Gradle exécuté avant chaque
+compilation. Même si une commande Flutter directe est lancée par erreur, aucun
+APK ou AAB ne peut être produit sans une clé AES-256 valide correspondant à
+l'asset chiffré et sans un catalogue officiel d'au moins 6 000 spots.
+
+## Lancer l'application localement
+
+Ne pas appeler directement `flutter run`, car l'application démarrerait sans la
+clé du catalogue chiffré. Utiliser le lanceur sécurisé :
+
+```sh
+tools/run_app.sh -d <device-id>
+```
+
+Pour reproduire le comportement optimisé utilisé pendant les vérifications sur
+téléphone :
+
+```sh
+tools/run_app.sh --profile -d <device-id>
+```
+
+Le script vérifie `.env` et le catalogue avant l'installation. Si la
+configuration est absente ou invalide, il s'arrête avant de remplacer
+l'application déjà installée.
+
 ## Verification courante
 
 ```sh

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spots_app/models/user_spot.dart';
+import 'package:spots_app/services/favorite_spot_service.dart';
 import 'package:spots_app/services/user_spot_service.dart';
 
 void main() {
@@ -28,5 +29,10 @@ void main() {
   test('photo and duplicate limits stay explicit', () {
     expect(UserSpot.maximumPhotoBytes, 2 * 1024 * 1024);
     expect(UserSpot.duplicateRadiusMeters, 100);
+  });
+
+  test('favorite and personal spot quotas stay independent', () {
+    expect(FavoriteSpotService.maximumFavorites, 30);
+    expect(UserSpot.maximumPersonalSpots, 30);
   });
 }

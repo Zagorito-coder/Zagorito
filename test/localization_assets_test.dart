@@ -30,6 +30,25 @@ void main() {
     }
 
     expect(catalogs['fr']!['map.searchHint'], 'Rechercher un spot...');
+    expect(
+      catalogs['fr']!['mySpots.favoriteLimitReached'],
+      contains('30 favoris'),
+    );
+    expect(
+      catalogs['fr']!['mySpots.personalLimitReached'],
+      contains('30 spots personnels'),
+    );
+    expect(
+      catalogs['fr']!['mySpots.addToMine'],
+      'Ajouter à mes spots',
+    );
+    expect(
+      catalogs['fr']!['mySpots.tapLocation'],
+      startsWith('Maintenez'),
+    );
+    expect(referenceKeys, isNot(contains('mySpots.saveAndSubmit')));
+    expect(referenceKeys, isNot(contains('mySpots.reviewNotice')));
+    expect(referenceKeys, isNot(contains('mySpots.status.pending')));
   });
 }
 

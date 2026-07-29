@@ -17,6 +17,8 @@ import '../theme.dart';
 import '../theme_controller.dart';
 import '../l10n/app_localizations.dart';
 import '../widgets/app_back_button.dart';
+import '../widgets/finite_map_controller.dart';
+import '../widgets/finite_marker_layer.dart';
 import '../widgets/app_tile_layer.dart';
 
 /// 20 images webP locales pour les cartes magasins (bandeau détail).
@@ -85,7 +87,7 @@ class ShopsMapPage extends StatefulWidget {
 }
 
 class _ShopsMapPageState extends State<ShopsMapPage> {
-  final MapController _mapController = MapController();
+  final MapController _mapController = FiniteMapController();
 
   List<FishingShop> _shopsWithImage = [];
   bool _isLoading = true;
@@ -121,14 +123,13 @@ class _ShopsMapPageState extends State<ShopsMapPage> {
       if (userPos != null) {
         final userLatLng = LatLng(userPos.latitude, userPos.longitude);
         markers.sort((a, b) {
-          final dA = const Distance().as(LengthUnit.Kilometer,
-              userLatLng, LatLng(a.latitude, a.longitude));
-          final dB = const Distance().as(LengthUnit.Kilometer,
-              userLatLng, LatLng(b.latitude, b.longitude));
+          final dA = const Distance().as(LengthUnit.Kilometer, userLatLng,
+              LatLng(a.latitude, a.longitude));
+          final dB = const Distance().as(LengthUnit.Kilometer, userLatLng,
+              LatLng(b.latitude, b.longitude));
           return dA.compareTo(dB);
         });
       }
-
 
       if (mounted) {
         setState(() {
@@ -185,7 +186,8 @@ class _ShopsMapPageState extends State<ShopsMapPage> {
                 width: 1,
               ),
             ),
-            child: const Icon(Icons.storefront, color: Color(0xFFFF8C69), size: 22),
+            child: const Icon(Icons.storefront,
+                color: Color(0xFFFF8C69), size: 22),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -202,7 +204,8 @@ class _ShopsMapPageState extends State<ShopsMapPage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  context.trArgs('shopsMap.count', args: {'count': _shopsWithImage.length.toString()}),
+                  context.trArgs('shopsMap.count',
+                      args: {'count': _shopsWithImage.length.toString()}),
                   style: TextStyle(
                     color: tc.textSecondary.withValues(alpha: 0.7),
                     fontSize: 12,
@@ -227,7 +230,8 @@ class _ShopsMapPageState extends State<ShopsMapPage> {
             const SizedBox(height: 12),
             Text(
               context.tr('shopsMap.loading'),
-              style: TextStyle(color: tc.textSecondary.withValues(alpha: 0.7), fontSize: 13),
+              style: TextStyle(
+                  color: tc.textSecondary.withValues(alpha: 0.7), fontSize: 13),
             ),
           ],
         ),
@@ -239,11 +243,15 @@ class _ShopsMapPageState extends State<ShopsMapPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline, color: const Color(0xFFEF5350).withValues(alpha: 0.6), size: 48),
+            Icon(Icons.error_outline,
+                color: const Color(0xFFEF5350).withValues(alpha: 0.6),
+                size: 48),
             const SizedBox(height: 12),
             Text(context.tr('shopsMap.loadingError'),
-                style: TextStyle(color: tc.textSecondary.withValues(alpha: 0.7))),
-            TextButton(onPressed: _loadShops, child: Text(context.tr('shops.retry'))),
+                style:
+                    TextStyle(color: tc.textSecondary.withValues(alpha: 0.7))),
+            TextButton(
+                onPressed: _loadShops, child: Text(context.tr('shops.retry'))),
           ],
         ),
       );
@@ -285,7 +293,7 @@ class _ShopsMapPageState extends State<ShopsMapPage> {
       children: [
         const AppTileLayer(style: MapStyle.standard),
         const AppMapAttribution(style: MapStyle.standard),
-        MarkerLayer(
+        FiniteMarkerLayer(
           markers: _shopsWithImage.map((shop) {
             return Marker(
               width: 40,
@@ -375,15 +383,15 @@ class _ShopDetailsSheet extends StatelessWidget {
               height: 180,
               width: double.infinity,
               margin: const EdgeInsets.only(top: 14),
-                  color: tc.surfaceElevated,
-                  child: Image.asset(
-                    _shopImageAsset(shop),
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Center(
-                      child: Icon(Icons.storefront,
-                          color: tc.textSecondary.withValues(alpha: 0.3), size: 48),
-                    ),
-                  ),
+              color: tc.surfaceElevated,
+              child: Image.asset(
+                _shopImageAsset(shop),
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Center(
+                  child: Icon(Icons.storefront,
+                      color: tc.textSecondary.withValues(alpha: 0.3), size: 48),
+                ),
+              ),
             ),
             Padding(
               padding: const EdgeInsets.all(18),
@@ -401,7 +409,10 @@ class _ShopDetailsSheet extends StatelessWidget {
                   const SizedBox(height: 10),
                   _InfoRow(icon: Icons.location_on, text: shop.address, tc: tc),
                   const SizedBox(height: 6),
-                  _InfoRow(icon: Icons.access_time, text: '${shop.openTime} — ${shop.closeTime}', tc: tc),
+                  _InfoRow(
+                      icon: Icons.access_time,
+                      text: '${shop.openTime} — ${shop.closeTime}',
+                      tc: tc),
                   const SizedBox(height: 20),
                   Row(
                     children: [
@@ -505,7 +516,10 @@ class _InfoRow extends StatelessWidget {
         Icon(icon, color: tc.oceanMedium.withValues(alpha: 0.7), size: 15),
         const SizedBox(width: 6),
         Expanded(
-          child: Text(text, style: TextStyle(color: tc.textSecondary.withValues(alpha: 0.8), fontSize: 13)),
+          child: Text(text,
+              style: TextStyle(
+                  color: tc.textSecondary.withValues(alpha: 0.8),
+                  fontSize: 13)),
         ),
       ],
     );
@@ -545,7 +559,8 @@ class _ActionButton extends StatelessWidget {
               child: Text(
                 label,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700),
+                style: TextStyle(
+                    color: color, fontSize: 12, fontWeight: FontWeight.w700),
               ),
             ),
           ],

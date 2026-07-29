@@ -156,6 +156,8 @@ class _SpotsPainter extends CustomPainter {
     } catch (_) {
       return;
     }
+    final cameraBounds = camera.visibleBounds;
+    final canvasBounds = (Offset.zero & size).inflate(12);
 
     // Reuse Paint instances for the whole frame. Allocating and configuring
     // four Paints for every spot creates significant garbage at wide zooms.
@@ -163,11 +165,21 @@ class _SpotsPainter extends CustomPainter {
     final mainPaint = Paint()..style = PaintingStyle.fill;
     final borderPaint = Paint()..style = PaintingStyle.stroke;
     final highlightPaint = Paint()..style = PaintingStyle.fill;
+    final borderColor = Colors.white.withValues(alpha: 0.92);
+    final highlightColor = Colors.white.withValues(alpha: 0.55);
 
     for (final spot in visibleSpots) {
-      final isSelected = spot == selectedSpot;
+      // visibleSpots is deliberately refreshed only after an 80 ms debounce.
+      // During a continuous pinch it can therefore still describe the old,
+      // much wider viewport. Cull against the live camera before doing any
+      // paint work so obsolete markers cannot saturate the UI thread.
+      if (!cameraBounds.contains(spot.location)) continue;
+
       final point = camera.latLngToScreenOffset(spot.location);
       final pos = Offset(point.dx, point.dy);
+      if (!canvasBounds.contains(pos)) continue;
+
+      final isSelected = spot == selectedSpot;
       final radius = isSelected ? 11.0 : 6.0;
       final baseColor = spot.type.color;
 
@@ -187,14 +199,14 @@ class _SpotsPainter extends CustomPainter {
 
       // Bordure nette blanche (glassmorphique)
       borderPaint
-        ..color = Colors.white.withValues(alpha: 0.92)
+        ..color = borderColor
         ..strokeWidth = isSelected ? 2.2 : 1.3;
       canvas.drawCircle(pos, radius, borderPaint);
 
       // Reflet highlight en haut à gauche (effet liquide)
       if (!isSelected) {
         highlightPaint
-          ..color = Colors.white.withValues(alpha: 0.55)
+          ..color = highlightColor
           ..maskFilter = null;
         canvas.drawCircle(
           Offset(pos.dx - radius * 0.35, pos.dy - radius * 0.35),

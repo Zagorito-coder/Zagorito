@@ -177,6 +177,7 @@ class _UserSpotFormSheetState extends State<_UserSpotFormSheet> {
     return switch (failure) {
       UserSpotFailure.authenticationRequired => 'mySpots.signInRequired',
       UserSpotFailure.duplicateSpot => 'mySpots.duplicatePrivate',
+      UserSpotFailure.limitReached => 'mySpots.personalLimitReached',
       UserSpotFailure.invalidPhoto => 'mySpots.photoTooLarge',
       UserSpotFailure.photoUploadFailed => 'mySpots.photoUploadError',
       UserSpotFailure.permissionDenied => 'mySpots.permissionError',
@@ -321,12 +322,10 @@ class _UserSpotFormSheetState extends State<_UserSpotFormSheet> {
                                     color: Colors.white,
                                   ),
                                 )
-                              : const Icon(Icons.cloud_upload_rounded),
+                              : const Icon(Icons.save_rounded),
                           label: Text(
                             context.tr(
-                              _isSaving
-                                  ? 'mySpots.saving'
-                                  : 'mySpots.saveAndSubmit',
+                              _isSaving ? 'mySpots.saving' : 'common.save',
                             ),
                           ),
                           style: FilledButton.styleFrom(
@@ -336,16 +335,6 @@ class _UserSpotFormSheetState extends State<_UserSpotFormSheet> {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          context.tr('mySpots.reviewNotice'),
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: tc.textMuted,
-                            fontSize: 11,
-                            height: 1.35,
                           ),
                         ),
                       ],

@@ -22,6 +22,8 @@ import 'package:spots_app/pages/tide_page.dart';
 import 'package:spots_app/pages/forecast_page.dart';
 import 'package:spots_app/models.dart';
 import 'package:spots_app/models/spot_selection_request.dart';
+import 'package:spots_app/models/user_spot.dart';
+import 'package:spots_app/models/user_spot_selection_request.dart';
 import 'package:spots_app/services/ad_service.dart';
 import 'package:spots_app/widgets/adaptive_banner_ad.dart';
 
@@ -43,7 +45,10 @@ class AppShellState extends State<AppShell> {
   late final List<Widget?> _pages;
   late final ValueNotifier<int> _addSpotRequests;
   late final ValueNotifier<SpotSelectionRequest?> _spotSelectionRequests;
+  late final ValueNotifier<UserSpotSelectionRequest?>
+      _userSpotSelectionRequests;
   int _spotSelectionSerial = 0;
+  int _userSpotSelectionSerial = 0;
   bool _showAds = false;
 
   @override
@@ -51,6 +56,7 @@ class AppShellState extends State<AppShell> {
     super.initState();
     _addSpotRequests = ValueNotifier<int>(0);
     _spotSelectionRequests = ValueNotifier<SpotSelectionRequest?>(null);
+    _userSpotSelectionRequests = ValueNotifier<UserSpotSelectionRequest?>(null);
     _pages = List<Widget?>.filled(5, null);
     _pages[_currentIndex] = _buildPage(_currentIndex);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -69,11 +75,13 @@ class AppShellState extends State<AppShell> {
       2 => MySpotsPage(
           onAddSpot: openSpotCreation,
           onOpenFavorite: openFavoriteSpot,
+          onOpenPersonal: openPersonalSpot,
         ),
       3 => SpotFinderPage(
           initialSpots: widget.initialSpots,
           addSpotRequests: _addSpotRequests,
           spotSelectionRequests: _spotSelectionRequests,
+          userSpotSelectionRequests: _userSpotSelectionRequests,
           onOpenMySpots: () => navigateTo(2),
         ),
       4 => const SettingsPageWrapper(),
@@ -107,10 +115,21 @@ class AppShellState extends State<AppShell> {
     });
   }
 
+  void openPersonalSpot(UserSpot spot) {
+    navigateTo(3);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _userSpotSelectionRequests.value = UserSpotSelectionRequest(
+        serial: ++_userSpotSelectionSerial,
+        spot: spot,
+      );
+    });
+  }
+
   @override
   void dispose() {
     _addSpotRequests.dispose();
     _spotSelectionRequests.dispose();
+    _userSpotSelectionRequests.dispose();
     super.dispose();
   }
 

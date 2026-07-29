@@ -33,6 +33,7 @@ class UserSpot {
   static const maximumDangerNotesLength = 500;
   static const maximumPhotoBytes = 2 * 1024 * 1024;
   static const duplicateRadiusMeters = 100.0;
+  static const maximumPersonalSpots = 30;
 
   final String id;
   final String name;
