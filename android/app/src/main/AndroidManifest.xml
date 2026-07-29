@@ -15,6 +15,12 @@
          android:dataExtractionRules="@xml/data_extraction_rules"
          android:networkSecurityConfig="@xml/network_security_config"
          android:usesCleartextTraffic="false">
+        <!--
+          Geolocator embarque une classe optionnelle de notification pour le
+          suivi en arrière-plan. BoosterFish n'active jamais
+          ForegroundNotificationConfig : la localisation reste au premier
+          plan, donc POST_NOTIFICATIONS ne doit pas être demandée.
+        -->
         <activity
             android:name=".MainActivity"
             android:exported="true"

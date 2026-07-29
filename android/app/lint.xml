@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!--
+      geolocator_android contient une implémentation optionnelle de
+      notification pour ForegroundNotificationConfig. BoosterFish ne crée
+      jamais cette configuration et ne suit pas la position en arrière-plan.
+      L'exception vise donc uniquement la classe tierce à l'origine du faux
+      positif; toute future notification applicative restera contrôlée.
+    -->
+    <issue id="NotificationPermission">
+        <ignore
+            regexp="com\.baseflow\.geolocator\.location\.BackgroundNotification" />
+    </issue>
+</lint>
