@@ -18,6 +18,7 @@ import 'package:spots_app/app_shell.dart';
 import 'package:spots_app/providers/fish_provider.dart';
 import 'package:spots_app/providers/premium_provider.dart';
 import 'package:spots_app/services/offline_map_service.dart';
+import 'package:spots_app/services/crash_reporting_service.dart';
 import 'package:spots_app/services/spot_service.dart';
 import 'package:spots_app/theme.dart';
 import 'package:spots_app/l10n/app_localizations.dart';
@@ -50,6 +51,13 @@ class _SplashBootstrapState extends State<SplashBootstrap> {
       } catch (e) {
         debugPrint('[SplashBootstrap] Firebase error: $e');
         rethrow;
+      }
+      try {
+        await CrashReportingService.initialize();
+      } catch (e) {
+        // Le diagnostic ne doit jamais empêcher l'accès à l'application.
+        // Aucun contexte utilisateur n'est ajouté à cette erreur locale.
+        debugPrint('[SplashBootstrap] Crash reporting init error: $e');
       }
 
       _update('splash.loadingData', 0.3);

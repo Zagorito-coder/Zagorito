@@ -41,6 +41,7 @@
   <li><strong>Zones cartographiques et lieux consultés :</strong> les fournisseurs de cartes reçoivent les coordonnées des tuiles nécessaires à la zone affichée. Les coordonnées publiques d'un spot peuvent être transmises à une application de navigation uniquement lorsque vous choisissez explicitement de l'ouvrir. Elles ne sont pas associées à votre compte par BoosterFish.</li>
   <li><strong>Publicité et consentement :</strong> Google Mobile Ads (AdMob) et la plateforme UMP peuvent traiter des identifiants d'appareil ou publicitaires, l'adresse IP, des informations techniques, les interactions avec les annonces et le choix de consentement, conformément aux paramètres UMP et aux règles de Google.</li>
   <li><strong>Protection de l'application :</strong> Firebase App Check utilise, en version Android Release, l'attestation Google Play Integrity et un jeton d'intégrité transmis à Firebase afin de vérifier que les requêtes proviennent de l'application authentique et de limiter les abus. Ce traitement sert à la sécurité et à la prévention de la fraude, et n'est pas utilisé pour la publicité ou la personnalisation.</li>
+  <li><strong>Diagnostic de stabilité :</strong> en version Android Release, Firebase Crashlytics reçoit automatiquement les rapports de crash et d'absence de réponse (ANR), notamment la pile d'exécution, l'état technique pertinent de l'Application, des métadonnées ponctuelles sur l'appareil et un identifiant d'installation Crashlytics. BoosterFish n'ajoute à ces rapports aucun UID Firebase, nom, e-mail, emplacement, nom de spot, note, photo, journal personnalisé ni donnée publicitaire. Crashlytics est désactivé dans les builds Debug et Profile et Google Analytics n'est pas intégré à ce diagnostic.</li>
   <li><strong>Données locales :</strong> langue, thème, caches de spots et magasins et, si nécessaire, un identifiant anonyme aléatoire stocké dans le stockage sécurisé ou les préférences de l'appareil.</li>
   <li><strong>Données techniques des fournisseurs :</strong> adresse IP, modèle d'appareil, journaux réseau ou requêtes de tuiles susceptibles d'être traités par les services tiers nécessaires au fonctionnement.</li>
 </ul>
@@ -51,6 +52,7 @@
   <li>enregistrer la galerie privée choisie par l'utilisateur et afficher les prises communautaires publiées volontairement ;</li>
   <li>faire respecter la limite d'une publication par 24 heures, calculer la meilleure prise hebdomadaire et traiter les likes, blocages et signalements ;</li>
   <li>mémoriser les préférences et assurer la sécurité du service ;</li>
+  <li>détecter, regrouper et corriger les crashs et ANR afin d'améliorer la stabilité ;</li>
   <li>afficher des annonces pour financer l'Application ;</li>
   <li>respecter les obligations légales et prévenir les abus.</li>
 </ul>
@@ -67,6 +69,7 @@
 <ul>
   <li><strong>Google Firebase Auth, Firestore et Cloud Functions :</strong> connexion Google, données privées de compte, spots personnels, publication communautaire, likes, blocages, signalements, classement hebdomadaire, modération et suppression des données. Aucun nouveau droit d'abonnement n'est créé par l'Application.</li>
   <li><strong>Firebase App Check et Google Play Integrity :</strong> attestation de l'application et de l'environnement Android pour protéger les ressources Firebase contre les requêtes frauduleuses ou non autorisées. Voir les informations de confidentialité de Google et Firebase.</li>
+  <li><strong>Firebase Crashlytics :</strong> diagnostic technique des crashs et ANR de la version Release, sans identifiant de compte ni contexte utilisateur ajouté par BoosterFish.</li>
   <li><strong>Cloudflare Workers et R2 :</strong> distribution des cartes hors ligne et stockage des photos de spots ou de prises publiées. Les photos communautaires sont accessibles publiquement par une URL non devinable pendant leur période de publication ou de classement ; les écritures sont protégées par Firebase Auth et App Check.</li>
   <li><strong>Google AdMob et User Messaging Platform (UMP) :</strong> consentement et diffusion des annonces. Voir la <a href="https://policies.google.com/privacy">Politique de confidentialité de Google</a>.</li>
   <li><strong>Open-Meteo :</strong> données météo et marines obtenues exclusivement par les tâches serveur utilisant les endpoints commerciaux, puis publiées dans Firestore. L'Application mobile ne contacte pas directement Open-Meteo. Voir les <a href="https://open-meteo.com/en/terms">conditions et informations de confidentialité</a>.</li>
@@ -103,6 +106,7 @@
   <li>Les photos et fiches de la galerie privée restent sur l'appareil jusqu'à leur suppression par l'utilisateur, la suppression du compte lorsqu'elle peut être exécutée, l'effacement des données de l'Application ou sa désinstallation.</li>
   <li>Les préférences et caches locaux restent sur l'appareil jusqu'à leur effacement, la suppression du compte lorsqu'ils sont concernés, ou la désinstallation.</li>
   <li>Les données publicitaires et journaux des prestataires sont conservés selon leurs propres politiques et votre choix de consentement.</li>
+  <li>Firebase Crashlytics conserve les piles de crash, données techniques associées et identifiants d'installation pendant 90 jours avant le début de leur suppression de ses systèmes actifs et de sauvegarde. Ces rapports ne sont volontairement pas liés au compte BoosterFish.</li>
 </ul>
 
 <h2>6. Vos droits</h2>
@@ -140,7 +144,8 @@
   les règles Firestore isolent les données privées, valident les publications et bloquent les
   écritures du client sur les prévisions et les anciens droits d'abonnement. Les photos sont
   limitées à 2 Mo, réencodées sans métadonnées EXIF avant stockage et protégées à l'écriture par
-  Firebase Auth et App Check. Aucun mot de passe Google n'est reçu ou stocké par BoosterFish.
+  Firebase Auth et App Check. Les données applicatives privées sont exclues d'Android Auto Backup
+  et du transfert appareil-à-appareil. Aucun mot de passe Google n'est reçu ou stocké par BoosterFish.
   Aucun système n'étant infaillible, contactez-nous si vous soupçonnez un incident.
 </p>
 

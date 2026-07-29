@@ -41,6 +41,7 @@ import 'package:provider/provider.dart';
 import 'package:spots_app/providers/fish_provider.dart';
 import 'package:spots_app/providers/premium_provider.dart';
 import 'package:spots_app/services/auth_service.dart';
+import 'package:spots_app/services/crash_reporting_service.dart';
 import 'package:flutter_compass/flutter_compass.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:spots_app/providers/wind_animation_provider.dart';
@@ -50,7 +51,7 @@ void main() {
   runZonedGuarded(_bootstrap, (error, stackTrace) {
     // Expected when vector tiles discard stale work during pan or zoom.
     if (error is CancellationException) return;
-    Error.throwWithStackTrace(error, stackTrace);
+    CrashReportingService.handleUncaught(error, stackTrace);
   });
 }
 

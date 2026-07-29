@@ -67,15 +67,16 @@ leur contenu corresponde aux fichiers `docs/` de cette version.
 | Localisation approximative | Zone d'environ 5 km d'une prise publiée ; estimation IP du SDK Google Mobile Ads | Oui | Oui | Facultative pour la communauté ; requise lorsque les annonces sont diffusées | Fonctionnalité de l'application ; publicité ou marketing ; analyses ; prévention de la fraude, sécurité et conformité |
 | Activité dans l'application — interactions | Likes, blocages, signalements, lancements et interactions avec l'application ou les annonces | Oui | Oui pour les signaux publicitaires ; seul le total des likes est public | Facultatif pour la communauté ; requis lorsque les annonces sont diffusées | Fonctionnalité de l'application ; analyses ; sécurité/prévention des abus ; publicité ou marketing |
 | Autres contenus générés par les utilisateurs | Espèce, poids, zone, montage, appât, notes et conseil associés à une prise publiée ; informations d'un spot personnel | Oui | Oui pour une publication volontaire | Facultatif | Fonctionnalité de l'application ; sécurité/prévention des abus |
-| Informations sur l'application et performances — diagnostics | Temps de lancement, blocages, consommation d'énergie et diagnostics du SDK publicitaire | Oui | Oui | Requise lorsque les annonces sont autorisées/diffusées | Analyses ; prévention de la fraude, sécurité et conformité ; publicité ou marketing |
+| Informations sur l'application et performances — journaux de plantage | Piles de crash et ANR Firebase Crashlytics, état technique pertinent de l'application | Oui | Non¹ | Requise dans la version Release | Analyses |
+| Informations sur l'application et performances — diagnostics | Métadonnées techniques Crashlytics ; temps de lancement, blocages, consommation d'énergie et diagnostics du SDK publicitaire | Oui | Oui pour les signaux publicitaires ; non¹ pour Crashlytics | Requise dans la version Release et lorsque les annonces sont diffusées | Analyses ; prévention de la fraude, sécurité et conformité ; publicité ou marketing |
 | Appareil ou autres identifiants | Identifiant publicitaire Android, App Set ID et identifiants apparentés | Oui | Oui | Requise lorsque les annonces sont autorisées/diffusées | Publicité ou marketing ; analyses ; prévention de la fraude, sécurité et conformité |
 
-¹ Firebase Auth et Google Sign-In sont utilisés comme prestataires de service
-pour l'authentification. Cette transmission n'est pas déclarée comme un
-« partage » si l'exception fournisseur de services de Google Play s'applique à
-la configuration contractuelle du compte développeur. Si une donnée est
-réutilisée par un destinataire pour ses propres finalités, la déclarer aussi
-comme partagée.
+¹ Firebase Auth, Google Sign-In et Firebase Crashlytics sont utilisés comme
+prestataires de service respectivement pour l'authentification et le diagnostic.
+Cette transmission n'est pas déclarée comme un « partage » si l'exception
+fournisseur de services de Google Play s'applique à la configuration
+contractuelle du compte développeur. Si une donnée est réutilisée par un
+destinataire pour ses propres finalités, la déclarer aussi comme partagée.
 
 ### Données locales ou non transmises
 
@@ -90,6 +91,11 @@ comme partagée.
   localisation précise doit être déclarée comme collecte facultative.
 - Aucun mot de passe Google, donnée bancaire, contact, message, donnée de santé,
   fichier personnel ou historique d'achat n'est collecté par l'application.
+- Firebase Crashlytics collecte les crashs et ANR techniques uniquement dans la
+  version Release. Aucun UID Firebase, nom, e-mail, emplacement, nom de spot,
+  note, photo, journal personnalisé ni événement Google Analytics n'est ajouté
+  aux rapports. Les identifiants et rapports Crashlytics sont conservés 90
+  jours selon la documentation Firebase.
 
 Les fournisseurs de cartes reçoivent néanmoins les coordonnées des tuiles de la
 zone affichée ainsi que des données techniques réseau. Cette information est
@@ -135,6 +141,11 @@ fournisseur ou un SDK de cartographie est ajouté.
   jusqu'à validation d'une installation distribuée par Google Play en Internal
   Testing, puis doit être activé progressivement sur Firestore, Storage et
   Functions.
+- **Crashlytics :** intégré uniquement pour la version Release, sans Analytics,
+  identifiant utilisateur, clé personnalisée ni journal applicatif. Dans la
+  console Firebase, désactiver le partage optionnel « Crash Insights » avant la
+  production si vous ne souhaitez pas contribuer les piles anonymisées aux
+  comparaisons globales.
 
 ## Contrôles avant chaque envoi
 
