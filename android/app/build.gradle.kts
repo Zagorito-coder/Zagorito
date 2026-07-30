@@ -181,5 +181,10 @@ configurations.all {
         force("androidx.core:core:1.13.1")
         force("androidx.core:core-ktx:1.13.1")
         force("androidx.browser:browser:1.7.0")
+        // Google Mobile Ads 25.3.0 référence encore WorkManager 2.7.0.
+        // Cette ancienne version échoue à instancier sa WorkDatabase après
+        // minification R8/AGP 9. Utiliser la version AndroidX stable actuelle,
+        // compatible avec minSdk 24 et compileSdk 36.
+        force("androidx.work:work-runtime:2.11.2")
     }
 }
