@@ -876,6 +876,7 @@ class _MapScreenState extends State<MapScreen>
       _selectedUserSpot = null;
       _pendingPersonalSpot = null;
       _searchQuery = '';
+      _showToolsPanel = false;
     });
     _searchController.clear();
     FocusScope.of(context).unfocus();
@@ -904,26 +905,25 @@ class _MapScreenState extends State<MapScreen>
   }
 
   void _clearSelection() {
-    if (_selectedSpot == null) return;
-    final center = LatLng(_selectedSpot!.latitude, _selectedSpot!.longitude);
-    if (!center.latitude.isFinite || !center.longitude.isFinite) {
-      setState(() => _selectedSpot = null);
-      return;
-    }
+    final selectedSpot = _selectedSpot;
+    if (selectedSpot == null) return;
+
+    // La fermeture d'un spot désactive toujours son vent, même si ses
+    // coordonnées ne permettent exceptionnellement pas de recalculer le zoom.
+    context.read<WindAnimationProvider>().disable();
+    setState(() => _selectedSpot = null);
+
+    final center = LatLng(selectedSpot.latitude, selectedSpot.longitude);
+    if (!center.latitude.isFinite || !center.longitude.isFinite) return;
+
     final zoom = (math.log(40075016.686 *
                 math.cos(center.latitude * math.pi / 180) /
                 (256 * (20000 / 256))) /
             math.ln2)
         .clamp(3.0, _maxZoom);
-    if (!zoom.isFinite) {
-      setState(() => _selectedSpot = null);
-      return;
-    }
+    if (!zoom.isFinite) return;
+
     _zoomTo(zoom);
-    // Desactive le vent quand on quitte le spot
-    final wind = context.read<WindAnimationProvider>();
-    wind.disable();
-    setState(() => _selectedSpot = null);
   }
 
   void _startAddingSpot() {
@@ -1853,9 +1853,23 @@ class _MapScreenState extends State<MapScreen>
 
   Widget _buildToolsPanelToggleButton() {
     return ZoomButton(
+        key: const ValueKey<String>('map-tools-toggle'),
         heroTag: 'tpt',
         icon: _showToolsPanel ? Icons.close : Icons.layers,
-        onTap: () => setState(() => _showToolsPanel = !_showToolsPanel));
+        onTap: () {
+          final shouldOpen = !_showToolsPanel;
+          if (shouldOpen) {
+            _clearSelection();
+          }
+          if (!mounted) return;
+          setState(() {
+            _showToolsPanel = shouldOpen;
+            if (shouldOpen) {
+              _selectedUserSpot = null;
+              _isFishBarVisible = false;
+            }
+          });
+        });
   }
 
   Widget _buildZoomIn() {

@@ -96,7 +96,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                         onTap: widget.onNavigateToTides,
                       ),
                       _ExpeditionCard(
-                        title: context.tr('drawer.tidesPro'),
+                        title: context.tr('home.tidesProTitle'),
                         subtitle: context.tr('home.tidesProSubtitle'),
                         accent: palette.blue,
                         motif: _ExpeditionMotif.forecast,
@@ -837,13 +837,13 @@ class _ExpeditionHeading extends StatelessWidget {
                   fit: BoxFit.scaleDown,
                   alignment: AlignmentDirectional.centerStart,
                   child: Text(
-                    context.tr('home.expeditionTitle'),
+                    context.tr('home.anglerSpacesTitle'),
                     maxLines: 1,
                     style: TextStyle(
                       color: palette.textPrimary,
-                      fontSize: 14,
+                      fontSize: 15.5,
                       fontWeight: FontWeight.w900,
-                      letterSpacing: 2.3,
+                      letterSpacing: 1.35,
                     ),
                   ),
                 ),
@@ -982,6 +982,14 @@ class _ExpeditionCard extends StatelessWidget {
                 );
                 final textStart = constraints.maxWidth * 0.37;
                 final textWidth = constraints.maxWidth - textStart - 6;
+                final titleFontSize = (constraints.maxHeight * 0.105).clamp(
+                  11.5,
+                  14.0,
+                );
+                final subtitleFontSize = (constraints.maxHeight * 0.078).clamp(
+                  9.0,
+                  11.2,
+                );
                 return Stack(
                   children: [
                     PositionedDirectional(
@@ -1031,20 +1039,20 @@ class _ExpeditionCard extends StatelessWidget {
                                 textScaler: textScaler,
                                 style: TextStyle(
                                   color: palette.textPrimary,
-                                  fontSize: 10,
-                                  height: 1.08,
-                                  fontWeight: FontWeight.w800,
+                                  fontSize: titleFontSize,
+                                  height: 1.12,
+                                  fontWeight: FontWeight.w900,
                                 ),
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 5),
                               Text(
                                 subtitle,
                                 textScaler: textScaler,
                                 style: TextStyle(
                                   color: palette.textSecondary,
-                                  fontSize: 8,
-                                  height: 1.24,
-                                  fontWeight: FontWeight.w500,
+                                  fontSize: subtitleFontSize,
+                                  height: 1.3,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ],

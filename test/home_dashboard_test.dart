@@ -169,17 +169,18 @@ void main() {
     await tester.pumpAndSettle();
 
     const visibleTexts = <String>[
+      'Espaces pêcheurs',
       'Marées',
       'Consultez les marées\nen temps réel pour\nmieux planifier.',
-      'Marées avancées',
+      'Marées Pro',
       'Prévisions détaillées\net coefficients pour\nles experts.',
-      'Espèces de poissons',
+      'Encyclopédie',
       '72 espèces répertoriées\navec conseils et périodes\nfavorables.',
-      'Techniques de pêche',
+      'Techniques',
       'Guides pratiques pour\nmaîtriser chaque\ntechnique.',
       'Communauté',
       'Rejoignez les pêcheurs,\npartagez vos prises et\nastuces.',
-      'Magasins d’articles',
+      'Magasins',
       'Trouvez le matériel\nidéal près de\nvos spots.',
     ];
 
@@ -200,6 +201,45 @@ void main() {
       }
     }
     expect(truncated, isEmpty, reason: 'Textes tronqués : $truncated');
+  });
+
+  testWidgets('conserve une typographie lisible dans les six cartes',
+      (tester) async {
+    await _setViewport(tester, const Size(360, 640));
+    await tester.pumpWidget(_testApp(tideData: _marineData()));
+    await tester.pumpAndSettle();
+
+    for (final title in const [
+      'Marées',
+      'Marées Pro',
+      'Encyclopédie',
+      'Techniques',
+      'Communauté',
+      'Magasins',
+    ]) {
+      final widget = tester.widget<Text>(find.text(title));
+      expect(
+        widget.style?.fontSize,
+        greaterThanOrEqualTo(11.5),
+        reason: 'Titre trop petit : $title',
+      );
+    }
+
+    for (final description in const [
+      'Consultez les marées\nen temps réel pour\nmieux planifier.',
+      'Prévisions détaillées\net coefficients pour\nles experts.',
+      '72 espèces répertoriées\navec conseils et périodes\nfavorables.',
+      'Guides pratiques pour\nmaîtriser chaque\ntechnique.',
+      'Rejoignez les pêcheurs,\npartagez vos prises et\nastuces.',
+      'Trouvez le matériel\nidéal près de\nvos spots.',
+    ]) {
+      final widget = tester.widget<Text>(find.text(description));
+      expect(
+        widget.style?.fontSize,
+        greaterThanOrEqualTo(9),
+        reason: 'Description trop petite : $description',
+      );
+    }
   });
 
   testWidgets('le bouton carte et le Drawer conservent leur navigation',
