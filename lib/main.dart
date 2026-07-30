@@ -268,6 +268,8 @@ class _SearchBar extends StatelessWidget {
   final VoidCallback onClear;
   final void Function(Spot) onSelect;
   final String Function(Spot) distanceText;
+  final String? measurementText;
+  final VoidCallback onStopMeasurement;
   final VoidCallback? onTap;
   const _SearchBar(
       {required this.controller,
@@ -276,6 +278,8 @@ class _SearchBar extends StatelessWidget {
       required this.onClear,
       required this.onSelect,
       required this.distanceText,
+      required this.onStopMeasurement,
+      this.measurementText,
       this.onTap});
 
   @override
@@ -283,55 +287,133 @@ class _SearchBar extends StatelessWidget {
     final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context);
     return Column(mainAxisAlignment: MainAxisAlignment.end, children: [
-      Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(
-              color: tc.surface.withValues(alpha: 0.9),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: tc.glassBorder, width: 1.2),
-              boxShadow: [
-                BoxShadow(
-                    color: tc.shadowColor,
-                    blurRadius: 12,
-                    offset: const Offset(0, 4))
-              ]),
-          child: TextField(
-              controller: controller,
-              style: TextStyle(
-                  color: tc.textPrimary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500),
-              onTap: onTap,
-              decoration: InputDecoration(
-                  filled: true,
-                  fillColor: tc.surfaceLight.withValues(alpha: 0.8),
-                  hintText: l10n.translate('map.searchHint'),
-                  hintStyle: TextStyle(color: tc.textMuted, fontSize: 14),
-                  prefixIcon:
-                      Icon(Icons.search, color: tc.textSecondary, size: 22),
-                  suffixIcon: controller.text.isEmpty
-                      ? null
-                      : IconButton(
-                          icon:
-                              Icon(Icons.close, color: tc.textMuted, size: 18),
-                          onPressed: onClear),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none),
-                  enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none),
-                  focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          BorderSide(color: tc.oceanMedium, width: 1.5)),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14)),
-              textInputAction: TextInputAction.search,
-              onChanged: onChanged,
-              onSubmitted: (_) {
-                if (results.isNotEmpty) onSelect(results.first);
-              })),
+      Stack(clipBehavior: Clip.none, children: [
+        Padding(
+            padding: EdgeInsets.only(top: measurementText == null ? 0 : 28),
+            child: Container(
+                key: const ValueKey<String>('map-search-bar-surface'),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                    color: tc.surface.withValues(alpha: 0.9),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: tc.glassBorder, width: 1.2),
+                    boxShadow: [
+                      BoxShadow(
+                          color: tc.shadowColor,
+                          blurRadius: 12,
+                          offset: const Offset(0, 4))
+                    ]),
+                child: TextField(
+                    controller: controller,
+                    style: TextStyle(
+                        color: tc.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500),
+                    onTap: onTap,
+                    decoration: InputDecoration(
+                        filled: true,
+                        fillColor: tc.surfaceLight.withValues(alpha: 0.8),
+                        hintText: l10n.translate('map.searchHint'),
+                        hintStyle: TextStyle(color: tc.textMuted, fontSize: 14),
+                        prefixIcon: Icon(Icons.search,
+                            color: tc.textSecondary, size: 22),
+                        suffixIcon: controller.text.isEmpty
+                            ? null
+                            : IconButton(
+                                icon: Icon(Icons.close,
+                                    color: tc.textMuted, size: 18),
+                                onPressed: onClear),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none),
+                        enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none),
+                        focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide:
+                                BorderSide(color: tc.oceanMedium, width: 1.5)),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14)),
+                    textInputAction: TextInputAction.search,
+                    onChanged: onChanged,
+                    onSubmitted: (_) {
+                      if (results.isNotEmpty) onSelect(results.first);
+                    }))),
+        if (measurementText != null)
+          Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Center(
+                  child: Stack(clipBehavior: Clip.none, children: [
+                Semantics(
+                    liveRegion: true,
+                    label:
+                        '${l10n.translate('map.measureDistance')} : $measurementText',
+                    child: Container(
+                        key: const ValueKey<String>(
+                            'map-measurement-search-indicator'),
+                        width: 154,
+                        height: 52,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                            color: tc.surface.withValues(alpha: 0.97),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                                color: tc.gold.withValues(alpha: 0.75),
+                                width: 1.2),
+                            boxShadow: [
+                              BoxShadow(
+                                  color: tc.shadowColor,
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 3))
+                            ]),
+                        child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.straighten_rounded,
+                                  color: tc.gold, size: 22),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                  child: Text(measurementText!,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.fade,
+                                      softWrap: false,
+                                      style: TextStyle(
+                                          color: tc.gold,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w800,
+                                          fontFeatures: const [
+                                            FontFeature.tabularFigures()
+                                          ])))
+                            ]))),
+                Positioned(
+                    top: 6,
+                    right: -18,
+                    child: SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: Material(
+                            color: tc.surface.withValues(alpha: 0.97),
+                            elevation: 4,
+                            shadowColor: tc.shadowColor,
+                            shape: CircleBorder(
+                                side: BorderSide(
+                                    color: tc.gold.withValues(alpha: 0.75),
+                                    width: 1.2)),
+                            child: IconButton(
+                                key: const ValueKey<String>(
+                                    'map-measurement-close'),
+                                tooltip: l10n.translate('map.stopMeasure'),
+                                padding: EdgeInsets.zero,
+                                icon: Icon(Icons.close_rounded,
+                                    color: tc.textPrimary, size: 24),
+                                onPressed: onStopMeasurement))))
+              ]))),
+      ]),
       if (controller.text.isNotEmpty && results.isNotEmpty)
         Container(
             margin: const EdgeInsets.only(bottom: 8),
@@ -650,6 +732,9 @@ class _MapScreenState extends State<MapScreen>
         LatLng(spot.latitude, spot.longitude));
     return '${km.toStringAsFixed(1)} km';
   }
+
+  String get _formattedMeasuredDistance =>
+      '${_measuredDistanceKm.toStringAsFixed(2)} km';
 
   @override
   void initState() {
@@ -1121,6 +1206,15 @@ class _MapScreenState extends State<MapScreen>
     _measuredDistanceKm = total;
   }
 
+  void _stopMeasuring() {
+    if (!mounted || !_isMeasuring) return;
+    setState(() {
+      _isMeasuring = false;
+      _measurePoints.clear();
+      _measuredDistanceKm = 0.0;
+    });
+  }
+
   final MarkerCacheManager _markerCacheManager = MarkerCacheManager();
 
   bool _isValidMapPoint(LatLng point) =>
@@ -1397,7 +1491,11 @@ class _MapScreenState extends State<MapScreen>
                                     FocusScope.of(context).unfocus();
                                   },
                                   onSelect: _selectSpot,
-                                  distanceText: _distanceText))));
+                                  distanceText: _distanceText,
+                                  measurementText: _isMeasuring
+                                      ? _formattedMeasuredDistance
+                                      : null,
+                                  onStopMeasurement: _stopMeasuring))));
                 }),
           if (_isCompassEnabled)
             Positioned(
@@ -1544,25 +1642,26 @@ class _MapScreenState extends State<MapScreen>
                   ),
                   const SizedBox(height: 10),
                   _toolItem(
+                      key: const ValueKey<String>('map-measurement-toggle'),
                       icon: _isMeasuring ? Icons.stop : Icons.straighten,
                       label: _isMeasuring
                           ? context.tr('map.stopMeasure')
                           : context.tr('map.measureDistance'),
                       color: _isMeasuring ? AppColors.gold : tc.textPrimary,
                       onTap: () {
-                        setState(() {
-                          _isMeasuring = !_isMeasuring;
-                          if (!_isMeasuring) {
-                            _measurePoints.clear();
-                            _measuredDistanceKm = 0.0;
-                          }
-                        });
+                        if (_isMeasuring) {
+                          _stopMeasuring();
+                        } else {
+                          setState(() {
+                            _isMeasuring = true;
+                            _showToolsPanel = false;
+                          });
+                        }
                       }),
                   if (_isMeasuring && _measurePoints.isNotEmpty)
                     Padding(
                         padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                            '${_measuredDistanceKm.toStringAsFixed(2)} km',
+                        child: Text(_formattedMeasuredDistance,
                             style: const TextStyle(
                                 color: AppColors.gold,
                                 fontSize: 13,
@@ -1782,18 +1881,23 @@ class _MapScreenState extends State<MapScreen>
   }
 
   Widget _toolItem(
-      {required IconData icon,
+      {Key? key,
+      required IconData icon,
       required String label,
       required Color color,
       required VoidCallback onTap}) {
     return GestureDetector(
+        key: key,
         onTap: onTap,
         child: Row(children: [
           Icon(icon, color: color, size: 20),
           const SizedBox(width: 10),
-          Text(label,
-              style: TextStyle(
-                  color: color, fontSize: 13, fontWeight: FontWeight.w500))
+          Expanded(
+              child: Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      color: color, fontSize: 13, fontWeight: FontWeight.w500)))
         ]));
   }
 
