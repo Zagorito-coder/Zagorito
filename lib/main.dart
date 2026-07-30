@@ -289,7 +289,7 @@ class _SearchBar extends StatelessWidget {
     return Column(mainAxisAlignment: MainAxisAlignment.end, children: [
       Stack(clipBehavior: Clip.none, children: [
         Padding(
-            padding: EdgeInsets.only(top: measurementText == null ? 0 : 28),
+            padding: EdgeInsets.only(top: measurementText == null ? 0 : 64),
             child: Container(
                 key: const ValueKey<String>('map-search-bar-surface'),
                 padding:

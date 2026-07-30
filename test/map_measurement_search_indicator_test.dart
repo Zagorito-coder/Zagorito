@@ -21,7 +21,7 @@ void main() {
   });
 
   testWidgets(
-    'le compteur est attaché au-dessus de la barre uniquement si actif',
+    'le compteur est isolé au-dessus de la barre uniquement si actif',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(430, 932));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -79,7 +79,10 @@ void main() {
       final indicatorRect = tester.getRect(find.byKey(indicatorKey));
       final searchSurfaceRect = tester.getRect(find.byKey(searchSurfaceKey));
       expect(indicatorRect.top, lessThan(searchSurfaceRect.top));
-      expect(indicatorRect.bottom, greaterThan(searchSurfaceRect.top));
+      expect(
+        searchSurfaceRect.top - indicatorRect.bottom,
+        greaterThanOrEqualTo(12),
+      );
       expect(
         indicatorRect.center.dx,
         closeTo(searchSurfaceRect.center.dx, 0.5),
