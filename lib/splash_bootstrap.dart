@@ -52,6 +52,17 @@ class _SplashBootstrapState extends State<SplashBootstrap> {
         debugPrint('[SplashBootstrap] Firebase error: $e');
         rethrow;
       }
+
+      // App Check doit enregistrer son fournisseur d'attestation avant tout
+      // autre service Firebase. Sinon Auth, Firestore ou Crashlytics peuvent
+      // demander un jeton trop tôt, recevoir un jeton de remplacement, puis
+      // déclencher la limitation "Too many attempts".
+      //
+      // L'échec d'une attestation ne bloque pas le démarrage : la méthode
+      // sécurisée journalise l'erreur en debug et laisse l'application
+      // fonctionner hors ligne.
+      await _activateAppCheckSafely();
+
       try {
         await CrashReportingService.initialize();
       } catch (e) {
@@ -82,7 +93,6 @@ class _SplashBootstrapState extends State<SplashBootstrap> {
 
       // Ces initialisations ne sont pas nécessaires à la première frame.
       unawaited(fishProvider.loadFishData());
-      unawaited(_activateAppCheckSafely());
       unawaited(_initPremiumInBackground());
     } on SpotCatalogConfigurationException catch (e, st) {
       debugPrint('[SplashBootstrap] CONFIGURATION APK INVALIDE: $e\n$st');

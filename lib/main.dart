@@ -749,9 +749,6 @@ class _MapScreenState extends State<MapScreen>
     widget.userSpotSelectionRequests
         ?.addListener(_handleUserSpotSelectionRequest);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    if (OfflineMapService.instance.hasActiveMap) {
-      _mapStyle = MapStyle.offline;
-    }
     _loadSpots();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -828,22 +825,36 @@ class _MapScreenState extends State<MapScreen>
   }
 
   void _initPositionStream() {
+    if (_positionSubscription != null) return;
     _positionSubscription = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.best, distanceFilter: 10),
-    ).listen((pos) {
-      if (!mounted) return;
-      final cog = pos.heading;
-      if (!cog.isNaN && cog >= 0) {
-        _courseOverGround = cog;
-      } else if (_lastPosition != null) {
-        _courseOverGround = Geolocator.bearingBetween(_lastPosition!.latitude,
-            _lastPosition!.longitude, pos.latitude, pos.longitude);
-      }
-      _lastPosition = pos;
-      _currentPosition = pos;
-      setState(() {});
-    });
+    ).listen(
+      (pos) {
+        if (!mounted) return;
+        final cog = pos.heading;
+        if (!cog.isNaN && cog >= 0) {
+          _courseOverGround = cog;
+        } else if (_lastPosition != null) {
+          _courseOverGround = Geolocator.bearingBetween(_lastPosition!.latitude,
+              _lastPosition!.longitude, pos.latitude, pos.longitude);
+        }
+        _lastPosition = pos;
+        _currentPosition = pos;
+        setState(() {});
+      },
+      onError: (Object error) {
+        debugPrint('[MapScreen] Position stream unavailable: $error');
+        _positionSubscription = null;
+        if (!mounted) return;
+        setState(() {
+          _currentPosition = null;
+          _lastPosition = null;
+          _courseOverGround = 0.0;
+        });
+      },
+      cancelOnError: true,
+    );
   }
 
   @override

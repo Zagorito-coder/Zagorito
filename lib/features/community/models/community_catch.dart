@@ -205,6 +205,7 @@ enum CommunityFailure {
   ownPostLike,
   postUnavailable,
   permissionDenied,
+  appCheckUnavailable,
   unavailable,
 }
 

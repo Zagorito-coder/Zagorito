@@ -233,6 +233,7 @@
     "invalidData": "Algunos datos no son válidos o están incompletos.",
     "uploadFailed": "Falló el envío seguro de la foto.",
     "permissionDenied": "Esta acción no está autorizada.",
+    "appCheckUnavailable": "La verificación de seguridad no está disponible temporalmente. Cierra y vuelve a abrir la aplicación e inténtalo de nuevo.",
     "unavailable": "El servicio comunitario no está disponible temporalmente.",
     "postUnavailable": "Esta publicación ya no está disponible.",
     "approximateZones": "Zonas aproximadas",

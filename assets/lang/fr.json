@@ -233,6 +233,7 @@
     "invalidData": "Certaines informations sont invalides ou incomplètes.",
     "uploadFailed": "L’envoi sécurisé de la photo a échoué.",
     "permissionDenied": "Cette action n’est pas autorisée.",
+    "appCheckUnavailable": "La vérification de sécurité est temporairement indisponible. Fermez puis relancez l’application, puis réessayez.",
     "unavailable": "Le service communautaire est temporairement indisponible.",
     "postUnavailable": "Cette publication n’est plus disponible.",
     "approximateZones": "Zones approximatives",
