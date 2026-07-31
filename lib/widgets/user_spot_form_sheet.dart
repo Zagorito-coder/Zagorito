@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:spots_app/l10n/app_localizations.dart';
 import 'package:spots_app/models/user_spot.dart';
+import 'package:spots_app/services/user_spot_photo_processor.dart';
 import 'package:spots_app/services/user_spot_service.dart';
 import 'package:spots_app/theme.dart';
 import 'package:spots_app/widgets/authenticated_spot_photo.dart';
@@ -50,6 +51,7 @@ class _UserSpotFormSheet extends StatefulWidget {
 class _UserSpotFormSheetState extends State<_UserSpotFormSheet> {
   final _formKey = GlobalKey<FormState>();
   final _picker = ImagePicker();
+  final _photoProcessor = const UserSpotPhotoProcessor();
   late final TextEditingController _nameController;
   late final TextEditingController _notesController;
   late final TextEditingController _dangerController;
@@ -114,27 +116,26 @@ class _UserSpotFormSheetState extends State<_UserSpotFormSheet> {
   }
 
   Future<void> _useImage(XFile file) async {
-    final bytes = await file.readAsBytes();
-    if (bytes.isEmpty || bytes.length > UserSpot.maximumPhotoBytes) {
-      if (mounted) setState(() => _errorKey = 'mySpots.photoTooLarge');
-      return;
+    try {
+      final source = await file.readAsBytes();
+      final processed = await _photoProcessor.process(source);
+      if (!mounted) return;
+      setState(() {
+        _photoBytes = processed.bytes;
+        _photoContentType = processed.contentType;
+        _removeExistingPhoto = false;
+        _errorKey = null;
+      });
+    } on UserSpotPhotoException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _errorKey = error.failure == UserSpotPhotoFailure.tooLarge
+            ? 'mySpots.photoTooLarge'
+            : 'mySpots.photoReadError';
+      });
+    } catch (_) {
+      if (mounted) setState(() => _errorKey = 'mySpots.photoReadError');
     }
-    if (!mounted) return;
-    setState(() {
-      _photoBytes = bytes;
-      _photoContentType = _contentTypeFor(file);
-      _removeExistingPhoto = false;
-      _errorKey = null;
-    });
-  }
-
-  String _contentTypeFor(XFile file) {
-    final mimeType = file.mimeType?.toLowerCase();
-    if (mimeType == 'image/png' || mimeType == 'image/webp') return mimeType!;
-    final path = file.path.toLowerCase();
-    if (path.endsWith('.png')) return 'image/png';
-    if (path.endsWith('.webp')) return 'image/webp';
-    return 'image/jpeg';
   }
 
   void _removePhoto() {

@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:spots_app/models/user_spot.dart';
+import 'package:spots_app/services/user_spot_photo_processor.dart';
 
 enum UserSpotFailure {
   authenticationRequired,
@@ -402,11 +403,11 @@ class UserSpotService {
     if (bytes.isEmpty || bytes.length > UserSpot.maximumPhotoBytes) {
       throw const UserSpotException(UserSpotFailure.invalidPhoto);
     }
-    final normalizedContentType = switch (contentType?.toLowerCase()) {
-      'image/png' => 'image/png',
-      'image/webp' => 'image/webp',
-      _ => 'image/jpeg',
-    };
+    final detectedContentType = detectUserSpotPhotoContentType(bytes);
+    if (detectedContentType == null) {
+      throw const UserSpotException(UserSpotFailure.invalidPhoto);
+    }
+    final normalizedContentType = detectedContentType;
     final token = await _auth.currentUser?.getIdToken();
     if (token == null || token.isEmpty) {
       throw const UserSpotException(UserSpotFailure.authenticationRequired);
@@ -429,7 +430,14 @@ class UserSpotService {
         )
         .timeout(const Duration(seconds: 30));
     if (response.statusCode != 201) {
-      throw const UserSpotException(UserSpotFailure.photoUploadFailed);
+      throw UserSpotException(
+        switch (response.statusCode) {
+          401 => UserSpotFailure.authenticationRequired,
+          403 => UserSpotFailure.permissionDenied,
+          413 || 415 => UserSpotFailure.invalidPhoto,
+          _ => UserSpotFailure.photoUploadFailed,
+        },
+      );
     }
     final payload = jsonDecode(response.body);
     if (payload is! Map<String, dynamic> ||
