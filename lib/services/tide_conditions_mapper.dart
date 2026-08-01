@@ -16,8 +16,10 @@ class TideConditionsMapper {
   }) {
     final tide = _asMap(data['tide']);
     final weather = _asMap(data['weather']);
+    final gfs = _asMap(data['gfs']);
     final tideSlots = tide?['hourly'];
     final weatherSlots = weather?['hourly'];
+    final gfsSlots = gfs?['hourly'];
 
     if (tideSlots is! List<dynamic>) {
       throw const FormatException('Prévisions de marée absentes.');
@@ -30,6 +32,19 @@ class TideConditionsMapper {
         final time = _parseForecastTime(slot?['time']);
         if (slot != null && time != null) {
           weatherByTime[time.millisecondsSinceEpoch] = slot;
+        }
+      }
+    }
+
+    final gfsByTime = <int, Map<String, dynamic>>{};
+    if (gfsSlots is List<dynamic>) {
+      for (final raw in gfsSlots) {
+        final slot = _asMap(raw);
+        // Le job GFS utilise `timezone=auto` et publie donc une heure locale,
+        // contrairement au document de conditions dont les heures sont UTC.
+        final time = _parseLocalForecastTime(slot?['time']);
+        if (slot != null && time != null) {
+          gfsByTime[time.millisecondsSinceEpoch] = slot;
         }
       }
     }
@@ -49,6 +64,7 @@ class TideConditionsMapper {
       }
 
       final weatherAtTime = weatherByTime[time.millisecondsSinceEpoch];
+      final gfsAtTime = _nearestSlot(gfsByTime, time);
       final totalWaveHeight = _number(slot, 'waveHeightM');
       final windWaveHeight = _number(slot, 'windWaveHeightM');
       final wavePeriod = _number(slot, 'wavePeriodS');
@@ -67,6 +83,24 @@ class TideConditionsMapper {
           windWaveHeight: totalWaveHeight ?? windWaveHeight ?? 0,
           temperatureC: _number(weatherAtTime, 'temperatureC'),
           windSpeedKmh: _number(weatherAtTime, 'windSpeedKmh'),
+          pressureHpa: _boundedNumber(
+            gfsAtTime,
+            'pressureHpa',
+            minimum: 800,
+            maximum: 1200,
+          ),
+          precipitationProbabilityPct: _boundedNumber(
+            gfsAtTime,
+            'precipitationProbabilityPct',
+            minimum: 0,
+            maximum: 100,
+          ),
+          relativeHumidityPct: _boundedNumber(
+            gfsAtTime,
+            'relativeHumidityPct',
+            minimum: 0,
+            maximum: 100,
+          ),
         ),
       );
     }
@@ -156,6 +190,32 @@ class TideConditionsMapper {
     return parsed?.toLocal();
   }
 
+  static DateTime? _parseLocalForecastTime(dynamic value) {
+    if (value is! String || value.trim().isEmpty) return null;
+    return DateTime.tryParse(value.trim())?.toLocal();
+  }
+
+  static Map<String, dynamic>? _nearestSlot(
+    Map<int, Map<String, dynamic>> slots,
+    DateTime target,
+  ) {
+    Map<String, dynamic>? nearest;
+    var shortestDifference = const Duration(days: 365);
+    for (final entry in slots.entries) {
+      final difference = DateTime.fromMillisecondsSinceEpoch(entry.key)
+          .difference(target)
+          .abs();
+      if (difference < shortestDifference) {
+        shortestDifference = difference;
+        nearest = entry.value;
+      }
+    }
+    // Les créneaux GFS sont espacés de trois heures. Une tolérance de
+    // 90 minutes associe chaque heure au créneau le plus proche sans réutiliser
+    // une prévision ancienne ou appartenant à un autre jour.
+    return shortestDifference <= const Duration(minutes: 90) ? nearest : null;
+  }
+
   static DateTime? _parseTimestamp(dynamic value) {
     if (value is! String || value.trim().isEmpty) return null;
     return DateTime.tryParse(value.trim())?.toLocal();
@@ -168,6 +228,22 @@ class TideConditionsMapper {
 
   static double? _number(Map<String, dynamic>? map, String key) {
     return (map?[key] as num?)?.toDouble();
+  }
+
+  static double? _boundedNumber(
+    Map<String, dynamic>? map,
+    String key, {
+    required double minimum,
+    required double maximum,
+  }) {
+    final value = _number(map, key);
+    if (value == null ||
+        !value.isFinite ||
+        value < minimum ||
+        value > maximum) {
+      return null;
+    }
+    return value;
   }
 
   static String _activityLabel(double score) {

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' show ClientException;
 
 /// Configure un diagnostic de crash minimal pour les builds Release.
 ///
@@ -31,6 +32,12 @@ class CrashReportingService {
 
     _isReady = true;
     FlutterError.onError = (details) {
+      if (isRecoverableTileNetworkError(
+        details.exception,
+        details.stack,
+      )) {
+        return;
+      }
       crashlytics.recordFlutterFatalError(
         FlutterErrorDetails(
           exception: sanitizeError(details.exception),
@@ -42,6 +49,7 @@ class CrashReportingService {
       );
     };
     PlatformDispatcher.instance.onError = (error, stackTrace) {
+      if (isRecoverableTileNetworkError(error, stackTrace)) return true;
       unawaited(
         crashlytics.recordError(
           sanitizeError(error),
@@ -60,6 +68,7 @@ class CrashReportingService {
   /// Release, elle est transmise comme erreur fatale sans donnée contextuelle
   /// personnalisée.
   static void handleUncaught(Object error, StackTrace stackTrace) {
+    if (isRecoverableTileNetworkError(error, stackTrace)) return;
     if (!_isReady) {
       Error.throwWithStackTrace(error, stackTrace);
     }
@@ -70,6 +79,23 @@ class CrashReportingService {
         fatal: true,
       ),
     );
+  }
+
+  /// Reconnaît uniquement une panne du client HTTP déclenchée par le chargeur
+  /// de tuiles de flutter_map. `_ClientSocketException`, le type observé dans
+  /// Crashlytics, hérite de [ClientException] : aucun accès à son type privé
+  /// n'est nécessaire.
+  ///
+  /// Le type réseau seul ne suffit volontairement pas. La pile doit aussi
+  /// désigner `NetworkTileImageProvider`, afin qu'une erreur HTTP provenant de
+  /// l'authentification, de Firestore ou d'un autre service reste diagnostiquée.
+  @visibleForTesting
+  static bool isRecoverableTileNetworkError(
+    Object error,
+    StackTrace? stackTrace,
+  ) {
+    if (error is! ClientException || stackTrace == null) return false;
+    return stackTrace.toString().contains('NetworkTileImageProvider');
   }
 
   /// Retire le message d'exception, qui pourrait contenir une URL de tuile,

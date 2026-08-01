@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/tide_page_models.dart' as tm;
 import '../models/tide_data.dart' as tide_data;
+import '../services/forecast_firestore_service.dart';
 import '../services/tide_service.dart' as tide_svc;
 import '../theme_controller.dart';
 import '../widgets/app_back_button.dart';
@@ -34,7 +35,10 @@ Color _txt(double opacity) => _isDark
     : Colors.black.withValues(alpha: opacity);
 
 // ── Conversion TideService → modèle TidePage ─────────────────
-tm.TideData _fromTideService(tide_data.TideData src) {
+tm.TideData _fromTideService(
+  tide_data.TideData src, {
+  GfsWeatherTimeline? gfsWeather,
+}) {
   final now = DateTime.now();
   final currentHour = now.hour;
 
@@ -106,6 +110,8 @@ tm.TideData _fromTideService(tide_data.TideData src) {
     final windWaveH = matchPoint?.windWaveHeight ?? 0.0;
     final windSpeed = matchPoint?.windSpeedKmh?.round().clamp(0, 200) ?? 0;
     final temperature = matchPoint?.temperatureC?.round() ?? 0;
+    final requestedTime = DateTime(today.year, today.month, today.day, h);
+    final gfsPoint = gfsWeather?.nearestTo(requestedTime);
 
     hourlyCards.add(tm.HourlyCard(
       hour: h,
@@ -119,6 +125,11 @@ tm.TideData _fromTideService(tide_data.TideData src) {
       windDirection: windDir,
       waveHeight: windWaveH,
       temp: temperature,
+      pressureHpa: matchPoint?.pressureHpa ?? gfsPoint?.pressureHpa,
+      precipitationProbabilityPct: matchPoint?.precipitationProbabilityPct ??
+          gfsPoint?.precipitationProbabilityPct,
+      relativeHumidityPct:
+          matchPoint?.relativeHumidityPct ?? gfsPoint?.relativeHumidityPct,
       isIdeal: activity > 0.7,
       isNow: isNow,
       wavePeriod: wavePeriodH.round(),
@@ -290,6 +301,9 @@ class _TidePageState extends State<TidePage>
   }
 
   Future<void> _loadTideData() async {
+    final gfsFuture = ForecastFirestoreService.fetchGfsWeather(
+      'casablanca_maroc',
+    ).catchError((_) => null);
     try {
       final d = await tide_svc.TideService.fetchTides();
       if (!mounted) return;
@@ -300,6 +314,15 @@ class _TidePageState extends State<TidePage>
         _isLoading = false;
         _selectedHourIndex = _data.hourlyCards.indexWhere((c) => c.isNow);
         if (_selectedHourIndex < 0) _selectedHourIndex = 0;
+      });
+
+      final gfsWeather = await gfsFuture;
+      if (!mounted || gfsWeather == null || d.hourlyPoints.isEmpty) return;
+      setState(() {
+        _data = _fromTideService(d, gfsWeather: gfsWeather);
+        if (_selectedHourIndex >= _data.hourlyCards.length) {
+          _selectedHourIndex = 0;
+        }
       });
     } catch (_) {
       if (!mounted) return;
@@ -435,8 +458,7 @@ class _TidePageState extends State<TidePage>
             SliverToBoxAdapter(child: _buildScoreCard()),
             SliverToBoxAdapter(child: _buildCurrentTideRibbon()),
             SliverToBoxAdapter(child: _buildCurveCard()),
-            SliverToBoxAdapter(child: _buildHourlyTitle()),
-            SliverToBoxAdapter(child: _buildHourlyScroller()),
+            SliverToBoxAdapter(child: _buildHourlyActivitySection()),
             SliverToBoxAdapter(child: _buildConditionsPanel()),
             SliverToBoxAdapter(child: _buildEventsPanel()),
             const SliverToBoxAdapter(
@@ -984,13 +1006,51 @@ class _TidePageState extends State<TidePage>
     ]);
   }
 
+  Widget _buildHourlyActivitySection() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 7, 16, 4),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: _isDark
+                ? const [Color(0xFF071A2B), Color(0xFF0A2638)]
+                : const [Color(0xFFF9FDFF), Color(0xFFE4F5FB)],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: _isDark
+                ? _accent.withValues(alpha: 0.46)
+                : const Color(0xFF3F9ED3).withValues(alpha: 0.68),
+            width: 0.9,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: (_isDark ? _accent : const Color(0xFF126AA4))
+                  .withValues(alpha: _isDark ? 0.15 : 0.13),
+              blurRadius: 18,
+              offset: const Offset(0, 7),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            _buildHourlyTitle(),
+            _buildHourlyScroller(),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildHourlyTitle() {
     return FadeTransition(
         opacity: _fadeAnims[3],
         child: SlideTransition(
             position: _slideAnims[3],
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 7, 16, 4),
+              padding: const EdgeInsets.fromLTRB(10, 9, 10, 4),
               child: Row(children: [
                 Container(
                     width: 4,
@@ -1018,7 +1078,7 @@ class _TidePageState extends State<TidePage>
         child: SlideTransition(
             position: _slideAnims[4],
             child: SizedBox(
-                height: 80,
+                height: 82,
                 child: ShaderMask(
                   shaderCallback: (bounds) => const LinearGradient(
                       begin: Alignment.centerLeft,
@@ -1039,7 +1099,7 @@ class _TidePageState extends State<TidePage>
                   child: ListView.builder(
                       controller: _scrollController,
                       scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
                       itemCount: _data.hourlyCards.length,
                       itemBuilder: (context, index) {
                         final card = _data.hourlyCards[index];
@@ -1135,15 +1195,69 @@ class _TidePageState extends State<TidePage>
                 ],
               ),
             ),
+            const SizedBox(height: 5),
+            Container(
+              height: 0.7,
+              color: _glassBorder.withValues(alpha: 0.55),
+            ),
+            const SizedBox(height: 5),
+            SizedBox(
+              height: 52,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _compactConditionCell(
+                      icon: const Icon(
+                        Icons.speed_rounded,
+                        color: _accent,
+                        size: 18,
+                      ),
+                      label: 'PRESSION',
+                      value: selected.pressureHpa == null
+                          ? 'Indisponible'
+                          : '${selected.pressureHpa!.round()} hPa',
+                    ),
+                  ),
+                  _conditionDivider(height: 47),
+                  Expanded(
+                    child: _compactConditionCell(
+                      icon: const Icon(
+                        Icons.umbrella_rounded,
+                        color: Color(0xFF77C7FF),
+                        size: 18,
+                      ),
+                      label: 'PLUIE',
+                      value: selected.precipitationProbabilityPct == null
+                          ? 'Indisponible'
+                          : '${selected.precipitationProbabilityPct!.round()} %',
+                    ),
+                  ),
+                  _conditionDivider(height: 47),
+                  Expanded(
+                    child: _compactConditionCell(
+                      icon: const Icon(
+                        Icons.water_drop_outlined,
+                        color: Color(0xFF6FE7D2),
+                        size: 18,
+                      ),
+                      label: 'HUMIDITÉ',
+                      value: selected.relativeHumidityPct == null
+                          ? 'Indisponible'
+                          : '${selected.relativeHumidityPct!.round()} %',
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _conditionDivider() => Container(
+  Widget _conditionDivider({double height = 53}) => Container(
         width: 0.7,
-        height: 53,
+        height: height,
         color: _glassBorder.withValues(alpha: 0.65),
       );
 
@@ -1527,65 +1641,113 @@ class _HourlyCardWidget extends StatelessWidget {
       required this.animation});
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    final selectedText = _isDark ? Colors.white : const Color(0xFF07364A);
+    final accentText = _isDark ? _accent : const Color(0xFF007C9E);
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: '${card.hour} heures',
+      child: GestureDetector(
         onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
+        child: AnimatedScale(
+          scale: isSelected ? 1.035 : 1,
+          duration: const Duration(milliseconds: 220),
           curve: Curves.easeOutCubic,
-          width: 44,
-          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 6),
-          decoration: BoxDecoration(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+            width: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 6),
+            decoration: BoxDecoration(
               color: isSelected
-                  ? _accent.withValues(alpha: _isDark ? 0.20 : 0.12)
-                  : _card,
+                  ? null
+                  : (_isDark
+                      ? const Color(0xFF0C2134)
+                      : const Color(0xFFF8FCFE)),
+              gradient: isSelected
+                  ? LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: _isDark
+                          ? const [Color(0xFF10607A), Color(0xFF0B4058)]
+                          : const [Color(0xFFDDF6FC), Color(0xFFBFEAF5)],
+                    )
+                  : null,
               borderRadius: BorderRadius.circular(9),
               border: Border.all(
-                  color: isSelected
-                      ? _accent.withValues(alpha: 0.75)
-                      : _glassBorder,
-                  width: isSelected ? 1.2 : 0.6),
+                color: isSelected
+                    ? (_isDark ? _accent : const Color(0xFF087FA1))
+                    : _glassBorder,
+                width: isSelected ? 1.35 : 0.65,
+              ),
               boxShadow: isSelected
                   ? [
                       BoxShadow(
-                          color: _accent.withValues(alpha: 0.18),
-                          blurRadius: 10,
-                          spreadRadius: 0.5)
+                        color: (_isDark ? _accent : const Color(0xFF087FA1))
+                            .withValues(alpha: 0.28),
+                        blurRadius: 11,
+                        spreadRadius: 0.5,
+                        offset: const Offset(0, 3),
+                      ),
                     ]
-                  : null),
-          child: Column(
+                  : null,
+            ),
+            child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Text('${card.hour}h',
-                    style: GoogleFonts.inter(
-                        color: isSelected ? _accent : _txt(0.72),
-                        fontSize: 8.5,
-                        fontWeight: FontWeight.w700)),
-                Text(card.windDirection,
-                    style: GoogleFonts.inter(
-                        color: _accent,
-                        fontSize: 8,
-                        fontWeight: FontWeight.w700)),
-                Transform.rotate(
-                  angle: _compassToRadians(card.windDirection),
-                  child: const Icon(Icons.arrow_downward_rounded,
-                      size: 14, color: _accent),
+                Text(
+                  '${card.hour}h',
+                  style: GoogleFonts.inter(
+                    color: isSelected ? selectedText : _txt(0.76),
+                    fontSize: 8.5,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 Text(
-                    card.waveHeight > 0
-                        ? card.waveHeight.toStringAsFixed(1)
-                        : 'N/D',
-                    style: GoogleFonts.inter(
-                        color: _txt(0.94),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800)),
-                Text(card.wavePeriod > 0 ? '${card.wavePeriod}s' : 'N/D',
-                    style: GoogleFonts.inter(
-                        color: _amber,
-                        fontSize: 8,
-                        fontWeight: FontWeight.w700)),
-              ]),
-        ));
+                  card.windDirection,
+                  style: GoogleFonts.inter(
+                    color: isSelected ? selectedText : accentText,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Transform.rotate(
+                  angle: _compassToRadians(card.windDirection),
+                  child: Icon(
+                    Icons.arrow_downward_rounded,
+                    size: 14,
+                    color: isSelected ? selectedText : accentText,
+                  ),
+                ),
+                Text(
+                  card.waveHeight > 0
+                      ? card.waveHeight.toStringAsFixed(1)
+                      : 'N/D',
+                  style: GoogleFonts.inter(
+                    color: isSelected ? selectedText : _txt(0.94),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  card.wavePeriod > 0 ? '${card.wavePeriod}s' : 'N/D',
+                  style: GoogleFonts.inter(
+                    color: isSelected
+                        ? (_isDark
+                            ? const Color(0xFFFFCC4D)
+                            : const Color(0xFF8A5200))
+                        : _amber,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

@@ -45,7 +45,10 @@ async function main() {
       console.log(`Traitement du spot : ${spot.name} (${spot.spotId})...`);
       const conditions = await buildConditionsForSpot(spot);
 
-      await db.collection('conditions').doc(spot.spotId).set(conditions);
+      // Préserve le petit résumé `gfs` publié quatre fois par jour par
+      // harvest_forecast.py. Tous les autres champs fournis ici sont bien
+      // remplacés, mais une récolte quotidienne ne supprime plus ce résumé.
+      await db.collection('conditions').doc(spot.spotId).set(conditions, { merge: true });
       console.log(`✅ Conditions écrites pour ${spot.spotId} (score: ${conditions.activityScore})`);
     } catch (err) {
       failedSpots += 1;

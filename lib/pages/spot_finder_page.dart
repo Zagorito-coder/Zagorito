@@ -16,6 +16,7 @@ class SpotFinderPage extends StatelessWidget {
   final ValueListenable<SpotSelectionRequest?>? spotSelectionRequests;
   final ValueListenable<UserSpotSelectionRequest?>? userSpotSelectionRequests;
   final VoidCallback? onOpenMySpots;
+  final VoidCallback? onPersonalSpotCreated;
 
   const SpotFinderPage({
     super.key,
@@ -24,6 +25,7 @@ class SpotFinderPage extends StatelessWidget {
     this.spotSelectionRequests,
     this.userSpotSelectionRequests,
     this.onOpenMySpots,
+    this.onPersonalSpotCreated,
   });
 
   @override
@@ -34,6 +36,7 @@ class SpotFinderPage extends StatelessWidget {
       spotSelectionRequests: spotSelectionRequests,
       userSpotSelectionRequests: userSpotSelectionRequests,
       onOpenMySpots: onOpenMySpots,
+      onPersonalSpotCreated: onPersonalSpotCreated,
     );
   }
 }

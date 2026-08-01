@@ -202,5 +202,57 @@ class SpotCatalogTests(unittest.TestCase):
             )
 
 
+class ConditionsGfsSummaryTests(unittest.TestCase):
+    def test_summary_keeps_only_two_days_and_three_lightweight_metrics(self):
+        def slot(time, pressure):
+            return {
+                "hour": time,
+                "models": {
+                    "wind": {
+                        "wind_speed_kt": 12.5,
+                        "pressure_msl": pressure,
+                        "precip_prob_pct": 18.0,
+                        "rel_humidity_pct": 72.0,
+                    },
+                    "hires": {"pressure_msl": 999.0},
+                },
+            }
+
+        days = [
+            {"slots": [slot("2026-08-01T00:00", 1014.2)]},
+            {"slots": [slot("2026-08-02T00:00", 1012.8)]},
+            {"slots": [slot("2026-08-03T00:00", 1009.1)]},
+        ]
+
+        result = harvest_forecast.build_conditions_gfs_summary(days)
+
+        self.assertEqual("GFS ~13km", result["model"])
+        self.assertEqual(2, len(result["hourly"]))
+        self.assertEqual(
+            {
+                "time": "2026-08-01T00:00",
+                "precipitationProbabilityPct": 18.0,
+                "pressureHpa": 1014.2,
+                "relativeHumidityPct": 72.0,
+            },
+            result["hourly"][0],
+        )
+        self.assertNotIn("wind_speed_kt", result["hourly"][0])
+
+    def test_summary_ignores_slots_without_any_requested_metric(self):
+        result = harvest_forecast.build_conditions_gfs_summary([
+            {
+                "slots": [
+                    {
+                        "hour": "2026-08-01T00:00",
+                        "models": {"wind": {"wind_speed_kt": 8.0}},
+                    }
+                ]
+            }
+        ])
+
+        self.assertEqual([], result["hourly"])
+
+
 if __name__ == "__main__":
     unittest.main()

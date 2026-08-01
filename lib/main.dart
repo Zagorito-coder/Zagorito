@@ -16,6 +16,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:spots_app/models.dart';
+import 'package:spots_app/models/compass_readings.dart';
 import 'package:spots_app/models/offline_map_region.dart';
 import 'package:spots_app/models/spot_selection_request.dart';
 import 'package:spots_app/models/user_spot.dart';
@@ -28,9 +29,11 @@ import 'package:spots_app/spot_details_panel.dart';
 import 'package:spots_app/spots_canvas_layer.dart';
 import 'package:spots_app/theme.dart';
 import 'package:spots_app/theme_controller.dart';
+import 'package:spots_app/utils/map_flight_plan.dart';
 import 'package:spots_app/widgets/app_tile_layer.dart';
 import 'package:spots_app/widgets/finite_map_controller.dart';
 import 'package:spots_app/widgets/finite_marker_layer.dart';
+import 'package:spots_app/widgets/fish_image_framing.dart';
 import 'package:spots_app/widgets/offline_map_manager_sheet.dart';
 import 'package:spots_app/widgets/personal_spots_map_layer.dart';
 import 'package:spots_app/widgets/user_spot_form_sheet.dart';
@@ -46,6 +49,8 @@ import 'package:flutter_compass/flutter_compass.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:spots_app/providers/wind_animation_provider.dart';
 import 'package:spots_app/widgets/wind_particle_layer.dart';
+
+const double _mapBottomControlHeight = 60;
 
 void main() {
   runZonedGuarded(_bootstrap, (error, stackTrace) {
@@ -292,6 +297,7 @@ class _SearchBar extends StatelessWidget {
             padding: EdgeInsets.only(top: measurementText == null ? 0 : 64),
             child: Container(
                 key: const ValueKey<String>('map-search-bar-surface'),
+                height: _mapBottomControlHeight,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
@@ -637,8 +643,10 @@ class _FishRow extends StatelessWidget {
 
   Widget _buildImage(BuildContext context) {
     if (fish.imageUrl.startsWith('assets/')) {
-      return Image.asset(fish.imageUrl,
-          fit: BoxFit.cover, errorBuilder: (_, __, ___) => _ph());
+      return Transform.scale(
+          scale: FishImageFraming.thumbnailScale(fish.id),
+          child: Image.asset(fish.imageUrl,
+              fit: BoxFit.cover, errorBuilder: (_, __, ___) => _ph()));
     }
     return CachedNetworkImage(
         imageUrl: fish.imageUrl,
@@ -662,6 +670,7 @@ class MapScreen extends StatefulWidget {
   final ValueListenable<SpotSelectionRequest?>? spotSelectionRequests;
   final ValueListenable<UserSpotSelectionRequest?>? userSpotSelectionRequests;
   final VoidCallback? onOpenMySpots;
+  final VoidCallback? onPersonalSpotCreated;
 
   const MapScreen({
     super.key,
@@ -670,6 +679,7 @@ class MapScreen extends StatefulWidget {
     this.spotSelectionRequests,
     this.userSpotSelectionRequests,
     this.onOpenMySpots,
+    this.onPersonalSpotCreated,
   });
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -703,6 +713,7 @@ class _MapScreenState extends State<MapScreen>
   int _lastAddSpotRequest = 0;
   int _lastSpotSelectionRequest = 0;
   int _lastUserSpotSelectionRequest = 0;
+  int _cameraFlightSerial = 0;
   final List<LatLng> _measurePoints = [];
   double _measuredDistanceKm = 0.0;
   MapStyle _mapStyle = MapStyle.satellite;
@@ -712,9 +723,10 @@ class _MapScreenState extends State<MapScreen>
 
   // Compass — désactivé par défaut
   bool _isCompassEnabled = false;
-  double _heading = 0.0, _courseOverGround = 0.0;
+  double? _magneticHeading, _gpsCourseOverGround;
   StreamSubscription<CompassEvent>? _compassSubscription;
   StreamSubscription<Position>? _positionSubscription;
+  bool _positionStreamStartedForCompass = false;
   Position? _lastPosition;
 
   List<Spot> get _searchResults {
@@ -811,46 +823,98 @@ class _MapScreenState extends State<MapScreen>
     if (_isCompassEnabled) {
       _compassSubscription?.cancel();
       _compassSubscription = null;
-      _heading = 0.0;
-      _courseOverGround = 0.0;
+      _magneticHeading = null;
+      _gpsCourseOverGround = null;
       setState(() => _isCompassEnabled = false);
+      _stopCompassOwnedPositionStream();
     } else {
       _compassSubscription = FlutterCompass.events?.listen((e) {
-        if (mounted && e.heading != null) {
-          setState(() => _heading = e.heading!);
+        final magneticHeading = e.heading;
+        if (mounted && magneticHeading != null && magneticHeading.isFinite) {
+          setState(() => _magneticHeading = magneticHeading);
         }
       });
       setState(() => _isCompassEnabled = true);
+      unawaited(_ensureCompassCourseTracking());
     }
   }
 
-  void _initPositionStream() {
+  Future<void> _ensureCompassCourseTracking() async {
     if (_positionSubscription != null) return;
+    await _initLocation();
+    if (!mounted || !_isCompassEnabled || _positionSubscription != null) return;
+    _initPositionStream(startedForCompass: true);
+  }
+
+  void _stopCompassOwnedPositionStream() {
+    if (!_positionStreamStartedForCompass) return;
+    final subscription = _positionSubscription;
+    _positionStreamStartedForCompass = false;
+    _positionSubscription = null;
+    if (subscription != null) unawaited(subscription.cancel());
+  }
+
+  double? _courseOverGroundFor(Position position) {
+    final rawCourse = position.heading;
+    final speed = position.speed;
+    if (speed.isFinite && speed >= 0 && speed < 0.5) return null;
+    if (speed.isFinite &&
+        speed >= 0.5 &&
+        rawCourse.isFinite &&
+        rawCourse >= 0) {
+      return rawCourse;
+    }
+
+    final previous = _lastPosition;
+    if (previous == null) return null;
+    final movedMeters = Geolocator.distanceBetween(
+      previous.latitude,
+      previous.longitude,
+      position.latitude,
+      position.longitude,
+    );
+    final accuracyGuard = math.max(
+      5.0,
+      math.min(30.0, math.max(previous.accuracy, position.accuracy)),
+    );
+    if (!movedMeters.isFinite || movedMeters < accuracyGuard) return null;
+    return Geolocator.bearingBetween(
+      previous.latitude,
+      previous.longitude,
+      position.latitude,
+      position.longitude,
+    );
+  }
+
+  void _initPositionStream({bool startedForCompass = false}) {
+    if (_positionSubscription != null) {
+      if (!startedForCompass) _positionStreamStartedForCompass = false;
+      return;
+    }
+    _positionStreamStartedForCompass = startedForCompass;
     _positionSubscription = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.best, distanceFilter: 10),
     ).listen(
       (pos) {
         if (!mounted) return;
-        final cog = pos.heading;
-        if (!cog.isNaN && cog >= 0) {
-          _courseOverGround = cog;
-        } else if (_lastPosition != null) {
-          _courseOverGround = Geolocator.bearingBetween(_lastPosition!.latitude,
-              _lastPosition!.longitude, pos.latitude, pos.longitude);
-        }
+        final gpsCourseOverGround = _courseOverGroundFor(pos);
         _lastPosition = pos;
         _currentPosition = pos;
-        setState(() {});
+        setState(() {
+          _gpsCourseOverGround =
+              _isCompassEnabled ? gpsCourseOverGround : null;
+        });
       },
       onError: (Object error) {
         debugPrint('[MapScreen] Position stream unavailable: $error');
         _positionSubscription = null;
+        _positionStreamStartedForCompass = false;
         if (!mounted) return;
         setState(() {
           _currentPosition = null;
           _lastPosition = null;
-          _courseOverGround = 0.0;
+          _gpsCourseOverGround = null;
         });
       },
       cancelOnError: true,
@@ -860,6 +924,7 @@ class _MapScreenState extends State<MapScreen>
   @override
   void dispose() {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    _cancelCameraFlight();
     _mapController.dispose();
     _searchController.dispose();
     _debounceTimer?.cancel();
@@ -936,6 +1001,7 @@ class _MapScreenState extends State<MapScreen>
   }
 
   void _zoomTo(double zoom) {
+    _cancelCameraFlight();
     if (!zoom.isFinite) return;
     final center = _mapController.camera.center;
     if (!center.latitude.isFinite || !center.longitude.isFinite) return;
@@ -953,18 +1019,55 @@ class _MapScreenState extends State<MapScreen>
 
   Future<void> _animateToPoint(LatLng target) async {
     if (!_isValidMapPoint(target)) return;
-    final tz = (_currentZoom < _maxZoom ? _maxZoom : _currentZoom)
-        .clamp(3.0, _maxZoom);
-    if (!tz.isFinite) return;
-    for (var i = 1; i <= 6; i++) {
-      final stepZ =
-          (_currentZoom + (tz - _currentZoom) * (i / 6)).clamp(3.0, _maxZoom);
-      if (!stepZ.isFinite) continue;
-      _mapController.move(target, stepZ);
-      if (i < 6) await Future.delayed(const Duration(milliseconds: 25));
+    final flightSerial = ++_cameraFlightSerial;
+
+    late final MapCamera camera;
+    try {
+      camera = _mapController.camera;
+    } catch (_) {
+      return;
     }
-    if (mounted) setState(() => _currentZoom = tz);
+    final start = camera.center;
+    final startZoom = camera.zoom;
+    if (!_isValidMapPoint(start) || !startZoom.isFinite) return;
+
+    final targetZoom = (startZoom < _maxZoom ? _maxZoom : startZoom)
+        .clamp(3.0, _maxZoom)
+        .toDouble();
+    final distanceKm = _distance.as(LengthUnit.Kilometer, start, target);
+    final plan = MapFlightPlan.adaptive(
+      start: start,
+      target: target,
+      startZoom: startZoom,
+      targetZoom: targetZoom,
+      distanceKm: distanceKm,
+    );
+    final stopwatch = Stopwatch()..start();
+
+    while (true) {
+      if (!mounted || flightSerial != _cameraFlightSerial) return;
+      final progress =
+          (stopwatch.elapsedMicroseconds / plan.duration.inMicroseconds)
+              .clamp(0.0, 1.0)
+              .toDouble();
+      try {
+        _mapController.move(
+          plan.centerAt(progress),
+          plan.zoomAt(progress),
+        );
+      } catch (_) {
+        return;
+      }
+      if (progress >= 1) break;
+      await Future<void>.delayed(MapFlightPlan.frameInterval);
+    }
+
+    if (mounted && flightSerial == _cameraFlightSerial) {
+      setState(() => _currentZoom = targetZoom);
+    }
   }
+
+  void _cancelCameraFlight() => _cameraFlightSerial++;
 
   Future<void> _selectSpot(Spot spot) async {
     setState(() {
@@ -1141,9 +1244,14 @@ class _MapScreenState extends State<MapScreen>
       },
     );
     if (!created || !mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    widget.onPersonalSpotCreated?.call();
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
       SnackBar(
         content: Text(context.tr('mySpots.created')),
+        duration: const Duration(seconds: 3),
+        persist: false,
         action: widget.onOpenMySpots == null
             ? null
             : SnackBarAction(
@@ -1237,6 +1345,7 @@ class _MapScreenState extends State<MapScreen>
       point.longitude <= 180;
 
   void _onPositionChanged(MapCamera camera, bool gesture) {
+    if (gesture) _cancelCameraFlight();
     final nb = camera.visibleBounds;
     var nz = camera.zoom;
     if (!nz.isFinite) return;
@@ -1460,10 +1569,10 @@ class _MapScreenState extends State<MapScreen>
                                 onFishDeselected: fp.deselectFish)));
                   }))),
           Positioned(
-              bottom: 8,
-              left: 8,
-              width: 96,
-              height: 96,
+              bottom: 16,
+              left: 16,
+              width: _mapBottomControlHeight,
+              height: _mapBottomControlHeight,
               child: Directionality(
                   textDirection: TextDirection.ltr,
                   child: _buildFishFilterButton())),
@@ -1514,7 +1623,8 @@ class _MapScreenState extends State<MapScreen>
                 left: 0,
                 right: 0,
                 child: _CompassRibbon(
-                    heading: _heading, courseOverGround: _courseOverGround)),
+                    magneticHeading: _magneticHeading,
+                    gpsCourseOverGround: _gpsCourseOverGround)),
           Positioned(
             top: MediaQuery.of(context).padding.top + 80,
             right: 16,
@@ -1919,10 +2029,11 @@ class _MapScreenState extends State<MapScreen>
               _searchQuery = '';
             }),
         child: SizedBox(
-            width: 96,
-            height: 96,
-            child: ClipOval(
-                child: Image.asset('assets/images/blue_fish_button.png',
+            width: _mapBottomControlHeight,
+            height: _mapBottomControlHeight,
+            child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Image.asset('assets/images/fish_route_button.png',
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => const Center(
                         child: Text('🐟', style: TextStyle(fontSize: 48)))))));
@@ -1945,6 +2056,7 @@ class _MapScreenState extends State<MapScreen>
           if (!pos.latitude.isFinite || !pos.longitude.isFinite) return;
           final z = (_currentZoom + 2).clamp(3.0, _maxZoom);
           if (!z.isFinite) return;
+          _cancelCameraFlight();
           _mapController.move(pos, z);
           if (mounted) setState(() {});
         },
@@ -2050,72 +2162,100 @@ class _MapScreenState extends State<MapScreen>
 // ═══════════════════════════════════════════════════════════════
 
 class _CompassRibbon extends StatelessWidget {
-  final double heading, courseOverGround;
-  const _CompassRibbon({required this.heading, required this.courseOverGround});
+  final double? magneticHeading, gpsCourseOverGround;
+  const _CompassRibbon({
+    required this.magneticHeading,
+    required this.gpsCourseOverGround,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final cog = courseOverGround.isNaN || courseOverGround == 0
-        ? 0.0
-        : courseOverGround;
-    final head = heading.isNaN ? 0.0 : heading;
+    final readings = CompassReadings(
+      magneticHeadingDegrees: magneticHeading,
+      gpsCourseOverGroundDegrees: gpsCourseOverGround,
+    );
+    final head = readings.magneticHeadingDegrees ?? 0;
     final topInset = MediaQuery.paddingOf(context).top;
+    const radius = BorderRadius.only(
+      bottomLeft: Radius.circular(20),
+      bottomRight: Radius.circular(20),
+    );
 
     return Semantics(
       container: true,
       label:
-          'Boussole, cap ${_valueText(head)}, route suivie ${_valueText(cog)}',
-      child: Container(
-        padding: EdgeInsets.fromLTRB(16, topInset + 5, 16, 8),
-        decoration: BoxDecoration(
-          color: const Color(0xEED6FBFA),
-          borderRadius: const BorderRadius.only(
-            bottomLeft: Radius.circular(20),
-            bottomRight: Radius.circular(20),
+          'Boussole, cap ${_valueText(readings.magneticHeadingDegrees)}, route suivie ${_valueText(readings.gpsCourseOverGroundDegrees)}',
+      child: RepaintBoundary(
+        child: Container(
+          key: const ValueKey<String>('map-active-compass-ribbon'),
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.38),
+                blurRadius: 18,
+                offset: const Offset(0, 6),
+              ),
+            ],
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.10),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              height: 39,
-              width: double.infinity,
-              child: CustomPaint(
-                painter: _CompassScalePainter(heading: head),
+          child: ClipRRect(
+            borderRadius: radius,
+            child: BackdropFilter(
+              filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+              child: Container(
+                padding: EdgeInsets.fromLTRB(16, topInset + 5, 16, 8),
+                decoration: BoxDecoration(
+                  borderRadius: radius,
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xB821252B),
+                      Color(0xD10A0C0F),
+                    ],
+                  ),
+                  border: Border.all(
+                    color: Colors.white24,
+                    width: 0.75,
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      height: 39,
+                      width: double.infinity,
+                      child: CustomPaint(
+                        painter: _CompassScalePainter(heading: head),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        for (final metric in readings.displayValues)
+                          Expanded(
+                            child: _CompassValue(
+                              key: ValueKey<String>(
+                                'map-compass-${metric.kind.name}',
+                              ),
+                              label: metric.label,
+                              value: _valueText(metric.degrees),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Expanded(
-                  child: _CompassValue(
-                    label: 'Course over ground',
-                    value: _valueText(cog),
-                  ),
-                ),
-                Expanded(
-                  child: _CompassValue(
-                    label: 'Heading',
-                    value: _valueText(head),
-                  ),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  String _valueText(double value) =>
-      value == 0 ? '--' : '${value.round()}° ${_gd(value)}';
+  String _valueText(double? value) =>
+      value == null ? '--' : '${value.round()}° ${_gd(value)}';
 
   String _gd(double d) {
     const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
@@ -2124,7 +2264,11 @@ class _CompassRibbon extends StatelessWidget {
 }
 
 class _CompassValue extends StatelessWidget {
-  const _CompassValue({required this.label, required this.value});
+  const _CompassValue({
+    super.key,
+    required this.label,
+    required this.value,
+  });
 
   final String label;
   final String value;
@@ -2139,7 +2283,7 @@ class _CompassValue extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(
-            color: Color(0xFF101820),
+            color: Color(0xFFCDD3D8),
             fontSize: 12,
             height: 1,
             fontWeight: FontWeight.w500,
@@ -2151,7 +2295,7 @@ class _CompassValue extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(
-            color: Color(0xFF05090C),
+            color: Color(0xFFF7F8F9),
             fontSize: 19,
             height: 1,
             fontWeight: FontWeight.w600,
@@ -2168,7 +2312,7 @@ class _CompassScalePainter extends CustomPainter {
   final double heading;
 
   static const _labelStyle = TextStyle(
-    color: Color(0xFF11191E),
+    color: Color(0xFFF1F3F5),
     fontSize: 12,
     height: 1,
     fontWeight: FontWeight.w600,
@@ -2182,7 +2326,7 @@ class _CompassScalePainter extends CustomPainter {
     final firstTick = ((normalizedHeading - visibleDegrees) / 5).floor() * 5;
     final lastTick = normalizedHeading + visibleDegrees;
     final tickPaint = Paint()
-      ..color = const Color(0xFF12191D)
+      ..color = const Color(0xFFD9DEE3)
       ..strokeCap = StrokeCap.square;
 
     for (var degree = firstTick; degree <= lastTick; degree += 5) {
@@ -2218,7 +2362,7 @@ class _CompassScalePainter extends CustomPainter {
       }
     }
 
-    final markerPaint = Paint()..color = const Color(0xFFFF453A);
+    final markerPaint = Paint()..color = const Color(0xFFFF4D47);
     final marker = ui.Path()
       ..moveTo(size.width / 2, 24)
       ..lineTo(size.width / 2 - 4.5, 34)

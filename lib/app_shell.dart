@@ -7,6 +7,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spots_app/theme.dart';
 import 'package:spots_app/theme_controller.dart';
 import 'package:spots_app/l10n/app_localizations.dart';
@@ -40,6 +41,9 @@ class AppShell extends StatefulWidget {
 }
 
 class AppShellState extends State<AppShell> {
+  static const _personalSpotBadgePreferenceKey =
+      'unread_personal_spot_badge_count';
+
   int _currentIndex = 3;
 
   late final List<Widget?> _pages;
@@ -50,6 +54,8 @@ class AppShellState extends State<AppShell> {
   int _spotSelectionSerial = 0;
   int _userSpotSelectionSerial = 0;
   bool _showAds = false;
+  int _personalSpotBadgeCount = 0;
+  bool _personalSpotBadgeChangedLocally = false;
 
   @override
   void initState() {
@@ -59,6 +65,7 @@ class AppShellState extends State<AppShell> {
     _userSpotSelectionRequests = ValueNotifier<UserSpotSelectionRequest?>(null);
     _pages = List<Widget?>.filled(5, null);
     _pages[_currentIndex] = _buildPage(_currentIndex);
+    unawaited(_restorePersonalSpotBadge());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future<void>.delayed(const Duration(seconds: 1), () {
         if (!mounted) return;
@@ -83,6 +90,7 @@ class AppShellState extends State<AppShell> {
           spotSelectionRequests: _spotSelectionRequests,
           userSpotSelectionRequests: _userSpotSelectionRequests,
           onOpenMySpots: () => navigateTo(2),
+          onPersonalSpotCreated: notifyPersonalSpotCreated,
         ),
       4 => const SettingsPageWrapper(),
       _ => const SizedBox.shrink(),
@@ -92,10 +100,51 @@ class AppShellState extends State<AppShell> {
   /// Navigue vers un onglet spécifique
   void navigateTo(int index) {
     if (index < 0 || index >= _pages.length) return;
+    final openedMySpots = index == 2;
     setState(() {
       _pages[index] ??= _buildPage(index);
       _currentIndex = index;
+      if (openedMySpots) {
+        _personalSpotBadgeChangedLocally = true;
+        _personalSpotBadgeCount = 0;
+      }
     });
+    if (openedMySpots) {
+      unawaited(_persistPersonalSpotBadge(0));
+    }
+  }
+
+  Future<void> _restorePersonalSpotBadge() async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      final storedCount =
+          preferences.getInt(_personalSpotBadgePreferenceKey) ?? 0;
+      if (!mounted || _personalSpotBadgeChangedLocally) return;
+      setState(() {
+        _personalSpotBadgeCount = storedCount.clamp(0, 999);
+      });
+    } catch (error) {
+      debugPrint('[AppShell] Badge Mes spots indisponible: $error');
+    }
+  }
+
+  void notifyPersonalSpotCreated() {
+    if (!mounted) return;
+    setState(() {
+      _personalSpotBadgeChangedLocally = true;
+      _personalSpotBadgeCount = (_personalSpotBadgeCount + 1).clamp(0, 999);
+    });
+    unawaited(_persistPersonalSpotBadge(_personalSpotBadgeCount));
+  }
+
+  Future<void> _persistPersonalSpotBadge(int count) async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setInt(_personalSpotBadgePreferenceKey, count);
+    } catch (error) {
+      debugPrint(
+          '[AppShell] Persistance du badge Mes spots impossible: $error');
+    }
   }
 
   void openSpotCreation() {
@@ -257,6 +306,7 @@ class AppShellState extends State<AppShell> {
                           icon: Icons.add_location_alt_rounded,
                           label: context.tr('bottomNav.addSpot'),
                           isActive: _currentIndex == 2,
+                          badgeCount: _personalSpotBadgeCount,
                           onTap: () => navigateTo(2),
                         ),
                       ),
@@ -291,6 +341,7 @@ class _NavItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool isActive;
+  final int badgeCount;
   final VoidCallback onTap;
 
   const _NavItem({
@@ -298,6 +349,7 @@ class _NavItem extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.isActive,
+    this.badgeCount = 0,
     required this.onTap,
   });
 
@@ -309,6 +361,7 @@ class _NavItem extends StatelessWidget {
       button: true,
       selected: isActive,
       label: label,
+      value: badgeCount > 0 ? '$badgeCount' : null,
       excludeSemantics: true,
       child: InkResponse(
         key: itemKey,
@@ -365,6 +418,47 @@ class _NavItem extends StatelessWidget {
                           blurRadius: 6,
                         ),
                       ],
+                    ),
+                  ),
+                ),
+              if (badgeCount > 0)
+                Positioned(
+                  top: 4,
+                  right: 10,
+                  child: IgnorePointer(
+                    child: Container(
+                      key: const ValueKey<String>(
+                        'personal-spot-notification-badge',
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 5),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFF365F),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: tc.surface, width: 1.4),
+                        boxShadow: [
+                          BoxShadow(
+                            color:
+                                const Color(0xFFFF365F).withValues(alpha: 0.34),
+                            blurRadius: 7,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        badgeCount > 99 ? '99+' : '$badgeCount',
+                        maxLines: 1,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          height: 1,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                     ),
                   ),
                 ),

@@ -2,6 +2,8 @@
 //  fish_intelligence_modal.dart — Modal fiche intelligence poisson
 // ============================================================
 
+import 'dart:math' as math;
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -10,6 +12,7 @@ import 'package:spots_app/l10n/app_localizations.dart';
 import 'package:spots_app/models.dart';
 import 'package:spots_app/models/fish_model.dart';
 import 'package:spots_app/models/tide_data.dart';
+import 'package:spots_app/services/forecast_firestore_service.dart';
 import 'package:spots_app/services/tide_service.dart';
 import 'package:spots_app/theme.dart';
 
@@ -39,41 +42,43 @@ class FishIntelligenceModal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tc = ThemeColors.of(context);
     final size = MediaQuery.of(context).size;
+    final palette = _FishModalPalette.of(context);
 
     return Container(
-      width: size.width * 0.65,
-      constraints: BoxConstraints(maxHeight: size.height * 0.75),
+      width: math.min(size.width * 0.90, 430),
+      constraints: BoxConstraints(maxHeight: size.height * 0.68),
       decoration: BoxDecoration(
-        color: tc.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: tc.glassBorder, width: 1),
+        color: palette.background,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: palette.accent.withValues(alpha: 0.72),
+          width: 0.9,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.35),
-            blurRadius: 30,
-            offset: const Offset(0, 12),
+            color: palette.shadow,
+            blurRadius: 24,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _CloseButton(onClose: onClose),
           _Header(fish: fish, onClose: onClose),
           Flexible(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.only(bottom: 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _IdentityBlock(fish: fish),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 11),
                   _TechniqueBlock(fish: fish),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 11),
                   _TideBlock(fish: fish, currentPosition: currentPosition),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 11),
                   _SpotsBlock(
                     fish: fish,
                     nearbySpots: nearbySpots,
@@ -91,28 +96,33 @@ class FishIntelligenceModal extends StatelessWidget {
   }
 }
 
-class _CloseButton extends StatelessWidget {
-  final VoidCallback onClose;
-  const _CloseButton({required this.onClose});
+class _FishModalPalette {
+  final bool isDark;
 
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.topLeft,
-      child: GestureDetector(
-        onTap: onClose,
-        child: Container(
-          margin: const EdgeInsets.only(left: 8, top: 8),
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.2),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(Icons.close, color: Colors.white, size: 22),
-        ),
-      ),
-    );
-  }
+  const _FishModalPalette(this.isDark);
+
+  factory _FishModalPalette.of(BuildContext context) =>
+      _FishModalPalette(Theme.of(context).brightness == Brightness.dark);
+
+  Color get background =>
+      isDark ? const Color(0xFF071722) : const Color(0xFFF7FCFE);
+  Color get header =>
+      isDark ? const Color(0xFF0A2130) : const Color(0xFFE7F5FA);
+  Color get panel => isDark ? const Color(0xFF0B202D) : const Color(0xFFEDF7FB);
+  Color get cell =>
+      isDark ? Colors.white.withValues(alpha: 0.035) : const Color(0xFFF9FDFF);
+  Color get primaryText => isDark ? Colors.white : const Color(0xFF102B3A);
+  Color get secondaryText => isDark ? Colors.white70 : const Color(0xFF425E6B);
+  Color get mutedText => isDark ? Colors.white38 : const Color(0xFF6A818C);
+  Color get border =>
+      isDark ? Colors.white.withValues(alpha: 0.10) : const Color(0xFFC8DFE8);
+  Color get accent =>
+      isDark ? FishIntelligenceModal._cyan : const Color(0xFF087F9C);
+  Color get progressBackground =>
+      isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFD5E8EF);
+  Color get shadow => isDark
+      ? Colors.black.withValues(alpha: 0.42)
+      : const Color(0xFF164C66).withValues(alpha: 0.16);
 }
 
 class _Header extends StatelessWidget {
@@ -123,44 +133,47 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final palette = _FishModalPalette.of(context);
     return Container(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isDark
-              ? [const Color(0xFF0D1B2A), const Color(0xFF1E6091)]
-              : [tc.oceanDeep, tc.oceanMedium],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: palette.header,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        border: Border(
+          bottom: BorderSide(
+            color: palette.accent.withValues(alpha: 0.20),
+          ),
+        ),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+      padding: const EdgeInsets.fromLTRB(14, 9, 10, 9),
       child: Row(
         children: [
-          const Text('🐟', style: TextStyle(fontSize: 22)),
-          const SizedBox(width: 10),
+          Icon(
+            Icons.radar_rounded,
+            size: 18,
+            color: palette.accent,
+          ),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
-              l10n.translate('fishIntelligence.title'),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+              l10n.translate('fishIntelligence.title').toUpperCase(),
+              style: TextStyle(
+                color: palette.primaryText,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.15,
               ),
             ),
           ),
-          GestureDetector(
-            onTap: onClose,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.close, color: Colors.white, size: 20),
+          IconButton(
+            onPressed: onClose,
+            tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+            constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+            padding: EdgeInsets.zero,
+            icon: Icon(
+              Icons.close_rounded,
+              color: palette.secondaryText,
+              size: 20,
             ),
           ),
         ],
@@ -176,43 +189,111 @@ class _IdentityBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final palette = _FishModalPalette.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+      child: Column(
         children: [
           Container(
-            width: 100,
-            height: 100,
+            height: 132,
+            width: double.infinity,
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: FishIntelligenceModal._cyan, width: 2.5),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: FishIntelligenceModal._cyan.withValues(alpha: 0.35),
+                width: 0.8,
+              ),
             ),
-            child: ClipOval(child: _buildImage(context)),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
+              fit: StackFit.expand,
               children: [
-                Text(
-                  fish.name,
-                  style: AppTextStyles.headlineSmall(context),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  fish.scientificName,
-                  style: AppTextStyles.bodyMedium(context).copyWith(
-                    fontStyle: FontStyle.italic,
+                _buildImage(context),
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.transparent, Color(0xE6071722)],
+                      stops: [0.35, 1],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 10),
-                _infoRow(Icons.straighten,
-                    '${fish.minSize.toStringAsFixed(0)} ${l10n.translate('fishIntelligence.sizeCm')}'),
-                _infoRow(Icons.scale,
-                    '${fish.averageWeight.toStringAsFixed(1)} ${l10n.translate('fishIntelligence.weightKg')}'),
-                _infoRow(Icons.place, fish.habitat),
-                _infoRow(Icons.calendar_today, fish.bestSeason),
+                Positioned(
+                  left: 14,
+                  right: 14,
+                  bottom: 10,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        fish.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      Text(
+                        fish.scientificName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11.5,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 7),
+          Container(
+            height: 52,
+            decoration: BoxDecoration(
+              color: palette.panel,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: palette.border),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _identityMetric(
+                    context,
+                    Icons.straighten_rounded,
+                    '${fish.minSize.toStringAsFixed(0)} ${l10n.translate('fishIntelligence.sizeCm')}',
+                  ),
+                ),
+                _metricDivider(context),
+                Expanded(
+                  child: _identityMetric(
+                    context,
+                    Icons.scale_outlined,
+                    '${fish.averageWeight.toStringAsFixed(1)} ${l10n.translate('fishIntelligence.weightKg')}',
+                  ),
+                ),
+                _metricDivider(context),
+                Expanded(
+                  child: _identityMetric(
+                    context,
+                    Icons.waves_rounded,
+                    fish.habitat,
+                  ),
+                ),
+                _metricDivider(context),
+                Expanded(
+                  child: _identityMetric(
+                    context,
+                    Icons.calendar_today_outlined,
+                    fish.bestSeason,
+                  ),
+                ),
               ],
             ),
           ),
@@ -244,23 +325,37 @@ class _IdentityBlock extends StatelessWidget {
     );
   }
 
-  Widget _infoRow(IconData icon, String text) {
+  Widget _identityMetric(BuildContext context, IconData icon, String value) {
+    final palette = _FishModalPalette.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
+      padding: const EdgeInsets.symmetric(horizontal: 3),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 14, color: FishIntelligenceModal._cyan),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(fontSize: 12, color: Colors.white),
+          Icon(icon, size: 13, color: palette.accent),
+          const SizedBox(height: 3),
+          Text(
+            value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 8.5,
+              height: 1.05,
+              color: palette.secondaryText,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
       ),
     );
   }
+
+  Widget _metricDivider(BuildContext context) => Container(
+        width: 0.7,
+        height: 33,
+        color: _FishModalPalette.of(context).border,
+      );
 }
 
 class _TechniqueBlock extends StatelessWidget {
@@ -270,32 +365,35 @@ class _TechniqueBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final palette = _FishModalPalette.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _BlockTitle(l10n.translate('fishIntelligence.techniqueBlock')),
-          const SizedBox(height: 10),
+          const SizedBox(height: 7),
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: 6,
+            runSpacing: 6,
             children: fish.techniques
-                .map((t) => _Chip(text: t, color: FishIntelligenceModal._cyan))
+                .map((t) => _Chip(text: t, color: palette.accent))
                 .toList(),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           _TextRow(l10n.translate('fishIntelligence.montage'), fish.montage),
-          const SizedBox(height: 10),
+          const SizedBox(height: 7),
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: 6,
+            runSpacing: 6,
             children: fish.baits
-                .map((b) => _Chip(text: b, color: FishIntelligenceModal._orange))
+                .map(
+                    (b) => _Chip(text: b, color: FishIntelligenceModal._orange))
                 .toList(),
           ),
-          const SizedBox(height: 12),
-          _TextRow(l10n.translate('fishIntelligence.expertAdvice'), fish.fishingAdvice),
+          const SizedBox(height: 8),
+          _TextRow(l10n.translate('fishIntelligence.expertAdvice'),
+              fish.fishingAdvice),
         ],
       ),
     );
@@ -315,6 +413,7 @@ class _TideBlock extends StatefulWidget {
 
 class _TideBlockState extends State<_TideBlock> {
   TideData? _tide;
+  GfsWeatherTimeline? _gfsWeather;
   bool _loading = true;
 
   @override
@@ -326,6 +425,10 @@ class _TideBlockState extends State<_TideBlock> {
   Future<void> _fetch() async {
     final lat = widget.currentPosition?.latitude ?? 33.57;
     final lon = widget.currentPosition?.longitude ?? -7.59;
+    final gfsFuture = ForecastFirestoreService.fetchNearestGfsWeather(
+      latitude: lat,
+      longitude: lon,
+    ).catchError((_) => null);
     final cacheKey = '${lat.toStringAsFixed(2)},${lon.toStringAsFixed(2)}';
     final cached = _TideBlock._cachedTides[cacheKey];
     if (cached != null) {
@@ -334,25 +437,29 @@ class _TideBlockState extends State<_TideBlock> {
         _tide = cached;
         _loading = false;
       });
-      return;
-    }
-    try {
-      final d = await TideService.fetchTides(latitude: lat, longitude: lon);
-      if (d.hourlyPoints.isNotEmpty) {
-        _TideBlock._cachedTides[cacheKey] = d;
+    } else {
+      try {
+        final d = await TideService.fetchTides(latitude: lat, longitude: lon);
+        if (d.hourlyPoints.isNotEmpty) {
+          _TideBlock._cachedTides[cacheKey] = d;
+        }
+        if (!mounted) return;
+        setState(() {
+          _tide = d;
+          _loading = false;
+        });
+      } catch (_) {
+        if (!mounted) return;
+        setState(() {
+          _tide = TideData.fallback();
+          _loading = false;
+        });
       }
-      if (!mounted) return;
-      setState(() {
-        _tide = d;
-        _loading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _tide = TideData.fallback();
-        _loading = false;
-      });
     }
+
+    final gfsWeather = await gfsFuture;
+    if (!mounted || gfsWeather == null) return;
+    setState(() => _gfsWeather = gfsWeather);
   }
 
   double _getTideActivity(TideData t) {
@@ -360,7 +467,10 @@ class _TideBlockState extends State<_TideBlock> {
     final now = DateTime.now();
     double cur = t.low;
     for (final p in t.hourlyPoints) {
-      if (p.time.isAfter(now)) { cur = p.height; break; }
+      if (p.time.isAfter(now)) {
+        cur = p.height;
+        break;
+      }
     }
     final range = t.high - t.low;
     if (range <= 0) return 0.0;
@@ -378,7 +488,9 @@ class _TideBlockState extends State<_TideBlock> {
 
   String _getTideLabel(BuildContext context, double activity) {
     final l10n = AppLocalizations.of(context);
-    if (activity > 0.75) return l10n.translate('fishIntelligence.tideRisingStrong');
+    if (activity > 0.75) {
+      return l10n.translate('fishIntelligence.tideRisingStrong');
+    }
     if (activity > 0.5) return l10n.translate('fishIntelligence.tideRising');
     if (activity > 0.25) return l10n.translate('fishIntelligence.tideFalling');
     return l10n.translate('fishIntelligence.tideSlack');
@@ -388,6 +500,7 @@ class _TideBlockState extends State<_TideBlock> {
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context);
+    final palette = _FishModalPalette.of(context);
     final t = _tide;
     if (_loading) {
       return Padding(
@@ -441,65 +554,208 @@ class _TideBlockState extends State<_TideBlock> {
     final activity = _getTideActivity(t);
     final isGood = activity > 0.5;
     final point = _currentPoint(t);
+    final gfsPoint = _gfsWeather?.nearestTo(point?.time ?? DateTime.now());
     final wind = point?.windSpeedKmh;
     final temp = point?.temperatureC;
+    final pressure = point?.pressureHpa ?? gfsPoint?.pressureHpa;
+    final rain = point?.precipitationProbabilityPct ??
+        gfsPoint?.precipitationProbabilityPct;
+    final humidity =
+        point?.relativeHumidityPct ?? gfsPoint?.relativeHumidityPct;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: tc.surfaceLight.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: tc.glassBorder),
+          color: palette.panel,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: palette.border),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _BlockTitle(l10n.translate('fishIntelligence.tideBlock')),
-            const SizedBox(height: 10),
-            _TextRow(l10n.translate('fishIntelligence.tide'), _getTideLabel(context, activity)),
-            const SizedBox(height: 6),
-            _TextRow('Hauteur', '${t.next.toStringAsFixed(2)}m (basse: ${t.low.toStringAsFixed(1)}m, haute: ${t.high.toStringAsFixed(1)}m)'),
             const SizedBox(height: 8),
             Row(
               children: [
-                Text(
-                  l10n.translate('fishIntelligence.fishActivity'),
-                  style: const TextStyle(fontSize: 12, color: Colors.white70),
+                Expanded(
+                  child: Text(
+                    l10n.translate('fishIntelligence.fishActivity'),
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      color: palette.secondaryText,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
-                const SizedBox(width: 10),
+                Text(
+                  '${(activity * 100).round()}%',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isGood
+                        ? FishIntelligenceModal._green
+                        : FishIntelligenceModal._orange,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 5),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(5),
+              child: LinearProgressIndicator(
+                value: activity,
+                minHeight: 5,
+                backgroundColor: palette.progressBackground,
+                valueColor: AlwaysStoppedAnimation(
+                  isGood
+                      ? FishIntelligenceModal._green
+                      : FishIntelligenceModal._orange,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final tileWidth = (constraints.maxWidth - 12) / 3;
+                return Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _ConditionMetric(
+                      width: tileWidth,
+                      icon: Icons.waves_rounded,
+                      label: l10n.translate('fishIntelligence.tide'),
+                      value: _getTideLabel(context, activity),
+                    ),
+                    _ConditionMetric(
+                      width: tileWidth,
+                      icon: Icons.air_rounded,
+                      label: l10n.translate('fishIntelligence.wind'),
+                      value: wind == null ? '--' : '${wind.round()} km/h',
+                    ),
+                    _ConditionMetric(
+                      width: tileWidth,
+                      icon: Icons.thermostat_rounded,
+                      label: l10n.translate('fishIntelligence.waterTemp'),
+                      value:
+                          temp == null ? '--' : '${temp.toStringAsFixed(1)}°',
+                    ),
+                    _ConditionMetric(
+                      width: tileWidth,
+                      icon: Icons.speed_rounded,
+                      label: l10n.translate('fishIntelligence.pressure'),
+                      value:
+                          pressure == null ? '--' : '${pressure.round()} hPa',
+                    ),
+                    _ConditionMetric(
+                      width: tileWidth,
+                      icon: Icons.umbrella_rounded,
+                      label: l10n.translate('fishIntelligence.rain'),
+                      value: rain == null ? '--' : '${rain.round()}%',
+                    ),
+                    _ConditionMetric(
+                      width: tileWidth,
+                      icon: Icons.water_drop_outlined,
+                      label: l10n.translate('fishIntelligence.humidity'),
+                      value: humidity == null ? '--' : '${humidity.round()}%',
+                    ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 7),
+            Row(
+              children: [
+                Icon(
+                  Icons.height_rounded,
+                  size: 12,
+                  color: palette.mutedText,
+                ),
+                const SizedBox(width: 4),
                 Expanded(
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: LinearProgressIndicator(
-                      value: activity,
-                      minHeight: 8,
-                      backgroundColor: tc.glassBorder,
-                      valueColor: AlwaysStoppedAnimation(
-                        isGood ? FishIntelligenceModal._green : FishIntelligenceModal._orange,
+                    child: Text(
+                      '${t.next.toStringAsFixed(2)} m  ·  ${t.low.toStringAsFixed(1)}–${t.high.toStringAsFixed(1)} m',
+                      style: TextStyle(
+                        color: palette.mutedText,
+                        fontSize: 8.5,
                       ),
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            _TextRow(
-              l10n.translate('fishIntelligence.wind'),
-              wind == null ? '--' : '${wind.round()} km/h',
-            ),
-            _TextRow(
-              l10n.translate('fishIntelligence.waterTemp'),
-              temp == null ? '--' : '${temp.toStringAsFixed(1)}°C',
-            ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Text(
               l10n.translate('fishIntelligence.simulatedNote'),
-              style: TextStyle(fontSize: 10, color: tc.textMuted, fontStyle: FontStyle.italic),
+              style: TextStyle(
+                fontSize: 8,
+                color: palette.mutedText,
+                fontStyle: FontStyle.italic,
+              ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ConditionMetric extends StatelessWidget {
+  final double width;
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _ConditionMetric({
+    required this.width,
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = _FishModalPalette.of(context);
+    return Container(
+      width: width,
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+      decoration: BoxDecoration(
+        color: palette.cell,
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: palette.border),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 13, color: palette.accent),
+          const SizedBox(height: 2),
+          Text(
+            label.toUpperCase(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: palette.mutedText,
+              fontSize: 6.8,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.35,
+            ),
+          ),
+          const SizedBox(height: 1),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: palette.primaryText,
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -522,16 +778,16 @@ class _SpotsBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context);
+    final palette = _FishModalPalette.of(context);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _BlockTitle(l10n.translate('fishIntelligence.nearbySpots')),
-          const SizedBox(height: 10),
+          const SizedBox(height: 7),
           if (isLoadingNearby)
             Row(
               children: [
@@ -546,63 +802,74 @@ class _SpotsBlock extends StatelessWidget {
                 const SizedBox(width: 12),
                 Text(
                   l10n.translate('fishIntelligence.loadingNearbySpots'),
-                  style: AppTextStyles.bodyMedium(context),
+                  style: TextStyle(color: palette.secondaryText, fontSize: 11),
                 ),
               ],
             )
           else if (nearbySpots.isEmpty)
             Text(
               l10n.translate('fishIntelligence.noNearbySpots'),
-              style: AppTextStyles.bodyMedium(context),
+              style: TextStyle(color: palette.secondaryText, fontSize: 11),
             )
           else
             Column(
               children: nearbySpots.map((spot) {
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  decoration: BoxDecoration(
-                    color: tc.surfaceLight.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: tc.glassBorder),
-                  ),
-                  child: ListTile(
-                    dense: true,
-                    leading: Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: spot.type.color,
-                      ),
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Material(
+                    color: palette.panel,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      side: BorderSide(color: palette.border),
                     ),
-                    title: Text(
-                      spot.name,
-                      style: TextStyle(
-                        color: tc.textPrimary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    subtitle: Text(
-                      distanceText(spot),
-                      style: TextStyle(color: tc.textMuted, fontSize: 11),
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          l10n.translate('fishIntelligence.navigate'),
-                          style: const TextStyle(
-                            color: FishIntelligenceModal._cyan,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
+                    clipBehavior: Clip.antiAlias,
+                    child: ListTile(
+                      dense: true,
+                      visualDensity: const VisualDensity(vertical: -2),
+                      leading: Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: spot.type.color,
                         ),
-                        const SizedBox(width: 2),
-                        const Icon(Icons.arrow_forward_ios, size: 12, color: FishIntelligenceModal._cyan),
-                      ],
+                      ),
+                      title: Text(
+                        spot.name,
+                        style: TextStyle(
+                          color: palette.primaryText,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      subtitle: Text(
+                        distanceText(spot),
+                        style: TextStyle(
+                          color: palette.mutedText,
+                          fontSize: 10,
+                        ),
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            l10n.translate('fishIntelligence.navigate'),
+                            style: TextStyle(
+                              color: palette.accent,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          Icon(
+                            Icons.arrow_forward_ios,
+                            size: 12,
+                            color: palette.accent,
+                          ),
+                        ],
+                      ),
+                      onTap: () => onSpotSelected(spot),
                     ),
-                    onTap: () => onSpotSelected(spot),
                   ),
                 );
               }).toList(),
@@ -619,10 +886,14 @@ class _BlockTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = _FishModalPalette.of(context);
     return Text(
-      text,
-      style: AppTextStyles.titleLarge(context).copyWith(
-        color: FishIntelligenceModal._cyan,
+      text.toUpperCase(),
+      style: TextStyle(
+        color: palette.accent,
+        fontSize: 10.5,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 0.8,
       ),
     );
   }
@@ -636,15 +907,16 @@ class _Chip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Text(
         text,
-        style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
+        style:
+            TextStyle(color: color, fontSize: 9.5, fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -657,13 +929,21 @@ class _TextRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = _FishModalPalette.of(context);
     return RichText(
       text: TextSpan(
-        style: TextStyle(fontSize: 12, color: ThemeColors.of(context).textSecondary, height: 1.4),
+        style: TextStyle(
+          fontSize: 10.5,
+          color: palette.secondaryText,
+          height: 1.35,
+        ),
         children: [
           TextSpan(
             text: '$label : ',
-            style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white70),
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: palette.primaryText,
+            ),
           ),
           TextSpan(text: value),
         ],

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart';
 import 'package:spots_app/services/crash_reporting_service.dart';
 
 void main() {
@@ -48,6 +49,51 @@ void main() {
     expect(sanitized, isNot(contains('tiles.example')));
     expect(sanitized, isNot(contains('coordonnée')));
     expect(sanitized, isNot(contains('note privée')));
+  });
+
+  test('une erreur réseau de tuile est reconnue comme récupérable', () {
+    final tileStack = StackTrace.fromString(
+      'NetworkTileImageProvider._loadImage '
+      '(package:flutter_map/src/layer/tile_layer/image_provider.dart:224)',
+    );
+
+    expect(
+      CrashReportingService.isRecoverableTileNetworkError(
+        ClientException('connexion interrompue'),
+        tileStack,
+      ),
+      isTrue,
+    );
+  });
+
+  test('une erreur réseau étrangère aux tuiles reste diagnostiquée', () {
+    final serviceStack = StackTrace.fromString(
+      'CommunityRepository.publish '
+      '(package:spots_app/features/community/repository.dart:120)',
+    );
+
+    expect(
+      CrashReportingService.isRecoverableTileNetworkError(
+        ClientException('connexion interrompue'),
+        serviceStack,
+      ),
+      isFalse,
+    );
+  });
+
+  test('une vraie erreur applicative de tuile reste diagnostiquée', () {
+    final tileStack = StackTrace.fromString(
+      'NetworkTileImageProvider._loadImage '
+      '(package:flutter_map/src/layer/tile_layer/image_provider.dart:224)',
+    );
+
+    expect(
+      CrashReportingService.isRecoverableTileNetworkError(
+        StateError('invariant applicatif invalide'),
+        tileStack,
+      ),
+      isFalse,
+    );
   });
 
   test('le SDK et les plugins Gradle officiels sont verrouillés', () {

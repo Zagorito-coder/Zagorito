@@ -13,6 +13,9 @@ class TidePoint {
   final double windWaveHeight; // mètres
   final double? temperatureC;
   final double? windSpeedKmh;
+  final double? pressureHpa;
+  final double? precipitationProbabilityPct;
+  final double? relativeHumidityPct;
 
   const TidePoint({
     required this.time,
@@ -22,6 +25,9 @@ class TidePoint {
     this.windWaveHeight = 0.0,
     this.temperatureC,
     this.windSpeedKmh,
+    this.pressureHpa,
+    this.precipitationProbabilityPct,
+    this.relativeHumidityPct,
   });
 }
 

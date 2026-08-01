@@ -19,8 +19,9 @@ dépôt principal. La candidate `1.0.5+8` a été construite avec le script de
 release obligatoire, contrôlée, installée localement en Release et validée sur
 un appareil physique pour les parcours déjà exécutés.
 
-Le code suivi du dépôt principal est propre. Le seul élément marqué comme
-modifié par Git est le sous-dépôt utilisateur `spots_app_temp`, qui est
+Le code applicatif suivi du dépôt principal est propre. La présente mise à jour
+modifie uniquement `docs/NEW_SESSION_PROMPT_V8.md` et ce dossier de passation.
+Le sous-dépôt utilisateur `spots_app_temp` reste marqué dirty ; il est
 volontairement hors périmètre de la candidate et ne doit pas être touché.
 
 La situation réelle est donc la suivante :
@@ -31,17 +32,20 @@ La situation réelle est donc la suivante :
 | Build `1.0.5 (8)` | Produit et validé localement |
 | Installation Release par câble | Réalisée sur Samsung Android 16 |
 | Pages légales publiques | Accessibles en HTTPS et vérifiées |
-| Validation depuis Google Play Internal Testing | À faire pour cette candidate |
-| App Check / Play Integrity sur l'installation Play | À confirmer depuis Google Play |
-| Publication Communauté avec compte Play | À confirmer après installation Play |
+| Validation depuis Google Play Internal Testing | Réalisée sur `1.0.5 (8)` installée par `com.android.vending` |
+| App Check / Play Integrity sur l'installation Play | Validé après correction de l'empreinte SHA-256 Firebase |
+| Publication Communauté avec compte Play | Réussie sur l'installation Play authentique |
 | Déclarations Play Console | À relire et finaliser manuellement |
+| Compte reviewer dédié | Adresse modifiable sans nouvel AAB ; création/test/enregistrement final à confirmer |
 | Fiche Play Store (captures, visuel, vidéo) | À refaire : ancien thème obsolète |
 | Disponibilité pays/régions | À choisir |
 | Production | Interdite pour le moment |
 
-Il n'y a pas, dans les contrôles locaux connus, de défaut bloquant avéré du
-code. Les principaux risques restants sont des validations externes ou des
-déclarations Play Console incomplètes/inexactes. Ils doivent être traités avant
+Il n'y a pas, dans les contrôles connus, de défaut bloquant avéré du code. La
+publication Communauté et l'échange App Check ont également été validés depuis
+Google Play après correction de la configuration Firebase. Les principaux
+risques restants sont la checklist manuelle complète, le compte reviewer, les
+déclarations Play Console et la fiche obsolète. Ils doivent être traités avant
 toute promotion.
 
 ## 2. Règles de continuité à respecter
@@ -58,8 +62,9 @@ La nouvelle session doit impérativement :
 5. Utiliser `tools/build_release.sh` pour tout build Play.
 6. Utiliser `flutter test --dart-define-from-file=.env` pour les tests qui
    exigent le catalogue chiffré.
-7. Ne pas activer l'enforcement App Check avant validation sur une installation
-   provenant de Google Play Internal Testing.
+7. La validation App Check sur une installation Play est acquise. Ne pas
+   durcir brutalement l'enforcement : toute activation future doit rester
+   progressive et précédée d'un contrôle des métriques.
 8. Ne pas modifier la logique de zoom/sélection accidentelle de la carte :
    l'utilisateur a volontairement différé ce changement jusqu'à une nouvelle
    réclamation des testeurs.
@@ -416,8 +421,28 @@ l'AAB.
 - persistance de photos privées après relance validée ;
 - correctif d'envoi d'une photo personnelle validé manuellement.
 
-Cette validation locale ne prouve pas l'attestation Play Integrity. Elle doit
-être complétée par une installation depuis le canal Internal Testing.
+Cette validation locale ne prouvait pas l'attestation Play Integrity. La preuve
+complémentaire sur une installation Google Play authentique a ensuite été
+obtenue et est détaillée dans `docs/releases/1.0.5-8-evidence.md`.
+
+### 5.4 Validation Google Play et correction App Check
+
+Un Samsung `SM_A037F` (`R9YRB0N9JHL`) équipé de la version `1.0.5 (8)`
+installée par `com.android.vending` a permis de mesurer le certificat de
+signature Play réel :
+
+`6C:B8:0F:3A:2D:40:50:79:7F:D5:DC:36:93:08:6D:7E:D0:7F:D3:61:9E:CF:35:AA:44:20:55:F5:E3:8C:EE:47`
+
+Les journaux ont montré une réponse Play Integrity suivie d'un refus Firebase
+`403 App attestation failed`. L'empreinte enregistrée dans Firebase contenait
+deux caractères incorrects. L'empreinte correcte a été ajoutée de manière non
+destructive à l'application Firebase Android
+`1:68722970471:android:22dce79885650fc112e9c2`.
+
+Après propagation et relance à froid, la publication Communauté a réussi. Les
+journaux ne contenaient plus ni `403`, ni `App attestation failed`, ni
+`Too many attempts`. Cette correction était une correction de configuration ;
+elle n'a nécessité ni modification Flutter ni nouvel AAB.
 
 ## 6. État Git et sauvegarde
 
@@ -427,8 +452,8 @@ Cette validation locale ne prouve pas l'attestation Play Integrity. Elle doit
 Branche : main
 Remote  : https://github.com/Zagorito-coder/Zagorito.git
 Origin  : 4311276
-HEAD    : 8c7b43e
-Écart   : main est en avance de 4 commits sur origin/main
+HEAD    : b1a6fc3
+Écart   : main est en avance de 7 commits sur origin/main
 ```
 
 ### 6.2 Commits locaux de la candidate
@@ -439,11 +464,17 @@ HEAD    : 8c7b43e
 | `d3a0617` | Normalisation et correction de l'envoi des photos personnelles |
 | `159a6e8` | Documentation des preuves de validation de la release interne |
 | `8c7b43e` | Vérification des pages légales en ligne |
+| `6f56761` | Dossier de passation V+8 et prompt de reprise |
+| `25e7495` | Preuve du diagnostic App Check sur installation locale |
+| `b1a6fc3` | Preuve de la correction et validation App Check depuis Google Play |
 
-Le dépôt principal ne présente pas de modification suivie hors de ces commits.
-`spots_app_temp` est un sous-dépôt marqué dirty et doit rester exclu.
+Au moment de cette dernière mise à jour, les deux documents de passation
+`docs/NEW_SESSION_PROMPT_V8.md` et
+`docs/SESSION_HANDOFF_V8_2026-07-31.md` sont modifiés après `b1a6fc3`. Ce ne
+sont pas des changements du code applicatif. `spots_app_temp` est également un
+sous-dépôt marqué dirty et doit rester exclu.
 
-Les quatre commits locaux n'ont pas été poussés vers GitHub dans cette
+Les sept commits locaux n'ont pas été poussés vers GitHub dans cette
 passation, car aucune autorisation explicite de push n'a été donnée dans le
 dernier échange. Dans une nouvelle session, demander une confirmation claire
 avant `git push origin main`.
@@ -453,32 +484,28 @@ avant `git push origin main`.
 Ces tâches sont la priorité opérationnelle. Elles ne signifient pas
 automatiquement qu'un défaut de code existe.
 
-### 7.1 Avant de téléverser V+8
+### 7.1 Téléversement et installation V+8 — réalisés
 
-1. Ouvrir **Test et publier > Tests internes**.
-2. Créer ou modifier la release avec
-   `build/app/outputs/bundle/release/app-release.aab`.
-3. Vérifier dans l'App Bundle Explorer :
-   - package `com.zagorito.spots_app` ;
-   - version `1.0.5 (8)` ;
-   - target SDK 36 ;
-   - permissions réellement détectées ;
-   - aucun artefact plus ancien n'est sélectionné par erreur.
-4. Enregistrer les notes de version sans déclarer une fonctionnalité absente.
-5. Ne pas promouvoir en production à cette étape.
+L'AAB `1.0.5 (8)` a été traité sur la piste Test interne. Une copie authentique
+a ensuite été installée par Google Play, avec :
 
-### 7.2 Installer depuis Google Play
+- package `com.zagorito.spots_app` ;
+- version `1.0.5 (8)` ;
+- installateur `com.android.vending` ;
+- certificat de signature d'application Play mesuré et enregistré dans
+  Firebase.
 
-Après le traitement de l'AAB :
+Cette étape ne doit être répétée que pour une nouvelle candidate ou pour
+reproduire un défaut. Elle ne doit pas conduire à reconstruire V+8 uniquement
+pour modifier le compte reviewer.
 
-1. ouvrir le lien du test interne ;
-2. rejoindre le test avec le compte testeur ;
-3. désinstaller toute version sideloadée ;
-4. installer depuis Google Play ;
-5. vérifier que l'écran **Informations sur l'application** affiche bien
-   `1.0.5 (8)`.
+### 7.2 App Check et publication Communauté — validés
 
-Cette étape est indispensable pour vérifier Play Integrity/App Check.
+La vérification Play Integrity/App Check et la publication Communauté ont
+réussi après correction de l'empreinte SHA-256 Firebase. Cette validation est
+acquise pour la candidate `1.0.5 (8)`. Les autres interactions UGC restent à
+confirmer dans la matrice ci-dessous si aucune preuve distincte n'est
+documentée.
 
 ### 7.3 Parcours de validation manuelle obligatoire
 
@@ -592,16 +619,18 @@ fraîcheur du cron et des secrets doit être reconfirmée.
 
 ### Risques critiques avant production
 
-1. **App Check/Play Integrity non prouvé sur une installation Google Play.**
-   Peut maintenir l'erreur de publication malgré le correctif code.
-2. **Déclarations Play inexactes ou encore en brouillon.**
+1. **Déclarations Play inexactes ou encore en brouillon.**
    Peut retarder ou provoquer un rejet.
-3. **Compte reviewer inutilisable.**
+2. **Compte reviewer inutilisable.**
    Peut empêcher l'examen de toutes les fonctions restreintes.
-4. **Fiche Play Store obsolète.**
+3. **Fiche Play Store obsolète.**
    Les visuels ne doivent pas présenter l'ancien thème.
-5. **URL de site non opérationnelle.**
+4. **URL de site non opérationnelle.**
    Ne pas afficher `http://www.boosterfish.com` comme site réel.
+5. **Parcours communautaires complémentaires non tous documentés.**
+   Le like avec un second compte, le signalement, le blocage et le retrait
+   doivent être confirmés avant promotion, même si la publication et App Check
+   sont déjà validés.
 
 ### Risques importants mais contrôlables
 
@@ -632,7 +661,8 @@ La reprise la plus sûre est :
 3. Ne pas modifier le code.
 4. Faire un contrôle léger :
    `flutter analyze`, puis les tests selon le temps disponible.
-5. Préparer l'installation/validation de V+8 dans Google Play Internal Testing.
+5. Conserver la preuve de validation Google Play de V+8 et poursuivre la
+   checklist manuelle restante avec le compte reviewer.
 6. Reporter les résultats dans `docs/releases/1.0.5-8-evidence.md` ou dans un
    nouveau journal daté, sans réécrire l'historique.
 7. Corriger uniquement un défaut reproduit.
@@ -660,12 +690,49 @@ La reprise la plus sûre est :
 
 ## 11. Conclusion de passation
 
-La session longue a produit une candidate fonctionnelle et documentée, mais la
-production n'est pas encore autorisée. Le prochain travail n'est pas de
-recommencer les corrections déjà faites : c'est de prouver la candidate depuis
-Google Play Internal Testing, de finaliser les déclarations manuelles et de
-remplacer les éléments obsolètes de la fiche Play Store.
+La session longue a produit une candidate fonctionnelle et documentée, puis a
+validé App Check/Play Integrity et la publication Communauté depuis une
+installation Google Play authentique. La production n'est pas encore
+autorisée. Le prochain travail n'est pas de recommencer les corrections déjà
+faites : c'est de finaliser et tester le compte reviewer, terminer la checklist
+manuelle, finaliser les déclarations et remplacer les éléments obsolètes de la
+fiche Play Store.
 
 Si un nouveau défaut est découvert, le reproduire d'abord sur la version exacte
 `1.0.5 (8)`, distinguer un problème de distribution/App Check d'un problème de
 code, puis corriger la plus petite surface possible.
+
+## 12. Addendum final — dernières décisions de la session
+
+### Blocage et déblocage des pêcheurs
+
+Le blocage existe déjà dans le code et dans les règles :
+
+- écriture dans `community_blocks/{currentUid}/users/{blockedUid}` ;
+- filtrage des publications du pêcheur bloqué ;
+- suppression du document autorisée à son propriétaire ;
+- tests de conformité pour le blocage et le signalement.
+
+Il n'existe pas encore d'interface de gestion permettant de débloquer un
+pêcheur. Cette amélioration pourra être ajoutée plus tard dans
+**Profil > Confidentialité/Communauté > Pêcheurs bloqués**, sans notification
+au pêcheur concerné. Elle est considérée comme isolée, à faible risque et non
+bloquante pour la production actuelle. Ne pas l'implémenter sans demande
+explicite.
+
+### Dernière tâche manuelle : adresse du reviewer
+
+L'adresse du compte reviewer peut être changée dans :
+
+**Règles et programmes > Contenu de l'application > Informations de connexion
+> Gérer**.
+
+Ce changement ne nécessite ni modification du code ni nouvel AAB. Le nouveau
+compte doit exister dans Firebase Authentication, fonctionner sur
+l'installation Google Play, donner accès à toutes les fonctions et ne pas
+demander de 2FA/OTP. Les instructions doivent être fournies en anglais.
+
+L'utilisateur n'a pas encore confirmé que la nouvelle adresse a été créée,
+testée et enregistrée. La prochaine action normale est donc de finaliser ce
+compte reviewer, puis de reprendre la checklist manuelle restante. Aucun
+identifiant ni mot de passe ne doit être ajouté aux fichiers du dépôt.

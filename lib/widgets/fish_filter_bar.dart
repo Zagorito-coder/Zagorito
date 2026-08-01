@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 
 import 'package:spots_app/models/fish_model.dart';
 import 'package:spots_app/theme.dart';
+import 'package:spots_app/widgets/fish_image_framing.dart';
 
 class FishFilterBar extends StatelessWidget {
   final List<FishModel> fishes;
@@ -124,7 +125,8 @@ class _FishCard extends StatelessWidget {
                 child: Container(
                   width: FishFilterBar._imageSize,
                   height: FishFilterBar._imageSize,
-                  padding: isSelected ? const EdgeInsets.all(4) : EdgeInsets.zero,
+                  padding:
+                      isSelected ? const EdgeInsets.all(4) : EdgeInsets.zero,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: isSelected ? FishFilterBar._selectedRing : null,
@@ -156,10 +158,13 @@ class _FishCard extends StatelessWidget {
 
   Widget _buildImage(BuildContext context) {
     if (fish.imageUrl.startsWith('assets/')) {
-      return Image.asset(
-        fish.imageUrl,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _placeholder(context),
+      return Transform.scale(
+        scale: FishImageFraming.thumbnailScale(fish.id),
+        child: Image.asset(
+          fish.imageUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _placeholder(context),
+        ),
       );
     }
     return CachedNetworkImage(
@@ -181,5 +186,4 @@ class _FishCard extends StatelessWidget {
       ),
     );
   }
-
 }
