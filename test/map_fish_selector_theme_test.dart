@@ -24,7 +24,8 @@ void main() {
     });
   });
 
-  test('le sélecteur poissons adopte le modèle 2 compact et léger', () {
+  test('le sélecteur applique les familles modèle 4 clair et modèle 3 sombre',
+      () {
     final source =
         File('lib/main.dart').readAsStringSync().replaceAll('\r\n', '\n');
     final start = source.indexOf('class _FishVerticalMenu');
@@ -34,14 +35,26 @@ void main() {
     expect(end, greaterThan(start));
 
     final selector = source.substring(start, end);
-    expect(selector, contains('static const double _collapsedWidth = 62'));
-    expect(selector, contains('static const double _selectedWidth = 184'));
+    expect(selector, contains('static const double _collapsedWidth = 68'));
+    expect(selector, contains('static const double _selectedWidth = 190'));
     expect(selector, contains('width: isSelected'));
     expect(selector, contains("'map-fish-tile-\${fish.id}'"));
-    expect(selector, contains('BorderRadius.circular(16)'));
+    expect(selector, contains('BorderRadius.circular(17)'));
     expect(selector, contains('if (isSelected) ...['));
+    expect(selector,
+        contains('child: Text(\n                              fish.name'));
+    expect(selector, contains('class _FishSelectorPalette'));
+    expect(selector, contains('surfaceTop: Color(0xFFFDFEFE)'));
+    expect(selector, contains('accent: Color(0xFF087D88)'));
+    expect(selector, contains('surfaceTop: Color(0xFF080B11)'));
+    expect(selector, contains('accent: Color(0xFF168BFF)'));
+    expect(selector, contains('class _FishCompassGridPainter'));
     expect(
-        selector, contains('child: Text(\n                        fish.name'));
+      selector,
+      contains('Theme.of(context).brightness == Brightness.dark'),
+    );
+    expect(selector, contains("'assets/fish_selector_thumbnails/'"));
+    expect(selector, contains('fit: BoxFit.contain'));
     expect(selector, contains('RepaintBoundary('));
     expect(selector, contains('ListView.builder('));
     expect(selector, contains('cacheWidth:'));

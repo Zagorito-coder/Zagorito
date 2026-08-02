@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as image;
 import 'package:spots_app/widgets/fish_image_framing.dart';
 
 void main() {
@@ -76,6 +77,44 @@ void main() {
       expect(
         FishImageFraming.thumbnailScale(fishId),
         inInclusiveRange(1.0, 1.8),
+      );
+    }
+  });
+
+  test('le sélecteur carte possède une vignette détourée et bornée', () {
+    final decoded =
+        jsonDecode(File('assets/fish_data.json').readAsStringSync());
+    final fish = (decoded as List<dynamic>).cast<Map<String, dynamic>>();
+    final generatedThumbnails = Directory('assets/fish_selector_thumbnails')
+        .listSync()
+        .whereType<File>()
+        .where((file) => file.path.toLowerCase().endsWith('.png'))
+        .toList();
+    expect(generatedThumbnails.length, fish.length);
+
+    for (final entry in fish) {
+      final originalPath = entry['imageUrl'] as String;
+      final thumbnailPath = originalPath.replaceFirst(
+        'assets/fish_images/',
+        'assets/fish_selector_thumbnails/',
+      );
+      final thumbnailFile = File(thumbnailPath);
+      expect(
+        thumbnailFile.existsSync(),
+        isTrue,
+        reason: 'Vignette sélecteur absente pour ${entry['name']}',
+      );
+
+      final thumbnail = image.decodePng(thumbnailFile.readAsBytesSync());
+      expect(thumbnail, isNotNull, reason: 'PNG invalide: $thumbnailPath');
+      expect(thumbnail!.width, 320);
+      expect(thumbnail.height, 220);
+      expect(thumbnail.numChannels, 4);
+      expect(thumbnail.getPixel(0, 0).a, 0);
+      expect(
+        thumbnail.any((pixel) => pixel.a.toInt() > 240),
+        isTrue,
+        reason: 'Sujet détouré absent pour ${entry['name']}',
       );
     }
   });

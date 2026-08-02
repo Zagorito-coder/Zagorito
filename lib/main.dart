@@ -33,7 +33,6 @@ import 'package:spots_app/utils/map_flight_plan.dart';
 import 'package:spots_app/widgets/app_tile_layer.dart';
 import 'package:spots_app/widgets/finite_map_controller.dart';
 import 'package:spots_app/widgets/finite_marker_layer.dart';
-import 'package:spots_app/widgets/fish_image_framing.dart';
 import 'package:spots_app/widgets/offline_map_manager_sheet.dart';
 import 'package:spots_app/widgets/personal_spots_map_layer.dart';
 import 'package:spots_app/widgets/user_spot_form_sheet.dart';
@@ -539,8 +538,8 @@ class _FishVerticalMenu extends StatelessWidget {
       required this.selectedFish,
       required this.onFishSelected,
       required this.onFishDeselected});
-  static const double _menuWidth = 188;
-  static const double _rowExtent = 66;
+  static const double _menuWidth = 194;
+  static const double _rowExtent = 68;
 
   @override
   Widget build(BuildContext context) {
@@ -582,95 +581,137 @@ class _FishRow extends StatelessWidget {
   const _FishRow(
       {required this.fish, required this.isSelected, required this.onTap});
 
-  static const double _collapsedWidth = 62;
-  static const double _selectedWidth = 184;
-  static const double _tileHeight = 58;
+  static const double _collapsedWidth = 68;
+  static const double _selectedWidth = 190;
+  static const double _tileHeight = 60;
 
   @override
   Widget build(BuildContext context) {
-    final tc = ThemeColors.of(context);
-    const accent = Color(0xFF48CAE4);
-    return Semantics(
-      button: true,
-      selected: isSelected,
-      label: fish.name,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: SizedBox(
-          height: _FishVerticalMenu._rowExtent,
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: AnimatedContainer(
-              key: ValueKey<String>('map-fish-tile-${fish.id}'),
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOutCubic,
-              width: isSelected ? _selectedWidth : _collapsedWidth,
-              height: _tileHeight,
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    tc.surface.withValues(alpha: 0.97),
-                    tc.surfaceLight.withValues(alpha: 0.94),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isSelected ? accent : tc.glassBorder,
-                  width: isSelected ? 1.4 : 1,
-                ),
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: accent.withValues(alpha: 0.22),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ]
-                    : null,
-              ),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: _collapsedWidth - 2,
-                    height: _tileHeight,
-                    child: Padding(
-                      padding: const EdgeInsets.all(3),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(13),
-                        child: _buildImage(context),
-                      ),
-                    ),
+    final palette = _FishSelectorPalette.of(context);
+    return RepaintBoundary(
+      child: Semantics(
+        button: true,
+        selected: isSelected,
+        label: fish.name,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: SizedBox(
+            height: _FishVerticalMenu._rowExtent,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: AnimatedContainer(
+                key: ValueKey<String>('map-fish-tile-${fish.id}'),
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                width: isSelected ? _selectedWidth : _collapsedWidth,
+                height: _tileHeight,
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [palette.surfaceTop, palette.surfaceBottom],
                   ),
-                  if (isSelected) ...[
-                    Container(
-                      width: 3,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: accent,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
+                  borderRadius: BorderRadius.circular(17),
+                  border: Border.all(
+                    color: isSelected ? palette.accent : palette.border,
+                    width: isSelected ? 1.5 : 0.8,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: palette.shadow,
+                      blurRadius: isSelected ? 10 : 6,
+                      offset: const Offset(0, 3),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        fish.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: tc.textPrimary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.1,
-                        ),
+                    if (isSelected)
+                      BoxShadow(
+                        color: palette.accent.withValues(alpha: 0.18),
+                        blurRadius: 10,
                       ),
-                    ),
-                    const SizedBox(width: 10),
                   ],
-                ],
+                ),
+                child: Stack(
+                  children: [
+                    Positioned(
+                      top: 0,
+                      left: 12,
+                      right: 12,
+                      child: Container(
+                        height: 0.7,
+                        color: palette.topHighlight,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        SizedBox(
+                          width: _collapsedWidth - 2,
+                          height: _tileHeight,
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    palette.imageTop,
+                                    palette.imageBottom,
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(13),
+                                border: Border.all(
+                                  color: palette.imageBorder,
+                                  width: 0.7,
+                                ),
+                              ),
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  if (palette.isDark)
+                                    CustomPaint(
+                                      painter: _FishCompassGridPainter(
+                                        palette.compassGrid,
+                                      ),
+                                    ),
+                                  Padding(
+                                    padding: const EdgeInsets.all(3),
+                                    child: _buildImage(context),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (isSelected) ...[
+                          Container(
+                            width: 3,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: palette.accent,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              fish.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: palette.text,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.1,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -681,15 +722,24 @@ class _FishRow extends StatelessWidget {
 
   Widget _buildImage(BuildContext context) {
     if (fish.imageUrl.startsWith('assets/')) {
-      final imageScale = FishImageFraming.thumbnailScale(fish.id);
       final pixelRatio = MediaQuery.devicePixelRatioOf(context);
-      return Transform.scale(
-          scale: imageScale,
-          child: Image.asset(fish.imageUrl,
-              fit: BoxFit.cover,
-              cacheWidth: (_tileHeight * imageScale * pixelRatio).ceil(),
-              filterQuality: FilterQuality.medium,
-              errorBuilder: (_, __, ___) => _ph()));
+      final thumbnailPath = fish.imageUrl.replaceFirst(
+        'assets/fish_images/',
+        'assets/fish_selector_thumbnails/',
+      );
+      return Image.asset(
+        thumbnailPath,
+        fit: BoxFit.contain,
+        cacheWidth: (_collapsedWidth * pixelRatio).ceil(),
+        filterQuality: FilterQuality.medium,
+        errorBuilder: (_, __, ___) => Image.asset(
+          fish.imageUrl,
+          fit: BoxFit.contain,
+          cacheWidth: (_collapsedWidth * pixelRatio).ceil(),
+          filterQuality: FilterQuality.medium,
+          errorBuilder: (_, __, ___) => _ph(),
+        ),
+      );
     }
     return CachedNetworkImage(
         imageUrl: fish.imageUrl,
@@ -701,6 +751,98 @@ class _FishRow extends StatelessWidget {
   Widget _ph() => Container(
       color: const Color(0xFF1E6091),
       child: const Center(child: Text('🐟', style: TextStyle(fontSize: 20))));
+}
+
+class _FishSelectorPalette {
+  final bool isDark;
+  final Color surfaceTop;
+  final Color surfaceBottom;
+  final Color imageTop;
+  final Color imageBottom;
+  final Color border;
+  final Color imageBorder;
+  final Color accent;
+  final Color text;
+  final Color shadow;
+  final Color topHighlight;
+  final Color compassGrid;
+
+  const _FishSelectorPalette({
+    required this.isDark,
+    required this.surfaceTop,
+    required this.surfaceBottom,
+    required this.imageTop,
+    required this.imageBottom,
+    required this.border,
+    required this.imageBorder,
+    required this.accent,
+    required this.text,
+    required this.shadow,
+    required this.topHighlight,
+    required this.compassGrid,
+  });
+
+  static const light = _FishSelectorPalette(
+    isDark: false,
+    surfaceTop: Color(0xFFFDFEFE),
+    surfaceBottom: Color(0xFFDDE8E9),
+    imageTop: Color(0xFFF7FAFA),
+    imageBottom: Color(0xFFCFE0E2),
+    border: Color(0x66788F98),
+    imageBorder: Color(0x52667E87),
+    accent: Color(0xFF087D88),
+    text: Color(0xFF17323A),
+    shadow: Color(0x3322343A),
+    topHighlight: Color(0xE6FFFFFF),
+    compassGrid: Colors.transparent,
+  );
+
+  static const dark = _FishSelectorPalette(
+    isDark: true,
+    surfaceTop: Color(0xFF080B11),
+    surfaceBottom: Color(0xFF151D29),
+    imageTop: Color(0xFF0C1A2C),
+    imageBottom: Color(0xFF07101C),
+    border: Color(0x9953687E),
+    imageBorder: Color(0x80416689),
+    accent: Color(0xFF168BFF),
+    text: Color(0xFFF4F8FC),
+    shadow: Color(0x8C000000),
+    topHighlight: Color(0x3DFFFFFF),
+    compassGrid: Color(0x522B8DDA),
+  );
+
+  static _FishSelectorPalette of(BuildContext context) {
+    return Theme.of(context).brightness == Brightness.dark ? dark : light;
+  }
+}
+
+class _FishCompassGridPainter extends CustomPainter {
+  final Color color;
+
+  const _FishCompassGridPainter(this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.7;
+    final radius = math.min(size.width, size.height) * 0.33;
+    canvas
+      ..drawCircle(center, radius, paint)
+      ..drawCircle(center, radius * 0.56, paint)
+      ..drawLine(
+          Offset(center.dx, 4), Offset(center.dx, size.height - 4), paint)
+      ..drawLine(
+          Offset(4, center.dy), Offset(size.width - 4, center.dy), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _FishCompassGridPainter oldDelegate) {
+    return oldDelegate.color != color;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════

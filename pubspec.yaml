@@ -82,6 +82,7 @@ flutter:
     - assets/Shopsimages/
     - assets/Shopsimages/mini tiles marqueurs/
     - assets/fish_images/
+    - assets/fish_selector_thumbnails/
     - assets/animations/
     - assets/flags/
     - assets/launcher_icon.png
