@@ -530,6 +530,19 @@
     "invalidArchive": "هذه الخريطة دون اتصال غير صالحة.",
     "limitReached": "لتنزيل خريطة أخرى، احذف الخريطة الحالية أولا."
   },
+  "locationAccess": {
+    "title": "استخدام موقعك",
+    "rationale": "يستخدم BoosterFish موقعك فقط عندما تطلب ذلك لتوسيط الخريطة أو حساب المسافة أو حفظ مكان خاص. لا يتم تتبعك في الخلفية.",
+    "continue": "متابعة",
+    "denied": "تم رفض الإذن. يمكنك متابعة استخدام BoosterFish دون موقعك.",
+    "unavailable": "خدمة الموقع غير متاحة مؤقتا. أعد المحاولة بعد قليل.",
+    "deniedForeverTitle": "إذن الموقع معطّل",
+    "deniedForeverMessage": "اسمح بالوصول إلى الموقع من إعدادات Android لاستخدام هذه الميزة. لا يتتبع BoosterFish موقعك في الخلفية مطلقا.",
+    "openAppSettings": "فتح الإعدادات",
+    "serviceDisabledTitle": "نظام تحديد الموقع معطّل",
+    "serviceDisabledMessage": "فعّل خدمة الموقع في الجهاز لاستخدام هذه الميزة.",
+    "openLocationSettings": "تفعيل الموقع"
+  },
   "common": {
     "ok": "موافق",
     "close": "إغلاق",

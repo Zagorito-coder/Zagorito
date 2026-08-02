@@ -35,6 +35,7 @@ import 'package:spots_app/widgets/finite_map_controller.dart';
 import 'package:spots_app/widgets/finite_marker_layer.dart';
 import 'package:spots_app/widgets/offline_map_manager_sheet.dart';
 import 'package:spots_app/widgets/personal_spots_map_layer.dart';
+import 'package:spots_app/widgets/location_access_feedback.dart';
 import 'package:spots_app/widgets/user_spot_form_sheet.dart';
 import 'package:spots_app/l10n/app_localizations.dart';
 import 'package:spots_app/splash_bootstrap.dart';
@@ -958,7 +959,7 @@ class _MapScreenState extends State<MapScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _updateVisibleSpots();
-      unawaited(_initLocation());
+      unawaited(_initLocation(requestAccess: false));
     });
     // Compass & position stream démarrés uniquement à la demande.
   }
@@ -1050,7 +1051,7 @@ class _MapScreenState extends State<MapScreen>
 
   Future<void> _ensureCompassCourseTracking() async {
     if (_positionSubscription != null) return;
-    await _initLocation();
+    await _initLocation(requestAccess: true);
     if (!mounted || !_isCompassEnabled || _positionSubscription != null) return;
     _initPositionStream(startedForCompass: true);
   }
@@ -1192,16 +1193,17 @@ class _MapScreenState extends State<MapScreen>
     }
   }
 
-  Future<void> _initLocation() async {
+  Future<void> _initLocation({required bool requestAccess}) async {
     try {
-      if (!await Geolocator.isLocationServiceEnabled()) return;
-      var p = await Geolocator.checkPermission();
-      if (p == LocationPermission.denied) {
-        p = await Geolocator.requestPermission();
-      }
-      if (p == LocationPermission.denied ||
-          p == LocationPermission.deniedForever) {
-        return;
+      if (requestAccess) {
+        if (!await ensureLocationAccess(context)) return;
+      } else {
+        if (!await Geolocator.isLocationServiceEnabled()) return;
+        final permission = await Geolocator.checkPermission();
+        if (permission != LocationPermission.whileInUse &&
+            permission != LocationPermission.always) {
+          return;
+        }
       }
       final pos = await Geolocator.getCurrentPosition();
       if (mounted) setState(() => _currentPosition = pos);
@@ -2289,7 +2291,7 @@ class _MapScreenState extends State<MapScreen>
     return GestureDetector(
         onTap: () async {
           if (_currentPosition == null) {
-            await _initLocation();
+            await _initLocation(requestAccess: true);
             if (_currentPosition != null && _positionSubscription == null) {
               _initPositionStream();
             }

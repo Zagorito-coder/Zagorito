@@ -530,6 +530,19 @@
     "invalidArchive": "Cette carte hors ligne n'est pas valide.",
     "limitReached": "Pour télécharger une autre carte, supprimez d'abord la carte en cours."
   },
+  "locationAccess": {
+    "title": "Utiliser votre position",
+    "rationale": "BoosterFish utilise votre position uniquement lorsque vous le demandez pour centrer une carte, calculer une distance ou enregistrer un lieu privé. Aucun suivi en arrière-plan.",
+    "continue": "Continuer",
+    "denied": "Autorisation refusée. BoosterFish reste utilisable sans votre position.",
+    "unavailable": "La localisation est momentanément indisponible. Réessayez dans un instant.",
+    "deniedForeverTitle": "Autorisation désactivée",
+    "deniedForeverMessage": "Autorisez la localisation dans les paramètres Android pour utiliser cette fonction. BoosterFish ne suit jamais votre position en arrière-plan.",
+    "openAppSettings": "Ouvrir les paramètres",
+    "serviceDisabledTitle": "GPS désactivé",
+    "serviceDisabledMessage": "Activez la localisation de l’appareil pour utiliser cette fonction.",
+    "openLocationSettings": "Activer le GPS"
+  },
   "common": {
     "ok": "OK",
     "close": "Fermer",

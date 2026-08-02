@@ -93,11 +93,9 @@ class _ForecastPageState extends State<ForecastPage> {
 
   /// Trouve le spot le plus proche de la position GPS actuelle
   Future<String> _findNearestSpot() async {
-    // Verifier les permissions
-    LocationPermission perm = await Geolocator.checkPermission();
-    if (perm == LocationPermission.denied) {
-      perm = await Geolocator.requestPermission();
-    }
+    // Cette détection est facultative : elle ne demande jamais une permission
+    // au démarrage. Sans accès déjà accordé, le premier spot reste disponible.
+    final LocationPermission perm = await Geolocator.checkPermission();
     if (perm == LocationPermission.denied ||
         perm == LocationPermission.deniedForever) {
       // GPS refuse → fallback sur le premier spot de la liste

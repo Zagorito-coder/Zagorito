@@ -13,6 +13,7 @@ import 'package:spots_app/l10n/app_localizations.dart';
 import 'package:spots_app/widgets/app_tile_layer.dart';
 import 'package:spots_app/widgets/boosterfish_page.dart';
 import 'package:spots_app/widgets/finite_marker_layer.dart';
+import 'package:spots_app/widgets/location_access_feedback.dart';
 
 const _likedHeartColor = Color(0xFF1877F2);
 
@@ -309,15 +310,7 @@ class _CommunityMapViewState extends State<CommunityMapView> {
   Future<void> _centerOnUser() async {
     setState(() => _locating = true);
     try {
-      if (!await Geolocator.isLocationServiceEnabled()) return;
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        return;
-      }
+      if (!await ensureLocationAccess(context)) return;
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.medium,

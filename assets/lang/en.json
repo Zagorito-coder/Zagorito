@@ -530,6 +530,19 @@
     "invalidArchive": "This offline map is invalid.",
     "limitReached": "To download another map, delete the current map first."
   },
+  "locationAccess": {
+    "title": "Use your location",
+    "rationale": "BoosterFish uses your location only when you request it to center a map, calculate a distance, or save a private place. No background tracking.",
+    "continue": "Continue",
+    "denied": "Permission denied. BoosterFish remains usable without your location.",
+    "unavailable": "Location is temporarily unavailable. Please try again shortly.",
+    "deniedForeverTitle": "Permission disabled",
+    "deniedForeverMessage": "Allow location in Android settings to use this feature. BoosterFish never tracks your location in the background.",
+    "openAppSettings": "Open settings",
+    "serviceDisabledTitle": "GPS disabled",
+    "serviceDisabledMessage": "Turn on device location to use this feature.",
+    "openLocationSettings": "Turn on GPS"
+  },
   "common": {
     "ok": "OK",
     "close": "Close",

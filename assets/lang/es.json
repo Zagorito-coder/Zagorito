@@ -530,6 +530,19 @@
     "invalidArchive": "Este mapa sin conexión no es válido.",
     "limitReached": "Para descargar otro mapa, elimina primero el mapa actual."
   },
+  "locationAccess": {
+    "title": "Usar tu ubicación",
+    "rationale": "BoosterFish usa tu ubicación solo cuando la solicitas para centrar un mapa, calcular una distancia o guardar un lugar privado. Sin seguimiento en segundo plano.",
+    "continue": "Continuar",
+    "denied": "Permiso rechazado. BoosterFish sigue disponible sin tu ubicación.",
+    "unavailable": "La ubicación no está disponible temporalmente. Inténtalo de nuevo en un momento.",
+    "deniedForeverTitle": "Permiso desactivado",
+    "deniedForeverMessage": "Permite la ubicación en los ajustes de Android para usar esta función. BoosterFish nunca rastrea tu ubicación en segundo plano.",
+    "openAppSettings": "Abrir ajustes",
+    "serviceDisabledTitle": "GPS desactivado",
+    "serviceDisabledMessage": "Activa la ubicación del dispositivo para usar esta función.",
+    "openLocationSettings": "Activar GPS"
+  },
   "common": {
     "ok": "OK",
     "close": "Cerrar",
