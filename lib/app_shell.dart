@@ -56,6 +56,7 @@ class AppShellState extends State<AppShell> {
 
   late final List<Widget?> _pages;
   late final ValueNotifier<int> _addSpotRequests;
+  late final ValueNotifier<bool> _mapIsActive;
   late final ValueNotifier<SpotSelectionRequest?> _spotSelectionRequests;
   late final ValueNotifier<UserSpotSelectionRequest?>
       _userSpotSelectionRequests;
@@ -69,6 +70,7 @@ class AppShellState extends State<AppShell> {
   void initState() {
     super.initState();
     _addSpotRequests = ValueNotifier<int>(0);
+    _mapIsActive = ValueNotifier<bool>(_currentIndex == 3);
     _spotSelectionRequests = ValueNotifier<SpotSelectionRequest?>(null);
     _userSpotSelectionRequests = ValueNotifier<UserSpotSelectionRequest?>(null);
     _pages = List<Widget?>.filled(5, null);
@@ -96,6 +98,7 @@ class AppShellState extends State<AppShell> {
         ),
       3 => SpotFinderPage(
           initialSpots: widget.initialSpots,
+          isActive: _mapIsActive,
           addSpotRequests: _addSpotRequests,
           spotSelectionRequests: _spotSelectionRequests,
           userSpotSelectionRequests: _userSpotSelectionRequests,
@@ -111,6 +114,7 @@ class AppShellState extends State<AppShell> {
   void navigateTo(int index) {
     if (index < 0 || index >= _pages.length) return;
     final openedMySpots = index == 2;
+    _mapIsActive.value = index == 3;
     setState(() {
       _pages[index] ??= _buildPage(index);
       _currentIndex = index;
@@ -187,6 +191,7 @@ class AppShellState extends State<AppShell> {
   @override
   void dispose() {
     _addSpotRequests.dispose();
+    _mapIsActive.dispose();
     _spotSelectionRequests.dispose();
     _userSpotSelectionRequests.dispose();
     super.dispose();

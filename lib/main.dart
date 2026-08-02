@@ -546,6 +546,7 @@ class _FishVerticalMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     if (fishes.isEmpty) return const SizedBox.shrink();
     return RepaintBoundary(
+      key: const ValueKey<String>('map-fish-selector'),
       child: SizedBox(
         width: _menuWidth,
         height: 6 * _rowExtent + 20,
@@ -708,6 +709,7 @@ class _FishRow extends StatelessWidget {
 
 class MapScreen extends StatefulWidget {
   final List<Spot>? initialSpots;
+  final ValueListenable<bool>? isActive;
   final ValueListenable<int>? addSpotRequests;
   final ValueListenable<SpotSelectionRequest?>? spotSelectionRequests;
   final ValueListenable<UserSpotSelectionRequest?>? userSpotSelectionRequests;
@@ -717,6 +719,7 @@ class MapScreen extends StatefulWidget {
   const MapScreen({
     super.key,
     this.initialSpots,
+    this.isActive,
     this.addSpotRequests,
     this.spotSelectionRequests,
     this.userSpotSelectionRequests,
@@ -798,6 +801,7 @@ class _MapScreenState extends State<MapScreen>
     super.initState();
     _cameraFlightController = AnimationController(vsync: this)
       ..addListener(_applyCameraFlightFrame);
+    widget.isActive?.addListener(_handleMapActivityChanged);
     _lastAddSpotRequest = widget.addSpotRequests?.value ?? 0;
     widget.addSpotRequests?.addListener(_handleAddSpotRequest);
     _lastSpotSelectionRequest =
@@ -820,6 +824,11 @@ class _MapScreenState extends State<MapScreen>
   @override
   void didUpdateWidget(covariant MapScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive != widget.isActive) {
+      oldWidget.isActive?.removeListener(_handleMapActivityChanged);
+      widget.isActive?.addListener(_handleMapActivityChanged);
+      _handleMapActivityChanged();
+    }
     if (oldWidget.addSpotRequests != widget.addSpotRequests) {
       oldWidget.addSpotRequests?.removeListener(_handleAddSpotRequest);
       _lastAddSpotRequest = widget.addSpotRequests?.value ?? 0;
@@ -848,6 +857,17 @@ class _MapScreenState extends State<MapScreen>
     if (request == _lastAddSpotRequest) return;
     _lastAddSpotRequest = request;
     _startAddingSpot();
+  }
+
+  void _handleMapActivityChanged() {
+    if (widget.isActive?.value ?? true) return;
+
+    final fishProvider = FishProvider.instance;
+    if (fishProvider.isFishModalVisible) {
+      fishProvider.closeFishModal();
+    }
+    if (!mounted || !_isFishBarVisible) return;
+    setState(() => _isFishBarVisible = false);
   }
 
   void _handleSpotSelectionRequest() {
@@ -977,6 +997,7 @@ class _MapScreenState extends State<MapScreen>
     _debounceTimer?.cancel();
     _compassSubscription?.cancel();
     _positionSubscription?.cancel();
+    widget.isActive?.removeListener(_handleMapActivityChanged);
     widget.addSpotRequests?.removeListener(_handleAddSpotRequest);
     widget.spotSelectionRequests?.removeListener(_handleSpotSelectionRequest);
     widget.userSpotSelectionRequests
@@ -1627,23 +1648,25 @@ class _MapScreenState extends State<MapScreen>
                     if (fp.isFishModalVisible) {
                       return const SizedBox.shrink();
                     }
+                    if (!_isFishBarVisible) {
+                      return const SizedBox.shrink();
+                    }
                     final df = fp.allFish;
                     if (df.isEmpty) return const SizedBox.shrink();
-                    return AnimatedSlide(
-                        offset: _isFishBarVisible
-                            ? Offset.zero
-                            : const Offset(0, 2),
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.easeOutCubic,
-                        child: AnimatedOpacity(
-                            opacity: _isFishBarVisible ? 1.0 : 0.0,
-                            duration: const Duration(milliseconds: 200),
-                            child: _FishVerticalMenu(
-                                fishes: df,
-                                selectedFish: fp.selectedFish,
-                                onFishSelected: (f) =>
-                                    fp.selectFish(f, _spots, _currentPosition),
-                                onFishDeselected: fp.deselectFish)));
+                    return _FishVerticalMenu(
+                        fishes: df,
+                        selectedFish: fp.selectedFish,
+                        onFishSelected: (f) {
+                          if (_isFishBarVisible) {
+                            setState(() => _isFishBarVisible = false);
+                          }
+                          unawaited(fp.selectFish(
+                            f,
+                            _spots,
+                            _currentPosition,
+                          ));
+                        },
+                        onFishDeselected: fp.deselectFish);
                   }))),
           Positioned(
               bottom: 16,
@@ -2102,6 +2125,7 @@ class _MapScreenState extends State<MapScreen>
 
   Widget _buildFishFilterButton() {
     return GestureDetector(
+        key: const ValueKey<String>('map-fish-filter-button'),
         onTap: () => setState(() {
               _isFishBarVisible = !_isFishBarVisible;
               _searchQuery = '';
