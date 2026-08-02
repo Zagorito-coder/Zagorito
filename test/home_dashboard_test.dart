@@ -317,11 +317,34 @@ void main() {
       expect(bounds.bottom, lessThanOrEqualTo(viewport.height));
     }
     expect(tester.takeException(), isNull);
-    await expectLater(
-      drawer,
-      matchesGoldenFile('goldens/home_drawer_compact.png'),
-    );
   });
+
+  testWidgets(
+    'golden du Drawer compact',
+    (tester) async {
+      await _setViewport(tester, const Size(360, 640));
+      await tester.pumpWidget(_testApp(tideData: _marineData()));
+      await tester.pumpAndSettle();
+      final imageContext = tester.element(find.byType(HomeDashboard));
+      await tester.runAsync(
+        () => precacheImage(
+          const AssetImage(
+            'assets/home_cards/drawer_fisherman_banner_v1.webp',
+          ),
+          imageContext,
+        ),
+      );
+
+      await tester.tap(find.byIcon(Icons.menu_rounded));
+      await tester.pumpAndSettle();
+
+      await expectLater(
+        find.byType(Drawer),
+        matchesGoldenFile('goldens/home_drawer_compact.png'),
+      );
+    },
+    tags: const ['host-golden'],
+  );
 
   testWidgets('le sélecteur de langue suit le thème sombre', (tester) async {
     await _setViewport(tester, const Size(360, 640));
