@@ -1304,7 +1304,7 @@ class _CatchDetailsSheetState extends State<_CatchDetailsSheet> {
     final reason = await showDialog<String>(
       context: context,
       builder: (context) => SimpleDialog(
-        title: Text(context.tr('community.reportReason')),
+        title: Text(context.tr('community.reportPost')),
         children: [
           for (final reason in const [
             'child_safety',

@@ -26,6 +26,10 @@ void main() {
     ).readAsStringSync();
 
     expect(source, contains("context.tr('community.reportPost')"));
+    expect(
+      source,
+      isNot(contains("title: Text(context.tr('community.reportReason'))")),
+    );
     expect(source, contains("context.tr('community.blockUser')"));
     expect(source, contains('repository.reportPost'));
     expect(source, contains('repository.blockUser'));
