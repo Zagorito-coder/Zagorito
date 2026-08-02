@@ -62,6 +62,22 @@ void main() {
     expect(spotFinder, contains('isActive: isActive'));
   });
 
+  test('la sélection d un spot officiel ferme le sélecteur poissons', () {
+    final source =
+        File('lib/main.dart').readAsStringSync().replaceAll('\r\n', '\n');
+    final selectSpotStart = source.indexOf('Future<void> _selectSpot');
+    final selectUserSpotStart = source.indexOf(
+      'Future<void> _selectUserSpot',
+      selectSpotStart,
+    );
+    expect(selectSpotStart, greaterThanOrEqualTo(0));
+    expect(selectUserSpotStart, greaterThan(selectSpotStart));
+    expect(
+      source.substring(selectSpotStart, selectUserSpotStart),
+      contains('_isFishBarVisible = false;'),
+    );
+  });
+
   testWidgets(
     'la fiche et un changement d onglet ferment réellement le sélecteur',
     (tester) async {

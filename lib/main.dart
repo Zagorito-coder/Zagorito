@@ -1163,6 +1163,7 @@ class _MapScreenState extends State<MapScreen>
       _selectedUserSpot = null;
       _pendingPersonalSpot = null;
       _searchQuery = '';
+      _isFishBarVisible = false;
       _showToolsPanel = false;
     });
     _searchController.clear();
