@@ -28,6 +28,7 @@ class SettingsPage extends StatelessWidget {
       animation: ThemeController.instance,
       builder: (context, _) {
         final tc = BoosterFishPagePalette.of(context);
+        final auth = context.watch<AuthService>();
 
         return BoosterFishPageShell(
           child: CustomScrollView(
@@ -82,14 +83,24 @@ class SettingsPage extends StatelessWidget {
                           ),
                         ),
                         const _AdvertisingPrivacyEntry(),
-                        if (context.watch<AuthService>().isLoggedIn)
+                        if (auth.isLoggedIn)
                           _SettingsRow(
                             icon: Icons.delete_forever,
                             iconColor: tc.error,
                             title: context.tr('settings.deleteAccount'),
                             subtitle:
                                 context.tr('settings.deleteAccountSubtitle'),
-                            onTap: () => _confirmDeleteAccount(context),
+                            trailing: auth.isLoading
+                                ? const SizedBox.square(
+                                    dimension: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : null,
+                            onTap: auth.isLoading
+                                ? null
+                                : () => _confirmDeleteAccount(context),
                           ),
                       ],
                     ),

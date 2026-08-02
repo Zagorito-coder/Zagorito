@@ -381,7 +381,11 @@ async function retryCommunityCleanupTasksPage(
   return tasks.size;
 }
 
-async function deleteCatchDocument(document, firestore = db) {
+async function deleteCatchDocument(
+  document,
+  firestore = db,
+  {deletePhoto = deleteR2Photo} = {},
+) {
   const data = document.data();
   const taskReference = await enqueuePhotoCleanup({
     catchId: document.id,
@@ -392,7 +396,7 @@ async function deleteCatchDocument(document, firestore = db) {
     await deleteReportsForPost(document.id, firestore);
     return;
   }
-  await processPhotoCleanupTask(taskReference, {firestore});
+  await processPhotoCleanupTask(taskReference, {firestore, deletePhoto});
 }
 
 async function promoteAfterRemoval(catchId, firestore = db) {
@@ -699,6 +703,85 @@ exports.onCommunityCatchDeleted = onDocumentDeleted(
   },
 );
 
+async function deleteCommunityAccountDataForUid(
+  uid,
+  {
+    firestore = db,
+    deletePhoto = deleteR2Photo,
+  } = {},
+) {
+  const owned = await firestore
+    .collection('community_catches')
+    .where('ownerUid', '==', uid)
+    .get();
+  for (const document of owned.docs) {
+    await promoteAfterRemoval(document.id, firestore);
+    await deleteCatchDocument(document, firestore, {deletePhoto});
+  }
+
+  const likes = await firestore
+    .collectionGroup('likes')
+    .where('likerUid', '==', uid)
+    .get();
+  for (const like of likes.docs) {
+    const postReference = like.ref.parent.parent;
+    if (postReference == null) {
+      await like.ref.delete();
+      continue;
+    }
+    await firestore.runTransaction(async (transaction) => {
+      const [post, currentLike] = await Promise.all([
+        transaction.get(postReference),
+        transaction.get(like.ref),
+      ]);
+      if (!currentLike.exists) return;
+      transaction.delete(like.ref);
+      if (post.exists) {
+        const count = Number.isInteger(post.data().likeCount)
+          ? post.data().likeCount
+          : 0;
+        transaction.update(postReference, {
+          likeCount: Math.max(0, count - 1),
+        });
+      }
+    });
+  }
+
+  const [reportedByUser, reportsAboutUser, ownedBlocks, blocksOfUser] =
+    await Promise.all([
+      firestore.collection('community_reports')
+        .where('reporterUid', '==', uid).get(),
+      firestore.collection('community_reports')
+        .where('postOwnerUid', '==', uid).get(),
+      firestore.collection('community_blocks').doc(uid)
+        .collection('users').get(),
+      firestore.collectionGroup('users').where('blockedUid', '==', uid).get(),
+    ]);
+  const affectedPostIds = new Set(
+    reportedByUser.docs
+      .map((document) => document.data().postId)
+      .filter((postId) => typeof postId === 'string'),
+  );
+  const unique = new Map();
+  for (const document of [
+    ...reportedByUser.docs,
+    ...reportsAboutUser.docs,
+    ...ownedBlocks.docs,
+    ...blocksOfUser.docs,
+  ]) {
+    unique.set(document.ref.path, document);
+  }
+  await deleteDocuments([...unique.values()], firestore);
+  for (const postId of affectedPostIds) {
+    await recalculateCommunityReportCount(postId, {firestore});
+  }
+  await Promise.all([
+    firestore.collection('community_profiles').doc(uid).delete(),
+    firestore.collection('community_public_profiles').doc(uid).delete(),
+    firestore.collection('community_publish_state').doc(uid).delete(),
+  ]);
+}
+
 exports.deleteCommunityAccountData = onCall(
   {
     region,
@@ -714,73 +797,7 @@ exports.deleteCommunityAccountData = onCall(
       throw new HttpsError('unauthenticated', 'Authentication required.');
     }
     try {
-      const owned = await db
-        .collection('community_catches')
-        .where('ownerUid', '==', uid)
-        .get();
-      for (const document of owned.docs) {
-        await promoteAfterRemoval(document.id);
-        await deleteCatchDocument(document);
-      }
-
-      const likes = await db
-        .collectionGroup('likes')
-        .where('likerUid', '==', uid)
-        .get();
-      for (const like of likes.docs) {
-        const postReference = like.ref.parent.parent;
-        if (postReference == null) {
-          await like.ref.delete();
-          continue;
-        }
-        await db.runTransaction(async (transaction) => {
-          const [post, currentLike] = await Promise.all([
-            transaction.get(postReference),
-            transaction.get(like.ref),
-          ]);
-          if (!currentLike.exists) return;
-          transaction.delete(like.ref);
-          if (post.exists) {
-            const count = Number.isInteger(post.data().likeCount)
-              ? post.data().likeCount
-              : 0;
-            transaction.update(postReference, {
-              likeCount: Math.max(0, count - 1),
-            });
-          }
-        });
-      }
-
-      const [reportedByUser, reportsAboutUser, ownedBlocks, blocksOfUser] =
-        await Promise.all([
-          db.collection('community_reports').where('reporterUid', '==', uid).get(),
-          db.collection('community_reports').where('postOwnerUid', '==', uid).get(),
-          db.collection('community_blocks').doc(uid).collection('users').get(),
-          db.collectionGroup('users').where('blockedUid', '==', uid).get(),
-        ]);
-      const affectedPostIds = new Set(
-        reportedByUser.docs
-          .map((document) => document.data().postId)
-          .filter((postId) => typeof postId === 'string'),
-      );
-      const unique = new Map();
-      for (const document of [
-        ...reportedByUser.docs,
-        ...reportsAboutUser.docs,
-        ...ownedBlocks.docs,
-        ...blocksOfUser.docs,
-      ]) {
-        unique.set(document.ref.path, document);
-      }
-      await deleteDocuments([...unique.values()]);
-      for (const postId of affectedPostIds) {
-        await recalculateCommunityReportCount(postId);
-      }
-      await Promise.all([
-        db.collection('community_profiles').doc(uid).delete(),
-        db.collection('community_public_profiles').doc(uid).delete(),
-        db.collection('community_publish_state').doc(uid).delete(),
-      ]);
+      await deleteCommunityAccountDataForUid(uid);
       return {deleted: true};
     } catch (error) {
       console.error('Community account cleanup failed', {
@@ -797,6 +814,7 @@ exports.deleteCommunityAccountData = onCall(
 
 exports.__test = {
   cleanupRetryDate,
+  deleteCommunityAccountDataForUid,
   deleteR2Photo,
   handleCommunityReportCreated,
   isValidR2ObjectKey,

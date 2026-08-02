@@ -7,6 +7,7 @@ const {initializeApp, deleteApp} = require('firebase-admin/app');
 const {getFirestore, Timestamp} = require('firebase-admin/firestore');
 const {initializeTestEnvironment} = require('@firebase/rules-unit-testing');
 const {
+  deleteCommunityAccountDataForUid,
   handleCommunityReportCreated,
   photoCleanupTaskId,
   processPhotoCleanupTask,
@@ -70,6 +71,119 @@ test.beforeEach(async () => {
 test.after(async () => {
   await environment.cleanup();
   await deleteApp(adminApp);
+});
+
+test('account deletion removes the owner data without touching other users',
+    async () => {
+  const uid = 'account-owner';
+  const otherUid = 'other-owner';
+  const ownedPost = firestore.collection('community_catches').doc('owned-post');
+  const survivorPost =
+    firestore.collection('community_catches').doc('survivor-post');
+  const deletedLike = survivorPost.collection('likes').doc(uid);
+  const survivorLike = survivorPost.collection('likes').doc(otherUid);
+  const ownedBlock = firestore.collection('community_blocks').doc(uid)
+    .collection('users').doc(otherUid);
+  const reverseBlock = firestore.collection('community_blocks').doc(otherUid)
+    .collection('users').doc(uid);
+  const survivorBlock = firestore.collection('community_blocks').doc(otherUid)
+    .collection('users').doc('third-user');
+
+  await Promise.all([
+    ownedPost.set(catchData({
+      ownerUid: uid,
+      photoObjectKey: 'owner_abcdefghijklmnopqrstuvwx',
+      likeCount: 1,
+    })),
+    ownedPost.collection('likes').doc(otherUid).set({likerUid: otherUid}),
+    survivorPost.set(catchData({
+      ownerUid: otherUid,
+      photoObjectKey: 'other_abcdefghijklmnopqrstuvwx',
+      likeCount: 2,
+      reportCount: 2,
+    })),
+    deletedLike.set({likerUid: uid}),
+    survivorLike.set({likerUid: otherUid}),
+    firestore.collection('community_reports').doc('reported-by-owner').set({
+      reporterUid: uid,
+      postId: survivorPost.id,
+      postOwnerUid: otherUid,
+    }),
+    firestore.collection('community_reports').doc('report-about-owner').set({
+      reporterUid: otherUid,
+      postId: ownedPost.id,
+      postOwnerUid: uid,
+    }),
+    firestore.collection('community_reports').doc('survivor-report').set({
+      reporterUid: otherUid,
+      postId: survivorPost.id,
+      postOwnerUid: otherUid,
+    }),
+    ownedBlock.set({blockedUid: otherUid}),
+    reverseBlock.set({blockedUid: uid}),
+    survivorBlock.set({blockedUid: 'third-user'}),
+    firestore.collection('community_profiles').doc(uid).set({accepted: true}),
+    firestore.collection('community_public_profiles').doc(uid)
+      .set({displayName: 'Anonymous'}),
+    firestore.collection('community_publish_state').doc(uid)
+      .set({lastPublishedAt: Timestamp.now()}),
+  ]);
+
+  const deletedPhotos = [];
+  await deleteCommunityAccountDataForUid(uid, {
+    firestore,
+    deletePhoto: async (objectKey) => deletedPhotos.push(objectKey),
+  });
+
+  const [
+    ownedPostAfter,
+    survivorPostAfter,
+    deletedLikeAfter,
+    survivorLikeAfter,
+    reportedByOwnerAfter,
+    reportAboutOwnerAfter,
+    survivorReportAfter,
+    ownedBlockAfter,
+    reverseBlockAfter,
+    survivorBlockAfter,
+    profileAfter,
+    publicProfileAfter,
+    publishStateAfter,
+    cleanupTasksAfter,
+  ] = await Promise.all([
+    ownedPost.get(),
+    survivorPost.get(),
+    deletedLike.get(),
+    survivorLike.get(),
+    firestore.collection('community_reports').doc('reported-by-owner').get(),
+    firestore.collection('community_reports').doc('report-about-owner').get(),
+    firestore.collection('community_reports').doc('survivor-report').get(),
+    ownedBlock.get(),
+    reverseBlock.get(),
+    survivorBlock.get(),
+    firestore.collection('community_profiles').doc(uid).get(),
+    firestore.collection('community_public_profiles').doc(uid).get(),
+    firestore.collection('community_publish_state').doc(uid).get(),
+    firestore.collection('community_cleanup_tasks').get(),
+  ]);
+
+  assert.equal(ownedPostAfter.exists, false);
+  assert.equal(survivorPostAfter.exists, true);
+  assert.equal(survivorPostAfter.data().likeCount, 1);
+  assert.equal(survivorPostAfter.data().reportCount, 1);
+  assert.equal(deletedLikeAfter.exists, false);
+  assert.equal(survivorLikeAfter.exists, true);
+  assert.equal(reportedByOwnerAfter.exists, false);
+  assert.equal(reportAboutOwnerAfter.exists, false);
+  assert.equal(survivorReportAfter.exists, true);
+  assert.equal(ownedBlockAfter.exists, false);
+  assert.equal(reverseBlockAfter.exists, false);
+  assert.equal(survivorBlockAfter.exists, true);
+  assert.equal(profileAfter.exists, false);
+  assert.equal(publicProfileAfter.exists, false);
+  assert.equal(publishStateAfter.exists, false);
+  assert.equal(cleanupTasksAfter.empty, true);
+  assert.deepEqual(deletedPhotos, ['owner_abcdefghijklmnopqrstuvwx']);
 });
 
 test('report creation is idempotent under duplicate event delivery',
