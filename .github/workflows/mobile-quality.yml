@@ -57,7 +57,11 @@ jobs:
         run: flutter analyze
 
       - name: Tests Flutter complets avec contrôle du catalogue
-        run: flutter test --dart-define-from-file=.env
+        # Les références visuelles du tableau de bord sont générées sur le Mac
+        # de release. Linux rasterise les polices et pixels différemment : la CI
+        # conserve tous les tests fonctionnels/widgets et laisse ce contrôle
+        # visuel dépendant de l'hôte à la suite locale de pré-release.
+        run: flutter test --dart-define-from-file=.env --exclude-tags=host-golden
 
       - name: Effacer la configuration de test
         if: always()

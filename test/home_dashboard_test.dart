@@ -390,22 +390,26 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('goldens de référence clair et sombre', (tester) async {
-    await _setViewport(tester, const Size(390, 844));
-    await tester.pumpWidget(_testApp(tideData: _marineData()));
-    await tester.pumpAndSettle();
-    await expectLater(
-      find.byType(HomeDashboard),
-      matchesGoldenFile('goldens/home_dashboard_light.png'),
-    );
+  testWidgets(
+    'goldens de référence clair et sombre',
+    (tester) async {
+      await _setViewport(tester, const Size(390, 844));
+      await tester.pumpWidget(_testApp(tideData: _marineData()));
+      await tester.pumpAndSettle();
+      await expectLater(
+        find.byType(HomeDashboard),
+        matchesGoldenFile('goldens/home_dashboard_light.png'),
+      );
 
-    ThemeController.instance.setDark(true);
-    await tester.pumpAndSettle();
-    await expectLater(
-      find.byType(HomeDashboard),
-      matchesGoldenFile('goldens/home_dashboard_dark.png'),
-    );
-  });
+      ThemeController.instance.setDark(true);
+      await tester.pumpAndSettle();
+      await expectLater(
+        find.byType(HomeDashboard),
+        matchesGoldenFile('goldens/home_dashboard_dark.png'),
+      );
+    },
+    tags: const ['host-golden'],
+  );
 }
 
 Future<void> _tapCard(
