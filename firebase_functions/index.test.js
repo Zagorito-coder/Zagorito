@@ -122,3 +122,21 @@ test('Firestore cleanup triggers explicitly enable delivery retries', () => {
     true,
   );
 });
+
+test('all community functions use the dedicated least-privilege identity',
+    () => {
+  const expected =
+    'boosterfish-community-runtime@zagorito-9a0c4.iam.gserviceaccount.com';
+  const functions = [
+    communityFunctions.selectWeeklyCommunityWinner,
+    communityFunctions.cleanupExpiredCommunityCatches,
+    communityFunctions.retryCommunityCleanupTasks,
+    communityFunctions.reconcileCommunityReportCounts,
+    communityFunctions.onCommunityReportCreated,
+    communityFunctions.onCommunityCatchDeleted,
+    communityFunctions.deleteCommunityAccountData,
+  ];
+  for (const fn of functions) {
+    assert.equal(fn.__endpoint.serviceAccountEmail, expected);
+  }
+});

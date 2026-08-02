@@ -20,6 +20,8 @@ initializeApp();
 
 const db = getFirestore();
 const region = 'europe-west1';
+const runtimeServiceAccount =
+  'boosterfish-community-runtime@zagorito-9a0c4.iam.gserviceaccount.com';
 const communityAdminKey = defineSecret('COMMUNITY_ADMIN_KEY');
 const workerBaseUrl =
   'https://boosterfish-offline-maps.boosterfish-maps.workers.dev/';
@@ -566,6 +568,7 @@ async function reconcileCommunityReportCountsPage(firestore = db) {
 exports.selectWeeklyCommunityWinner = onSchedule(
   {
     region,
+    serviceAccount: runtimeServiceAccount,
     schedule: '1 0 * * 1',
     timeZone: 'UTC',
     secrets: [communityAdminKey],
@@ -596,6 +599,7 @@ exports.selectWeeklyCommunityWinner = onSchedule(
 exports.cleanupExpiredCommunityCatches = onSchedule(
   {
     region,
+    serviceAccount: runtimeServiceAccount,
     schedule: '2-59/5 * * * *',
     timeZone: 'UTC',
     secrets: [communityAdminKey],
@@ -632,6 +636,7 @@ exports.cleanupExpiredCommunityCatches = onSchedule(
 exports.retryCommunityCleanupTasks = onSchedule(
   {
     region,
+    serviceAccount: runtimeServiceAccount,
     schedule: '3-59/5 * * * *',
     timeZone: 'UTC',
     secrets: [communityAdminKey],
@@ -652,6 +657,7 @@ exports.retryCommunityCleanupTasks = onSchedule(
 exports.reconcileCommunityReportCounts = onSchedule(
   {
     region,
+    serviceAccount: runtimeServiceAccount,
     schedule: '17 * * * *',
     timeZone: 'UTC',
     retryCount: 3,
@@ -665,6 +671,7 @@ exports.onCommunityReportCreated = onDocumentCreated(
   {
     document: 'community_reports/{reportId}',
     region,
+    serviceAccount: runtimeServiceAccount,
     retry: true,
   },
   async (event) => handleCommunityReportCreated(event),
@@ -674,6 +681,7 @@ exports.onCommunityCatchDeleted = onDocumentDeleted(
   {
     document: 'community_catches/{postId}',
     region,
+    serviceAccount: runtimeServiceAccount,
     secrets: [communityAdminKey],
     retry: true,
   },
@@ -697,6 +705,7 @@ exports.onCommunityCatchDeleted = onDocumentDeleted(
 exports.deleteCommunityAccountData = onCall(
   {
     region,
+    serviceAccount: runtimeServiceAccount,
     enforceAppCheck: true,
     secrets: [communityAdminKey],
     timeoutSeconds: 120,
