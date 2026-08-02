@@ -219,6 +219,19 @@ MAX_STATION_WORKERS = 6
 RETRYABLE_HTTP_STATUSES = {408, 425, 429, 500, 502, 503, 504}
 _HTTP_LOCAL = threading.local()
 
+# Les cinq stations de la page Marées utilisent déjà `conditions/{id}`.
+# On y recopie uniquement un résumé météo GFS très léger : le téléphone évite
+# ainsi de télécharger le document `spots_meteo` complet (15 jours, 3 modèles)
+# lorsqu'il affiche la fiche Intelligence ou la page Marées.
+CONDITIONS_SPOT_IDS = {
+    "casablanca_maroc": "casablanca",
+    "rabat_maroc": "rabat",
+    "agadir_maroc": "agadir",
+    "tanger_maroc": "tanger",
+    "essaouira_maroc": "essaouira",
+}
+CONDITIONS_GFS_DAYS = 2
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -689,6 +702,40 @@ def validate_payload(days_payload):
           f"sur {total} slots.")
 
 
+def build_conditions_gfs_summary(days_payload, max_days=CONDITIONS_GFS_DAYS):
+    """Construit le résumé GFS minimal consommé par les écrans légers.
+
+    Le tableau Marées Pro conserve son document complet. Ici, seules pression,
+    probabilité de pluie et humidité sont dupliquées pour deux jours maximum.
+    Les valeurs absentes restent ``None`` et seront affichées comme
+    indisponibles par l'application.
+    """
+    hourly = []
+    for day in days_payload[:max_days]:
+        for slot in day.get("slots", []):
+            wind = (slot.get("models") or {}).get("wind") or {}
+            values = {
+                "time": slot.get("hour"),
+                "precipitationProbabilityPct": wind.get("precip_prob_pct"),
+                "pressureHpa": wind.get("pressure_msl"),
+                "relativeHumidityPct": wind.get("rel_humidity_pct"),
+            }
+            if values["time"] and any(
+                values[key] is not None
+                for key in (
+                    "precipitationProbabilityPct",
+                    "pressureHpa",
+                    "relativeHumidityPct",
+                )
+            ):
+                hourly.append(values)
+
+    return {
+        "model": "GFS ~13km",
+        "hourly": hourly,
+    }
+
+
 # ---------------------------------------------------------------------------
 # 6. Pipeline principal (collection de test)
 # ---------------------------------------------------------------------------
@@ -895,6 +942,12 @@ def main():
                 "latitude": spot["lat"],
                 "longitude": spot["lon"],
             })
+            conditions_spot_id = CONDITIONS_SPOT_IDS.get(spot["id"])
+            if conditions_spot_id is not None:
+                db.collection("conditions").document(conditions_spot_id).set(
+                    {"gfs": build_conditions_gfs_summary(days_payload)},
+                    merge=True,
+                )
             print(f"  -> {len(days_payload)} jours envoyes sur Firestore.")
 
             success += 1
