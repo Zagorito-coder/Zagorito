@@ -7,8 +7,8 @@ abstract final class FishImageFraming {
   static const Map<String, double> _thumbnailScaleByFishId = {
     'daurade_royale': 1.00,
     'loup_bar': 1.08,
-    'thon_rouge': 1.75,
-    'rouget': 1.02,
+    'sar_commun': 1.72,
+    'congre': 1.70,
     'pageot': 1.70,
     'maquereau': 1.00,
     'mulet': 1.72,

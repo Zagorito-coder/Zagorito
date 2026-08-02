@@ -16,13 +16,34 @@ void main() {
       containsAll(<String>{
         'daurade_royale',
         'loup_bar',
-        'thon_rouge',
-        'rouget',
+        'sar_commun',
+        'congre',
         'pageot',
         'maquereau',
         'mulet',
         'sole',
       }),
+    );
+
+    expect(
+      fish.map((entry) => entry['id']).toSet(),
+      isNot(contains(anyOf('thon_rouge', 'rouget'))),
+    );
+
+    final fishById = <String, Map<String, dynamic>>{
+      for (final entry in fish) entry['id'] as String: entry,
+    };
+    expect(fishById['sar_commun']?['name'], 'Sar commun');
+    expect(fishById['sar_commun']?['scientificName'], 'Diplodus sargus');
+    expect(
+      fishById['sar_commun']?['imageUrl'],
+      'assets/fish_images/sar commun.png',
+    );
+    expect(fishById['congre']?['name'], 'Congre');
+    expect(fishById['congre']?['scientificName'], 'Conger conger');
+    expect(
+      fishById['congre']?['imageUrl'],
+      'assets/fish_images/congre.png',
     );
 
     for (final entry in fish) {

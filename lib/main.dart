@@ -539,32 +539,38 @@ class _FishVerticalMenu extends StatelessWidget {
       required this.selectedFish,
       required this.onFishSelected,
       required this.onFishDeselected});
-  static const double _cs = 53, _rs = 72;
+  static const double _menuWidth = 188;
+  static const double _rowExtent = 66;
+
   @override
   Widget build(BuildContext context) {
     if (fishes.isEmpty) return const SizedBox.shrink();
-    return SizedBox(
-        width: _cs + 120,
-        height: 6 * _rs + 20,
+    return RepaintBoundary(
+      child: SizedBox(
+        width: _menuWidth,
+        height: 6 * _rowExtent + 20,
         child: ListView.builder(
-            reverse: true,
-            padding: EdgeInsets.zero,
-            itemCount: fishes.length,
-            itemBuilder: (ctx, i) {
-              final f = fishes[i];
-              final sel = selectedFish?.id == f.id;
-              return _FishRow(
-                  fish: f,
-                  isSelected: sel,
-                  onTap: () {
-                    if (sel) {
-                      onFishDeselected();
-                    } else {
-                      onFishSelected(f);
-                    }
-                  },
-                  circleSize: _cs);
-            }));
+          reverse: true,
+          padding: EdgeInsets.zero,
+          itemCount: fishes.length,
+          itemBuilder: (ctx, i) {
+            final f = fishes[i];
+            final sel = selectedFish?.id == f.id;
+            return _FishRow(
+              fish: f,
+              isSelected: sel,
+              onTap: () {
+                if (sel) {
+                  onFishDeselected();
+                } else {
+                  onFishSelected(f);
+                }
+              },
+            );
+          },
+        ),
+      ),
+    );
   }
 }
 
@@ -572,81 +578,117 @@ class _FishRow extends StatelessWidget {
   final FishModel fish;
   final bool isSelected;
   final VoidCallback onTap;
-  final double circleSize;
   const _FishRow(
-      {required this.fish,
-      required this.isSelected,
-      required this.onTap,
-      required this.circleSize});
+      {required this.fish, required this.isSelected, required this.onTap});
+
+  static const double _collapsedWidth = 62;
+  static const double _selectedWidth = 184;
+  static const double _tileHeight = 58;
+
   @override
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
-    return GestureDetector(
+    const accent = Color(0xFF48CAE4);
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: fish.name,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeOut,
-                  width: circleSize,
-                  height: circleSize,
-                  decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isSelected
-                          ? const Color(0xFF48CAE4)
-                          : tc.surfaceLight,
-                      border: Border.all(
-                          color: isSelected
-                              ? const Color(0xFF48CAE4)
-                              : tc.glassBorder,
-                          width: 2),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                  color: const Color(0xFF48CAE4)
-                                      .withValues(alpha: 0.35),
-                                  blurRadius: 8,
-                                  spreadRadius: 1)
-                            ]
-                          : null),
-                  child: ClipOval(child: _buildImage(context))),
-              const SizedBox(width: 8),
-              Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                  decoration: BoxDecoration(
-                      color: tc.surface.withValues(alpha: 0.55),
-                      borderRadius: BorderRadius.circular(8)),
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(fish.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                                color: tc.textPrimary,
-                                fontSize: 12,
-                                fontWeight: isSelected
-                                    ? FontWeight.w700
-                                    : FontWeight.w500)),
-                        Text(fish.scientificName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                                color: tc.textMuted,
-                                fontSize: 9,
-                                fontStyle: FontStyle.italic)),
-                      ])),
-            ])));
+        child: SizedBox(
+          height: _FishVerticalMenu._rowExtent,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: AnimatedContainer(
+              key: ValueKey<String>('map-fish-tile-${fish.id}'),
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutCubic,
+              width: isSelected ? _selectedWidth : _collapsedWidth,
+              height: _tileHeight,
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    tc.surface.withValues(alpha: 0.97),
+                    tc.surfaceLight.withValues(alpha: 0.94),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isSelected ? accent : tc.glassBorder,
+                  width: isSelected ? 1.4 : 1,
+                ),
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: accent.withValues(alpha: 0.22),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: _collapsedWidth - 2,
+                    height: _tileHeight,
+                    child: Padding(
+                      padding: const EdgeInsets.all(3),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(13),
+                        child: _buildImage(context),
+                      ),
+                    ),
+                  ),
+                  if (isSelected) ...[
+                    Container(
+                      width: 3,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: accent,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        fish.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: tc.textPrimary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.1,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildImage(BuildContext context) {
     if (fish.imageUrl.startsWith('assets/')) {
+      final imageScale = FishImageFraming.thumbnailScale(fish.id);
+      final pixelRatio = MediaQuery.devicePixelRatioOf(context);
       return Transform.scale(
-          scale: FishImageFraming.thumbnailScale(fish.id),
+          scale: imageScale,
           child: Image.asset(fish.imageUrl,
-              fit: BoxFit.cover, errorBuilder: (_, __, ___) => _ph()));
+              fit: BoxFit.cover,
+              cacheWidth: (_tileHeight * imageScale * pixelRatio).ceil(),
+              filterQuality: FilterQuality.medium,
+              errorBuilder: (_, __, ___) => _ph()));
     }
     return CachedNetworkImage(
         imageUrl: fish.imageUrl,
