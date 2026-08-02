@@ -68,26 +68,56 @@ class FishIntelligenceModal extends StatelessWidget {
         children: [
           _Header(fish: fish, onClose: onClose),
           Flexible(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _IdentityBlock(fish: fish),
-                  const SizedBox(height: 11),
-                  _TechniqueBlock(fish: fish),
-                  const SizedBox(height: 11),
-                  _TideBlock(fish: fish, currentPosition: currentPosition),
-                  const SizedBox(height: 11),
-                  _SpotsBlock(
-                    fish: fish,
-                    nearbySpots: nearbySpots,
-                    isLoadingNearby: isLoadingNearby,
-                    distanceText: distanceText,
-                    onSpotSelected: onSpotSelected,
+            child: CustomScrollView(
+              key: const ValueKey<String>('fish-intelligence-scroll'),
+              physics: const ClampingScrollPhysics(),
+              slivers: [
+                SliverToBoxAdapter(
+                  child: RepaintBoundary(child: _IdentityBlock(fish: fish)),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 11)),
+                SliverToBoxAdapter(
+                  child: RepaintBoundary(child: _TechniqueBlock(fish: fish)),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 11)),
+                SliverToBoxAdapter(
+                  child: RepaintBoundary(
+                    child: _TideBlock(
+                      fish: fish,
+                      currentPosition: currentPosition,
+                    ),
                   ),
-                ],
-              ),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 11)),
+                SliverToBoxAdapter(
+                  child: _SpotsSectionHeader(
+                    isLoadingNearby: isLoadingNearby,
+                    isEmpty: nearbySpots.isEmpty,
+                  ),
+                ),
+                if (!isLoadingNearby && nearbySpots.isNotEmpty)
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final spot = nearbySpots[index];
+                          return _NearbySpotTile(
+                            key: ValueKey<String>(
+                              'fish-intelligence-spot-${spot.id}',
+                            ),
+                            spot: spot,
+                            distanceText: distanceText,
+                            onSpotSelected: onSpotSelected,
+                          );
+                        },
+                        childCount: nearbySpots.length,
+                        addAutomaticKeepAlives: false,
+                      ),
+                    ),
+                  ),
+                const SliverToBoxAdapter(child: SizedBox(height: 12)),
+              ],
             ),
           ),
         ],
@@ -761,19 +791,13 @@ class _ConditionMetric extends StatelessWidget {
   }
 }
 
-class _SpotsBlock extends StatelessWidget {
-  final FishModel fish;
-  final List<Spot> nearbySpots;
+class _SpotsSectionHeader extends StatelessWidget {
   final bool isLoadingNearby;
-  final String Function(Spot) distanceText;
-  final void Function(Spot) onSpotSelected;
+  final bool isEmpty;
 
-  const _SpotsBlock({
-    required this.fish,
-    required this.nearbySpots,
+  const _SpotsSectionHeader({
     required this.isLoadingNearby,
-    required this.distanceText,
-    required this.onSpotSelected,
+    required this.isEmpty,
   });
 
   @override
@@ -806,75 +830,89 @@ class _SpotsBlock extends StatelessWidget {
                 ),
               ],
             )
-          else if (nearbySpots.isEmpty)
+          else if (isEmpty)
             Text(
               l10n.translate('fishIntelligence.noNearbySpots'),
               style: TextStyle(color: palette.secondaryText, fontSize: 11),
-            )
-          else
-            Column(
-              children: nearbySpots.map((spot) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Material(
-                    color: palette.panel,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      side: BorderSide(color: palette.border),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: ListTile(
-                      dense: true,
-                      visualDensity: const VisualDensity(vertical: -2),
-                      leading: Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: spot.type.color,
-                        ),
-                      ),
-                      title: Text(
-                        spot.name,
-                        style: TextStyle(
-                          color: palette.primaryText,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      subtitle: Text(
-                        distanceText(spot),
-                        style: TextStyle(
-                          color: palette.mutedText,
-                          fontSize: 10,
-                        ),
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            l10n.translate('fishIntelligence.navigate'),
-                            style: TextStyle(
-                              color: palette.accent,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(width: 2),
-                          Icon(
-                            Icons.arrow_forward_ios,
-                            size: 12,
-                            color: palette.accent,
-                          ),
-                        ],
-                      ),
-                      onTap: () => onSpotSelected(spot),
-                    ),
-                  ),
-                );
-              }).toList(),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _NearbySpotTile extends StatelessWidget {
+  final Spot spot;
+  final String Function(Spot) distanceText;
+  final void Function(Spot) onSpotSelected;
+
+  const _NearbySpotTile({
+    super.key,
+    required this.spot,
+    required this.distanceText,
+    required this.onSpotSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final palette = _FishModalPalette.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Material(
+        color: palette.panel,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(color: palette.border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          dense: true,
+          visualDensity: const VisualDensity(vertical: -2),
+          leading: Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: spot.type.color,
+            ),
+          ),
+          title: Text(
+            spot.name,
+            style: TextStyle(
+              color: palette.primaryText,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          subtitle: Text(
+            distanceText(spot),
+            style: TextStyle(
+              color: palette.mutedText,
+              fontSize: 10,
+            ),
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                l10n.translate('fishIntelligence.navigate'),
+                style: TextStyle(
+                  color: palette.accent,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(width: 2),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 12,
+                color: palette.accent,
+              ),
+            ],
+          ),
+          onTap: () => onSpotSelected(spot),
+        ),
       ),
     );
   }

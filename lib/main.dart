@@ -1507,12 +1507,19 @@ class _MapScreenState extends State<MapScreen>
                 ),
               // 🌬️ Couche de particules de vent animees (30fps)
               // IgnorePointer pour ne pas bloquer les taps sur la carte
-              IgnorePointer(
-                child: Consumer<WindAnimationProvider>(
-                  builder: (ctx, wind, _) => WindParticleLayer(
-                    provider: wind,
-                    mapController: _mapController,
+              ListenableBuilder(
+                listenable: FishProvider.instance,
+                child: IgnorePointer(
+                  child: Consumer<WindAnimationProvider>(
+                    builder: (ctx, wind, _) => WindParticleLayer(
+                      provider: wind,
+                      mapController: _mapController,
+                    ),
                   ),
+                ),
+                builder: (context, child) => TickerMode(
+                  enabled: !FishProvider.instance.isFishModalVisible,
+                  child: child!,
                 ),
               ),
               if (_selectedSpot != null)
@@ -1575,6 +1582,9 @@ class _MapScreenState extends State<MapScreen>
               child: Align(
                   alignment: Alignment.centerLeft,
                   child: Consumer<FishProvider>(builder: (ctx, fp, _) {
+                    if (fp.isFishModalVisible) {
+                      return const SizedBox.shrink();
+                    }
                     final df = fp.allFish;
                     if (df.isEmpty) return const SizedBox.shrink();
                     return AnimatedSlide(
@@ -1732,19 +1742,20 @@ class _MapScreenState extends State<MapScreen>
                                               scale: 0.8 + 0.2 * v, child: c)),
                                       child: GestureDetector(
                                           onTap: () {},
-                                          child: FishIntelligenceModal(
-                                              fish: fp.selectedFish!,
-                                              nearbySpots: fp.nearbySpots,
-                                              isLoadingNearby:
-                                                  fp.isLoadingNearby,
-                                              distanceText: _distanceText,
-                                              onSpotSelected: (s) {
-                                                fp.closeFishModal();
-                                                _selectSpot(s);
-                                              },
-                                              onClose: fp.closeFishModal,
-                                              currentPosition:
-                                                  _currentPosition)))))));
+                                          child: RepaintBoundary(
+                                              child: FishIntelligenceModal(
+                                                  fish: fp.selectedFish!,
+                                                  nearbySpots: fp.nearbySpots,
+                                                  isLoadingNearby:
+                                                      fp.isLoadingNearby,
+                                                  distanceText: _distanceText,
+                                                  onSpotSelected: (s) {
+                                                    fp.closeFishModal();
+                                                    _selectSpot(s);
+                                                  },
+                                                  onClose: fp.closeFishModal,
+                                                  currentPosition:
+                                                      _currentPosition))))))));
                 });
               }),
         ]));
