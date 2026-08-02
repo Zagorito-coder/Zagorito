@@ -608,6 +608,8 @@ class SettingsPageWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const SettingsPage();
+    return SettingsPage(
+      onOpenMySpots: () => appShellKey.currentState?.navigateTo(2),
+    );
   }
 }

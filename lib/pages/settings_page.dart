@@ -15,7 +15,12 @@ import 'package:spots_app/theme_controller.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class SettingsPage extends StatelessWidget {
-  const SettingsPage({super.key});
+  const SettingsPage({
+    super.key,
+    this.onOpenMySpots,
+  });
+
+  final VoidCallback? onOpenMySpots;
 
   @override
   Widget build(BuildContext context) {
@@ -104,14 +109,14 @@ class SettingsPage extends StatelessWidget {
                           ),
                           onOpen: () => _showEditProfileDialog(context, tc),
                         ),
-                        _SettingsRow(
-                          icon: Icons.anchor,
-                          iconColor: tc.oceanLight,
-                          title: context.tr('settings.mySpots'),
-                          subtitle: context.tr('settings.mySpotsSubtitle'),
-                          onTap: () => _showComingSoon(
-                              context, context.tr('settings.mySpots')),
-                        ),
+                        if (onOpenMySpots != null)
+                          _SettingsRow(
+                            icon: Icons.anchor,
+                            iconColor: tc.oceanLight,
+                            title: context.tr('settings.mySpots'),
+                            subtitle: context.tr('settings.mySpotsSubtitle'),
+                            onTap: onOpenMySpots!,
+                          ),
                         const _BlockedUsersSettingsRow(),
                       ],
                     ),
@@ -450,16 +455,6 @@ class SettingsPage extends StatelessWidget {
                 style: const TextStyle(color: Colors.redAccent)),
           ),
         ],
-      ),
-    );
-  }
-
-  void _showComingSoon(BuildContext context, String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          context.trArgs('settings.comingSoon', args: {'feature': feature}),
-        ),
       ),
     );
   }
