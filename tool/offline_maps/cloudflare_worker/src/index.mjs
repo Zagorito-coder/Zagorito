@@ -85,10 +85,16 @@ function offlineObjectKey(request) {
   return allowedObjects.has(key) ? key : null;
 }
 
-function photoObjectKey(request) {
+function personalPhotoRoute(request) {
   const path = new URL(request.url).pathname;
-  const match = /^\/spot-photos\/([A-Za-z0-9_-]{20,96})$/.exec(path);
-  return match?.[1] ?? null;
+  // Keep the authenticated v1 mutation route until Play 1.0.2 is outside the
+  // supported install base. New clients use v2, where App Check is mandatory.
+  const match = /^\/spot-photos(-v2)?\/([A-Za-z0-9_-]{20,96})$/.exec(path);
+  if (match == null) return null;
+  return {
+    key: match[2],
+    requiresAppCheck: match[1] === '-v2',
+  };
 }
 
 function communityPhotoObjectKey(request) {
@@ -650,8 +656,9 @@ export function createWorker({
       }
     }
 
-    const photoKey = photoObjectKey(request);
-    if (photoKey != null) {
+    const photoRoute = personalPhotoRoute(request);
+    if (photoRoute != null) {
+      const photoKey = photoRoute.key;
       try {
         if (
           request.method !== 'GET'
@@ -676,9 +683,11 @@ export function createWorker({
             actor,
           );
         }
-        const appId = await authenticateAppRequest(request);
-        if (appId == null) {
-          return errorResponse(401, 'Invalid Firebase App Check token');
+        if (photoRoute.requiresAppCheck) {
+          const appId = await authenticateAppRequest(request);
+          if (appId == null) {
+            return errorResponse(401, 'Invalid Firebase App Check token');
+          }
         }
         return request.method === 'PUT'
           ? await handlePhotoPut(request, env.SPOT_PHOTOS, photoKey, actor.uid)

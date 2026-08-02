@@ -155,7 +155,7 @@ test('requires Firebase authentication for photo uploads', async () => {
   const {env} = photoEnvironment();
   const response = await photoWorker.fetch(
     new Request(
-      'https://maps.example/spot-photos/abcdefghijklmnopqrst-1234567890',
+      'https://maps.example/spot-photos-v2/abcdefghijklmnopqrst-1234567890',
       {
         method: 'PUT',
         headers: {'Content-Type': 'image/jpeg'},
@@ -174,7 +174,7 @@ test('requires App Check for personal photo mutations', async () => {
   });
   const {env, operations, photos} = photoEnvironment();
   const key = 'abcdefghijklmnopqrst-1234567890';
-  const url = `https://maps.example/spot-photos/${key}`;
+  const url = `https://maps.example/spot-photos-v2/${key}`;
 
   const upload = await photoWorker.fetch(
     new Request(url, {
@@ -198,6 +198,40 @@ test('requires App Check for personal photo mutations', async () => {
   assert.equal(deletion.status, 401);
   assert.equal(operations.deleteCalls, 0);
   assert.equal(photos.has(key), true);
+});
+
+test('keeps the authenticated legacy photo route compatible', async () => {
+  const photoWorker = createWorker({
+    authenticate: async () => 'owner-1',
+    authenticateAppCheck: async () => null,
+  });
+  const {env, photos} = photoEnvironment();
+  const key = 'abcdefghijklmnopqrst-1234567890';
+  const legacyUrl = `https://maps.example/spot-photos/${key}`;
+
+  const upload = await photoWorker.fetch(
+    new Request(legacyUrl, {
+      method: 'PUT',
+      headers: {'Content-Type': 'image/jpeg'},
+      body: jpegBytes,
+    }),
+    env,
+  );
+  assert.equal(upload.status, 201);
+  assert.equal(photos.has(key), true);
+
+  const secureRead = await photoWorker.fetch(
+    new Request(`https://maps.example/spot-photos-v2/${key}`),
+    env,
+  );
+  assert.equal(secureRead.status, 200);
+
+  const deletion = await photoWorker.fetch(
+    new Request(legacyUrl, {method: 'DELETE'}),
+    env,
+  );
+  assert.equal(deletion.status, 204);
+  assert.equal(photos.has(key), false);
 });
 
 test('indexes the Firebase public JWKS response by key id', () => {
@@ -245,7 +279,7 @@ test('stores one photo and serves it only to its owner', async () => {
   const photoWorker = authenticatedPhotoWorker();
   const {env, photos} = photoEnvironment();
   const url =
-    'https://maps.example/spot-photos/abcdefghijklmnopqrst-1234567890';
+    'https://maps.example/spot-photos-v2/abcdefghijklmnopqrst-1234567890';
   const upload = await photoWorker.fetch(
     new Request(url, {
       method: 'PUT',
@@ -280,7 +314,7 @@ test('rejects a photo larger than 2 MB', async () => {
   const {env} = photoEnvironment();
   const response = await photoWorker.fetch(
     new Request(
-      'https://maps.example/spot-photos/abcdefghijklmnopqrst-1234567890',
+      'https://maps.example/spot-photos-v2/abcdefghijklmnopqrst-1234567890',
       {
         method: 'PUT',
         headers: {'Content-Type': 'image/jpeg'},
@@ -297,7 +331,7 @@ test('rejects a photo whose bytes do not match its declared type', async () => {
   const {env} = photoEnvironment();
   const response = await photoWorker.fetch(
     new Request(
-      'https://maps.example/spot-photos/abcdefghijklmnopqrst-1234567890',
+      'https://maps.example/spot-photos-v2/abcdefghijklmnopqrst-1234567890',
       {
         method: 'PUT',
         headers: {'Content-Type': 'image/jpeg'},
@@ -326,7 +360,7 @@ test('stops reading an unbounded upload after the 2 MB limit', async () => {
   });
   const response = await photoWorker.fetch(
     new Request(
-      'https://maps.example/spot-photos/abcdefghijklmnopqrst-1234567890',
+      'https://maps.example/spot-photos-v2/abcdefghijklmnopqrst-1234567890',
       {
         method: 'PUT',
         headers: {'Content-Type': 'image/jpeg'},
@@ -350,7 +384,7 @@ test('reviewers can inspect but cannot mutate another owner photo', async () => 
   });
   const {env, operations, photos} = photoEnvironment();
   const key = 'abcdefghijklmnopqrst-1234567890';
-  const url = `https://maps.example/spot-photos/${key}`;
+  const url = `https://maps.example/spot-photos-v2/${key}`;
   photos.set(key, {
     ...storedObject(jpegBytes, 'image/jpeg'),
     customMetadata: {ownerUid: 'owner-1'},
@@ -385,7 +419,7 @@ test('personal photo deletion is idempotent and retries lost responses',
     removeBeforeDeleteFailure: true,
   });
   const key = 'abcdefghijklmnopqrst-1234567890';
-  const url = `https://maps.example/spot-photos/${key}`;
+  const url = `https://maps.example/spot-photos-v2/${key}`;
   photos.set(key, {
     ...storedObject(jpegBytes, 'image/jpeg'),
     customMetadata: {ownerUid: 'owner-1'},
@@ -414,7 +448,7 @@ test('persistent R2 deletion failures return a retryable error', async () => {
   const photoWorker = authenticatedPhotoWorker();
   const {env, operations, photos} = photoEnvironment({deleteFailures: 3});
   const key = 'abcdefghijklmnopqrst-1234567890';
-  const url = `https://maps.example/spot-photos/${key}`;
+  const url = `https://maps.example/spot-photos-v2/${key}`;
   photos.set(key, {
     ...storedObject(jpegBytes, 'image/jpeg'),
     customMetadata: {ownerUid: 'owner-1'},
@@ -563,6 +597,7 @@ test('rejects encoded path traversal without touching photo storage',
   const {env, operations, photos} = photoEnvironment();
   for (const path of [
     'spot-photos/%2e%2e%2fabcdefghijklmnopqrst',
+    'spot-photos-v2/%2e%2e%2fabcdefghijklmnopqrst',
     'community-photos/owner-1%2fabcdefghijklmnopqrstuvwx',
     'community-admin/photos/%2e%2e%2fabcdefghijklmnopqrst',
   ]) {
@@ -577,7 +612,8 @@ test('rejects encoded path traversal without touching photo storage',
   assert.equal(photos.size, 0);
 });
 
-test('community R2 lifecycle fallback is exactly 14 days', async () => {
+test('community R2 lifecycle keeps multipart cleanup and 14-day fallback',
+    async () => {
   const lifecycleUrl = new URL(
     '../community_photos_lifecycle.json',
     import.meta.url,
@@ -585,6 +621,14 @@ test('community R2 lifecycle fallback is exactly 14 days', async () => {
   const lifecycle = JSON.parse(await readFile(lifecycleUrl, 'utf8'));
   assert.deepEqual(lifecycle, {
     rules: [
+      {
+        id: 'abort-incomplete-multipart-uploads-after-7-days',
+        enabled: true,
+        conditions: {prefix: ''},
+        abortMultipartUploadsTransition: {
+          condition: {type: 'Age', maxAge: 7 * 24 * 60 * 60},
+        },
+      },
       {
         id: 'expire-community-photos-after-14-days',
         enabled: true,

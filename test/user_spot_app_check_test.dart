@@ -3,6 +3,18 @@ import 'package:spots_app/services/user_spot_service.dart';
 
 void main() {
   group('protection App Check des photos de spots personnels', () {
+    test('utilise la route v2 protégée sans modifier la clé R2', () {
+      final uri = buildUserSpotPhotoUri(
+        Uri.parse('https://maps.example/base'),
+        'spot-key-123',
+      );
+
+      expect(
+        uri,
+        Uri.parse('https://maps.example/spot-photos-v2/spot-key-123'),
+      );
+    });
+
     test('envoie Auth et App Check avec le type MIME', () async {
       final headers = await buildUserSpotPhotoAuthorizationHeaders(
         authTokenProvider: () async => ' auth-token ',

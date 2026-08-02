@@ -422,7 +422,7 @@ class UserSpotService {
     }
     final response = await _httpClient
         .put(
-          baseUri.resolve('spot-photos/$objectKey'),
+          buildUserSpotPhotoUri(baseUri, objectKey),
           headers: await _authorizationHeaders(
             contentType: normalizedContentType,
           ),
@@ -457,7 +457,7 @@ class UserSpotService {
       if (baseUri == null || baseUri.scheme != 'https') return false;
       final response = await _httpClient
           .delete(
-            baseUri.resolve('spot-photos/$objectKey'),
+            buildUserSpotPhotoUri(baseUri, objectKey),
             headers: await _authorizationHeaders(),
           )
           .timeout(const Duration(seconds: 15));
@@ -518,6 +518,11 @@ class UserSpotService {
       _ => UserSpotFailure.unavailable,
     };
   }
+}
+
+@visibleForTesting
+Uri buildUserSpotPhotoUri(Uri baseUri, String objectKey) {
+  return baseUri.resolve('spot-photos-v2/$objectKey');
 }
 
 @visibleForTesting

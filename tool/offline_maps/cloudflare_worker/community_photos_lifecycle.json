@@ -1,6 +1,19 @@
 {
   "rules": [
     {
+      "id": "abort-incomplete-multipart-uploads-after-7-days",
+      "enabled": true,
+      "conditions": {
+        "prefix": ""
+      },
+      "abortMultipartUploadsTransition": {
+        "condition": {
+          "type": "Age",
+          "maxAge": 604800
+        }
+      }
+    },
+    {
       "id": "expire-community-photos-after-14-days",
       "enabled": true,
       "conditions": {
