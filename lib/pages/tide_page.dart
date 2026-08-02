@@ -33,6 +33,40 @@ Color _txt(double opacity) => _isDark
     ? Colors.white.withValues(alpha: opacity)
     : Colors.black.withValues(alpha: opacity);
 
+String _localizedTrend(BuildContext context, String trend) => context.tr(
+      trend == 'montante' ? 'tide.rising' : 'tide.falling',
+    );
+
+String _localizedActivity(BuildContext context, String activity) {
+  switch (activity) {
+    case 'Excellente':
+      return context.tr('tide.activityExcellent');
+    case 'Bonne':
+      return context.tr('tide.activityGood');
+    case 'Moyenne':
+      return context.tr('tide.activityMedium');
+    case 'Faible':
+      return context.tr('tide.activityLowShort');
+    default:
+      return activity;
+  }
+}
+
+String _localizedMoonPhase(BuildContext context, String phase) {
+  const phaseKeys = <String, String>{
+    'Nouvelle Lune': 'tide.moonNew',
+    'Croissante': 'tide.moonWaxingCrescent',
+    'Premier Quartier': 'tide.moonFirstQuarter',
+    'Gibbeuse Croissante': 'tide.moonWaxingGibbous',
+    'Pleine Lune': 'tide.moonFull',
+    'Gibbeuse Décroissante': 'tide.moonWaningGibbous',
+    'Dernier Quartier': 'tide.moonLastQuarter',
+    'Décroissante': 'tide.moonWaningCrescent',
+  };
+  final key = phaseKeys[phase];
+  return key == null ? phase : context.tr(key);
+}
+
 // ── Conversion TideService → modèle TidePage ─────────────────
 tm.TideData _fromTideService(
   tide_data.TideData src, {
@@ -537,10 +571,10 @@ class _TidePageState extends State<TidePage>
                   alignment: Alignment.topLeft,
                   child: AppBackButton(),
                 ),
-              const Center(
+              Center(
                 child: CircularProgressIndicator(
                   color: _accent,
-                  semanticsLabel: 'Chargement des prévisions marines',
+                  semanticsLabel: context.tr('tide.loadingForecasts'),
                 ),
               ),
             ],
@@ -560,7 +594,7 @@ class _TidePageState extends State<TidePage>
               Icon(Icons.cloud_off_outlined, color: _txt(0.55), size: 48),
               const SizedBox(height: 16),
               Text(
-                'Données marines indisponibles',
+                context.tr('tide.marineDataUnavailable'),
                 style: TextStyle(
                     color: _txt(0.85),
                     fontSize: 17,
@@ -569,7 +603,7 @@ class _TidePageState extends State<TidePage>
               ),
               const SizedBox(height: 8),
               Text(
-                'Réessayez lorsque la connexion aux conditions publiées sera rétablie.',
+                context.tr('tide.marineDataUnavailableMessage'),
                 style: TextStyle(color: _txt(0.55), fontSize: 13),
                 textAlign: TextAlign.center,
               ),
@@ -582,7 +616,7 @@ class _TidePageState extends State<TidePage>
                   });
                   unawaited(_loadTideData());
                 },
-                child: const Text('Réessayer'),
+                child: Text(context.tr('tide.retry')),
               ),
               const Spacer(),
             ],
@@ -751,7 +785,7 @@ class _TidePageState extends State<TidePage>
                           ),
                         ),
                         Text(
-                          'MARÉES',
+                          context.tr('tide.title').toUpperCase(),
                           style: TextStyle(
                             color: _txt(1),
                             fontSize: 21,
@@ -798,7 +832,12 @@ class _TidePageState extends State<TidePage>
                   if (_data.generatedAt != null) ...[
                     const SizedBox(width: 9),
                     Text(
-                      '• mise à jour ${_formatUpdateTime(_data.generatedAt!)}',
+                      context.trArgs(
+                        'tide.updatedAt',
+                        args: {
+                          'time': _formatUpdateTime(_data.generatedAt!),
+                        },
+                      ),
                       style: TextStyle(
                         color: _txt(0.52),
                         fontSize: 8.5,
@@ -846,7 +885,15 @@ class _TidePageState extends State<TidePage>
                         children: [
                           Flexible(
                             child: Text(
-                              'ACTIVITÉ ${_data.overallLabel.toUpperCase()}',
+                              context.trArgs(
+                                'tide.activityTitle',
+                                args: {
+                                  'level': _localizedActivity(
+                                    context,
+                                    _data.overallLabel,
+                                  ),
+                                },
+                              ).toUpperCase(),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -864,7 +911,7 @@ class _TidePageState extends State<TidePage>
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        'Indice pêche indicatif basé sur la marée et les paramètres solunaires.',
+                        context.tr('tide.scoreHint'),
                         style: TextStyle(
                           color: _txt(0.64),
                           fontSize: 8,
@@ -947,8 +994,14 @@ class _TidePageState extends State<TidePage>
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: Semantics(
             container: true,
-            label:
-                'Marée ${selected.tideTrend}, ${selected.tideHeight.toStringAsFixed(2)} mètres à ${selected.label}',
+            label: context.trArgs(
+              'tide.currentTideSemantics',
+              args: {
+                'trend': _localizedTrend(context, selected.tideTrend),
+                'height': selected.tideHeight.toStringAsFixed(2),
+                'time': selected.label,
+              },
+            ),
             child: _glassPanel(
               borderColor: _accent.withValues(alpha: 0.72),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -963,8 +1016,11 @@ class _TidePageState extends State<TidePage>
                           valueListenable: _clockNotifier,
                           builder: (context, now, _) => Text(
                             selected.hour == now.hour
-                                ? 'MARÉE ACTUELLE'
-                                : 'MARÉE À ${selected.label}',
+                                ? context.tr('tide.currentTide').toUpperCase()
+                                : context.trArgs(
+                                    'tide.tideAt',
+                                    args: {'time': selected.label},
+                                  ).toUpperCase(),
                             style: TextStyle(
                               color: _accent,
                               fontSize: 8,
@@ -986,7 +1042,15 @@ class _TidePageState extends State<TidePage>
                           ),
                         ),
                         Text(
-                          'Marée ${selected.tideTrend}',
+                          context.trArgs(
+                            'tide.tideStatus',
+                            args: {
+                              'trend': _localizedTrend(
+                                context,
+                                selected.tideTrend,
+                              ),
+                            },
+                          ),
                           style: TextStyle(
                             color: _accent,
                             fontSize: 9,
@@ -1021,7 +1085,7 @@ class _TidePageState extends State<TidePage>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'PROCHAINS EXTRÊMES',
+                          context.tr('tide.nextExtremes').toUpperCase(),
                           style: TextStyle(
                             color: _txt(0.52),
                             fontSize: 8.5,
@@ -1070,8 +1134,8 @@ class _TidePageState extends State<TidePage>
         Expanded(
           child: Text(
             event == null
-                ? (isHigh ? 'Haute mer —' : 'Basse mer —')
-                : '${isHigh ? 'Haute' : 'Basse'} ${_formatDecimalTime(event.time)} · ${event.height.toStringAsFixed(2)} m',
+                ? '${context.tr(isHigh ? 'tide.highTideLabel' : 'tide.lowTideLabel')} —'
+                : '${context.tr(isHigh ? 'tide.highTideLabel' : 'tide.lowTideLabel')} ${_formatDecimalTime(event.time)} · ${event.height.toStringAsFixed(2)} m',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
@@ -1131,6 +1195,8 @@ class _TidePageState extends State<TidePage>
                           events: _data.tideEvents,
                           currentHour: now.hour + now.minute / 60,
                           nowLabel: context.tr('tide.nowShort'),
+                          highTideShort: context.tr('tide.highTide'),
+                          lowTideShort: context.tr('tide.lowTide'),
                           isDark: _isDark,
                         ),
                       ),
@@ -1209,7 +1275,7 @@ class _TidePageState extends State<TidePage>
                         color: _accent,
                         borderRadius: BorderRadius.circular(2))),
                 const SizedBox(width: 8),
-                Text('ACTIVITÉ PAR HEURE',
+                Text(context.tr('tide.hourlyActivity').toUpperCase(),
                     style: TextStyle(
                         color: _txt(0.9),
                         fontSize: 11,
@@ -1275,7 +1341,7 @@ class _TidePageState extends State<TidePage>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'CONDITIONS ACTUELLES',
+              context.tr('tide.currentConditions').toUpperCase(),
               style: TextStyle(
                 color: _txt(0.64),
                 fontSize: 8.5,
@@ -1297,8 +1363,11 @@ class _TidePageState extends State<TidePage>
                             : const Color(0xFF284668),
                         size: 20,
                       ),
-                      label: 'LUNE',
-                      value: _data.moonInfo.phaseName,
+                      label: context.tr('tide.moon').toUpperCase(),
+                      value: _localizedMoonPhase(
+                        context,
+                        _data.moonInfo.phaseName,
+                      ),
                     ),
                   ),
                   _conditionDivider(),
@@ -1309,10 +1378,10 @@ class _TidePageState extends State<TidePage>
                         color: _accent,
                         size: 20,
                       ),
-                      label: 'VENT',
+                      label: context.tr('tide.wind').toUpperCase(),
                       value: selected.windSpeed > 0
                           ? '${selected.windSpeed} km/h\n${selected.windDirection}'
-                          : 'Indisponible',
+                          : context.tr('tide.unavailable'),
                     ),
                   ),
                   _conditionDivider(),
@@ -1323,10 +1392,10 @@ class _TidePageState extends State<TidePage>
                         color: _accent,
                         size: 20,
                       ),
-                      label: 'VAGUES',
+                      label: context.tr('tide.waves').toUpperCase(),
                       value: selected.waveHeight > 0
                           ? '${selected.waveHeight.toStringAsFixed(1)} m / ${selected.wavePeriod} s'
-                          : 'Indisponible',
+                          : context.tr('tide.unavailable'),
                     ),
                   ),
                   _conditionDivider(),
@@ -1337,7 +1406,7 @@ class _TidePageState extends State<TidePage>
                         color: _amber,
                         size: 20,
                       ),
-                      label: 'SOLEIL',
+                      label: context.tr('tide.sun').toUpperCase(),
                       value:
                           '${_data.sunTimes.sunrise}\n${_data.sunTimes.sunset}',
                     ),
@@ -1362,9 +1431,9 @@ class _TidePageState extends State<TidePage>
                         color: _accent,
                         size: 18,
                       ),
-                      label: 'PRESSION',
+                      label: context.tr('tide.pressure').toUpperCase(),
                       value: selected.pressureHpa == null
-                          ? 'Indisponible'
+                          ? context.tr('tide.unavailable')
                           : '${selected.pressureHpa!.round()} hPa',
                     ),
                   ),
@@ -1376,9 +1445,9 @@ class _TidePageState extends State<TidePage>
                         color: Color(0xFF77C7FF),
                         size: 18,
                       ),
-                      label: 'PLUIE',
+                      label: context.tr('tide.rain').toUpperCase(),
                       value: selected.precipitationProbabilityPct == null
-                          ? 'Indisponible'
+                          ? context.tr('tide.unavailable')
                           : '${selected.precipitationProbabilityPct!.round()} %',
                     ),
                   ),
@@ -1390,9 +1459,9 @@ class _TidePageState extends State<TidePage>
                         color: Color(0xFF6FE7D2),
                         size: 18,
                       ),
-                      label: 'HUMIDITÉ',
+                      label: context.tr('tide.humidity').toUpperCase(),
                       value: selected.relativeHumidityPct == null
-                          ? 'Indisponible'
+                          ? context.tr('tide.unavailable')
                           : '${selected.relativeHumidityPct!.round()} %',
                     ),
                   ),
@@ -1460,7 +1529,7 @@ class _TidePageState extends State<TidePage>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'PROCHAINS ÉVÉNEMENTS DE MARÉE',
+              context.tr('tide.upcomingTideEvents').toUpperCase(),
               style: TextStyle(
                 color: _txt(0.64),
                 fontSize: 8.5,
@@ -1512,7 +1581,9 @@ class _TidePageState extends State<TidePage>
               ),
               Expanded(
                 child: Text(
-                  isHigh ? 'HAUTE MER' : 'BASSE MER',
+                  context
+                      .tr(isHigh ? 'tide.highTideLabel' : 'tide.lowTideLabel')
+                      .toUpperCase(),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -1533,7 +1604,7 @@ class _TidePageState extends State<TidePage>
             ),
           ),
           Text(
-            '${event.height.toStringAsFixed(2)} m${tomorrow ? ' · J+1' : ''}',
+            '${event.height.toStringAsFixed(2)} m${tomorrow ? ' · ${context.tr('tide.tomorrowShort')}' : ''}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
@@ -1557,23 +1628,18 @@ class PositionedSafetyInfo extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: 'Informations importantes sur les prévisions',
+      label: context.tr('tide.forecastInfoSemantics'),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: () => showDialog<void>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            title: const Text('Prévisions marines'),
-            content: const Text(
-              'Ces prévisions sont indicatives et issues d’un modèle marin. '
-              'La précision est limitée près des côtes. Ne les utilisez pas '
-              'pour la navigation et vérifiez toujours les bulletins et '
-              'horaires officiels locaux.',
-            ),
+            title: Text(context.tr('tide.forecastDialogTitle')),
+            content: Text(context.tr('tide.forecastDisclaimer')),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text('Compris'),
+                child: Text(context.tr('tide.understood')),
               ),
             ],
           ),
@@ -1797,7 +1863,10 @@ class _HourlyCardWidget extends StatelessWidget {
     return Semantics(
       button: true,
       selected: isSelected,
-      label: '${card.hour} heures',
+      label: context.trArgs(
+        'tide.hourSemantics',
+        args: {'hour': card.hour.toString()},
+      ),
       child: GestureDetector(
         onTap: onTap,
         child: AnimatedScale(
@@ -1874,7 +1943,7 @@ class _HourlyCardWidget extends StatelessWidget {
                 Text(
                   card.waveHeight > 0
                       ? card.waveHeight.toStringAsFixed(1)
-                      : 'N/D',
+                      : context.tr('tide.unavailableShort'),
                   style: TextStyle(
                     color: isSelected ? selectedText : _txt(0.94),
                     fontSize: 11,
@@ -1882,7 +1951,9 @@ class _HourlyCardWidget extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  card.wavePeriod > 0 ? '${card.wavePeriod}s' : 'N/D',
+                  card.wavePeriod > 0
+                      ? '${card.wavePeriod}s'
+                      : context.tr('tide.unavailableShort'),
                   style: TextStyle(
                     color: isSelected
                         ? (_isDark
@@ -1908,12 +1979,16 @@ class _PillCurvePainter extends CustomPainter {
   final List<tm.TideEvent> events;
   final double currentHour;
   final String nowLabel;
+  final String highTideShort;
+  final String lowTideShort;
   final bool isDark;
   _PillCurvePainter(
       {required this.points,
       required this.events,
       required this.currentHour,
       required this.nowLabel,
+      required this.highTideShort,
+      required this.lowTideShort,
       required this.isDark});
 
   static const double _padL = 14.0,
@@ -2081,8 +2156,11 @@ class _PillCurvePainter extends CustomPainter {
     for (final e in events) {
       final isHigh = e.type == 'high';
       final ex = xFor(e.time);
-      drawPill(ex, '${e.height.toStringAsFixed(2)}m ${isHigh ? 'HM' : 'BM'}',
-          isHigh ? _accent : _red, isHigh ? '▲' : '▼');
+      drawPill(
+          ex,
+          '${e.height.toStringAsFixed(2)}m ${isHigh ? highTideShort : lowTideShort}',
+          isHigh ? _accent : _red,
+          isHigh ? '▲' : '▼');
       canvas.drawCircle(Offset(ex, yFor(e.height)), 5,
           Paint()..color = isHigh ? _accent : _red);
       canvas.drawCircle(Offset(ex, yFor(e.height)), 8,
@@ -2103,5 +2181,7 @@ class _PillCurvePainter extends CustomPainter {
       old.points != points ||
       old.events != events ||
       old.nowLabel != nowLabel ||
+      old.highTideShort != highTideShort ||
+      old.lowTideShort != lowTideShort ||
       old.isDark != isDark;
 }
