@@ -452,6 +452,7 @@ class _EnhancedSearchBarState extends State<EnhancedSearchBar> {
           ),
           suffixIcon: widget.controller.text.isNotEmpty
               ? IconButton(
+                  tooltip: context.tr('map.clearSearch'),
                   icon: Icon(
                     Icons.close,
                     color: tc.textSecondary,

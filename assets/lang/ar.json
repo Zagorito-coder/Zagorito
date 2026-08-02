@@ -6,9 +6,21 @@
   },
   "map": {
     "searchHint": "ابحث عن موقع صيد...",
+    "clearSearch": "مسح البحث",
     "tools": "أدوات الخريطة",
     "measureDistance": "قياس المسافة",
-    "stopMeasure": "إيقاف القياس"
+    "stopMeasure": "إيقاف القياس",
+    "zoomIn": "تكبير الخريطة",
+    "zoomOut": "تصغير الخريطة",
+    "myLocation": "توسيط الخريطة على موقعي",
+    "enableCompass": "تفعيل البوصلة",
+    "disableCompass": "إيقاف البوصلة",
+    "openTools": "فتح أدوات الخريطة",
+    "closeTools": "إغلاق أدوات الخريطة",
+    "showFish": "إظهار الأسماك",
+    "hideFish": "إخفاء الأسماك",
+    "enableWind": "إظهار الرياح",
+    "disableWind": "إخفاء الرياح"
   },
   "splash": {
     "initializingFirebase": "جارٍ تهيئة Firebase…",

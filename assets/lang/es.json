@@ -6,9 +6,21 @@
   },
   "map": {
     "searchHint": "Buscar un spot...",
+    "clearSearch": "Borrar búsqueda",
     "tools": "Herramientas del mapa",
     "measureDistance": "Medir distancia",
-    "stopMeasure": "Detener medición"
+    "stopMeasure": "Detener medición",
+    "zoomIn": "Acercar",
+    "zoomOut": "Alejar",
+    "myLocation": "Centrar en mi ubicación",
+    "enableCompass": "Activar brújula",
+    "disableCompass": "Desactivar brújula",
+    "openTools": "Abrir herramientas del mapa",
+    "closeTools": "Cerrar herramientas del mapa",
+    "showFish": "Mostrar peces",
+    "hideFish": "Ocultar peces",
+    "enableWind": "Mostrar viento",
+    "disableWind": "Ocultar viento"
   },
   "splash": {
     "initializingFirebase": "Inicializando Firebase…",

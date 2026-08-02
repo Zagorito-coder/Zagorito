@@ -327,6 +327,7 @@ class _SearchBar extends StatelessWidget {
                         suffixIcon: controller.text.isEmpty
                             ? null
                             : IconButton(
+                                tooltip: l10n.translate('map.clearSearch'),
                                 icon: Icon(Icons.close,
                                     color: tc.textMuted, size: 18),
                                 onPressed: onClear),
@@ -481,32 +482,39 @@ class _SearchBar extends StatelessWidget {
 
 class ZoomButton extends StatelessWidget {
   final String heroTag;
+  final String semanticLabel;
   final IconData icon;
   final VoidCallback onTap;
   const ZoomButton(
       {super.key,
       required this.heroTag,
+      required this.semanticLabel,
       required this.icon,
       required this.onTap});
   @override
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
-    return GestureDetector(
-        onTap: onTap,
-        child: Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-                color: tc.surface.withValues(alpha: 0.9),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: tc.glassBorder, width: 1.2),
-                boxShadow: [
-                  BoxShadow(
-                      color: tc.shadowColor,
-                      blurRadius: 12,
-                      offset: const Offset(0, 4))
-                ]),
-            child: Center(child: Icon(icon, color: tc.textPrimary, size: 24))));
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                  color: tc.surface.withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: tc.glassBorder, width: 1.2),
+                  boxShadow: [
+                    BoxShadow(
+                        color: tc.shadowColor,
+                        blurRadius: 12,
+                        offset: const Offset(0, 4))
+                  ]),
+              child:
+                  Center(child: Icon(icon, color: tc.textPrimary, size: 24)))),
+    );
   }
 }
 
@@ -1886,6 +1894,9 @@ class _MapScreenState extends State<MapScreen>
                   const SizedBox(height: 8),
                   ZoomButton(
                     heroTag: 'compass_toggle',
+                    semanticLabel: context.tr(_isCompassEnabled
+                        ? 'map.disableCompass'
+                        : 'map.enableCompass'),
                     icon: _isCompassEnabled ? Icons.explore : Icons.explore_off,
                     onTap: _toggleCompass,
                   ),
@@ -2269,66 +2280,81 @@ class _MapScreenState extends State<MapScreen>
   }
 
   Widget _buildFishFilterButton() {
-    return GestureDetector(
-        key: const ValueKey<String>('map-fish-filter-button'),
-        onTap: () => setState(() {
-              _isFishBarVisible = !_isFishBarVisible;
-              _searchQuery = '';
-            }),
-        child: SizedBox(
-            width: _mapBottomControlHeight,
-            height: _mapBottomControlHeight,
-            child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Image.asset('assets/images/fish_route_button.png',
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const Center(
-                        child: Text('🐟', style: TextStyle(fontSize: 48)))))));
+    return Semantics(
+      button: true,
+      toggled: _isFishBarVisible,
+      label: context.tr(
+        _isFishBarVisible ? 'map.hideFish' : 'map.showFish',
+      ),
+      child: GestureDetector(
+          key: const ValueKey<String>('map-fish-filter-button'),
+          onTap: () => setState(() {
+                _isFishBarVisible = !_isFishBarVisible;
+                _searchQuery = '';
+              }),
+          child: SizedBox(
+              width: _mapBottomControlHeight,
+              height: _mapBottomControlHeight,
+              child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.asset('assets/images/fish_route_button.png',
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Center(
+                          child:
+                              Text('🐟', style: TextStyle(fontSize: 48))))))),
+    );
   }
 
   Widget _buildMyLocationButton() {
     final tc = ThemeColors.of(context);
-    return GestureDetector(
-        onTap: () async {
-          if (_currentPosition == null) {
-            await _initLocation(requestAccess: true);
-            if (_currentPosition != null && _positionSubscription == null) {
-              _initPositionStream();
+    return Semantics(
+      button: true,
+      label: context.tr('map.myLocation'),
+      child: GestureDetector(
+          onTap: () async {
+            if (_currentPosition == null) {
+              await _initLocation(requestAccess: true);
+              if (_currentPosition != null && _positionSubscription == null) {
+                _initPositionStream();
+              }
+              return;
             }
-            return;
-          }
-          if (_positionSubscription == null) _initPositionStream();
-          final pos =
-              LatLng(_currentPosition!.latitude, _currentPosition!.longitude);
-          if (!pos.latitude.isFinite || !pos.longitude.isFinite) return;
-          final z = (_currentZoom + 2).clamp(3.0, _maxZoom);
-          if (!z.isFinite) return;
-          _cancelCameraFlight();
-          _mapController.move(pos, z);
-          if (mounted) setState(() {});
-        },
-        child: Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-                color: tc.surface.withValues(alpha: 0.9),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: tc.glassBorder, width: 1.2),
-                boxShadow: [
-                  BoxShadow(
-                      color: tc.shadowColor,
-                      blurRadius: 12,
-                      offset: const Offset(0, 4))
-                ]),
-            child: Center(
-                child:
-                    Icon(Icons.my_location, color: tc.oceanMedium, size: 24))));
+            if (_positionSubscription == null) _initPositionStream();
+            final pos =
+                LatLng(_currentPosition!.latitude, _currentPosition!.longitude);
+            if (!pos.latitude.isFinite || !pos.longitude.isFinite) return;
+            final z = (_currentZoom + 2).clamp(3.0, _maxZoom);
+            if (!z.isFinite) return;
+            _cancelCameraFlight();
+            _mapController.move(pos, z);
+            if (mounted) setState(() {});
+          },
+          child: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                  color: tc.surface.withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: tc.glassBorder, width: 1.2),
+                  boxShadow: [
+                    BoxShadow(
+                        color: tc.shadowColor,
+                        blurRadius: 12,
+                        offset: const Offset(0, 4))
+                  ]),
+              child: Center(
+                  child: Icon(Icons.my_location,
+                      color: tc.oceanMedium, size: 24)))),
+    );
   }
 
   Widget _buildToolsPanelToggleButton() {
     return ZoomButton(
         key: const ValueKey<String>('map-tools-toggle'),
         heroTag: 'tpt',
+        semanticLabel: context.tr(
+          _showToolsPanel ? 'map.closeTools' : 'map.openTools',
+        ),
         icon: _showToolsPanel ? Icons.close : Icons.layers,
         onTap: () {
           final shouldOpen = !_showToolsPanel;
@@ -2348,12 +2374,16 @@ class _MapScreenState extends State<MapScreen>
 
   Widget _buildZoomIn() {
     return ZoomButton(
-        heroTag: 'zi', icon: Icons.add, onTap: () => _zoomTo(_currentZoom + 1));
+        heroTag: 'zi',
+        semanticLabel: context.tr('map.zoomIn'),
+        icon: Icons.add,
+        onTap: () => _zoomTo(_currentZoom + 1));
   }
 
   Widget _buildZoomOut() {
     return ZoomButton(
         heroTag: 'zo',
+        semanticLabel: context.tr('map.zoomOut'),
         icon: Icons.remove,
         onTap: () => _zoomTo(_currentZoom - 1));
   }
@@ -2362,41 +2392,46 @@ class _MapScreenState extends State<MapScreen>
     final tc = ThemeColors.of(context);
     final wind = context.watch<WindAnimationProvider>();
     final isOn = wind.isEnabled;
-    return GestureDetector(
-      onTap: () {
-        // Utiliser la position GPS si dispo, sinon le centre de la carte
-        final lat =
-            _currentPosition?.latitude ?? _mapController.camera.center.latitude;
-        final lon = _currentPosition?.longitude ??
-            _mapController.camera.center.longitude;
-        wind.toggleNearest(lat, lon);
-        if (mounted) setState(() {});
-      },
-      child: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: isOn
-              ? tc.oceanMedium.withValues(alpha: 0.9)
-              : tc.surface.withValues(alpha: 0.9),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isOn ? tc.oceanMedium : tc.glassBorder,
-            width: 1.2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: tc.shadowColor,
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+    return Semantics(
+      button: true,
+      toggled: isOn,
+      label: context.tr(isOn ? 'map.disableWind' : 'map.enableWind'),
+      child: GestureDetector(
+        onTap: () {
+          // Utiliser la position GPS si dispo, sinon le centre de la carte
+          final lat = _currentPosition?.latitude ??
+              _mapController.camera.center.latitude;
+          final lon = _currentPosition?.longitude ??
+              _mapController.camera.center.longitude;
+          wind.toggleNearest(lat, lon);
+          if (mounted) setState(() {});
+        },
+        child: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: isOn
+                ? tc.oceanMedium.withValues(alpha: 0.9)
+                : tc.surface.withValues(alpha: 0.9),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isOn ? tc.oceanMedium : tc.glassBorder,
+              width: 1.2,
             ),
-          ],
-        ),
-        child: Center(
-          child: Icon(
-            Icons.air,
-            color: isOn ? Colors.white : tc.textPrimary,
-            size: 24,
+            boxShadow: [
+              BoxShadow(
+                color: tc.shadowColor,
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Center(
+            child: Icon(
+              Icons.air,
+              color: isOn ? Colors.white : tc.textPrimary,
+              size: 24,
+            ),
           ),
         ),
       ),
