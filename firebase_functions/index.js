@@ -366,6 +366,21 @@ async function processPhotoCleanupTask(
   }
 }
 
+async function retryCommunityCleanupTasksPage(
+  firestore = db,
+  {deletePhoto = deleteR2Photo} = {},
+) {
+  const tasks = await firestore
+    .collection(cleanupCollection)
+    .where('nextAttemptAt', '<=', Timestamp.now())
+    .limit(100)
+    .get();
+  for (const task of tasks.docs) {
+    await processPhotoCleanupTask(task.ref, {firestore, deletePhoto});
+  }
+  return tasks.size;
+}
+
 async function deleteCatchDocument(document, firestore = db) {
   const data = document.data();
   const taskReference = await enqueuePhotoCleanup({
@@ -604,8 +619,11 @@ exports.cleanupExpiredCommunityCatches = onSchedule(
     timeZone: 'UTC',
     secrets: [communityAdminKey],
     retryCount: 3,
+    timeoutSeconds: 300,
+    memory: '256MiB',
   },
   async () => {
+    await retryCommunityCleanupTasksPage();
     const {internalLeaderboard} = communityRefs();
     const leaderboard = await internalLeaderboard.get();
     const protectedCatchIds = new Set(
@@ -629,27 +647,6 @@ exports.cleanupExpiredCommunityCatches = onSchedule(
       } else {
         await deleteCatchDocument(document);
       }
-    }
-  },
-);
-
-exports.retryCommunityCleanupTasks = onSchedule(
-  {
-    region,
-    serviceAccount: runtimeServiceAccount,
-    schedule: '3-59/5 * * * *',
-    timeZone: 'UTC',
-    secrets: [communityAdminKey],
-    retryCount: 3,
-  },
-  async () => {
-    const tasks = await db
-      .collection(cleanupCollection)
-      .where('nextAttemptAt', '<=', Timestamp.now())
-      .limit(100)
-      .get();
-    for (const task of tasks.docs) {
-      await processPhotoCleanupTask(task.ref);
     }
   },
 );
@@ -807,6 +804,7 @@ exports.__test = {
   processPhotoCleanupTask,
   recalculateCommunityReportCount,
   reconcileCommunityReportCountsPage,
+  retryCommunityCleanupTasksPage,
   replaceLeaderboardState,
   safeAvatarUrl,
   previousUtcWeek,

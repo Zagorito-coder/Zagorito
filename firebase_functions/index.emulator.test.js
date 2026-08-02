@@ -12,6 +12,7 @@ const {
   processPhotoCleanupTask,
   recalculateCommunityReportCount,
   reconcileCommunityReportCountsPage,
+  retryCommunityCleanupTasksPage,
   replaceLeaderboardState,
 } = require('./index.js').__test;
 
@@ -200,13 +201,12 @@ test('failed R2 cleanup remains queued and succeeds on a later retry',
   );
 
   await taskReference.update({nextAttemptAt: Timestamp.now()});
-  const second = await processPhotoCleanupTask(taskReference, {
-    firestore,
+  const retried = await retryCommunityCleanupTasksPage(firestore, {
     deletePhoto: async () => {
       calls += 1;
     },
   });
-  assert.equal(second.processed, true);
+  assert.equal(retried, 1);
   assert.equal((await taskReference.get()).exists, false);
   assert.equal(calls, 2);
 });

@@ -130,7 +130,6 @@ test('all community functions use the dedicated least-privilege identity',
   const functions = [
     communityFunctions.selectWeeklyCommunityWinner,
     communityFunctions.cleanupExpiredCommunityCatches,
-    communityFunctions.retryCommunityCleanupTasks,
     communityFunctions.reconcileCommunityReportCounts,
     communityFunctions.onCommunityReportCreated,
     communityFunctions.onCommunityCatchDeleted,
@@ -139,4 +138,20 @@ test('all community functions use the dedicated least-privilege identity',
   for (const fn of functions) {
     assert.equal(fn.__endpoint.serviceAccountEmail, expected);
   }
+});
+
+test('community maintenance stays within the three free scheduler jobs',
+    () => {
+  const scheduledFunctions = [
+    communityFunctions.selectWeeklyCommunityWinner,
+    communityFunctions.cleanupExpiredCommunityCatches,
+    communityFunctions.reconcileCommunityReportCounts,
+  ];
+  assert.equal(
+    scheduledFunctions.filter(
+      (fn) => fn.__endpoint.scheduleTrigger != null,
+    ).length,
+    3,
+  );
+  assert.equal(communityFunctions.retryCommunityCleanupTasks, undefined);
 });
