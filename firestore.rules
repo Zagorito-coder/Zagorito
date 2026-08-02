@@ -40,7 +40,7 @@ service cloud.firestore {
           )
           || (
             request.resource.data.photoUrl.matches(
-              '^https://boosterfish-offline-maps\\.boosterfish-maps\\.workers\\.dev/spot-photos/[A-Za-z0-9_-]{20,96}(\\?v=[0-9]+)?$'
+              '^https://boosterfish-offline-maps\\.boosterfish-maps\\.workers\\.dev/spot-photos(-v2)?/[A-Za-z0-9_-]{20,96}(\\?v=[0-9]+)?$'
             )
             && request.resource.data.photoObjectKey.matches(
               '^[A-Za-z0-9_-]{20,96}$'

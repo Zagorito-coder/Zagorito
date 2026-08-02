@@ -28,6 +28,35 @@ const projectId = 'demo-boosterfish';
 const [host, portText] = process.env.FIRESTORE_EMULATOR_HOST.split(':');
 let environment;
 
+function personalSpotData(ownerUid, photoRoute = 'spot-photos-v2') {
+  const objectKey = 'abcdefghijklmnopqrst-1234567890';
+  return {
+    schemaVersion: 1,
+    ownerUid,
+    name: 'Spot test',
+    latitude: 33.5925,
+    longitude: -7.6,
+    locationKey: '33.593_-7.600',
+    notes: '',
+    dangerNotes: '',
+    photoUrl:
+      `https://boosterfish-offline-maps.boosterfish-maps.workers.dev/` +
+      `${photoRoute}/${objectKey}?v=1785686400000`,
+    photoObjectKey: objectKey,
+    status: 'pending',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+}
+
+async function createPersonalSpot(db, ownerUid, spotId, photoRoute) {
+  const data = personalSpotData(ownerUid, photoRoute);
+  const batch = writeBatch(db);
+  batch.set(doc(db, 'users', ownerUid, 'spots', spotId), data);
+  batch.set(doc(db, 'spot_submissions', spotId), data);
+  await batch.commit();
+}
+
 function catchData(ownerUid, expiresAt) {
   const objectKey = `${ownerUid}_abcdefghijklmnopqrstuvwx`;
   return {
@@ -114,6 +143,27 @@ test.beforeEach(async () => {
 
 test.after(async () => {
   await environment.cleanup();
+});
+
+test('personal spot batch accepts secure v2 and legacy photo URLs', async () => {
+  const ownerUid = 'spot-owner';
+  const ownerDb = environment.authenticatedContext(ownerUid).firestore();
+
+  await assertSucceeds(
+    createPersonalSpot(ownerDb, ownerUid, 'secure-v2', 'spot-photos-v2'),
+  );
+  await assertSucceeds(
+    createPersonalSpot(ownerDb, ownerUid, 'legacy-v1', 'spot-photos'),
+  );
+});
+
+test('personal spot batch rejects an untrusted photo route', async () => {
+  const ownerUid = 'spot-owner';
+  const ownerDb = environment.authenticatedContext(ownerUid).firestore();
+
+  await assertFails(
+    createPersonalSpot(ownerDb, ownerUid, 'untrusted', 'other-photos'),
+  );
 });
 
 test('publication requires consent and the atomic 24-hour state write',
