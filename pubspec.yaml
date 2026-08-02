@@ -2,7 +2,7 @@ name: spots_app
 description: Application de spots de pêche côtière
 publish_to: 'none'
 
-version: 1.0.5+8
+version: 1.0.6+9
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -27,7 +27,6 @@ dependencies:
   cupertino_icons: ^1.0.6
   url_launcher: ^6.2.5
   http: ^1.2.0
-  google_fonts: ^8.1.0
   dio: ^5.8.0
   provider: ^6.1.5+1
   flutter_compass: ^0.8.1
@@ -74,8 +73,8 @@ flutter:
     - assets/home_hero_v3.webp
     - assets/home_cards/
     - assets/page_heroes/
-    - assets/settings_hero.png
-    - assets/settings_fishing_banner.png
+    - assets/settings_hero.webp
+    - assets/settings_fishing_banner.webp
     - assets/earth_splash.jpg
     - assets/fish_data.json
     - assets/images/

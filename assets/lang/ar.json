@@ -39,6 +39,7 @@
   "bottomNav": {
     "home": "الرئيسية",
     "fish": "الأسماك",
+    "tides": "المد والجزر",
     "map": "الخريطة",
     "settings": "الإعدادات",
     "addSpot": "مواقعي"
@@ -313,6 +314,8 @@
     "privacySection": "الخصوصية",
     "termsOfService": "شروط الخدمة",
     "termsOfServiceSubtitle": "الشروط العامة للاستخدام",
+    "openSourceLicenses": "تراخيص المصادر المفتوحة",
+    "openSourceLicensesSubtitle": "المكتبات والإشعارات القانونية المستخدمة في BoosterFish",
     "deleteAccount": "حذف حسابي",
     "deleteAccountSubtitle": "حذف حسابك وجميع بياناتك نهائيًا",
     "deleteAccountConfirm": "سيؤدي هذا إلى حذف حسابك والبيانات المرتبطة به نهائيًا. هل تريد المتابعة؟",
@@ -322,7 +325,19 @@
     "comingSoon": "{feature} — قريبًا",
     "linkOpenError": "تعذر فتح الرابط",
     "editProfile": "تعديل الملف الشخصي",
-    "name": "الاسم"
+    "name": "الاسم",
+    "profileSignInRequired": "سجّل الدخول لإدارة هويتك العامة.",
+    "publicIdentityTitle": "الهوية العامة",
+    "publicIdentitySubtitle": "اختر الاسم الذي سيظهر في منشوراتك المجتمعية القادمة.",
+    "publicIdentityAnonymous": "البقاء مجهولًا",
+    "publicIdentityNickname": "إظهار لقبي",
+    "publicIdentityNicknameHint": "مثال: NadirFish",
+    "publicIdentityPreview": "المعاينة العامة",
+    "publicIdentitySave": "حفظ اختياري",
+    "publicIdentitySaved": "تم تحديث هويتك العامة.",
+    "publicIdentityLoadError": "تعذر تحميل الملف العام. يمكنك المحاولة مرة أخرى.",
+    "publicIdentitySaveError": "تعذر حفظ اختيارك. تحقق من الاتصال.",
+    "publicIdentityNicknameError": "يجب أن يتكون اللقب من حرفين إلى 40 حرفًا."
   },
   "language": {
     "title": "اللغة",
@@ -415,6 +430,7 @@
     "saving": "جارٍ الحفظ...",
     "saveError": "تعذر حفظ الموقع حاليًا.",
     "photoUploadError": "فشل رفع الصورة. تحقق من اتصالك.",
+    "appCheckError": "التحقق الأمني غير متاح. حاول مرة أخرى بعد قليل.",
     "permissionError": "حسابك غير مخول لتنفيذ هذه العملية.",
     "signInRequired": "سجل الدخول باستخدام Google لحفظ هذا الموقع.",
     "duplicatePrivate": "لديك موقع محفوظ بالفعل قريب جدًا من هذه النقطة.",

@@ -7,17 +7,17 @@ import 'dart:math' as math;
 
 /// Données astronomiques pour une journée de pêche
 class AstroData {
-  final double moonPhase;       // 0.0 = nouvelle, 0.5 = pleine, 1.0 = nouvelle
-  final String moonPhaseName;   // "Nouvelle Lune", "Pleine Lune"...
-  final double coefficient;     // 20 - 120
-  final double fishActivity;    // 0.0 - 1.0
-  final String activityLabel;   // "Excellente", "Bonne", "Moyenne", "Faible"
+  final double moonPhase; // 0.0 = nouvelle, 0.5 = pleine, 1.0 = nouvelle
+  final String moonPhaseName; // "Nouvelle Lune", "Pleine Lune"...
+  final double coefficient; // 20 - 120
+  final double fishActivity; // 0.0 - 1.0
+  final String activityLabel; // "Excellente", "Bonne", "Moyenne", "Faible"
   final String moonRise;
   final String moonSet;
   final String sunRise;
   final String sunSet;
-  final String lunarTransit;    // Lune au méridien (major)
-  final String lunarUnder;      // Lune au nadir (minor)
+  final String lunarTransit; // Lune au méridien (major)
+  final String lunarUnder; // Lune au nadir (minor)
 
   const AstroData({
     required this.moonPhase,
@@ -129,8 +129,10 @@ class AstronomyService {
     final dayOfYear = date.difference(DateTime(date.year, 1, 1)).inDays;
     final declination = 23.45 * math.sin(2 * math.pi * (284 + dayOfYear) / 365);
     const latRad = 33.57 * math.pi / 180; // Casablanca
-    final hourAngle = math.acos(-math.tan(latRad) * math.tan(declination * math.pi / 180));
-    final sunriseMin = (12 * 60 - (hourAngle * 180 / math.pi / 15) * 60).round();
+    final hourAngle =
+        math.acos(-math.tan(latRad) * math.tan(declination * math.pi / 180));
+    final sunriseMin =
+        (12 * 60 - (hourAngle * 180 / math.pi / 15) * 60).round();
     final sunsetMin = (12 * 60 + (hourAngle * 180 / math.pi / 15) * 60).round();
 
     return (
@@ -144,7 +146,8 @@ class AstronomyService {
     final dayOfYear = date.difference(DateTime(date.year, 1, 1)).inDays;
     const baseMoonrise = 12 * 60; // ~midi UTC pour la nouvelle lune
     const delayPerDay = 50; // minutes
-    final moonriseMin = (baseMoonrise + dayOfYear * delayPerDay + phase * 24 * 60) % (24 * 60);
+    final moonriseMin =
+        (baseMoonrise + dayOfYear * delayPerDay + phase * 24 * 60) % (24 * 60);
     final moonsetMin = (moonriseMin + 12 * 60) % (24 * 60);
 
     return (
@@ -189,7 +192,8 @@ class AstronomyService {
     score += (coeff / 120) * 0.40;
 
     // 2. Phase lunaire — pleine/nouvelle = meilleure (30%)
-    final phaseScore = 1.0 - (phase - 0.5).abs() * 2; // 1.0 à pleine, 0.0 au quartier
+    final phaseScore =
+        1.0 - (phase - 0.5).abs() * 2; // 1.0 à pleine, 0.0 au quartier
     score += phaseScore * 0.30;
 
     // 3. Proximité avec un transit solunaire (30%)

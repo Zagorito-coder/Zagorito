@@ -10,6 +10,7 @@
 // - Desactive automatiquement quand la carte bouge (economie GPU)
 // ============================================================================
 
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -34,10 +35,15 @@ class WindParticleLayer extends StatefulWidget {
 class _WindParticleLayerState extends State<WindParticleLayer>
     with TickerProviderStateMixin {
   late Ticker _ticker;
+  late final ValueNotifier<List<ParticleData>> _particles;
+  StreamSubscription<MapEvent>? _mapEventSubscription;
+  Timer? _mapIdleTimer;
+  bool _mapIsMoving = false;
+  bool _reduceMotion = false;
   int _lastFrameMs = 0;
-  static const _frameIntervalMs = 33; // ~30fps
+  int _frameIntervalMs = 40; // 25 fps par défaut sur téléphone modeste
 
-  List<ParticleData> _particles = [];
+  List<_ParticleSeed> _particleSeeds = const [];
   double _animPhase = 0.0;
 
   // Config LOD
@@ -48,8 +54,10 @@ class _WindParticleLayerState extends State<WindParticleLayer>
   @override
   void initState() {
     super.initState();
+    _particles = ValueNotifier<List<ParticleData>>(const []);
     _ticker = createTicker(_onTick);
     widget.provider.addListener(_onProviderChanged);
+    _listenToMapEvents();
     if (widget.provider.isEnabled) {
       _startTicker();
     }
@@ -62,35 +70,79 @@ class _WindParticleLayerState extends State<WindParticleLayer>
       oldWidget.provider.removeListener(_onProviderChanged);
       widget.provider.addListener(_onProviderChanged);
     }
-    if (widget.provider.isEnabled) {
-      _startTicker();
-    } else {
-      _stopTicker();
+    if (widget.mapController != oldWidget.mapController) {
+      _listenToMapEvents();
     }
+    _syncTicker();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _computeLOD();
-    _screenSize = MediaQuery.of(context).size;
+    final media = MediaQuery.of(context);
+    _reduceMotion = media.disableAnimations || media.accessibleNavigation;
+    final previousCount = _particleCount;
+    final previousSize = _screenSize;
+    _screenSize = media.size;
+    _computeLOD(media);
+    if (previousCount != _particleCount || previousSize != _screenSize) {
+      _createParticleSeeds();
+    }
+    _syncTicker();
   }
 
   @override
   void dispose() {
     widget.provider.removeListener(_onProviderChanged);
+    _mapIdleTimer?.cancel();
+    unawaited(_mapEventSubscription?.cancel());
     _ticker.dispose();
+    _particles.dispose();
     super.dispose();
   }
 
   void _onProviderChanged() {
     if (!mounted) return;
-    if (widget.provider.isEnabled) {
+    _syncTicker();
+    setState(() {});
+  }
+
+  void _listenToMapEvents() {
+    unawaited(_mapEventSubscription?.cancel());
+    _mapEventSubscription = widget.mapController.mapEventStream.listen((event) {
+      if (event is! MapEventMove &&
+          event is! MapEventFlingAnimation &&
+          event is! MapEventDoubleTapZoom &&
+          event is! MapEventScrollWheelZoom &&
+          event is! MapEventMoveStart &&
+          event is! MapEventMoveEnd &&
+          event is! MapEventFlingAnimationStart &&
+          event is! MapEventFlingAnimationEnd &&
+          event is! MapEventDoubleTapZoomStart &&
+          event is! MapEventDoubleTapZoomEnd) {
+        return;
+      }
+      _mapIdleTimer?.cancel();
+      if (!_mapIsMoving) {
+        _mapIsMoving = true;
+        _syncTicker();
+      }
+      _mapIdleTimer = Timer(const Duration(milliseconds: 180), () {
+        if (!mounted) return;
+        _mapIsMoving = false;
+        _syncTicker();
+      });
+    });
+  }
+
+  void _syncTicker() {
+    final shouldAnimate =
+        mounted && widget.provider.isEnabled && !_mapIsMoving && !_reduceMotion;
+    if (shouldAnimate) {
       _startTicker();
     } else {
       _stopTicker();
     }
-    setState(() {});
   }
 
   void _startTicker() {
@@ -107,46 +159,64 @@ class _WindParticleLayerState extends State<WindParticleLayer>
       _ticker.stop();
     }
     _lastFrameMs = 0;
-    _particles = [];
+    _particles.value = const [];
     _animPhase = 0.0;
   }
 
-  void _computeLOD() {
-    final dpr = MediaQuery.of(context).devicePixelRatio;
-    if (dpr < 2.0) {
-      _particleCount = 80;
-      _particleSpeed = 0.7;
-    } else if (dpr < 3.0) {
-      _particleCount = 140;
-      _particleSpeed = 1.0;
+  void _computeLOD(MediaQueryData media) {
+    final physicalPixels = media.size.width *
+        media.size.height *
+        media.devicePixelRatio *
+        media.devicePixelRatio;
+    if (media.size.shortestSide <= 400 || physicalPixels >= 2500000) {
+      _particleCount = 48;
+      _particleSpeed = 0.75;
+      _frameIntervalMs = 40;
+    } else if (media.size.shortestSide <= 600) {
+      _particleCount = 64;
+      _particleSpeed = 0.9;
+      _frameIntervalMs = 40;
     } else {
-      _particleCount = 200;
-      _particleSpeed = 1.3;
+      _particleCount = 80;
+      _particleSpeed = 1.0;
+      _frameIntervalMs = 33;
     }
+  }
+
+  void _createParticleSeeds() {
+    final random = math.Random(42);
+    _particleSeeds = List<_ParticleSeed>.generate(
+      _particleCount,
+      (_) => _ParticleSeed(
+        xRatio: random.nextDouble(),
+        yRatio: random.nextDouble(),
+        phaseOffset: random.nextDouble() * 0.3,
+        lengthFactor: 0.4 + random.nextDouble() * 0.6,
+        opacity: 0.35 + random.nextDouble() * 0.35,
+      ),
+      growable: false,
+    );
   }
 
   void _onTick(Duration elapsed) {
     final ms = elapsed.inMilliseconds;
-    if (ms - _lastFrameMs < _frameIntervalMs) return; // skip → 30fps
+    if (ms - _lastFrameMs < _frameIntervalMs) return;
+    final previousFrameMs = _lastFrameMs;
     _lastFrameMs = ms;
 
     // Si pas de vecteur vent, pas de particules
     final vector = widget.provider.currentVector;
     if (vector == null) {
-      if (_particles.isNotEmpty) {
-        _particles = [];
-        if (mounted) setState(() {});
-      }
+      if (_particles.value.isNotEmpty) _particles.value = const [];
       return;
     }
 
-    // Mise a jour de la phase d'animation
-    _animPhase += 0.016 * _particleSpeed; // ~1 frame a 30fps
-    if (_animPhase > 1.0) _animPhase -= 1.0;
+    final elapsedSeconds = previousFrameMs == 0
+        ? _frameIntervalMs / 1000.0
+        : ((ms - previousFrameMs) / 1000.0).clamp(0.0, 0.1);
+    _animPhase = (_animPhase + elapsedSeconds * 0.48 * _particleSpeed) % 1.0;
 
-    // Calculer les particules dans le Ticker (PAS dans paint)
-    _particles = _generateParticles(vector);
-    if (mounted) setState(() {});
+    _particles.value = _generateParticles(vector);
   }
 
   /// Genere toutes les particules pre-calculees autour du spot.
@@ -165,15 +235,14 @@ class _WindParticleLayerState extends State<WindParticleLayer>
     final lineLength = vector.speedKt * 3.0 * _particleSpeed;
 
     final particles = <ParticleData>[];
-    final rng = math.Random(42);
+    final color = WindColors.forKnots(vector.speedKt);
 
-    for (int i = 0; i < _particleCount; i++) {
-      // Position aleatoire sur tout l'ecran
-      final baseX = rng.nextDouble() * screenW;
-      final baseY = rng.nextDouble() * screenH;
+    for (final seed in _particleSeeds) {
+      final baseX = seed.xRatio * screenW;
+      final baseY = seed.yRatio * screenH;
 
       // Deplacement le long de la direction du vent
-      final phaseDist = (_animPhase + rng.nextDouble() * 0.3) * screenW;
+      final phaseDist = (_animPhase + seed.phaseOffset) * screenW;
       final px = (baseX + math.cos(windAngle) * phaseDist * lineLength * 0.15) %
           screenW;
       final py = (baseY + math.sin(windAngle) * phaseDist * lineLength * 0.15) %
@@ -183,22 +252,18 @@ class _WindParticleLayerState extends State<WindParticleLayer>
       final wrappedY = py < 0 ? py + screenH : py;
 
       // Ligne style etoile filante: longueur variable
-      final len = lineLength * (0.4 + rng.nextDouble() * 0.6);
+      final len = lineLength * seed.lengthFactor;
       final trailStart = Offset(
         wrappedX - math.cos(windAngle) * len,
         wrappedY - math.sin(windAngle) * len,
       );
       final trailEnd = Offset(wrappedX, wrappedY);
 
-      // Couleur + opacite
-      final color = WindColors.forKnots(vector.speedKt);
-      final opacity = 0.35 + rng.nextDouble() * 0.35;
-
       // Pas de cercle, juste une ligne (radius = 0)
       particles.add(ParticleData(
         position: trailEnd,
         radius: 0, // pas de cercle
-        opacity: opacity,
+        opacity: seed.opacity,
         color: color,
         trailStart: trailStart,
         trailEnd: trailEnd,
@@ -210,7 +275,7 @@ class _WindParticleLayerState extends State<WindParticleLayer>
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.provider.isEnabled || _particles.isEmpty) {
+    if (!widget.provider.isEnabled || _reduceMotion) {
       return const SizedBox.shrink();
     }
 
@@ -218,10 +283,25 @@ class _WindParticleLayerState extends State<WindParticleLayer>
       child: CustomPaint(
         painter: WindParticlePainter(
           particles: _particles,
-          camera: widget.mapController.camera,
         ),
         size: Size.infinite,
       ),
     );
   }
+}
+
+class _ParticleSeed {
+  const _ParticleSeed({
+    required this.xRatio,
+    required this.yRatio,
+    required this.phaseOffset,
+    required this.lengthFactor,
+    required this.opacity,
+  });
+
+  final double xRatio;
+  final double yRatio;
+  final double phaseOffset;
+  final double lengthFactor;
+  final double opacity;
 }

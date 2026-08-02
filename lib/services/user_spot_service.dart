@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -15,6 +16,7 @@ enum UserSpotFailure {
   limitReached,
   invalidPhoto,
   photoUploadFailed,
+  appCheckUnavailable,
   permissionDenied,
   unavailable,
 }
@@ -36,9 +38,11 @@ class UserSpotService {
   UserSpotService({
     FirebaseFirestore? firestore,
     FirebaseAuth? auth,
+    FirebaseAppCheck? appCheck,
     http.Client? httpClient,
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
         _auth = auth ?? FirebaseAuth.instance,
+        _appCheck = appCheck ?? FirebaseAppCheck.instance,
         _httpClient = httpClient ?? http.Client();
 
   static final UserSpotService instance = UserSpotService();
@@ -52,6 +56,7 @@ class UserSpotService {
 
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
+  final FirebaseAppCheck _appCheck;
   final http.Client _httpClient;
   final Distance _distance = const Distance();
 
@@ -189,6 +194,7 @@ class UserSpotService {
       );
       throw UserSpotException(_mapFirebaseFailure(error));
     } on UserSpotException {
+      if (photo != null) await _deletePhoto(photo.objectKey);
       rethrow;
     } catch (error, stackTrace) {
       if (photo != null) await _deletePhoto(photo.objectKey);
@@ -408,11 +414,6 @@ class UserSpotService {
       throw const UserSpotException(UserSpotFailure.invalidPhoto);
     }
     final normalizedContentType = detectedContentType;
-    final token = await _auth.currentUser?.getIdToken();
-    if (token == null || token.isEmpty) {
-      throw const UserSpotException(UserSpotFailure.authenticationRequired);
-    }
-
     final revision = DateTime.now().microsecondsSinceEpoch;
     final objectKey = '$spotId-$revision';
     final baseUri = Uri.tryParse(_photoBaseUrl);
@@ -422,10 +423,9 @@ class UserSpotService {
     final response = await _httpClient
         .put(
           baseUri.resolve('spot-photos/$objectKey'),
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': normalizedContentType,
-          },
+          headers: await _authorizationHeaders(
+            contentType: normalizedContentType,
+          ),
           body: Uint8List.fromList(bytes),
         )
         .timeout(const Duration(seconds: 30));
@@ -453,18 +453,29 @@ class UserSpotService {
 
   Future<bool> _deletePhoto(String objectKey) async {
     try {
-      final token = await _auth.currentUser?.getIdToken();
       final baseUri = Uri.tryParse(_photoBaseUrl);
-      if (token == null || token.isEmpty || baseUri == null) return false;
-      final response = await _httpClient.delete(
-        baseUri.resolve('spot-photos/$objectKey'),
-        headers: {'Authorization': 'Bearer $token'},
-      ).timeout(const Duration(seconds: 15));
+      if (baseUri == null || baseUri.scheme != 'https') return false;
+      final response = await _httpClient
+          .delete(
+            baseUri.resolve('spot-photos/$objectKey'),
+            headers: await _authorizationHeaders(),
+          )
+          .timeout(const Duration(seconds: 15));
       return response.statusCode == 204 || response.statusCode == 404;
     } catch (error) {
       debugPrint('[UserSpotService] Photo cleanup deferred: $error');
       return false;
     }
+  }
+
+  Future<Map<String, String>> _authorizationHeaders({
+    String? contentType,
+  }) {
+    return buildUserSpotPhotoAuthorizationHeaders(
+      authTokenProvider: () async => _auth.currentUser?.getIdToken(),
+      appCheckTokenProvider: () => _appCheck.getToken(false),
+      contentType: contentType,
+    );
   }
 
   static UserSpot? _fromDocument(
@@ -507,4 +518,32 @@ class UserSpotService {
       _ => UserSpotFailure.unavailable,
     };
   }
+}
+
+@visibleForTesting
+Future<Map<String, String>> buildUserSpotPhotoAuthorizationHeaders({
+  required Future<String?> Function() authTokenProvider,
+  required Future<String?> Function() appCheckTokenProvider,
+  String? contentType,
+}) async {
+  final authToken = await authTokenProvider();
+  if (authToken == null || authToken.trim().isEmpty) {
+    throw const UserSpotException(UserSpotFailure.authenticationRequired);
+  }
+
+  String? appCheckToken;
+  try {
+    appCheckToken = await appCheckTokenProvider();
+  } catch (_) {
+    throw const UserSpotException(UserSpotFailure.appCheckUnavailable);
+  }
+  if (appCheckToken == null || appCheckToken.trim().isEmpty) {
+    throw const UserSpotException(UserSpotFailure.appCheckUnavailable);
+  }
+
+  return {
+    'Authorization': 'Bearer ${authToken.trim()}',
+    'X-Firebase-AppCheck': appCheckToken.trim(),
+    if (contentType != null) 'Content-Type': contentType,
+  };
 }

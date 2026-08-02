@@ -114,10 +114,20 @@ void main() {
         dangerNotes: '',
         status: SpotModerationStatus.pending,
       );
+      final flightStart = mapController.camera.center;
       personalSelection.value = const UserSpotSelectionRequest(
         serial: 1,
         spot: personalSpot,
       );
+      await tester.pump();
+      expect(mapController.camera.center, flightStart);
+
+      await tester.pump(const Duration(milliseconds: 400));
+      final flightMidpoint = mapController.camera.center;
+      expect(flightMidpoint, isNot(flightStart));
+      expect(flightMidpoint.latitude, isNot(closeTo(31.2, 0.0001)));
+      expect(flightMidpoint.longitude, isNot(closeTo(-9.8, 0.0001)));
+
       await tester.pumpAndSettle();
       expect(
         find.byKey(

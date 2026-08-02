@@ -31,144 +31,144 @@ class AppDrawer extends StatelessWidget {
       builder: (context, _) {
         final tc = ThemeColors.of(context);
         return Drawer(
-      backgroundColor: tc.background,
-      child: SafeArea(
-        child: Column(
-          children: [
-            // Header du drawer
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(color: tc.surface),
-              child: Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [tc.oceanMedium, tc.oceanDeep],
+          backgroundColor: tc.background,
+          child: SafeArea(
+            child: Column(
+              children: [
+                // Header du drawer
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(color: tc.surface),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [tc.oceanMedium, tc.oceanDeep],
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(
+                          Icons.phishing,
+                          color: Colors.white,
+                          size: 24,
+                        ),
                       ),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(
-                      Icons.phishing,
-                      color: Colors.white,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          context.tr('drawer.title'),
-                          style: TextStyle(
-                            color: tc.oceanLight,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.5,
-                          ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              context.tr('drawer.title'),
+                              style: TextStyle(
+                                color: tc.oceanLight,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              context.tr('drawer.subtitle'),
+                              style: TextStyle(
+                                color: tc.textMuted,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          context.tr('drawer.subtitle'),
-                          style: TextStyle(
-                            color: tc.textMuted,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            // Items de navigation
-            Expanded(
-              child: ListView(
-                padding: EdgeInsets.zero,
-                children: [
-                  if (onHomeTap != null)
-                    _DrawerItem(
-                      icon: Icons.home_rounded,
-                      label: context.tr('drawer.home'),
-                      isActive: currentRoute == 'home',
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        onHomeTap!();
-                      },
-                    ),
-                  if (onTechniquesTap != null)
-                    _DrawerItem(
-                      icon: Icons.menu_book_rounded,
-                      label: context.tr('drawer.techniques'),
-                      isActive: currentRoute == 'techniques',
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        onTechniquesTap!();
-                      },
-                    ),
-                  if (onCommunityTap != null)
-                    _DrawerItem(
-                      icon: Icons.people_alt_rounded,
-                      label: context.tr('drawer.community'),
-                      isActive: currentRoute == 'community',
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        onCommunityTap!();
-                      },
-                    ),
-                  if (onShopsTap != null)
-                    _DrawerItem(
-                      icon: Icons.store_rounded,
-                      label: context.tr('drawer.shops'),
-                      isActive: currentRoute == 'shops',
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        onShopsTap!();
-                      },
-                    ),
-                ],
-              ),
-            ),
-            // Footer du drawer
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: tc.surface,
-                border: Border(
-                  top: BorderSide(color: tc.glassBorder, width: 0.5),
                 ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.water_drop,
-                    size: 16,
-                    color: tc.oceanMedium.withValues(alpha: 0.5),
+                const SizedBox(height: 8),
+                // Items de navigation
+                Expanded(
+                  child: ListView(
+                    padding: EdgeInsets.zero,
+                    children: [
+                      if (onHomeTap != null)
+                        _DrawerItem(
+                          icon: Icons.home_rounded,
+                          label: context.tr('drawer.home'),
+                          isActive: currentRoute == 'home',
+                          onTap: () {
+                            Navigator.of(context).pop();
+                            onHomeTap!();
+                          },
+                        ),
+                      if (onTechniquesTap != null)
+                        _DrawerItem(
+                          icon: Icons.menu_book_rounded,
+                          label: context.tr('drawer.techniques'),
+                          isActive: currentRoute == 'techniques',
+                          onTap: () {
+                            Navigator.of(context).pop();
+                            onTechniquesTap!();
+                          },
+                        ),
+                      if (onCommunityTap != null)
+                        _DrawerItem(
+                          icon: Icons.people_alt_rounded,
+                          label: context.tr('drawer.community'),
+                          isActive: currentRoute == 'community',
+                          onTap: () {
+                            Navigator.of(context).pop();
+                            onCommunityTap!();
+                          },
+                        ),
+                      if (onShopsTap != null)
+                        _DrawerItem(
+                          icon: Icons.store_rounded,
+                          label: context.tr('drawer.shops'),
+                          isActive: currentRoute == 'shops',
+                          onTap: () {
+                            Navigator.of(context).pop();
+                            onShopsTap!();
+                          },
+                        ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    context.tr('app.version'),
-                    style: TextStyle(
-                      color: tc.textMuted,
-                      fontSize: 11,
+                ),
+                // Footer du drawer
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: tc.surface,
+                    border: Border(
+                      top: BorderSide(color: tc.glassBorder, width: 0.5),
                     ),
                   ),
-                ],
-              ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.water_drop,
+                        size: 16,
+                        color: tc.oceanMedium.withValues(alpha: 0.5),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        context.tr('app.version'),
+                        style: TextStyle(
+                          color: tc.textMuted,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
-  },
-);
   }
 }
 

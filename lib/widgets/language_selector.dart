@@ -122,13 +122,11 @@ class _CuteFlagButtonState extends State<_CuteFlagButton>
       child: AnimatedBuilder(
         animation: _pulseController,
         builder: (context, child) {
-          final pulse = widget.isSelected
-              ? 1.0 + (_pulseController.value * 0.12)
-              : 1.0;
+          final pulse =
+              widget.isSelected ? 1.0 + (_pulseController.value * 0.12) : 1.0;
           final scale = _pressed ? 0.85 : pulse;
-          final glowOpacity = widget.isSelected
-              ? 0.35 + (_pulseController.value * 0.25)
-              : 0.0;
+          final glowOpacity =
+              widget.isSelected ? 0.35 + (_pulseController.value * 0.25) : 0.0;
 
           return Transform.scale(
             scale: scale,

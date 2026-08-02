@@ -1,5 +1,5 @@
 // ============================================================
-//  theme.dart — Thème personnalisé Spots App  
+//  theme.dart — Thème personnalisé Spots App
 //  Support Clair ☀️ / Sombre 🌙 avec bascule dynamique
 // ============================================================
 
@@ -15,65 +15,65 @@ import 'package:spots_app/theme_controller.dart';
 class AppColors {
   // Fonds
   static const Color background = Color(0xFF0A0E1F);
-  static const Color surface    = Color(0xFF14182B);
+  static const Color surface = Color(0xFF14182B);
   static const Color surfaceLight = Color(0xFF1E2340);
 
   // Accents océaniques
-  static const Color oceanDeep   = Color(0xFF006994);
+  static const Color oceanDeep = Color(0xFF006994);
   static const Color oceanMedium = Color(0xFF0099CC);
-  static const Color oceanLight  = Color(0xFF00B4D8);
-  static const Color oceanFoam   = Color(0xFF90E0EF);
+  static const Color oceanLight = Color(0xFF00B4D8);
+  static const Color oceanFoam = Color(0xFF90E0EF);
 
   // Accents pêche
   static const Color sunset = Color(0xFFFF6B35);
-  static const Color coral  = Color(0xFFFF8C69);
-  static const Color sand   = Color(0xFFF4E4C1);
+  static const Color coral = Color(0xFFFF8C69);
+  static const Color sand = Color(0xFFF4E4C1);
 
   // Texte
-  static const Color textPrimary   = Colors.white;
+  static const Color textPrimary = Colors.white;
   static const Color textSecondary = Color(0xFFB0B8C8);
-  static const Color textMuted     = Color(0xFF6B7280);
+  static const Color textMuted = Color(0xFF6B7280);
 
   // États
   static const Color success = Color(0xFF10B981);
   static const Color warning = Color(0xFFF59E0B);
-  static const Color error   = Color(0xFFEF4444);
+  static const Color error = Color(0xFFEF4444);
 
   // Premium
-  static const Color gold      = Color(0xFFFFD700);
+  static const Color gold = Color(0xFFFFD700);
   static const Color goldLight = Color(0xFFFFE55C);
 }
 
 /// Palette — mode CLAIR ☀️ (inspirée ciel océanique lumineux).
 class AppColorsLight {
   // Fonds
-  static const Color background   = Color(0xFFF0F4F8);
-  static const Color surface      = Color(0xFFFFFFFF);
+  static const Color background = Color(0xFFF0F4F8);
+  static const Color surface = Color(0xFFFFFFFF);
   static const Color surfaceLight = Color(0xFFE8EDF2);
 
   // Accents océaniques (plus saturés pour contraster sur fond clair)
-  static const Color oceanDeep   = Color(0xFF005A87);
+  static const Color oceanDeep = Color(0xFF005A87);
   static const Color oceanMedium = Color(0xFF0088BB);
-  static const Color oceanLight  = Color(0xFF00A3C4);
-  static const Color oceanFoam   = Color(0xFF0077A3);
+  static const Color oceanLight = Color(0xFF00A3C4);
+  static const Color oceanFoam = Color(0xFF0077A3);
 
   // Accents pêche
   static const Color sunset = Color(0xFFE85D2E);
-  static const Color coral  = Color(0xFFD96C50);
-  static const Color sand   = Color(0xFFC9A96E);
+  static const Color coral = Color(0xFFD96C50);
+  static const Color sand = Color(0xFFC9A96E);
 
   // Texte
-  static const Color textPrimary   = Color(0xFF1A2332);
+  static const Color textPrimary = Color(0xFF1A2332);
   static const Color textSecondary = Color(0xFF5A6A7A);
-  static const Color textMuted     = Color(0xFF8A9AAA);
+  static const Color textMuted = Color(0xFF8A9AAA);
 
   // États
   static const Color success = Color(0xFF0D9E6F);
   static const Color warning = Color(0xFFD97706);
-  static const Color error   = Color(0xFFDC2626);
+  static const Color error = Color(0xFFDC2626);
 
   // Premium
-  static const Color gold      = Color(0xFFD4AF37);
+  static const Color gold = Color(0xFFD4AF37);
   static const Color goldLight = Color(0xFFB8860B);
 }
 
@@ -93,41 +93,60 @@ class ThemeColors {
   }
 
   // Fonds
-  Color get background   => _isDark ? AppColors.background   : AppColorsLight.background;
-  Color get surface      => _isDark ? AppColors.surface      : AppColorsLight.surface;
-  Color get surfaceLight => _isDark ? AppColors.surfaceLight : AppColorsLight.surfaceLight;
-  Color get surfaceElevated => _isDark ? AppColors.surfaceLight : AppColorsLight.surfaceLight;
+  Color get background =>
+      _isDark ? AppColors.background : AppColorsLight.background;
+  Color get surface => _isDark ? AppColors.surface : AppColorsLight.surface;
+  Color get surfaceLight =>
+      _isDark ? AppColors.surfaceLight : AppColorsLight.surfaceLight;
+  Color get surfaceElevated =>
+      _isDark ? AppColors.surfaceLight : AppColorsLight.surfaceLight;
 
   // Accents océaniques
-  Color get oceanDeep   => _isDark ? AppColors.oceanDeep   : AppColorsLight.oceanDeep;
-  Color get oceanMedium => _isDark ? AppColors.oceanMedium : AppColorsLight.oceanMedium;
-  Color get oceanLight  => _isDark ? AppColors.oceanLight  : AppColorsLight.oceanLight;
-  Color get oceanFoam   => _isDark ? AppColors.oceanFoam   : AppColorsLight.oceanFoam;
+  Color get oceanDeep =>
+      _isDark ? AppColors.oceanDeep : AppColorsLight.oceanDeep;
+  Color get oceanMedium =>
+      _isDark ? AppColors.oceanMedium : AppColorsLight.oceanMedium;
+  Color get oceanLight =>
+      _isDark ? AppColors.oceanLight : AppColorsLight.oceanLight;
+  Color get oceanFoam =>
+      _isDark ? AppColors.oceanFoam : AppColorsLight.oceanFoam;
 
   // Accents pêche
   Color get sunset => _isDark ? AppColors.sunset : AppColorsLight.sunset;
-  Color get coral  => _isDark ? AppColors.coral  : AppColorsLight.coral;
-  Color get sand   => _isDark ? AppColors.sand   : AppColorsLight.sand;
+  Color get coral => _isDark ? AppColors.coral : AppColorsLight.coral;
+  Color get sand => _isDark ? AppColors.sand : AppColorsLight.sand;
 
   // Texte
-  Color get textPrimary   => _isDark ? AppColors.textPrimary   : AppColorsLight.textPrimary;
-  Color get textSecondary => _isDark ? AppColors.textSecondary : AppColorsLight.textSecondary;
-  Color get textMuted     => _isDark ? AppColors.textMuted     : AppColorsLight.textMuted;
+  Color get textPrimary =>
+      _isDark ? AppColors.textPrimary : AppColorsLight.textPrimary;
+  Color get textSecondary =>
+      _isDark ? AppColors.textSecondary : AppColorsLight.textSecondary;
+  Color get textMuted =>
+      _isDark ? AppColors.textMuted : AppColorsLight.textMuted;
 
   // États
   Color get success => _isDark ? AppColors.success : AppColorsLight.success;
   Color get warning => _isDark ? AppColors.warning : AppColorsLight.warning;
-  Color get error   => _isDark ? AppColors.error   : AppColorsLight.error;
+  Color get error => _isDark ? AppColors.error : AppColorsLight.error;
 
   // Premium
-  Color get gold      => _isDark ? AppColors.gold      : AppColorsLight.gold;
-  Color get goldLight => _isDark ? AppColors.goldLight : AppColorsLight.goldLight;
+  Color get gold => _isDark ? AppColors.gold : AppColorsLight.gold;
+  Color get goldLight =>
+      _isDark ? AppColors.goldLight : AppColorsLight.goldLight;
 
   // Helpers pour opacité / overlay
-  Color get divider => _isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.08);
-  Color get glassBorder => _isDark ? Colors.white.withValues(alpha: 0.10) : Colors.black.withValues(alpha: 0.08);
-  Color get shadowColor => _isDark ? Colors.black.withValues(alpha: 0.30) : Colors.black.withValues(alpha: 0.10);
-  Color get navOverlay  => _isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.06);
+  Color get divider => _isDark
+      ? Colors.white.withValues(alpha: 0.08)
+      : Colors.black.withValues(alpha: 0.08);
+  Color get glassBorder => _isDark
+      ? Colors.white.withValues(alpha: 0.10)
+      : Colors.black.withValues(alpha: 0.08);
+  Color get shadowColor => _isDark
+      ? Colors.black.withValues(alpha: 0.30)
+      : Colors.black.withValues(alpha: 0.10);
+  Color get navOverlay => _isDark
+      ? Colors.white.withValues(alpha: 0.06)
+      : Colors.black.withValues(alpha: 0.06);
   Color get iconInactive => textMuted;
 }
 
@@ -291,7 +310,6 @@ class AppTheme {
       useMaterial3: true,
       brightness: isDark ? Brightness.dark : Brightness.light,
       scaffoldBackgroundColor: tc.background,
-
       colorScheme: ColorScheme(
         brightness: isDark ? Brightness.dark : Brightness.light,
         primary: tc.oceanMedium,
@@ -304,35 +322,35 @@ class AppTheme {
         onError: Colors.white,
         surfaceContainerHighest: tc.surfaceLight,
       ),
-
       appBarTheme: AppBarTheme(
         elevation: 0,
         centerTitle: true,
         backgroundColor: tc.background.withValues(alpha: 0.9),
         foregroundColor: tc.textPrimary,
         systemOverlayStyle: isDark
-            ? SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent)
-            : SystemUiOverlayStyle.dark.copyWith(statusBarColor: Colors.transparent),
+            ? SystemUiOverlayStyle.light
+                .copyWith(statusBarColor: Colors.transparent)
+            : SystemUiOverlayStyle.dark
+                .copyWith(statusBarColor: Colors.transparent),
         titleTextStyle: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.w600,
           color: tc.textPrimary,
         ),
       ),
-
       cardTheme: CardThemeData(
         elevation: 0,
         color: tc.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
-
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           elevation: 0,
           backgroundColor: tc.oceanMedium,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(16))),
+          shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(Radius.circular(16))),
           textStyle: const TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
@@ -341,16 +359,15 @@ class AppTheme {
           ),
         ),
       ),
-
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: tc.textPrimary,
           side: BorderSide(color: tc.glassBorder.withValues(alpha: 0.3)),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
       ),
-
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: tc.oceanLight,
@@ -363,11 +380,11 @@ class AppTheme {
           ),
         ),
       ),
-
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: tc.surface.withValues(alpha: 0.6),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(color: tc.glassBorder),
@@ -393,13 +410,11 @@ class AppTheme {
           height: 1.4,
         ),
       ),
-
       dialogTheme: DialogThemeData(
         backgroundColor: tc.surface,
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       ),
-
       snackBarTheme: SnackBarThemeData(
         backgroundColor: tc.surfaceLight,
         behavior: SnackBarBehavior.floating,
@@ -411,7 +426,6 @@ class AppTheme {
           height: 1.5,
         ),
       ),
-
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: tc.surface,
         elevation: 0,
@@ -419,17 +433,14 @@ class AppTheme {
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
       ),
-
       dividerTheme: DividerThemeData(
         color: tc.divider,
         thickness: 1,
       ),
-
       iconTheme: IconThemeData(
         color: tc.textSecondary,
         size: 24,
       ),
-
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: tc.background,
         selectedItemColor: tc.oceanLight,

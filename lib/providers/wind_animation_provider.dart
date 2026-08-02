@@ -39,7 +39,8 @@ class WindAnimationProvider extends ChangeNotifier {
   String? _spotId;
   SpotForecast? _forecast;
   int _selectedHourIndex = 0;
-  bool _userSelectedHour = false; // true si l'utilisateur a explicitement selectionne une heure
+  bool _userSelectedHour =
+      false; // true si l'utilisateur a explicitement selectionne une heure
   WindVector? _currentVector;
   bool _isLoading = false;
   String? _error;
@@ -106,7 +107,8 @@ class WindAnimationProvider extends ChangeNotifier {
       double minDist = double.infinity;
       for (final s in spots) {
         final d = haversineKm(
-          lat, lon,
+          lat,
+          lon,
           (s['latitude'] as num).toDouble(),
           (s['longitude'] as num).toDouble(),
         );
@@ -155,11 +157,13 @@ class WindAnimationProvider extends ChangeNotifier {
         return;
       }
       _evictCacheIfNeeded();
-      _cache[spotId] = _CachedForecast(forecast: forecast, timestamp: DateTime.now());
+      _cache[spotId] =
+          _CachedForecast(forecast: forecast, timestamp: DateTime.now());
       _forecast = forecast;
       if (wasCached && _userSelectedHour) {
         // TTL expire : preserver le choix utilisateur s'il en a fait un
-        _selectedHourIndex = _selectedHourIndex.clamp(0, forecast.slots.length - 1);
+        _selectedHourIndex =
+            _selectedHourIndex.clamp(0, forecast.slots.length - 1);
       } else {
         _selectedHourIndex = _findClosestHourIndex(forecast);
         _userSelectedHour = false;
@@ -178,15 +182,16 @@ class WindAnimationProvider extends ChangeNotifier {
 
   void _evictCacheIfNeeded() {
     while (_cache.length >= _maxCacheEntries) {
-      final oldest = _cache.entries
-          .reduce((a, b) =>
-              a.value.timestamp.isBefore(b.value.timestamp) ? a : b);
+      final oldest = _cache.entries.reduce(
+          (a, b) => a.value.timestamp.isBefore(b.value.timestamp) ? a : b);
       _cache.remove(oldest.key);
     }
   }
 
   void selectHourIndex(int index) {
-    if (_forecast == null || index < 0 || index >= _forecast!.slots.length) return;
+    if (_forecast == null || index < 0 || index >= _forecast!.slots.length) {
+      return;
+    }
     if (index == _selectedHourIndex) return;
     _selectedHourIndex = index;
     _userSelectedHour = true;
@@ -199,7 +204,8 @@ class WindAnimationProvider extends ChangeNotifier {
     int best = 0;
     double bestDiff = double.infinity;
     for (int i = 0; i < forecast.slots.length; i++) {
-      final diff = forecast.slots[i].dateTime.difference(now).abs().inMinutes.toDouble();
+      final diff =
+          forecast.slots[i].dateTime.difference(now).abs().inMinutes.toDouble();
       if (diff < bestDiff) {
         bestDiff = diff;
         best = i;
@@ -214,7 +220,8 @@ class WindAnimationProvider extends ChangeNotifier {
       return;
     }
     final slot = _forecast!.slots[_selectedHourIndex];
-    final speed = slot.windGustKnots > 0 ? slot.windGustKnots : slot.windSpeedKnots;
+    final speed =
+        slot.windGustKnots > 0 ? slot.windGustKnots : slot.windSpeedKnots;
     final dirDeg = slot.windDirectionDeg;
     final angleRad = (270 - dirDeg) * pi / 180.0;
     _currentVector = WindVector(
@@ -229,8 +236,24 @@ class WindAnimationProvider extends ChangeNotifier {
   void clearCache() => _cache.clear();
 
   static String directionToText(int deg) {
-    const dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
-                  'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO'];
+    const dirs = [
+      'N',
+      'NNE',
+      'NE',
+      'ENE',
+      'E',
+      'ESE',
+      'SE',
+      'SSE',
+      'S',
+      'SSO',
+      'SO',
+      'OSO',
+      'O',
+      'ONO',
+      'NO',
+      'NNO'
+    ];
     final index = ((deg + 11.25) / 22.5).floor() % 16;
     return dirs[index];
   }

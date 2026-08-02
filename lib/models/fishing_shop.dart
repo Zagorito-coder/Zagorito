@@ -38,7 +38,8 @@ class FishingShop {
   factory FishingShop.fromCsv(String line, {required int index}) {
     final parts = line.split(',');
     if (parts.length < 8) {
-      throw const FormatException('Ligne invalide: besoin d\'au moins 8 colonnes');
+      throw const FormatException(
+          'Ligne invalide: besoin d\'au moins 8 colonnes');
     }
 
     final name = parts[0].trim();
@@ -55,7 +56,11 @@ class FishingShop {
     }
 
     final tags = parts.length > 8
-        ? parts[8].split('|').map((s) => s.trim()).where((s) => s.isNotEmpty).toList()
+        ? parts[8]
+            .split('|')
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty)
+            .toList()
         : <String>[];
 
     final rating = parts.length > 9 ? double.tryParse(parts[9]) : null;
@@ -88,24 +93,25 @@ class FishingShop {
       closeTime: json['closeTime'] as String,
       tags: List<String>.from(json['tags'] as List? ?? []),
       isOpen: json['isOpen'] as bool? ?? true,
-      rating: json['rating'] != null ? (json['rating'] as num).toDouble() : null,
+      rating:
+          json['rating'] != null ? (json['rating'] as num).toDouble() : null,
     );
   }
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'latitude': latitude,
-    'longitude': longitude,
-    'phone': phone,
-    'address': address,
-    'imageUrl': imageUrl,
-    'openTime': openTime,
-    'closeTime': closeTime,
-    'tags': tags,
-    'isOpen': isOpen,
-    'rating': rating,
-  };
+        'id': id,
+        'name': name,
+        'latitude': latitude,
+        'longitude': longitude,
+        'phone': phone,
+        'address': address,
+        'imageUrl': imageUrl,
+        'openTime': openTime,
+        'closeTime': closeTime,
+        'tags': tags,
+        'isOpen': isOpen,
+        'rating': rating,
+      };
 }
 
 /// Groupe de magasins associés à un spot

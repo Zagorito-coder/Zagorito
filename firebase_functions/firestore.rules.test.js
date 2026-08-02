@@ -68,7 +68,13 @@ async function seedAcceptedProfile(uid) {
   });
 }
 
-async function publish(db, uid, postId, photoOwnerUid = uid) {
+async function publish(
+  db,
+  uid,
+  postId,
+  photoOwnerUid = uid,
+  overrides = {},
+) {
   const batch = writeBatch(db);
   const data = catchData(
     uid,
@@ -79,6 +85,7 @@ async function publish(db, uid, postId, photoOwnerUid = uid) {
     doc(db, 'community_catches', postId),
     {
       ...data,
+      ...overrides,
       photoObjectKey: objectKey,
       photoUrl:
         `https://boosterfish-offline-maps.boosterfish-maps.workers.dev/` +
@@ -132,6 +139,43 @@ test('publication requires consent and the atomic 24-hour state write',
   );
   await assertSucceeds(publish(ownerDb, ownerUid, 'first-publication'));
   await assertFails(publish(ownerDb, ownerUid, 'second-publication'));
+});
+
+test('publication only accepts the strict Google avatar host', async () => {
+  const allowedUid = 'avatar-allowed';
+  await seedAcceptedProfile(allowedUid);
+  await assertSucceeds(publish(
+    environment.authenticatedContext(allowedUid).firestore(),
+    allowedUid,
+    'allowed-avatar',
+    allowedUid,
+    {
+      avatarUrl:
+        'https://lh3.googleusercontent.com/a/avatar_ABC-123=s96-c?sz=96',
+    },
+  ));
+
+  for (const [uid, avatarUrl] of [
+    ['avatar-tracker', 'https://tracker.example/avatar.png'],
+    [
+      'avatar-lookalike',
+      'https://lh3.googleusercontent.com.tracker.example/avatar.png',
+    ],
+    [
+      'avatar-credentials',
+      'https://tracker.example@lh3.googleusercontent.com/avatar.png',
+    ],
+    ['avatar-port', 'https://lh3.googleusercontent.com:444/avatar.png'],
+  ]) {
+    await seedAcceptedProfile(uid);
+    await assertFails(publish(
+      environment.authenticatedContext(uid).firestore(),
+      uid,
+      `${uid}-post`,
+      uid,
+      {avatarUrl},
+    ));
+  }
 });
 
 test('active feed query is public while unbounded feed queries are denied',
@@ -279,6 +323,75 @@ test('reports and blocks cannot target the current user', async () => {
       },
     ),
   );
+});
+
+test('a report cannot be deleted, updated, or recreated by its author',
+    async () => {
+  const ownerUid = 'reported-owner';
+  const reporterUid = 'reporter-1';
+  await seedAcceptedProfile(ownerUid);
+  await publish(
+    environment.authenticatedContext(ownerUid).firestore(),
+    ownerUid,
+    'reported-post',
+  );
+  const reporterDb = environment
+    .authenticatedContext(reporterUid)
+    .firestore();
+  const report = doc(
+    reporterDb,
+    'community_reports',
+    `${reporterUid}_reported-post`,
+  );
+  const data = {
+    schemaVersion: 1,
+    reporterUid,
+    postId: 'reported-post',
+    postOwnerUid: ownerUid,
+    reason: 'other',
+    status: 'pending',
+    createdAt: serverTimestamp(),
+  };
+  await assertSucceeds(setDoc(report, data));
+  await assertFails(deleteDoc(report));
+  await assertFails(setDoc(report, {...data, reason: 'privacy'}));
+});
+
+test('reports are rejected for expired or non-published catches', async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    const admin = context.firestore();
+    await setDoc(doc(admin, 'community_catches', 'under-review'), {
+      ...catchData(
+        'owner-1',
+        Timestamp.fromMillis(Date.now() + 60 * 60 * 1000),
+      ),
+      status: 'under_review',
+      createdAt: Timestamp.now(),
+    });
+    await setDoc(doc(admin, 'community_catches', 'expired-report-target'), {
+      ...catchData(
+        'owner-1',
+        Timestamp.fromMillis(Date.now() - 60 * 1000),
+      ),
+      createdAt: Timestamp.fromMillis(Date.now() - 8 * 24 * 60 * 60 * 1000),
+    });
+  });
+  const reporterUid = 'reporter-1';
+  const reporterDb = environment.authenticatedContext(reporterUid).firestore();
+  for (const postId of ['under-review', 'expired-report-target']) {
+    await assertFails(setDoc(
+      doc(reporterDb, 'community_reports', `${reporterUid}_${postId}`),
+      {
+        schemaVersion: 1,
+        reporterUid,
+        postId,
+        postOwnerUid: 'owner-1',
+        reason: 'other',
+        status: 'pending',
+        createdAt: serverTimestamp(),
+      },
+    ));
+  }
 });
 
 test('only the owner can remove a published catch', async () => {

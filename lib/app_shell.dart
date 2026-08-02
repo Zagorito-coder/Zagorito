@@ -1,6 +1,6 @@
 // ============================================================
 //  app_shell.dart — Shell de navigation principal
-//  BottomNavBar custom avec : Home, Fish, Add, Map, Settings
+//  BottomNavBar custom avec : Accueil, Marées, Spots, Mes spots, Paramètres
 //  + Bouton toggle thème Clair/Sombre intégré
 // ============================================================
 
@@ -34,7 +34,15 @@ final GlobalKey<AppShellState> appShellKey = GlobalKey<AppShellState>();
 /// Shell principal de l'application avec navigation par onglets
 class AppShell extends StatefulWidget {
   final List<Spot>? initialSpots;
-  const AppShell({super.key, this.initialSpots});
+
+  @visibleForTesting
+  final Widget Function(int index)? pageBuilderForTesting;
+
+  const AppShell({
+    super.key,
+    this.initialSpots,
+    this.pageBuilderForTesting,
+  });
 
   @override
   State<AppShell> createState() => AppShellState();
@@ -76,9 +84,11 @@ class AppShellState extends State<AppShell> {
   }
 
   Widget _buildPage(int index) {
+    final testPageBuilder = widget.pageBuilderForTesting;
+    if (testPageBuilder != null) return testPageBuilder(index);
     return switch (index) {
       0 => HomePageWrapper(initialSpots: widget.initialSpots),
-      1 => const SpeciesPageWrapper(),
+      1 => const TidePage(embeddedInBottomNavigation: true),
       2 => MySpotsPage(
           onAddSpot: openSpotCreation,
           onOpenFavorite: openFavoriteSpot,
@@ -284,9 +294,9 @@ class AppShellState extends State<AppShell> {
                       ),
                       Expanded(
                         child: _NavItem(
-                          itemKey: const ValueKey<String>('bottom-nav-fish'),
-                          icon: Icons.set_meal_rounded,
-                          label: context.tr('bottomNav.fish'),
+                          itemKey: const ValueKey<String>('bottom-nav-tides'),
+                          icon: Icons.waves_rounded,
+                          label: context.tr('bottomNav.tides'),
                           isActive: _currentIndex == 1,
                           onTap: () => navigateTo(1),
                         ),
@@ -571,11 +581,11 @@ class HomePageWrapper extends StatelessWidget {
     return HomePage(
       initialSpots: initialSpots,
       onNavigateToSpots: () => appShellKey.currentState?.navigateTo(3),
-      onNavigateToSpecies: () => appShellKey.currentState?.navigateTo(1),
+      onNavigateToSpecies: () => _goTo(context, const SpeciesPage()),
       onNavigateToTechniques: () => _goTo(context, const TechniquesPage()),
       onNavigateToCommunity: () => _goTo(context, const CommunityPage()),
       onNavigateToShops: () => _goTo(context, const ShopsPage()),
-      onNavigateToTides: () => _goTo(context, const TidePage()),
+      onNavigateToTides: () => appShellKey.currentState?.navigateTo(1),
       // Debug route / bouton caché : long-press sur "Marées" dans le drawer
       onNavigateToTidesV2: () => _goTo(context, const ForecastPage()),
     );
@@ -585,15 +595,6 @@ class HomePageWrapper extends StatelessWidget {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => page),
     );
-  }
-}
-
-class SpeciesPageWrapper extends StatelessWidget {
-  const SpeciesPageWrapper({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const SpeciesPage();
   }
 }
 

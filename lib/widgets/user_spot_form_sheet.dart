@@ -181,6 +181,7 @@ class _UserSpotFormSheetState extends State<_UserSpotFormSheet> {
       UserSpotFailure.limitReached => 'mySpots.personalLimitReached',
       UserSpotFailure.invalidPhoto => 'mySpots.photoTooLarge',
       UserSpotFailure.photoUploadFailed => 'mySpots.photoUploadError',
+      UserSpotFailure.appCheckUnavailable => 'mySpots.appCheckError',
       UserSpotFailure.permissionDenied => 'mySpots.permissionError',
       UserSpotFailure.unavailable => 'mySpots.saveError',
     };

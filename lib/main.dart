@@ -686,7 +686,7 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen>
-    with AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin, SingleTickerProviderStateMixin {
   @override
   bool get wantKeepAlive => true;
 
@@ -714,6 +714,9 @@ class _MapScreenState extends State<MapScreen>
   int _lastSpotSelectionRequest = 0;
   int _lastUserSpotSelectionRequest = 0;
   int _cameraFlightSerial = 0;
+  late final AnimationController _cameraFlightController;
+  MapFlightPlan? _cameraFlightPlan;
+  Duration _lastCameraFlightFrame = Duration.zero;
   final List<LatLng> _measurePoints = [];
   double _measuredDistanceKm = 0.0;
   MapStyle _mapStyle = MapStyle.satellite;
@@ -751,6 +754,8 @@ class _MapScreenState extends State<MapScreen>
   @override
   void initState() {
     super.initState();
+    _cameraFlightController = AnimationController(vsync: this)
+      ..addListener(_applyCameraFlightFrame);
     _lastAddSpotRequest = widget.addSpotRequests?.value ?? 0;
     widget.addSpotRequests?.addListener(_handleAddSpotRequest);
     _lastSpotSelectionRequest =
@@ -902,8 +907,7 @@ class _MapScreenState extends State<MapScreen>
         _lastPosition = pos;
         _currentPosition = pos;
         setState(() {
-          _gpsCourseOverGround =
-              _isCompassEnabled ? gpsCourseOverGround : null;
+          _gpsCourseOverGround = _isCompassEnabled ? gpsCourseOverGround : null;
         });
       },
       onError: (Object error) {
@@ -925,6 +929,7 @@ class _MapScreenState extends State<MapScreen>
   void dispose() {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _cancelCameraFlight();
+    _cameraFlightController.dispose();
     _mapController.dispose();
     _searchController.dispose();
     _debounceTimer?.cancel();
@@ -1020,6 +1025,8 @@ class _MapScreenState extends State<MapScreen>
   Future<void> _animateToPoint(LatLng target) async {
     if (!_isValidMapPoint(target)) return;
     final flightSerial = ++_cameraFlightSerial;
+    _cameraFlightController.stop();
+    _cameraFlightPlan = null;
 
     late final MapCamera camera;
     try {
@@ -1042,32 +1049,50 @@ class _MapScreenState extends State<MapScreen>
       targetZoom: targetZoom,
       distanceKm: distanceKm,
     );
-    final stopwatch = Stopwatch()..start();
+    _cameraFlightPlan = plan;
+    _lastCameraFlightFrame = Duration.zero;
+    _cameraFlightController.duration = plan.duration;
 
-    while (true) {
-      if (!mounted || flightSerial != _cameraFlightSerial) return;
-      final progress =
-          (stopwatch.elapsedMicroseconds / plan.duration.inMicroseconds)
-              .clamp(0.0, 1.0)
-              .toDouble();
-      try {
-        _mapController.move(
-          plan.centerAt(progress),
-          plan.zoomAt(progress),
-        );
-      } catch (_) {
-        return;
-      }
-      if (progress >= 1) break;
-      await Future<void>.delayed(MapFlightPlan.frameInterval);
+    try {
+      await _cameraFlightController.forward(from: 0).orCancel;
+    } on TickerCanceled {
+      return;
     }
 
     if (mounted && flightSerial == _cameraFlightSerial) {
       setState(() => _currentZoom = targetZoom);
+      _cameraFlightPlan = null;
     }
   }
 
-  void _cancelCameraFlight() => _cameraFlightSerial++;
+  void _applyCameraFlightFrame() {
+    final plan = _cameraFlightPlan;
+    if (plan == null || !mounted) return;
+
+    final elapsed =
+        _cameraFlightController.lastElapsedDuration ?? Duration.zero;
+    final isFinalFrame = _cameraFlightController.value >= 1;
+    if (!isFinalFrame &&
+        elapsed - _lastCameraFlightFrame < MapFlightPlan.frameInterval) {
+      return;
+    }
+    _lastCameraFlightFrame = elapsed;
+
+    try {
+      _mapController.move(
+        plan.centerAt(_cameraFlightController.value),
+        plan.zoomAt(_cameraFlightController.value),
+      );
+    } catch (_) {
+      _cancelCameraFlight();
+    }
+  }
+
+  void _cancelCameraFlight() {
+    _cameraFlightSerial++;
+    _cameraFlightController.stop();
+    _cameraFlightPlan = null;
+  }
 
   Future<void> _selectSpot(Spot spot) async {
     setState(() {

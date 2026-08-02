@@ -53,26 +53,27 @@ class FishModel {
       minSize: (json['minSize'] as num).toDouble(),
       averageWeight: (json['averageWeight'] as num).toDouble(),
       fishingAdvice: json['fishingAdvice'] as String,
-      compatibleSpotTypes: List<String>.from(json['compatibleSpotTypes'] as List? ?? []),
+      compatibleSpotTypes:
+          List<String>.from(json['compatibleSpotTypes'] as List? ?? []),
     );
   }
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'scientificName': scientificName,
-    'imageUrl': imageUrl,
-    'description': description,
-    'techniques': techniques,
-    'montage': montage,
-    'baits': baits,
-    'bestSeason': bestSeason,
-    'habitat': habitat,
-    'minSize': minSize,
-    'averageWeight': averageWeight,
-    'fishingAdvice': fishingAdvice,
-    'compatibleSpotTypes': compatibleSpotTypes,
-  };
+        'id': id,
+        'name': name,
+        'scientificName': scientificName,
+        'imageUrl': imageUrl,
+        'description': description,
+        'techniques': techniques,
+        'montage': montage,
+        'baits': baits,
+        'bestSeason': bestSeason,
+        'habitat': habitat,
+        'minSize': minSize,
+        'averageWeight': averageWeight,
+        'fishingAdvice': fishingAdvice,
+        'compatibleSpotTypes': compatibleSpotTypes,
+      };
 
   FishModel copyWith({
     String? id,

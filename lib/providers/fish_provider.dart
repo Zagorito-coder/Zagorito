@@ -192,7 +192,6 @@ class FishProvider extends ChangeNotifier {
     _isDisposed = true;
     super.dispose();
   }
-
 }
 
 class _NearbyArgs {

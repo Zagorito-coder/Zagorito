@@ -7,6 +7,9 @@
   "engines": {
     "node": "22"
   },
+  "scripts": {
+    "test": "node --test index.test.js"
+  },
   "dependencies": {
     "firebase-admin": "14.2.0",
     "firebase-functions": "7.3.2"

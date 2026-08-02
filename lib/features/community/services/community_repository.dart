@@ -10,6 +10,20 @@ import 'package:spots_app/features/community/services/community_photo_service.da
 import 'package:spots_app/features/community/services/community_privacy.dart';
 import 'package:spots_app/features/community/services/private_catch_repository.dart';
 
+/// Identité affichée dans la galerie publique, indépendante du nom du compte
+/// Google. Les valeurs par défaut conservent le comportement historique.
+class CommunityPublicProfile {
+  const CommunityPublicProfile({
+    required this.publicDisplayName,
+    required this.publishAnonymously,
+    required this.hasSavedPreference,
+  });
+
+  final String publicDisplayName;
+  final bool publishAnonymously;
+  final bool hasSavedPreference;
+}
+
 class CommunityRepository {
   CommunityRepository({
     FirebaseFirestore? firestore,
@@ -27,15 +41,83 @@ class CommunityRepository {
 
   static final instance = CommunityRepository();
   static const termsVersion = 1;
+  static const publicProfileCollection = 'community_public_profiles';
+  static const anonymousDisplayName = 'Pêcheur anonyme';
 
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
   final FirebaseFunctions _functions;
   final CommunityPhotoService _photoService;
   final PrivateCatchRepository _privateRepository;
+  CommunityPublicProfile? _publicProfileCache;
+  String? _publicProfileCacheUid;
 
   CollectionReference<Map<String, dynamic>> get _catches =>
       _firestore.collection('community_catches');
+
+  Future<CommunityPublicProfile> loadPublicProfile() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      return const CommunityPublicProfile(
+        publicDisplayName: '',
+        publishAnonymously: true,
+        hasSavedPreference: false,
+      );
+    }
+    if (_publicProfileCacheUid == user.uid && _publicProfileCache != null) {
+      return _publicProfileCache!;
+    }
+
+    final fallback = CommunityPublicProfile(
+      publicDisplayName: _fallbackPublicName(user),
+      publishAnonymously: false,
+      hasSavedPreference: false,
+    );
+    final snapshot = await _firestore
+        .collection(publicProfileCollection)
+        .doc(user.uid)
+        .get();
+    final data = snapshot.data();
+    final savedName = data?['publicDisplayName'];
+    final profile = CommunityPublicProfile(
+      publicDisplayName: savedName is String && savedName.trim().isNotEmpty
+          ? savedName.trim()
+          : fallback.publicDisplayName,
+      publishAnonymously: data?['publishAnonymously'] == true,
+      hasSavedPreference: snapshot.exists,
+    );
+    _publicProfileCacheUid = user.uid;
+    _publicProfileCache = profile;
+    return profile;
+  }
+
+  Future<void> savePublicProfile({
+    required bool publishAnonymously,
+    required String publicDisplayName,
+  }) async {
+    final user = _requireUser();
+    final cleanName = publicDisplayName.trim();
+    if (!publishAnonymously &&
+        (cleanName.length < 2 || cleanName.length > 40)) {
+      throw const FormatException(
+        'Le surnom public doit contenir entre 2 et 40 caractères.',
+      );
+    }
+    final profile = CommunityPublicProfile(
+      publicDisplayName: publishAnonymously ? '' : cleanName,
+      publishAnonymously: publishAnonymously,
+      hasSavedPreference: true,
+    );
+    await _firestore.collection(publicProfileCollection).doc(user.uid).set({
+      'schemaVersion': 1,
+      'ownerUid': user.uid,
+      'publicDisplayName': profile.publicDisplayName,
+      'publishAnonymously': profile.publishAnonymously,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    _publicProfileCacheUid = user.uid;
+    _publicProfileCache = profile;
+  }
 
   Stream<List<CommunityCatch>> watchActiveCatches() {
     final now = Timestamp.now();
@@ -144,6 +226,7 @@ class CommunityRepository {
       final expiresAt = Timestamp.fromDate(
         DateTime.now().add(CommunityCatch.publicationLifetime),
       );
+      final publicName = await _publicName(user);
       await _firestore.runTransaction((transaction) async {
         final stateSnapshot = await transaction.get(state);
         final lastPublishedAt = stateSnapshot.data()?['lastPublishedAt'];
@@ -160,7 +243,7 @@ class CommunityRepository {
         transaction.set(document, {
           'schemaVersion': 1,
           'ownerUid': user.uid,
-          'anglerName': _publicName(user),
+          'anglerName': publicName,
           'avatarUrl': _safeAvatarUrl(user.photoURL),
           'photoUrl': uploaded!.url,
           'photoObjectKey': uploaded.objectKey,
@@ -375,7 +458,28 @@ class CommunityRepository {
     }
   }
 
-  static String _publicName(User user) {
+  Future<String> _publicName(User user) async {
+    try {
+      final profile = await loadPublicProfile();
+      if (profile.publishAnonymously) return anonymousDisplayName;
+      if (profile.publicDisplayName.isNotEmpty) {
+        return profile.publicDisplayName;
+      }
+    } catch (error, stackTrace) {
+      // L’identité publique est optionnelle : une panne de son document ne
+      // doit jamais empêcher une publication déjà valide.
+      debugPrint(
+        '[CommunityRepository] Public profile unavailable: $error\n$stackTrace',
+      );
+    }
+    final displayName = user.displayName?.trim() ?? '';
+    if (displayName.isEmpty) return 'Pêcheur BoosterFish';
+    return displayName.length <= 80
+        ? displayName
+        : displayName.substring(0, 80);
+  }
+
+  static String _fallbackPublicName(User user) {
     final displayName = user.displayName?.trim() ?? '';
     if (displayName.isEmpty) return 'Pêcheur BoosterFish';
     return displayName.length <= 80
@@ -384,10 +488,7 @@ class CommunityRepository {
   }
 
   static String _safeAvatarUrl(String? value) {
-    final uri = Uri.tryParse(value ?? '');
-    if (uri == null || uri.scheme != 'https' || !uri.hasAuthority) return '';
-    final normalized = uri.toString();
-    return normalized.length <= 1024 ? normalized : '';
+    return safeCommunityAvatarUrl(value);
   }
 
   static String _zoneName(PrivateCatch item) {

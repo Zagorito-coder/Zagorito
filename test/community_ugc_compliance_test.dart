@@ -34,6 +34,11 @@ void main() {
 
   test('Firestore exige le consentement avant toute publication', () {
     final rules = File('firestore.rules').readAsStringSync();
+    final repository = File(
+      'lib/features/community/services/community_repository.dart',
+    ).readAsStringSync();
+    final settings = File('lib/pages/settings_page.dart').readAsStringSync();
+    final functions = File('firebase_functions/index.js').readAsStringSync();
 
     expect(rules, contains('communityProfileAccepted(request.auth.uid)'));
     expect(rules, contains('request.resource.data.termsAcceptedAt'));
@@ -41,8 +46,34 @@ void main() {
     expect(rules, contains("'child_safety'"));
     expect(
       rules,
+      contains("request.resource.data.avatarUrl.matches(\n"
+          "            '^https://lh3\\\\.googleusercontent"),
+    );
+    expect(
+      RegExp(
+        r'match /community_reports/\{reportId\}[\s\S]*?'
+        r'allow delete: if false;',
+      ).hasMatch(rules),
+      isTrue,
+    );
+    expect(
+      rules,
       contains('match /community_blocks/{userId}/users/{blockedUserId}'),
     );
+    expect(rules, contains('match /community_public_profiles/{userId}'));
+    expect(rules, contains("'publicDisplayName'"));
+    expect(rules, contains("'publishAnonymously'"));
+    expect(repository, contains('savePublicProfile'));
+    expect(repository, contains('loadPublicProfile'));
+    expect(repository, contains('hasSavedPreference: snapshot.exists'));
+    expect(repository, contains('hasSavedPreference: true'));
+    expect(repository, contains('Pêcheur anonyme'));
+    expect(settings, contains('_PublicProfileSheet'));
+    expect(settings, contains('_showUpdateHint = !profile.hasSavedPreference'));
+    expect(settings, contains('_showUpdateHint = false'));
+    expect(settings, contains('publicIdentityAnonymous'));
+    expect(
+        functions, contains("community_public_profiles').doc(uid).delete()"));
   });
 
   test('les CGU publient des standards explicites de sécurité des mineurs', () {

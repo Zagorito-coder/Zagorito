@@ -39,6 +39,7 @@
   "bottomNav": {
     "home": "Accueil",
     "fish": "Poissons",
+    "tides": "Marées",
     "map": "Carte",
     "settings": "Paramètres",
     "addSpot": "Mes spots"
@@ -313,6 +314,8 @@
   "privacySection": "Confidentialité",
   "termsOfService": "CGU",
   "termsOfServiceSubtitle": "Conditions Générales d'Utilisation",
+  "openSourceLicenses": "Licences open source",
+  "openSourceLicensesSubtitle": "Bibliothèques et mentions légales utilisées par BoosterFish",
   "deleteAccount": "Supprimer mon compte",
   "deleteAccountSubtitle": "Supprime définitivement votre compte et toutes vos données",
   "deleteAccountConfirm": "Cette action supprimera définitivement votre compte et les données associées. Continuer ?",
@@ -322,7 +325,19 @@
   "comingSoon": "{feature} — bientôt disponible",
   "linkOpenError": "Impossible d'ouvrir le lien",
   "editProfile": "Modifier le profil",
-  "name": "Nom"
+  "name": "Nom",
+  "profileSignInRequired": "Connectez-vous pour gérer votre identité publique.",
+  "publicIdentityTitle": "Identité publique",
+  "publicIdentitySubtitle": "Choisissez le nom visible sur vos prochaines publications communautaires.",
+  "publicIdentityAnonymous": "Rester anonyme",
+  "publicIdentityNickname": "Afficher mon surnom",
+  "publicIdentityNicknameHint": "Ex. NadirFish",
+  "publicIdentityPreview": "Aperçu public",
+  "publicIdentitySave": "Enregistrer mon choix",
+  "publicIdentitySaved": "Votre identité publique a été mise à jour.",
+  "publicIdentityLoadError": "Le profil public n’a pas pu être chargé. Vous pouvez réessayer.",
+  "publicIdentitySaveError": "Impossible d’enregistrer votre choix. Vérifiez votre connexion.",
+  "publicIdentityNicknameError": "Le surnom doit contenir entre 2 et 40 caractères."
   },
   "language": {
     "title": "Langue",
@@ -415,6 +430,7 @@
     "saving": "Enregistrement...",
     "saveError": "Impossible d'enregistrer le spot pour le moment.",
     "photoUploadError": "L'envoi de la photo a échoué. Vérifiez votre connexion.",
+    "appCheckError": "La vérification de sécurité est indisponible. Réessayez dans un instant.",
     "permissionError": "Votre compte n'est pas autorisé à effectuer cette opération.",
     "signInRequired": "Connectez-vous avec Google pour enregistrer ce spot.",
     "duplicatePrivate": "Vous avez déjà un spot enregistré très près de ce point.",

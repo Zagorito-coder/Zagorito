@@ -1,5 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+final RegExp _trustedCommunityAvatarPattern = RegExp(
+  r'^https://lh3\.googleusercontent\.com/[A-Za-z0-9_./%=-]+'
+  r'(\?[A-Za-z0-9_&.=%-]+)?$',
+);
+
+String safeCommunityAvatarUrl(Object? value) {
+  if (value is! String) return '';
+  final trimmed = value.trim();
+  if (trimmed.isEmpty || trimmed.length > 1024) return '';
+  return _trustedCommunityAvatarPattern.hasMatch(trimmed) ? trimmed : '';
+}
+
 class CommunityCatch {
   const CommunityCatch({
     required this.id,
@@ -89,7 +101,7 @@ class CommunityCatch {
       id: document.id,
       ownerUid: ownerUid,
       anglerName: anglerName,
-      avatarUrl: _optionalString(data['avatarUrl'], 1024),
+      avatarUrl: safeCommunityAvatarUrl(data['avatarUrl']),
       photoUrl: photoUrl,
       photoObjectKey: photoObjectKey,
       species: species,
@@ -184,7 +196,7 @@ class WeeklyCommunityWinner {
     return WeeklyCommunityWinner(
       catchId: catchId,
       anglerName: anglerName,
-      avatarUrl: data['avatarUrl'] is String ? data['avatarUrl'] as String : '',
+      avatarUrl: safeCommunityAvatarUrl(data['avatarUrl']),
       photoUrl: photoUrl,
       species: species,
       weightKg: weightKg.toDouble(),

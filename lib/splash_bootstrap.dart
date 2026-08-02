@@ -6,7 +6,12 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, kDebugMode, kIsWeb, TargetPlatform;
+    show
+        defaultTargetPlatform,
+        kIsWeb,
+        kReleaseMode,
+        TargetPlatform,
+        visibleForTesting;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemChrome, SystemUiMode;
 import 'package:provider/provider.dart';
@@ -129,9 +134,9 @@ class _SplashBootstrapState extends State<SplashBootstrap> {
 
     if (defaultTargetPlatform == TargetPlatform.android) {
       await FirebaseAppCheck.instance.activate(
-        providerAndroid: kDebugMode
-            ? const AndroidDebugProvider()
-            : const AndroidPlayIntegrityProvider(),
+        providerAndroid: appCheckAndroidProvider(
+          releaseMode: kReleaseMode,
+        ),
       );
       return;
     }
@@ -139,9 +144,9 @@ class _SplashBootstrapState extends State<SplashBootstrap> {
     if (defaultTargetPlatform == TargetPlatform.iOS ||
         defaultTargetPlatform == TargetPlatform.macOS) {
       await FirebaseAppCheck.instance.activate(
-        providerApple: kDebugMode
-            ? const AppleDebugProvider()
-            : const AppleDeviceCheckProvider(),
+        providerApple: appCheckAppleProvider(
+          releaseMode: kReleaseMode,
+        ),
       );
     }
   }
@@ -240,4 +245,25 @@ class _SplashBootstrapState extends State<SplashBootstrap> {
       ),
     );
   }
+}
+
+/// Les builds Debug et Profile sont installées localement et utilisent le
+/// fournisseur de développement. Seule la Release distribuable demande une
+/// attestation Play Integrity réelle.
+@visibleForTesting
+AndroidAppCheckProvider appCheckAndroidProvider({
+  required bool releaseMode,
+}) {
+  return releaseMode
+      ? const AndroidPlayIntegrityProvider()
+      : const AndroidDebugProvider();
+}
+
+@visibleForTesting
+AppleAppCheckProvider appCheckAppleProvider({
+  required bool releaseMode,
+}) {
+  return releaseMode
+      ? const AppleDeviceCheckProvider()
+      : const AppleDebugProvider();
 }

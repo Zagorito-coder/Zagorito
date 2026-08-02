@@ -79,7 +79,8 @@ class FishSpecies {
         final beforeBrackets = trimmed.substring(0, bracketIdx).trim();
         final closeBracketIdx = trimmed.lastIndexOf(']');
         if (closeBracketIdx != -1) {
-          baitSection = trimmed.substring(bracketIdx + 1, closeBracketIdx).trim();
+          baitSection =
+              trimmed.substring(bracketIdx + 1, closeBracketIdx).trim();
         }
 
         // Parse nom et description
@@ -142,8 +143,10 @@ class FishSpecies {
       habitat: cols[6].trim(),
       sizeMinCm: int.tryParse(cols[7].trim()) ?? 0,
       sizeMaxCm: int.tryParse(cols[8].trim()) ?? 0,
-      weightMinKg: double.tryParse(cols[9].trim().replaceFirst(',', '.')) ?? 0.0,
-      weightMaxKg: double.tryParse(cols[10].trim().replaceFirst(',', '.')) ?? 0.0,
+      weightMinKg:
+          double.tryParse(cols[9].trim().replaceFirst(',', '.')) ?? 0.0,
+      weightMaxKg:
+          double.tryParse(cols[10].trim().replaceFirst(',', '.')) ?? 0.0,
       season: cols[11].trim(),
       techniques: parseTechniques(cols[12].trim()),
       description: cols[13].trim(),

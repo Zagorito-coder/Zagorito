@@ -25,6 +25,7 @@ class _SpeciesPageState extends State<SpeciesPage> {
   String? _error;
   String _searchQuery = '';
   String? _regionFilter;
+  int _loadRequestId = 0;
 
   final List<String> _regionKeys = [
     'species.all',
@@ -38,7 +39,7 @@ class _SpeciesPageState extends State<SpeciesPage> {
   void initState() {
     super.initState();
     LanguageController.instance.addListener(_onLanguageChanged);
-    _loadData();
+    _loadData(resetState: false);
   }
 
   @override
@@ -51,25 +52,34 @@ class _SpeciesPageState extends State<SpeciesPage> {
     SpeciesService.clearCache();
     setState(() {
       _loading = true;
+      _error = null;
       _regionFilter = null;
       _searchQuery = '';
     });
-    _loadData();
+    _loadData(resetState: false);
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadData({bool resetState = true}) async {
+    final requestId = ++_loadRequestId;
+    if (resetState && mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final data = await SpeciesService.loadSpecies();
-      if (!mounted) return;
+      if (!mounted || requestId != _loadRequestId) return;
       setState(() {
         _allSpecies = data;
         _filtered = data;
         _loading = false;
+        _error = null;
       });
     } catch (e, st) {
+      if (!mounted || requestId != _loadRequestId) return;
       debugPrint('[SpeciesPage] Erreur chargement espèces: $e');
       debugPrint('$st');
-      if (!mounted) return;
       setState(() {
         _error = e.toString();
         _loading = false;
@@ -115,7 +125,6 @@ class _SpeciesPageState extends State<SpeciesPage> {
                       subtitle: context.trArgs('species.speciesCount', args: {
                         'count': _allSpecies.length.toString(),
                       }),
-                      backToHome: true,
                     ),
                     const SizedBox(height: 12),
                     const BoosterFishPageHero(

@@ -39,6 +39,7 @@
   "bottomNav": {
     "home": "Home",
     "fish": "Fish",
+    "tides": "Tides",
     "map": "Map",
     "settings": "Settings",
     "addSpot": "My Spots"
@@ -313,6 +314,8 @@
     "privacySection": "Privacy",
     "termsOfService": "Terms of service",
     "termsOfServiceSubtitle": "Terms and conditions of use",
+    "openSourceLicenses": "Open-source licences",
+    "openSourceLicensesSubtitle": "Libraries and legal notices used by BoosterFish",
     "deleteAccount": "Delete my account",
     "deleteAccountSubtitle": "Permanently delete your account and all your data",
     "deleteAccountConfirm": "This will permanently delete your account and associated data. Continue?",
@@ -322,7 +325,19 @@
     "comingSoon": "{feature} — coming soon",
     "linkOpenError": "Unable to open the link",
     "editProfile": "Edit profile",
-    "name": "Name"
+    "name": "Name",
+    "profileSignInRequired": "Sign in to manage your public identity.",
+    "publicIdentityTitle": "Public identity",
+    "publicIdentitySubtitle": "Choose the name shown on your next community posts.",
+    "publicIdentityAnonymous": "Stay anonymous",
+    "publicIdentityNickname": "Show my nickname",
+    "publicIdentityNicknameHint": "e.g. NadirFish",
+    "publicIdentityPreview": "Public preview",
+    "publicIdentitySave": "Save my choice",
+    "publicIdentitySaved": "Your public identity has been updated.",
+    "publicIdentityLoadError": "The public profile could not be loaded. You can try again.",
+    "publicIdentitySaveError": "Unable to save your choice. Check your connection.",
+    "publicIdentityNicknameError": "The nickname must contain between 2 and 40 characters."
   },
   "language": {
     "title": "Language",
@@ -415,6 +430,7 @@
     "saving": "Saving...",
     "saveError": "The spot cannot be saved right now.",
     "photoUploadError": "The photo upload failed. Check your connection.",
+    "appCheckError": "The security check is unavailable. Please try again shortly.",
     "permissionError": "Your account is not allowed to perform this operation.",
     "signInRequired": "Sign in with Google to save this spot.",
     "duplicatePrivate": "You already have a saved spot very close to this point.",

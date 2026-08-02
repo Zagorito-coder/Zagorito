@@ -27,7 +27,10 @@ class TideForecastMapper {
           final windModel = _asMap(models?['hires']) ?? _asMap(models?['wind']);
           final height = _number(slot, 'wave_height_m') ??
               _number(waveModel, 'wave_height_m');
-          if (time == null || height == null || !height.isFinite || height < 0) {
+          if (time == null ||
+              height == null ||
+              !height.isFinite ||
+              height < 0) {
             continue;
           }
 
@@ -43,8 +46,8 @@ class TideForecastMapper {
                 _number(slot, 'wave_period_s') ??
                 7,
             windWaveHeight: _number(waveModel, 'windwave_height_m') ?? height,
-            temperatureC: _number(windModel, 'temp_c') ??
-                _number(slot, 'temp_c'),
+            temperatureC:
+                _number(windModel, 'temp_c') ?? _number(slot, 'temp_c'),
             windSpeedKmh:
                 windSpeedKnots == null ? null : windSpeedKnots * 1.852,
           ));

@@ -65,14 +65,10 @@ class SpotLegend extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 6),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected
-              ? color.withValues(alpha: 0.2)
-              : Colors.transparent,
+          color: isSelected ? color.withValues(alpha: 0.2) : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected
-                ? color.withValues(alpha: 0.6)
-                : tc.glassBorder,
+            color: isSelected ? color.withValues(alpha: 0.6) : tc.glassBorder,
             width: 1,
           ),
         ),
@@ -101,11 +97,8 @@ class SpotLegend extends StatelessWidget {
               child: Text(
                 type.label,
                 style: AppTextStyles.labelMedium(context).copyWith(
-                  color: isSelected
-                      ? tc.textPrimary
-                      : tc.textSecondary,
-                  fontWeight:
-                      isSelected ? FontWeight.w600 : FontWeight.w500,
+                  color: isSelected ? tc.textPrimary : tc.textSecondary,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                 ),
               ),
             ),
@@ -554,8 +547,7 @@ class _WavePainter extends CustomPainter {
     path.moveTo(0, size.height);
 
     for (double x = 0; x <= size.width; x += 5) {
-      final y = size.height * 0.5 +
-          10 * math.sin(x / size.width * 4 * math.pi);
+      final y = size.height * 0.5 + 10 * math.sin(x / size.width * 4 * math.pi);
       path.lineTo(x, y);
     }
 

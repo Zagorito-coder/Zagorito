@@ -39,6 +39,7 @@
   "bottomNav": {
     "home": "Inicio",
     "fish": "Peces",
+    "tides": "Mareas",
     "map": "Mapa",
     "settings": "Ajustes",
     "addSpot": "Mis spots"
@@ -313,6 +314,8 @@
     "privacySection": "Privacidad",
     "termsOfService": "Términos de servicio",
     "termsOfServiceSubtitle": "Condiciones generales de uso",
+    "openSourceLicenses": "Licencias de código abierto",
+    "openSourceLicensesSubtitle": "Bibliotecas y avisos legales utilizados por BoosterFish",
     "deleteAccount": "Eliminar mi cuenta",
     "deleteAccountSubtitle": "Elimina permanentemente tu cuenta y todos tus datos",
     "deleteAccountConfirm": "Esta acción eliminará permanentemente tu cuenta y los datos asociados. ¿Continuar?",
@@ -322,7 +325,19 @@
     "comingSoon": "{feature} — próximamente",
     "linkOpenError": "No se pudo abrir el enlace",
     "editProfile": "Editar perfil",
-    "name": "Nombre"
+    "name": "Nombre",
+    "profileSignInRequired": "Inicia sesión para gestionar tu identidad pública.",
+    "publicIdentityTitle": "Identidad pública",
+    "publicIdentitySubtitle": "Elige el nombre que aparecerá en tus próximas publicaciones comunitarias.",
+    "publicIdentityAnonymous": "Permanecer anónimo",
+    "publicIdentityNickname": "Mostrar mi apodo",
+    "publicIdentityNicknameHint": "p. ej. NadirFish",
+    "publicIdentityPreview": "Vista previa pública",
+    "publicIdentitySave": "Guardar mi elección",
+    "publicIdentitySaved": "Tu identidad pública se ha actualizado.",
+    "publicIdentityLoadError": "No se pudo cargar el perfil público. Puedes intentarlo de nuevo.",
+    "publicIdentitySaveError": "No se pudo guardar tu elección. Comprueba tu conexión.",
+    "publicIdentityNicknameError": "El apodo debe tener entre 2 y 40 caracteres."
   },
   "language": {
     "title": "Idioma",
@@ -415,6 +430,7 @@
     "saving": "Guardando...",
     "saveError": "No se puede guardar el spot en este momento.",
     "photoUploadError": "Error al enviar la foto. Comprueba tu conexión.",
+    "appCheckError": "La verificación de seguridad no está disponible. Inténtalo de nuevo en unos instantes.",
     "permissionError": "Tu cuenta no está autorizada para realizar esta operación.",
     "signInRequired": "Inicia sesión con Google para guardar este spot.",
     "duplicatePrivate": "Ya tienes un spot guardado muy cerca de este punto.",

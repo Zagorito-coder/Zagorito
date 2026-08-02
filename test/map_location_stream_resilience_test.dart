@@ -8,14 +8,28 @@ void main() {
           '\r\n',
           '\n',
         );
-    final start = source.indexOf('  void _initPositionStream()');
-    final end = source.indexOf('\n  @override\n  void dispose()', start);
+    final signature = RegExp(
+      r'void\s+_initPositionStream\s*\(\s*\{\s*bool\s+'
+      r'startedForCompass\s*=\s*false\s*\}\s*\)',
+    ).firstMatch(source);
 
-    expect(start, greaterThanOrEqualTo(0));
+    expect(
+      signature,
+      isNotNull,
+      reason:
+          'Le flux doit conserver son paramètre nommé de propriété boussole.',
+    );
+    final start = signature!.start;
+    final end = source.indexOf('\n  @override\n  void dispose()', start);
     expect(end, greaterThan(start));
     final method = source.substring(start, end);
 
-    expect(method, contains('if (_positionSubscription != null) return;'));
+    expect(method, contains('if (_positionSubscription != null) {'));
+    expect(
+      method,
+      contains(
+          'if (!startedForCompass) _positionStreamStartedForCompass = false;'),
+    );
     expect(method, contains('onError: (Object error)'));
     expect(method, contains('_positionSubscription = null;'));
     expect(method, contains('_currentPosition = null;'));
