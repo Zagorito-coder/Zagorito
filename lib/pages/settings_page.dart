@@ -112,15 +112,7 @@ class SettingsPage extends StatelessWidget {
                           onTap: () => _showComingSoon(
                               context, context.tr('settings.mySpots')),
                         ),
-                        _SettingsRow(
-                          icon: Icons.people,
-                          iconColor: const Color(0xFF7C3AED),
-                          title: context.tr('settings.crewManagement'),
-                          subtitle:
-                              context.tr('settings.crewManagementSubtitle'),
-                          onTap: () => _showComingSoon(
-                              context, context.tr('settings.crewManagement')),
-                        ),
+                        const _BlockedUsersSettingsRow(),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -564,6 +556,358 @@ class SettingsPage extends StatelessWidget {
       );
     }
     return saved == true;
+  }
+}
+
+class _BlockedUsersSettingsRow extends StatelessWidget {
+  const _BlockedUsersSettingsRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthService>();
+    if (!auth.isLoggedIn) {
+      return _SettingsRow(
+        icon: Icons.people_outline_rounded,
+        iconColor: const Color(0xFF7C3AED),
+        title: context.tr('settings.crewManagement'),
+        subtitle: context.tr('settings.blockedUsersSubtitle'),
+        onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.tr('settings.profileSignInRequired')),
+          ),
+        ),
+      );
+    }
+
+    return StreamBuilder<List<CommunityBlockedUser>>(
+      stream: CommunityRepository.instance.watchBlockedUsers(),
+      builder: (context, snapshot) {
+        final count = snapshot.data?.length ?? 0;
+        return _SettingsRow(
+          icon: Icons.people_outline_rounded,
+          iconColor: const Color(0xFF7C3AED),
+          title: context.tr('settings.crewManagement'),
+          subtitle: count == 0
+              ? context.tr('settings.blockedUsersSubtitle')
+              : context.trArgs(
+                  'settings.blockedUsersCount',
+                  args: {'count': '$count'},
+                ),
+          onTap: () => showModalBottomSheet<void>(
+            context: context,
+            isScrollControlled: true,
+            useSafeArea: true,
+            backgroundColor: Colors.transparent,
+            builder: (_) => const _BlockedUsersSheet(),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _BlockedUsersSheet extends StatefulWidget {
+  const _BlockedUsersSheet();
+
+  @override
+  State<_BlockedUsersSheet> createState() => _BlockedUsersSheetState();
+}
+
+class _BlockedUsersSheetState extends State<_BlockedUsersSheet> {
+  String? _busyUid;
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = BoosterFishPagePalette.of(context);
+    final height = MediaQuery.sizeOf(context).height * 0.72;
+    return Container(
+      height: height,
+      decoration: BoxDecoration(
+        color: tc.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        border: Border.all(color: tc.borderStrong),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.24),
+            blurRadius: 32,
+            offset: const Offset(0, -8),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 10),
+          Container(
+            width: 42,
+            height: 4,
+            decoration: BoxDecoration(
+              color: tc.textSecondary.withValues(alpha: 0.34),
+              borderRadius: BorderRadius.circular(99),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 12, 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF7C3AED).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.groups_2_outlined,
+                    color: Color(0xFF7C3AED),
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        context.tr('settings.crewManagement'),
+                        style: TextStyle(
+                          color: tc.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        context.tr('settings.blockedUsersHelp'),
+                        style: TextStyle(
+                          color: tc.textSecondary,
+                          fontSize: 12,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: tc.divider),
+          Expanded(
+            child: StreamBuilder<List<CommunityBlockedUser>>(
+              stream: CommunityRepository.instance.watchBlockedUsers(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting &&
+                    !snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return _BlockedUsersEmptyState(
+                    icon: Icons.cloud_off_rounded,
+                    title: context.tr('settings.blockedUsersLoadError'),
+                    subtitle: context.tr('settings.blockedUsersRetry'),
+                  );
+                }
+                final users = snapshot.data ?? const <CommunityBlockedUser>[];
+                if (users.isEmpty) {
+                  return _BlockedUsersEmptyState(
+                    icon: Icons.verified_user_outlined,
+                    title: context.tr('settings.noBlockedUsers'),
+                    subtitle: context.tr('settings.noBlockedUsersSubtitle'),
+                  );
+                }
+                return ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
+                  itemCount: users.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 9),
+                  itemBuilder: (context, index) {
+                    final user = users[index];
+                    final displayName = user.displayName.isEmpty
+                        ? context.tr('settings.blockedUserFallback')
+                        : user.displayName;
+                    final busy = _busyUid == user.uid;
+                    return Container(
+                      padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+                      decoration: BoxDecoration(
+                        color: tc.surfaceElevated,
+                        borderRadius: BorderRadius.circular(17),
+                        border: Border.all(color: tc.borderStrong),
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 20,
+                            backgroundColor:
+                                tc.textSecondary.withValues(alpha: 0.11),
+                            child: Icon(
+                              Icons.person_off_outlined,
+                              color: tc.textSecondary,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 11),
+                          Expanded(
+                            child: Text(
+                              displayName,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: tc.textPrimary,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          OutlinedButton.icon(
+                            onPressed: busy
+                                ? null
+                                : () => _confirmUnblock(user, displayName),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(0, 38),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 11),
+                              foregroundColor: tc.oceanLight,
+                              side: BorderSide(
+                                color: tc.oceanLight.withValues(alpha: 0.46),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            icon: busy
+                                ? SizedBox(
+                                    width: 15,
+                                    height: 15,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: tc.oceanLight,
+                                    ),
+                                  )
+                                : const Icon(Icons.lock_open_rounded, size: 16),
+                            label: Text(
+                              context.tr('settings.unblock'),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmUnblock(
+    CommunityBlockedUser user,
+    String displayName,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(context.tr('settings.unblock')),
+        content: Text(
+          context.trArgs(
+            'settings.unblockConfirm',
+            args: {'name': displayName},
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(context.tr('common.cancel')),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.lock_open_rounded, size: 17),
+            label: Text(context.tr('settings.unblock')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _busyUid = user.uid);
+    try {
+      await CommunityRepository.instance.unblockUser(user.uid);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr('settings.unblockSuccess'))),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr('settings.unblockError'))),
+      );
+    } finally {
+      if (mounted) setState(() => _busyUid = null);
+    }
+  }
+}
+
+class _BlockedUsersEmptyState extends StatelessWidget {
+  const _BlockedUsersEmptyState({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = BoosterFishPagePalette.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 62,
+              height: 62,
+              decoration: BoxDecoration(
+                color: tc.success.withValues(alpha: 0.10),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: tc.success, size: 28),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: tc.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: tc.textSecondary,
+                fontSize: 12,
+                height: 1.35,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

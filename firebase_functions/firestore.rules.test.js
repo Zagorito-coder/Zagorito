@@ -375,6 +375,74 @@ test('reports and blocks cannot target the current user', async () => {
   );
 });
 
+test('blocked anglers remain private and can be unblocked by their owner',
+    async () => {
+  const ownerUid = 'block-owner';
+  const blockedUid = 'blocked-user';
+  const ownerDb = environment.authenticatedContext(ownerUid).firestore();
+  const block = doc(
+    ownerDb,
+    'community_blocks',
+    ownerUid,
+    'users',
+    blockedUid,
+  );
+  await assertSucceeds(setDoc(block, {
+    schemaVersion: 1,
+    ownerUid,
+    blockedUid,
+    blockedDisplayName: 'Pêcheur Test',
+    createdAt: serverTimestamp(),
+  }));
+
+  const outsiderDb = environment
+      .authenticatedContext('block-outsider')
+      .firestore();
+  await assertFails(getDocs(
+    collection(outsiderDb, 'community_blocks', ownerUid, 'users'),
+  ));
+  await assertFails(deleteDoc(doc(
+    outsiderDb,
+    'community_blocks',
+    ownerUid,
+    'users',
+    blockedUid,
+  )));
+  await assertSucceeds(deleteDoc(block));
+});
+
+test('legacy blocks stay valid while malformed display names are rejected',
+    async () => {
+  const ownerUid = 'legacy-block-owner';
+  const ownerDb = environment.authenticatedContext(ownerUid).firestore();
+  const baseData = {
+    schemaVersion: 1,
+    ownerUid,
+    createdAt: serverTimestamp(),
+  };
+  await assertSucceeds(setDoc(
+    doc(ownerDb, 'community_blocks', ownerUid, 'users', 'legacy-user'),
+    {...baseData, blockedUid: 'legacy-user'},
+  ));
+  await assertFails(setDoc(
+    doc(ownerDb, 'community_blocks', ownerUid, 'users', 'invalid-name'),
+    {
+      ...baseData,
+      blockedUid: 'invalid-name',
+      blockedDisplayName: 'x'.repeat(81),
+    },
+  ));
+  await assertFails(setDoc(
+    doc(ownerDb, 'community_blocks', ownerUid, 'users', 'extra-field'),
+    {
+      ...baseData,
+      blockedUid: 'extra-field',
+      blockedDisplayName: 'Pêcheur Test',
+      email: 'forbidden@example.test',
+    },
+  ));
+});
+
 test('a report cannot be deleted, updated, or recreated by its author',
     async () => {
   const ownerUid = 'reported-owner';

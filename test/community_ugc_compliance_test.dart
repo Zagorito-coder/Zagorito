@@ -32,6 +32,22 @@ void main() {
     expect(source, contains("'child_safety'"));
   });
 
+  test('la gestion de l’équipage permet de débloquer un pêcheur', () {
+    final repository = File(
+      'lib/features/community/services/community_repository.dart',
+    ).readAsStringSync();
+    final settings = File('lib/pages/settings_page.dart').readAsStringSync();
+    final map = File(
+      'lib/features/community/widgets/community_map_view.dart',
+    ).readAsStringSync();
+
+    expect(repository, contains('watchBlockedUsers'));
+    expect(repository, contains('unblockUser'));
+    expect(settings, contains('_BlockedUsersSheet'));
+    expect(settings, contains("context.tr('settings.unblock')"));
+    expect(map, contains('_blockedUsersStream'));
+  });
+
   test('Firestore exige le consentement avant toute publication', () {
     final rules = File('firestore.rules').readAsStringSync();
     final repository = File(

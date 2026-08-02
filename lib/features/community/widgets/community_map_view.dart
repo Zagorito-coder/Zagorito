@@ -29,8 +29,8 @@ class _CommunityMapViewState extends State<CommunityMapView> {
   late final Stream<List<CommunityCatch>> _catchesStream;
   late final Stream<WeeklyCommunityWinner?> _winnerStream;
   late Stream<Set<String>> _likesStream;
+  late Stream<List<CommunityBlockedUser>> _blockedUsersStream;
   StreamSubscription<User?>? _authSubscription;
-  final Set<String> _blockedDuringSession = {};
   String? _likesOwnerUid;
   String? _selectedId;
   int _zoomBand = 5;
@@ -44,12 +44,14 @@ class _CommunityMapViewState extends State<CommunityMapView> {
     _winnerStream = _repository.watchWeeklyWinner();
     _likesOwnerUid = FirebaseAuth.instance.currentUser?.uid;
     _likesStream = _repository.watchMyLikes();
+    _blockedUsersStream = _repository.watchBlockedUsers();
     _authSubscription = FirebaseAuth.instance.authStateChanges().listen(
       (user) {
         if (!mounted || user?.uid == _likesOwnerUid) return;
         setState(() {
           _likesOwnerUid = user?.uid;
           _likesStream = _repository.watchMyLikes();
+          _blockedUsersStream = _repository.watchBlockedUsers();
         });
       },
     );
@@ -68,124 +70,131 @@ class _CommunityMapViewState extends State<CommunityMapView> {
     return StreamBuilder<List<CommunityCatch>>(
       stream: _catchesStream,
       builder: (context, catchSnapshot) {
-        final catches = (catchSnapshot.data ?? const <CommunityCatch>[])
-            .where(
-              (item) => !_blockedDuringSession.contains(item.ownerUid),
-            )
-            .toList(growable: false);
-        final selected = _selectedCatch(catches);
-        return StreamBuilder<Set<String>>(
-          stream: _likesStream,
-          builder: (context, likesSnapshot) {
-            final likes = likesSnapshot.data ?? const <String>{};
-            return Stack(
-              children: [
-                Positioned.fill(
-                  child: FlutterMap(
-                    mapController: _mapController,
-                    options: MapOptions(
-                      initialCenter: const LatLng(30.5, -9.7),
-                      initialZoom: 5.2,
-                      minZoom: 3,
-                      maxZoom: 17,
-                      interactionOptions: const InteractionOptions(
-                        flags: InteractiveFlag.drag |
-                            InteractiveFlag.flingAnimation |
-                            InteractiveFlag.pinchZoom |
-                            InteractiveFlag.doubleTapZoom |
-                            InteractiveFlag.doubleTapDragZoom,
-                      ),
-                      onTap: (_, __) => _clearSelection(),
-                      onPositionChanged: (camera, _) {
-                        final next = camera.zoom.floor();
-                        if (next != _zoomBand && mounted) {
-                          setState(() => _zoomBand = next);
-                        }
-                      },
-                    ),
-                    children: [
-                      const AppTileLayer(style: MapStyle.satellite),
-                      if (palette.isDark)
-                        IgnorePointer(
-                          child: ColoredBox(
-                            color:
-                                const Color(0xFF001329).withValues(alpha: 0.34),
+        return StreamBuilder<List<CommunityBlockedUser>>(
+          stream: _blockedUsersStream,
+          builder: (context, blockedSnapshot) {
+            final blockedIds =
+                (blockedSnapshot.data ?? const <CommunityBlockedUser>[])
+                    .map((item) => item.uid)
+                    .toSet();
+            final catches = (catchSnapshot.data ?? const <CommunityCatch>[])
+                .where((item) => !blockedIds.contains(item.ownerUid))
+                .toList(growable: false);
+            final selected = _selectedCatch(catches);
+            return StreamBuilder<Set<String>>(
+              stream: _likesStream,
+              builder: (context, likesSnapshot) {
+                final likes = likesSnapshot.data ?? const <String>{};
+                return Stack(
+                  children: [
+                    Positioned.fill(
+                      child: FlutterMap(
+                        mapController: _mapController,
+                        options: MapOptions(
+                          initialCenter: const LatLng(30.5, -9.7),
+                          initialZoom: 5.2,
+                          minZoom: 3,
+                          maxZoom: 17,
+                          interactionOptions: const InteractionOptions(
+                            flags: InteractiveFlag.drag |
+                                InteractiveFlag.flingAnimation |
+                                InteractiveFlag.pinchZoom |
+                                InteractiveFlag.doubleTapZoom |
+                                InteractiveFlag.doubleTapDragZoom,
                           ),
+                          onTap: (_, __) => _clearSelection(),
+                          onPositionChanged: (camera, _) {
+                            final next = camera.zoom.floor();
+                            if (next != _zoomBand && mounted) {
+                              setState(() => _zoomBand = next);
+                            }
+                          },
                         ),
-                      AppMapAttribution(style: MapStyle.satellite),
-                      FiniteMarkerLayer(
-                        markers: _markers(catches, selected, palette),
+                        children: [
+                          const AppTileLayer(style: MapStyle.satellite),
+                          if (palette.isDark)
+                            IgnorePointer(
+                              child: ColoredBox(
+                                color: const Color(0xFF001329)
+                                    .withValues(alpha: 0.34),
+                              ),
+                            ),
+                          AppMapAttribution(style: MapStyle.satellite),
+                          FiniteMarkerLayer(
+                            markers: _markers(catches, selected, palette),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-                PositionedDirectional(
-                  top: 10,
-                  start: 12,
-                  child: _ApproximateZonePill(palette: palette),
-                ),
-                PositionedDirectional(
-                  top: 8,
-                  end: 10,
-                  child: Column(
-                    children: [
-                      _MapCircleButton(
-                        tooltip: context.tr('community.centerOnMe'),
-                        icon: _locating
-                            ? Icons.hourglass_top_rounded
-                            : Icons.my_location_rounded,
-                        palette: palette,
-                        onTap: _locating ? null : _centerOnUser,
-                      ),
-                      const SizedBox(height: 8),
-                      _MapCircleButton(
-                        tooltip: context.tr('community.fitCatches'),
-                        icon: Icons.center_focus_strong_rounded,
-                        palette: palette,
-                        onTap: catches.isEmpty ? null : () => _fit(catches),
-                      ),
-                    ],
-                  ),
-                ),
-                PositionedDirectional(
-                  top: 58,
-                  start: 12,
-                  end: 74,
-                  child: StreamBuilder<WeeklyCommunityWinner?>(
-                    stream: _winnerStream,
-                    builder: (context, snapshot) {
-                      final winner = snapshot.data;
-                      if (winner == null) return const SizedBox.shrink();
-                      return _WeeklyWinnerBanner(
-                        winner: winner,
-                        expanded: _winnerExpanded,
-                        palette: palette,
-                        onToggle: () => setState(
-                          () => _winnerExpanded = !_winnerExpanded,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.bottomCenter,
-                  child: _CatchShelf(
-                    catches: catches,
-                    selected: selected,
-                    likedIds: likes,
-                    loading: catchSnapshot.connectionState ==
-                            ConnectionState.waiting &&
-                        !catchSnapshot.hasData,
-                    error: catchSnapshot.hasError,
-                    palette: palette,
-                    onSelect: _select,
-                    onOpen: (item) => _openDetails(
-                      item,
-                      likes.contains(item.id),
                     ),
-                  ),
-                ),
-              ],
+                    PositionedDirectional(
+                      top: 10,
+                      start: 12,
+                      child: _ApproximateZonePill(palette: palette),
+                    ),
+                    PositionedDirectional(
+                      top: 8,
+                      end: 10,
+                      child: Column(
+                        children: [
+                          _MapCircleButton(
+                            tooltip: context.tr('community.centerOnMe'),
+                            icon: _locating
+                                ? Icons.hourglass_top_rounded
+                                : Icons.my_location_rounded,
+                            palette: palette,
+                            onTap: _locating ? null : _centerOnUser,
+                          ),
+                          const SizedBox(height: 8),
+                          _MapCircleButton(
+                            tooltip: context.tr('community.fitCatches'),
+                            icon: Icons.center_focus_strong_rounded,
+                            palette: palette,
+                            onTap: catches.isEmpty ? null : () => _fit(catches),
+                          ),
+                        ],
+                      ),
+                    ),
+                    PositionedDirectional(
+                      top: 58,
+                      start: 12,
+                      end: 74,
+                      child: StreamBuilder<WeeklyCommunityWinner?>(
+                        stream: _winnerStream,
+                        builder: (context, snapshot) {
+                          final winner = snapshot.data;
+                          if (winner == null) return const SizedBox.shrink();
+                          return _WeeklyWinnerBanner(
+                            winner: winner,
+                            expanded: _winnerExpanded,
+                            palette: palette,
+                            onToggle: () => setState(
+                              () => _winnerExpanded = !_winnerExpanded,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: _CatchShelf(
+                        catches: catches,
+                        selected: selected,
+                        likedIds: likes,
+                        loading: catchSnapshot.connectionState ==
+                                ConnectionState.waiting &&
+                            !catchSnapshot.hasData,
+                        error: catchSnapshot.hasError,
+                        palette: palette,
+                        onSelect: _select,
+                        onOpen: (item) => _openDetails(
+                          item,
+                          likes.contains(item.id),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             );
           },
         );
@@ -339,7 +348,6 @@ class _CommunityMapViewState extends State<CommunityMapView> {
     );
     if (!mounted || blockedUid == null) return;
     setState(() {
-      _blockedDuringSession.add(blockedUid);
       if (_selectedId == item.id) _selectedId = null;
     });
   }
@@ -1345,7 +1353,10 @@ class _CatchDetailsSheetState extends State<_CatchDetailsSheet> {
     if (confirmed != true) return;
     setState(() => _busy = true);
     try {
-      await widget.repository.blockUser(widget.item.ownerUid);
+      await widget.repository.blockUser(
+        blockedUid: widget.item.ownerUid,
+        blockedDisplayName: widget.item.anglerName,
+      );
       if (mounted) Navigator.pop(context, widget.item.ownerUid);
     } catch (_) {
       _message('community.actionFailed');

@@ -564,11 +564,19 @@ service cloud.firestore {
           'schemaVersion',
           'ownerUid',
           'blockedUid',
+          'blockedDisplayName',
           'createdAt'
         ])
         && request.resource.data.schemaVersion == 1
         && request.resource.data.ownerUid == userId
         && request.resource.data.blockedUid == blockedUserId
+        && (
+          !('blockedDisplayName' in request.resource.data)
+          || (
+            request.resource.data.blockedDisplayName is string
+            && request.resource.data.blockedDisplayName.size() <= 80
+          )
+        )
         && request.resource.data.createdAt == request.time;
     }
 
