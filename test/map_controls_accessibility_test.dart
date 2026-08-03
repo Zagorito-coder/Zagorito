@@ -112,4 +112,69 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     semanticsHandle.dispose();
   });
+
+  testWidgets('toutes les commandes restent accessibles en paysage RTL',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 360));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final semanticsHandle = tester.ensureSemantics();
+
+    const spot = Spot(
+      id: 'landscape-accessibility-test-spot',
+      name: 'Spot test',
+      latitude: 31.5,
+      longitude: -9.7,
+      location: LatLng(31.5, -9.7),
+    );
+
+    try {
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<FishProvider>.value(value: FishProvider()),
+            ChangeNotifierProvider<WindAnimationProvider>(
+              create: (_) => WindAnimationProvider(),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.lightTheme,
+            locale: const Locale('ar'),
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            home: const MapScreen(initialSpots: [spot]),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+
+      for (final label in [
+        'تكبير الخريطة',
+        'تصغير الخريطة',
+        'توسيط الخريطة على موقعي',
+        'تفعيل البوصلة',
+        'فتح أدوات الخريطة',
+        'إظهار الرياح',
+      ]) {
+        final finder = find.bySemanticsLabel(label);
+        expect(finder, findsOneWidget, reason: 'Commande absente : $label');
+        final rect = tester.getRect(finder);
+        expect(
+          const Rect.fromLTWH(0, 0, 800, 360).contains(rect.topLeft) &&
+              const Rect.fromLTWH(0, 0, 800, 360).contains(rect.bottomRight),
+          isTrue,
+          reason: 'Commande hors écran : $label ($rect)',
+        );
+      }
+    } finally {
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 300));
+      semanticsHandle.dispose();
+    }
+  });
 }

@@ -1632,6 +1632,8 @@ class _MapScreenState extends State<MapScreen>
       builder: (context, _) {
         final tc = ThemeColors.of(context);
         final hasSel = _selectedSpot != null;
+        final media = MediaQuery.of(context);
+        final isLandscape = media.orientation == Orientation.landscape;
 
         return Scaffold(
             body: Stack(children: [
@@ -1879,32 +1881,13 @@ class _MapScreenState extends State<MapScreen>
                     magneticHeading: _magneticHeading,
                     gpsCourseOverGround: _gpsCourseOverGround)),
           Positioned(
-            top: MediaQuery.of(context).padding.top + 80,
+            top: media.padding.top + (isLandscape ? 12 : 80),
             right: 16,
-            bottom: 100,
+            bottom: isLandscape ? null : 100,
             child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildZoomIn(),
-                  const SizedBox(height: 8),
-                  _buildZoomOut(),
-                  const SizedBox(height: 8),
-                  _buildMyLocationButton(),
-                  const SizedBox(height: 8),
-                  ZoomButton(
-                    heroTag: 'compass_toggle',
-                    semanticLabel: context.tr(_isCompassEnabled
-                        ? 'map.disableCompass'
-                        : 'map.enableCompass'),
-                    icon: _isCompassEnabled ? Icons.explore : Icons.explore_off,
-                    onTap: _toggleCompass,
-                  ),
-                  const SizedBox(height: 8),
-                  _buildToolsPanelToggleButton(),
-                  const SizedBox(height: 8),
-                  _buildWindToggleButton(),
-                ],
+              scrollDirection: isLandscape ? Axis.horizontal : Axis.vertical,
+              child: _buildPrimaryMapControls(
+                isLandscape ? Axis.horizontal : Axis.vertical,
               ),
             ),
           ),
@@ -2302,6 +2285,40 @@ class _MapScreenState extends State<MapScreen>
                       errorBuilder: (_, __, ___) => const Center(
                           child:
                               Text('🐟', style: TextStyle(fontSize: 48))))))),
+    );
+  }
+
+  Widget _buildPrimaryMapControls(Axis direction) {
+    final controls = <Widget>[
+      _buildZoomIn(),
+      _buildZoomOut(),
+      _buildMyLocationButton(),
+      ZoomButton(
+        heroTag: 'compass_toggle',
+        semanticLabel: context.tr(
+          _isCompassEnabled ? 'map.disableCompass' : 'map.enableCompass',
+        ),
+        icon: _isCompassEnabled ? Icons.explore : Icons.explore_off,
+        onTap: _toggleCompass,
+      ),
+      _buildToolsPanelToggleButton(),
+      _buildWindToggleButton(),
+    ];
+    final horizontal = direction == Axis.horizontal;
+
+    return Flex(
+      direction: direction,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var index = 0; index < controls.length; index++) ...[
+          if (index > 0)
+            SizedBox(
+              width: horizontal ? 8 : 0,
+              height: horizontal ? 0 : 8,
+            ),
+          controls[index],
+        ],
+      ],
     );
   }
 
