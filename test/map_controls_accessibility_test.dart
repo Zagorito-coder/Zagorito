@@ -146,7 +146,13 @@ void main() {
               GlobalWidgetsLocalizations.delegate,
               GlobalCupertinoLocalizations.delegate,
             ],
-            home: const MapScreen(initialSpots: [spot]),
+            home: const MediaQuery(
+              data: MediaQueryData(
+                size: Size(800, 360),
+                padding: EdgeInsets.only(right: 48),
+              ),
+              child: MapScreen(initialSpots: [spot]),
+            ),
           ),
         ),
       );
@@ -164,8 +170,8 @@ void main() {
         expect(finder, findsOneWidget, reason: 'Commande absente : $label');
         final rect = tester.getRect(finder);
         expect(
-          const Rect.fromLTWH(0, 0, 800, 360).contains(rect.topLeft) &&
-              const Rect.fromLTWH(0, 0, 800, 360).contains(rect.bottomRight),
+          const Rect.fromLTWH(0, 0, 752, 360).contains(rect.topLeft) &&
+              const Rect.fromLTWH(0, 0, 752, 360).contains(rect.bottomRight),
           isTrue,
           reason: 'Commande hors écran : $label ($rect)',
         );

@@ -1882,7 +1882,7 @@ class _MapScreenState extends State<MapScreen>
                     gpsCourseOverGround: _gpsCourseOverGround)),
           Positioned(
             top: media.padding.top + (isLandscape ? 12 : 80),
-            right: 16,
+            right: 16 + media.padding.right,
             bottom: isLandscape ? null : 100,
             child: SingleChildScrollView(
               scrollDirection: isLandscape ? Axis.horizontal : Axis.vertical,
