@@ -10,6 +10,9 @@ void main() {
     expect(source, contains('AlwaysScrollableScrollPhysics'));
     expect(source, isNot(contains('NeverScrollableScrollPhysics')));
     expect(source, contains('showLicensePage('));
+    expect(source, contains('PackageInfo.fromPlatform()'));
+    expect(source, contains('packageInfo.buildNumber'));
+    expect(source, isNot(contains("applicationVersion: '1.0.6'")));
     expect(source, contains('BoxConstraints(minHeight: 56)'));
     expect(source, contains('assets/settings_hero.webp'));
     expect(source, contains('assets/settings_fishing_banner.webp'));

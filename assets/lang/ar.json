@@ -340,6 +340,7 @@
     "termsOfServiceSubtitle": "الشروط العامة للاستخدام",
     "openSourceLicenses": "تراخيص المصادر المفتوحة",
     "openSourceLicensesSubtitle": "المكتبات والإشعارات القانونية المستخدمة في BoosterFish",
+    "appVersion": "الإصدار",
     "deleteAccount": "حذف حسابي",
     "deleteAccountSubtitle": "حذف حسابك وجميع بياناتك نهائيًا",
     "deleteAccountConfirm": "سيؤدي هذا إلى حذف حسابك والبيانات المرتبطة به نهائيًا. هل تريد المتابعة؟",

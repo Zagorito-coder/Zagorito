@@ -4,6 +4,7 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:spots_app/l10n/app_localizations.dart';
 import 'package:spots_app/widgets/app_back_button.dart';
@@ -69,19 +70,7 @@ class SettingsPage extends StatelessWidget {
                               context.tr('settings.termsOfServiceSubtitle'),
                           onTap: () => _openTermsOfService(context),
                         ),
-                        _SettingsRow(
-                          icon: Icons.info_outline_rounded,
-                          iconColor: tc.oceanLight,
-                          title: context.tr('settings.openSourceLicenses'),
-                          subtitle:
-                              context.tr('settings.openSourceLicensesSubtitle'),
-                          onTap: () => showLicensePage(
-                            context: context,
-                            applicationName: 'BoosterFish',
-                            applicationVersion: '1.0.6',
-                            applicationLegalese: '© 2026 BoosterFish',
-                          ),
-                        ),
+                        const _OpenSourceLicensesEntry(),
                         const _AdvertisingPrivacyEntry(),
                         if (auth.isLoggedIn)
                           _SettingsRow(
@@ -1505,6 +1494,59 @@ class _SettingsRow extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _OpenSourceLicensesEntry extends StatefulWidget {
+  const _OpenSourceLicensesEntry();
+
+  @override
+  State<_OpenSourceLicensesEntry> createState() =>
+      _OpenSourceLicensesEntryState();
+}
+
+class _OpenSourceLicensesEntryState extends State<_OpenSourceLicensesEntry> {
+  PackageInfo? _packageInfo;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPackageInfo();
+  }
+
+  Future<void> _loadPackageInfo() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      if (mounted) setState(() => _packageInfo = packageInfo);
+    } catch (_) {
+      // Les licences restent accessibles si Android ne fournit pas la version.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = BoosterFishPagePalette.of(context);
+    final packageInfo = _packageInfo;
+    final installedVersion = packageInfo == null
+        ? null
+        : '${packageInfo.version} (${packageInfo.buildNumber})';
+    final baseSubtitle = context.tr('settings.openSourceLicensesSubtitle');
+
+    return _SettingsRow(
+      icon: Icons.info_outline_rounded,
+      iconColor: tc.oceanLight,
+      title: context.tr('settings.openSourceLicenses'),
+      subtitle: installedVersion == null
+          ? baseSubtitle
+          : '$baseSubtitle\n${context.tr('settings.appVersion')} '
+              '$installedVersion',
+      onTap: () => showLicensePage(
+        context: context,
+        applicationName: 'BoosterFish',
+        applicationVersion: installedVersion,
+        applicationLegalese: '© 2026 BoosterFish',
       ),
     );
   }

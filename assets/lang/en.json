@@ -340,6 +340,7 @@
     "termsOfServiceSubtitle": "Terms and conditions of use",
     "openSourceLicenses": "Open-source licences",
     "openSourceLicensesSubtitle": "Libraries and legal notices used by BoosterFish",
+    "appVersion": "Version",
     "deleteAccount": "Delete my account",
     "deleteAccountSubtitle": "Permanently delete your account and all your data",
     "deleteAccountConfirm": "This will permanently delete your account and associated data. Continue?",
