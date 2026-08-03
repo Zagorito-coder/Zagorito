@@ -37,4 +37,12 @@ void main() {
       ),
     );
   });
+
+  test('le nom système et le titre Flutter utilisent BoosterFish', () {
+    final appSource = File('lib/main.dart').readAsStringSync();
+
+    expect(manifest, contains('android:label="BoosterFish"'));
+    expect(appSource, contains("title: 'BoosterFish'"));
+    expect(appSource, isNot(contains("title: 'Spots App'")));
+  });
 }

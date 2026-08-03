@@ -109,7 +109,7 @@ class SpotsApp extends StatelessWidget {
             ChangeNotifierProvider(create: (_) => WindAnimationProvider()),
           ],
           child: MaterialApp(
-            title: 'Spots App',
+            title: 'BoosterFish',
             debugShowCheckedModeBanner: false,
             theme: isDark ? AppTheme.darkTheme : AppTheme.lightTheme,
             locale: LanguageController.instance.locale,
