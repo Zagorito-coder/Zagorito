@@ -15,4 +15,13 @@ void main() {
     expect(privacy, contains("identifiant d'installation Firebase"));
     expect(checklist, contains("identifiant d'installation Firebase"));
   });
+
+  test('les deux pages légales affichent la même date actuelle', () {
+    final privacy = File('docs/privacy_policy.html').readAsStringSync();
+    final terms = File('docs/terms_of_service.html').readAsStringSync();
+    const currentDate = 'Dernière mise à jour : 3 août 2026';
+
+    expect(privacy, contains(currentDate));
+    expect(terms, contains(currentDate));
+  });
 }
