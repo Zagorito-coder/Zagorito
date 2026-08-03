@@ -301,7 +301,7 @@ void main() {
     for (final label in const [
       'Accueil',
       'Marées',
-      'Marées avancées',
+      'Marées Pro',
       'Spots',
       'Poissons',
       'Techniques',
@@ -317,11 +317,34 @@ void main() {
       expect(bounds.bottom, lessThanOrEqualTo(viewport.height));
     }
     expect(tester.takeException(), isNull);
-    await expectLater(
-      drawer,
-      matchesGoldenFile('goldens/home_drawer_compact.png'),
-    );
   });
+
+  testWidgets(
+    'golden du Drawer compact',
+    (tester) async {
+      await _setViewport(tester, const Size(360, 640));
+      await tester.pumpWidget(_testApp(tideData: _marineData()));
+      await tester.pumpAndSettle();
+      final imageContext = tester.element(find.byType(HomeDashboard));
+      await tester.runAsync(
+        () => precacheImage(
+          const AssetImage(
+            'assets/home_cards/drawer_fisherman_banner_v1.webp',
+          ),
+          imageContext,
+        ),
+      );
+
+      await tester.tap(find.byIcon(Icons.menu_rounded));
+      await tester.pumpAndSettle();
+
+      await expectLater(
+        find.byType(Drawer),
+        matchesGoldenFile('goldens/home_drawer_compact.png'),
+      );
+    },
+    tags: const ['host-golden'],
+  );
 
   testWidgets('le sélecteur de langue suit le thème sombre', (tester) async {
     await _setViewport(tester, const Size(360, 640));
@@ -390,22 +413,26 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('goldens de référence clair et sombre', (tester) async {
-    await _setViewport(tester, const Size(390, 844));
-    await tester.pumpWidget(_testApp(tideData: _marineData()));
-    await tester.pumpAndSettle();
-    await expectLater(
-      find.byType(HomeDashboard),
-      matchesGoldenFile('goldens/home_dashboard_light.png'),
-    );
+  testWidgets(
+    'goldens de référence clair et sombre',
+    (tester) async {
+      await _setViewport(tester, const Size(390, 844));
+      await tester.pumpWidget(_testApp(tideData: _marineData()));
+      await tester.pumpAndSettle();
+      await expectLater(
+        find.byType(HomeDashboard),
+        matchesGoldenFile('goldens/home_dashboard_light.png'),
+      );
 
-    ThemeController.instance.setDark(true);
-    await tester.pumpAndSettle();
-    await expectLater(
-      find.byType(HomeDashboard),
-      matchesGoldenFile('goldens/home_dashboard_dark.png'),
-    );
-  });
+      ThemeController.instance.setDark(true);
+      await tester.pumpAndSettle();
+      await expectLater(
+        find.byType(HomeDashboard),
+        matchesGoldenFile('goldens/home_dashboard_dark.png'),
+      );
+    },
+    tags: const ['host-golden'],
+  );
 }
 
 Future<void> _tapCard(

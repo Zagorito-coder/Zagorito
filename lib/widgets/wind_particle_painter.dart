@@ -12,8 +12,8 @@
 // - shouldRepaint strict (reference equality sur la liste de particules)
 // ============================================================================
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 
 /// Une particule pre-calculee, prete a etre dessinee.
 class ParticleData {
@@ -52,13 +52,13 @@ class WindColors {
 }
 
 class WindParticlePainter extends CustomPainter {
-  final List<ParticleData> particles;
-  final MapCamera camera;
+  final ValueListenable<List<ParticleData>> particles;
 
   WindParticlePainter({
     required this.particles,
-    required this.camera,
-  });
+  }) : super(repaint: particles);
+
+  List<ParticleData> get currentParticles => particles.value;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -72,7 +72,7 @@ class WindParticlePainter extends CustomPainter {
       ..strokeWidth = 1.0
       ..strokeCap = StrokeCap.round;
 
-    for (final p in particles) {
+    for (final p in currentParticles) {
       if (p.trailStart != null && p.trailEnd != null) {
         trailPaint.color = p.color.withValues(alpha: p.opacity);
         canvas.drawLine(p.trailStart!, p.trailEnd!, trailPaint);
@@ -82,7 +82,7 @@ class WindParticlePainter extends CustomPainter {
     // 2. Dessiner uniquement les particules avec radius > 0 (cercles)
     final particlePaint = Paint()..style = PaintingStyle.fill;
 
-    for (final p in particles) {
+    for (final p in currentParticles) {
       if (p.radius > 0) {
         particlePaint.color = p.color.withValues(alpha: p.opacity);
         canvas.drawCircle(p.position, p.radius, particlePaint);
@@ -94,7 +94,6 @@ class WindParticlePainter extends CustomPainter {
   bool shouldRepaint(WindParticlePainter oldDelegate) {
     // Repaint UNIQUEMENT si la liste de particules a change
     // (reference equality — le Ticker cree une nouvelle liste a chaque frame)
-    return oldDelegate.particles != particles ||
-        oldDelegate.camera != camera;
+    return oldDelegate.particles != particles;
   }
 }

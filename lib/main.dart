@@ -16,6 +16,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:spots_app/models.dart';
+import 'package:spots_app/models/compass_readings.dart';
 import 'package:spots_app/models/offline_map_region.dart';
 import 'package:spots_app/models/spot_selection_request.dart';
 import 'package:spots_app/models/user_spot.dart';
@@ -28,11 +29,13 @@ import 'package:spots_app/spot_details_panel.dart';
 import 'package:spots_app/spots_canvas_layer.dart';
 import 'package:spots_app/theme.dart';
 import 'package:spots_app/theme_controller.dart';
+import 'package:spots_app/utils/map_flight_plan.dart';
 import 'package:spots_app/widgets/app_tile_layer.dart';
 import 'package:spots_app/widgets/finite_map_controller.dart';
 import 'package:spots_app/widgets/finite_marker_layer.dart';
 import 'package:spots_app/widgets/offline_map_manager_sheet.dart';
 import 'package:spots_app/widgets/personal_spots_map_layer.dart';
+import 'package:spots_app/widgets/location_access_feedback.dart';
 import 'package:spots_app/widgets/user_spot_form_sheet.dart';
 import 'package:spots_app/l10n/app_localizations.dart';
 import 'package:spots_app/splash_bootstrap.dart';
@@ -46,6 +49,8 @@ import 'package:flutter_compass/flutter_compass.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:spots_app/providers/wind_animation_provider.dart';
 import 'package:spots_app/widgets/wind_particle_layer.dart';
+
+const double _mapBottomControlHeight = 60;
 
 void main() {
   runZonedGuarded(_bootstrap, (error, stackTrace) {
@@ -104,7 +109,7 @@ class SpotsApp extends StatelessWidget {
             ChangeNotifierProvider(create: (_) => WindAnimationProvider()),
           ],
           child: MaterialApp(
-            title: 'Spots App',
+            title: 'BoosterFish',
             debugShowCheckedModeBanner: false,
             theme: isDark ? AppTheme.darkTheme : AppTheme.lightTheme,
             locale: LanguageController.instance.locale,
@@ -292,6 +297,7 @@ class _SearchBar extends StatelessWidget {
             padding: EdgeInsets.only(top: measurementText == null ? 0 : 64),
             child: Container(
                 key: const ValueKey<String>('map-search-bar-surface'),
+                height: _mapBottomControlHeight,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
@@ -321,6 +327,7 @@ class _SearchBar extends StatelessWidget {
                         suffixIcon: controller.text.isEmpty
                             ? null
                             : IconButton(
+                                tooltip: l10n.translate('map.clearSearch'),
                                 icon: Icon(Icons.close,
                                     color: tc.textMuted, size: 18),
                                 onPressed: onClear),
@@ -475,32 +482,39 @@ class _SearchBar extends StatelessWidget {
 
 class ZoomButton extends StatelessWidget {
   final String heroTag;
+  final String semanticLabel;
   final IconData icon;
   final VoidCallback onTap;
   const ZoomButton(
       {super.key,
       required this.heroTag,
+      required this.semanticLabel,
       required this.icon,
       required this.onTap});
   @override
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
-    return GestureDetector(
-        onTap: onTap,
-        child: Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-                color: tc.surface.withValues(alpha: 0.9),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: tc.glassBorder, width: 1.2),
-                boxShadow: [
-                  BoxShadow(
-                      color: tc.shadowColor,
-                      blurRadius: 12,
-                      offset: const Offset(0, 4))
-                ]),
-            child: Center(child: Icon(icon, color: tc.textPrimary, size: 24))));
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                  color: tc.surface.withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: tc.glassBorder, width: 1.2),
+                  boxShadow: [
+                    BoxShadow(
+                        color: tc.shadowColor,
+                        blurRadius: 12,
+                        offset: const Offset(0, 4))
+                  ]),
+              child:
+                  Center(child: Icon(icon, color: tc.textPrimary, size: 24)))),
+    );
   }
 }
 
@@ -533,32 +547,39 @@ class _FishVerticalMenu extends StatelessWidget {
       required this.selectedFish,
       required this.onFishSelected,
       required this.onFishDeselected});
-  static const double _cs = 53, _rs = 72;
+  static const double _menuWidth = 194;
+  static const double _rowExtent = 68;
+
   @override
   Widget build(BuildContext context) {
     if (fishes.isEmpty) return const SizedBox.shrink();
-    return SizedBox(
-        width: _cs + 120,
-        height: 6 * _rs + 20,
+    return RepaintBoundary(
+      key: const ValueKey<String>('map-fish-selector'),
+      child: SizedBox(
+        width: _menuWidth,
+        height: 6 * _rowExtent + 20,
         child: ListView.builder(
-            reverse: true,
-            padding: EdgeInsets.zero,
-            itemCount: fishes.length,
-            itemBuilder: (ctx, i) {
-              final f = fishes[i];
-              final sel = selectedFish?.id == f.id;
-              return _FishRow(
-                  fish: f,
-                  isSelected: sel,
-                  onTap: () {
-                    if (sel) {
-                      onFishDeselected();
-                    } else {
-                      onFishSelected(f);
-                    }
-                  },
-                  circleSize: _cs);
-            }));
+          reverse: true,
+          padding: EdgeInsets.zero,
+          itemCount: fishes.length,
+          itemBuilder: (ctx, i) {
+            final f = fishes[i];
+            final sel = selectedFish?.id == f.id;
+            return _FishRow(
+              fish: f,
+              isSelected: sel,
+              onTap: () {
+                if (sel) {
+                  onFishDeselected();
+                } else {
+                  onFishSelected(f);
+                }
+              },
+            );
+          },
+        ),
+      ),
+    );
   }
 }
 
@@ -566,79 +587,168 @@ class _FishRow extends StatelessWidget {
   final FishModel fish;
   final bool isSelected;
   final VoidCallback onTap;
-  final double circleSize;
   const _FishRow(
-      {required this.fish,
-      required this.isSelected,
-      required this.onTap,
-      required this.circleSize});
+      {required this.fish, required this.isSelected, required this.onTap});
+
+  static const double _collapsedWidth = 68;
+  static const double _selectedWidth = 190;
+  static const double _tileHeight = 60;
+
   @override
   Widget build(BuildContext context) {
-    final tc = ThemeColors.of(context);
-    return GestureDetector(
-        onTap: onTap,
-        child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeOut,
-                  width: circleSize,
-                  height: circleSize,
-                  decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isSelected
-                          ? const Color(0xFF48CAE4)
-                          : tc.surfaceLight,
-                      border: Border.all(
-                          color: isSelected
-                              ? const Color(0xFF48CAE4)
-                              : tc.glassBorder,
-                          width: 2),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                  color: const Color(0xFF48CAE4)
-                                      .withValues(alpha: 0.35),
-                                  blurRadius: 8,
-                                  spreadRadius: 1)
-                            ]
-                          : null),
-                  child: ClipOval(child: _buildImage(context))),
-              const SizedBox(width: 8),
-              Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                  decoration: BoxDecoration(
-                      color: tc.surface.withValues(alpha: 0.55),
-                      borderRadius: BorderRadius.circular(8)),
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+    final palette = _FishSelectorPalette.of(context);
+    return RepaintBoundary(
+      child: Semantics(
+        button: true,
+        selected: isSelected,
+        label: fish.name,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: SizedBox(
+            height: _FishVerticalMenu._rowExtent,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: AnimatedContainer(
+                key: ValueKey<String>('map-fish-tile-${fish.id}'),
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                width: isSelected ? _selectedWidth : _collapsedWidth,
+                height: _tileHeight,
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [palette.surfaceTop, palette.surfaceBottom],
+                  ),
+                  borderRadius: BorderRadius.circular(17),
+                  border: Border.all(
+                    color: isSelected ? palette.accent : palette.border,
+                    width: isSelected ? 1.5 : 0.8,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: palette.shadow,
+                      blurRadius: isSelected ? 10 : 6,
+                      offset: const Offset(0, 3),
+                    ),
+                    if (isSelected)
+                      BoxShadow(
+                        color: palette.accent.withValues(alpha: 0.18),
+                        blurRadius: 10,
+                      ),
+                  ],
+                ),
+                child: Stack(
+                  children: [
+                    Positioned(
+                      top: 0,
+                      left: 12,
+                      right: 12,
+                      child: Container(
+                        height: 0.7,
+                        color: palette.topHighlight,
+                      ),
+                    ),
+                    Row(
                       children: [
-                        Text(fish.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                                color: tc.textPrimary,
+                        SizedBox(
+                          width: _collapsedWidth - 2,
+                          height: _tileHeight,
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    palette.imageTop,
+                                    palette.imageBottom,
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(13),
+                                border: Border.all(
+                                  color: palette.imageBorder,
+                                  width: 0.7,
+                                ),
+                              ),
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  if (palette.isDark)
+                                    CustomPaint(
+                                      painter: _FishCompassGridPainter(
+                                        palette.compassGrid,
+                                      ),
+                                    ),
+                                  Padding(
+                                    padding: const EdgeInsets.all(3),
+                                    child: _buildImage(context),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (isSelected) ...[
+                          Container(
+                            width: 3,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: palette.accent,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              fish.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: palette.text,
                                 fontSize: 12,
-                                fontWeight: isSelected
-                                    ? FontWeight.w700
-                                    : FontWeight.w500)),
-                        Text(fish.scientificName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                                color: tc.textMuted,
-                                fontSize: 9,
-                                fontStyle: FontStyle.italic)),
-                      ])),
-            ])));
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.1,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildImage(BuildContext context) {
     if (fish.imageUrl.startsWith('assets/')) {
-      return Image.asset(fish.imageUrl,
-          fit: BoxFit.cover, errorBuilder: (_, __, ___) => _ph());
+      final pixelRatio = MediaQuery.devicePixelRatioOf(context);
+      final thumbnailPath = fish.imageUrl.replaceFirst(
+        'assets/fish_images/',
+        'assets/fish_selector_thumbnails/',
+      );
+      return Image.asset(
+        thumbnailPath,
+        fit: BoxFit.contain,
+        cacheWidth: (_collapsedWidth * pixelRatio).ceil(),
+        filterQuality: FilterQuality.medium,
+        errorBuilder: (_, __, ___) => Image.asset(
+          fish.imageUrl,
+          fit: BoxFit.contain,
+          cacheWidth: (_collapsedWidth * pixelRatio).ceil(),
+          filterQuality: FilterQuality.medium,
+          errorBuilder: (_, __, ___) => _ph(),
+        ),
+      );
     }
     return CachedNetworkImage(
         imageUrl: fish.imageUrl,
@@ -652,31 +762,127 @@ class _FishRow extends StatelessWidget {
       child: const Center(child: Text('🐟', style: TextStyle(fontSize: 20))));
 }
 
+class _FishSelectorPalette {
+  final bool isDark;
+  final Color surfaceTop;
+  final Color surfaceBottom;
+  final Color imageTop;
+  final Color imageBottom;
+  final Color border;
+  final Color imageBorder;
+  final Color accent;
+  final Color text;
+  final Color shadow;
+  final Color topHighlight;
+  final Color compassGrid;
+
+  const _FishSelectorPalette({
+    required this.isDark,
+    required this.surfaceTop,
+    required this.surfaceBottom,
+    required this.imageTop,
+    required this.imageBottom,
+    required this.border,
+    required this.imageBorder,
+    required this.accent,
+    required this.text,
+    required this.shadow,
+    required this.topHighlight,
+    required this.compassGrid,
+  });
+
+  static const light = _FishSelectorPalette(
+    isDark: false,
+    surfaceTop: Color(0xFFFDFEFE),
+    surfaceBottom: Color(0xFFDDE8E9),
+    imageTop: Color(0xFFF7FAFA),
+    imageBottom: Color(0xFFCFE0E2),
+    border: Color(0x66788F98),
+    imageBorder: Color(0x52667E87),
+    accent: Color(0xFF087D88),
+    text: Color(0xFF17323A),
+    shadow: Color(0x3322343A),
+    topHighlight: Color(0xE6FFFFFF),
+    compassGrid: Colors.transparent,
+  );
+
+  static const dark = _FishSelectorPalette(
+    isDark: true,
+    surfaceTop: Color(0xFF080B11),
+    surfaceBottom: Color(0xFF151D29),
+    imageTop: Color(0xFF0C1A2C),
+    imageBottom: Color(0xFF07101C),
+    border: Color(0x9953687E),
+    imageBorder: Color(0x80416689),
+    accent: Color(0xFF168BFF),
+    text: Color(0xFFF4F8FC),
+    shadow: Color(0x8C000000),
+    topHighlight: Color(0x3DFFFFFF),
+    compassGrid: Color(0x522B8DDA),
+  );
+
+  static _FishSelectorPalette of(BuildContext context) {
+    return Theme.of(context).brightness == Brightness.dark ? dark : light;
+  }
+}
+
+class _FishCompassGridPainter extends CustomPainter {
+  final Color color;
+
+  const _FishCompassGridPainter(this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.7;
+    final radius = math.min(size.width, size.height) * 0.33;
+    canvas
+      ..drawCircle(center, radius, paint)
+      ..drawCircle(center, radius * 0.56, paint)
+      ..drawLine(
+          Offset(center.dx, 4), Offset(center.dx, size.height - 4), paint)
+      ..drawLine(
+          Offset(4, center.dy), Offset(size.width - 4, center.dy), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _FishCompassGridPainter oldDelegate) {
+    return oldDelegate.color != color;
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  MAP SCREEN
 // ═══════════════════════════════════════════════════════════════
 
 class MapScreen extends StatefulWidget {
   final List<Spot>? initialSpots;
+  final ValueListenable<bool>? isActive;
   final ValueListenable<int>? addSpotRequests;
   final ValueListenable<SpotSelectionRequest?>? spotSelectionRequests;
   final ValueListenable<UserSpotSelectionRequest?>? userSpotSelectionRequests;
   final VoidCallback? onOpenMySpots;
+  final VoidCallback? onPersonalSpotCreated;
 
   const MapScreen({
     super.key,
     this.initialSpots,
+    this.isActive,
     this.addSpotRequests,
     this.spotSelectionRequests,
     this.userSpotSelectionRequests,
     this.onOpenMySpots,
+    this.onPersonalSpotCreated,
   });
   @override
   State<MapScreen> createState() => _MapScreenState();
 }
 
 class _MapScreenState extends State<MapScreen>
-    with AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin, SingleTickerProviderStateMixin {
   @override
   bool get wantKeepAlive => true;
 
@@ -703,6 +909,10 @@ class _MapScreenState extends State<MapScreen>
   int _lastAddSpotRequest = 0;
   int _lastSpotSelectionRequest = 0;
   int _lastUserSpotSelectionRequest = 0;
+  int _cameraFlightSerial = 0;
+  late final AnimationController _cameraFlightController;
+  MapFlightPlan? _cameraFlightPlan;
+  Duration _lastCameraFlightFrame = Duration.zero;
   final List<LatLng> _measurePoints = [];
   double _measuredDistanceKm = 0.0;
   MapStyle _mapStyle = MapStyle.satellite;
@@ -712,9 +922,10 @@ class _MapScreenState extends State<MapScreen>
 
   // Compass — désactivé par défaut
   bool _isCompassEnabled = false;
-  double _heading = 0.0, _courseOverGround = 0.0;
+  double? _magneticHeading, _gpsCourseOverGround;
   StreamSubscription<CompassEvent>? _compassSubscription;
   StreamSubscription<Position>? _positionSubscription;
+  bool _positionStreamStartedForCompass = false;
   Position? _lastPosition;
 
   List<Spot> get _searchResults {
@@ -739,6 +950,9 @@ class _MapScreenState extends State<MapScreen>
   @override
   void initState() {
     super.initState();
+    _cameraFlightController = AnimationController(vsync: this)
+      ..addListener(_applyCameraFlightFrame);
+    widget.isActive?.addListener(_handleMapActivityChanged);
     _lastAddSpotRequest = widget.addSpotRequests?.value ?? 0;
     widget.addSpotRequests?.addListener(_handleAddSpotRequest);
     _lastSpotSelectionRequest =
@@ -749,14 +963,11 @@ class _MapScreenState extends State<MapScreen>
     widget.userSpotSelectionRequests
         ?.addListener(_handleUserSpotSelectionRequest);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    if (OfflineMapService.instance.hasActiveMap) {
-      _mapStyle = MapStyle.offline;
-    }
     _loadSpots();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _updateVisibleSpots();
-      unawaited(_initLocation());
+      unawaited(_initLocation(requestAccess: false));
     });
     // Compass & position stream démarrés uniquement à la demande.
   }
@@ -764,6 +975,11 @@ class _MapScreenState extends State<MapScreen>
   @override
   void didUpdateWidget(covariant MapScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive != widget.isActive) {
+      oldWidget.isActive?.removeListener(_handleMapActivityChanged);
+      widget.isActive?.addListener(_handleMapActivityChanged);
+      _handleMapActivityChanged();
+    }
     if (oldWidget.addSpotRequests != widget.addSpotRequests) {
       oldWidget.addSpotRequests?.removeListener(_handleAddSpotRequest);
       _lastAddSpotRequest = widget.addSpotRequests?.value ?? 0;
@@ -794,6 +1010,17 @@ class _MapScreenState extends State<MapScreen>
     _startAddingSpot();
   }
 
+  void _handleMapActivityChanged() {
+    if (widget.isActive?.value ?? true) return;
+
+    final fishProvider = FishProvider.instance;
+    if (fishProvider.isFishModalVisible) {
+      fishProvider.closeFishModal();
+    }
+    if (!mounted || !_isFishBarVisible) return;
+    setState(() => _isFishBarVisible = false);
+  }
+
   void _handleSpotSelectionRequest() {
     final request = widget.spotSelectionRequests?.value;
     if (request == null || request.serial == _lastSpotSelectionRequest) return;
@@ -814,46 +1041,114 @@ class _MapScreenState extends State<MapScreen>
     if (_isCompassEnabled) {
       _compassSubscription?.cancel();
       _compassSubscription = null;
-      _heading = 0.0;
-      _courseOverGround = 0.0;
+      _magneticHeading = null;
+      _gpsCourseOverGround = null;
       setState(() => _isCompassEnabled = false);
+      _stopCompassOwnedPositionStream();
     } else {
       _compassSubscription = FlutterCompass.events?.listen((e) {
-        if (mounted && e.heading != null) {
-          setState(() => _heading = e.heading!);
+        final magneticHeading = e.heading;
+        if (mounted && magneticHeading != null && magneticHeading.isFinite) {
+          setState(() => _magneticHeading = magneticHeading);
         }
       });
       setState(() => _isCompassEnabled = true);
+      unawaited(_ensureCompassCourseTracking());
     }
   }
 
-  void _initPositionStream() {
+  Future<void> _ensureCompassCourseTracking() async {
+    if (_positionSubscription != null) return;
+    await _initLocation(requestAccess: true);
+    if (!mounted || !_isCompassEnabled || _positionSubscription != null) return;
+    _initPositionStream(startedForCompass: true);
+  }
+
+  void _stopCompassOwnedPositionStream() {
+    if (!_positionStreamStartedForCompass) return;
+    final subscription = _positionSubscription;
+    _positionStreamStartedForCompass = false;
+    _positionSubscription = null;
+    if (subscription != null) unawaited(subscription.cancel());
+  }
+
+  double? _courseOverGroundFor(Position position) {
+    final rawCourse = position.heading;
+    final speed = position.speed;
+    if (speed.isFinite && speed >= 0 && speed < 0.5) return null;
+    if (speed.isFinite &&
+        speed >= 0.5 &&
+        rawCourse.isFinite &&
+        rawCourse >= 0) {
+      return rawCourse;
+    }
+
+    final previous = _lastPosition;
+    if (previous == null) return null;
+    final movedMeters = Geolocator.distanceBetween(
+      previous.latitude,
+      previous.longitude,
+      position.latitude,
+      position.longitude,
+    );
+    final accuracyGuard = math.max(
+      5.0,
+      math.min(30.0, math.max(previous.accuracy, position.accuracy)),
+    );
+    if (!movedMeters.isFinite || movedMeters < accuracyGuard) return null;
+    return Geolocator.bearingBetween(
+      previous.latitude,
+      previous.longitude,
+      position.latitude,
+      position.longitude,
+    );
+  }
+
+  void _initPositionStream({bool startedForCompass = false}) {
+    if (_positionSubscription != null) {
+      if (!startedForCompass) _positionStreamStartedForCompass = false;
+      return;
+    }
+    _positionStreamStartedForCompass = startedForCompass;
     _positionSubscription = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.best, distanceFilter: 10),
-    ).listen((pos) {
-      if (!mounted) return;
-      final cog = pos.heading;
-      if (!cog.isNaN && cog >= 0) {
-        _courseOverGround = cog;
-      } else if (_lastPosition != null) {
-        _courseOverGround = Geolocator.bearingBetween(_lastPosition!.latitude,
-            _lastPosition!.longitude, pos.latitude, pos.longitude);
-      }
-      _lastPosition = pos;
-      _currentPosition = pos;
-      setState(() {});
-    });
+    ).listen(
+      (pos) {
+        if (!mounted) return;
+        final gpsCourseOverGround = _courseOverGroundFor(pos);
+        _lastPosition = pos;
+        _currentPosition = pos;
+        setState(() {
+          _gpsCourseOverGround = _isCompassEnabled ? gpsCourseOverGround : null;
+        });
+      },
+      onError: (Object error) {
+        debugPrint('[MapScreen] Position stream unavailable: $error');
+        _positionSubscription = null;
+        _positionStreamStartedForCompass = false;
+        if (!mounted) return;
+        setState(() {
+          _currentPosition = null;
+          _lastPosition = null;
+          _gpsCourseOverGround = null;
+        });
+      },
+      cancelOnError: true,
+    );
   }
 
   @override
   void dispose() {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    _cancelCameraFlight();
+    _cameraFlightController.dispose();
     _mapController.dispose();
     _searchController.dispose();
     _debounceTimer?.cancel();
     _compassSubscription?.cancel();
     _positionSubscription?.cancel();
+    widget.isActive?.removeListener(_handleMapActivityChanged);
     widget.addSpotRequests?.removeListener(_handleAddSpotRequest);
     widget.spotSelectionRequests?.removeListener(_handleSpotSelectionRequest);
     widget.userSpotSelectionRequests
@@ -906,16 +1201,17 @@ class _MapScreenState extends State<MapScreen>
     }
   }
 
-  Future<void> _initLocation() async {
+  Future<void> _initLocation({required bool requestAccess}) async {
     try {
-      if (!await Geolocator.isLocationServiceEnabled()) return;
-      var p = await Geolocator.checkPermission();
-      if (p == LocationPermission.denied) {
-        p = await Geolocator.requestPermission();
-      }
-      if (p == LocationPermission.denied ||
-          p == LocationPermission.deniedForever) {
-        return;
+      if (requestAccess) {
+        if (!await ensureLocationAccess(context)) return;
+      } else {
+        if (!await Geolocator.isLocationServiceEnabled()) return;
+        final permission = await Geolocator.checkPermission();
+        if (permission != LocationPermission.whileInUse &&
+            permission != LocationPermission.always) {
+          return;
+        }
       }
       final pos = await Geolocator.getCurrentPosition();
       if (mounted) setState(() => _currentPosition = pos);
@@ -925,6 +1221,7 @@ class _MapScreenState extends State<MapScreen>
   }
 
   void _zoomTo(double zoom) {
+    _cancelCameraFlight();
     if (!zoom.isFinite) return;
     final center = _mapController.camera.center;
     if (!center.latitude.isFinite || !center.longitude.isFinite) return;
@@ -942,17 +1239,74 @@ class _MapScreenState extends State<MapScreen>
 
   Future<void> _animateToPoint(LatLng target) async {
     if (!_isValidMapPoint(target)) return;
-    final tz = (_currentZoom < _maxZoom ? _maxZoom : _currentZoom)
-        .clamp(3.0, _maxZoom);
-    if (!tz.isFinite) return;
-    for (var i = 1; i <= 6; i++) {
-      final stepZ =
-          (_currentZoom + (tz - _currentZoom) * (i / 6)).clamp(3.0, _maxZoom);
-      if (!stepZ.isFinite) continue;
-      _mapController.move(target, stepZ);
-      if (i < 6) await Future.delayed(const Duration(milliseconds: 25));
+    final flightSerial = ++_cameraFlightSerial;
+    _cameraFlightController.stop();
+    _cameraFlightPlan = null;
+
+    late final MapCamera camera;
+    try {
+      camera = _mapController.camera;
+    } catch (_) {
+      return;
     }
-    if (mounted) setState(() => _currentZoom = tz);
+    final start = camera.center;
+    final startZoom = camera.zoom;
+    if (!_isValidMapPoint(start) || !startZoom.isFinite) return;
+
+    final targetZoom = (startZoom < _maxZoom ? _maxZoom : startZoom)
+        .clamp(3.0, _maxZoom)
+        .toDouble();
+    final distanceKm = _distance.as(LengthUnit.Kilometer, start, target);
+    final plan = MapFlightPlan.adaptive(
+      start: start,
+      target: target,
+      startZoom: startZoom,
+      targetZoom: targetZoom,
+      distanceKm: distanceKm,
+    );
+    _cameraFlightPlan = plan;
+    _lastCameraFlightFrame = Duration.zero;
+    _cameraFlightController.duration = plan.duration;
+
+    try {
+      await _cameraFlightController.forward(from: 0).orCancel;
+    } on TickerCanceled {
+      return;
+    }
+
+    if (mounted && flightSerial == _cameraFlightSerial) {
+      setState(() => _currentZoom = targetZoom);
+      _cameraFlightPlan = null;
+    }
+  }
+
+  void _applyCameraFlightFrame() {
+    final plan = _cameraFlightPlan;
+    if (plan == null || !mounted) return;
+
+    final elapsed =
+        _cameraFlightController.lastElapsedDuration ?? Duration.zero;
+    final isFinalFrame = _cameraFlightController.value >= 1;
+    if (!isFinalFrame &&
+        elapsed - _lastCameraFlightFrame < MapFlightPlan.frameInterval) {
+      return;
+    }
+    _lastCameraFlightFrame = elapsed;
+
+    try {
+      _mapController.move(
+        plan.centerAt(_cameraFlightController.value),
+        plan.zoomAt(_cameraFlightController.value),
+      );
+    } catch (_) {
+      _cancelCameraFlight();
+    }
+  }
+
+  void _cancelCameraFlight() {
+    _cameraFlightSerial++;
+    _cameraFlightController.stop();
+    _cameraFlightPlan = null;
   }
 
   Future<void> _selectSpot(Spot spot) async {
@@ -961,6 +1315,7 @@ class _MapScreenState extends State<MapScreen>
       _selectedUserSpot = null;
       _pendingPersonalSpot = null;
       _searchQuery = '';
+      _isFishBarVisible = false;
       _showToolsPanel = false;
     });
     _searchController.clear();
@@ -1130,9 +1485,14 @@ class _MapScreenState extends State<MapScreen>
       },
     );
     if (!created || !mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    widget.onPersonalSpotCreated?.call();
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
       SnackBar(
         content: Text(context.tr('mySpots.created')),
+        duration: const Duration(seconds: 3),
+        persist: false,
         action: widget.onOpenMySpots == null
             ? null
             : SnackBarAction(
@@ -1226,6 +1586,7 @@ class _MapScreenState extends State<MapScreen>
       point.longitude <= 180;
 
   void _onPositionChanged(MapCamera camera, bool gesture) {
+    if (gesture) _cancelCameraFlight();
     final nb = camera.visibleBounds;
     var nz = camera.zoom;
     if (!nz.isFinite) return;
@@ -1271,6 +1632,8 @@ class _MapScreenState extends State<MapScreen>
       builder: (context, _) {
         final tc = ThemeColors.of(context);
         final hasSel = _selectedSpot != null;
+        final media = MediaQuery.of(context);
+        final isLandscape = media.orientation == Orientation.landscape;
 
         return Scaffold(
             body: Stack(children: [
@@ -1362,12 +1725,19 @@ class _MapScreenState extends State<MapScreen>
                 ),
               // 🌬️ Couche de particules de vent animees (30fps)
               // IgnorePointer pour ne pas bloquer les taps sur la carte
-              IgnorePointer(
-                child: Consumer<WindAnimationProvider>(
-                  builder: (ctx, wind, _) => WindParticleLayer(
-                    provider: wind,
-                    mapController: _mapController,
+              ListenableBuilder(
+                listenable: FishProvider.instance,
+                child: IgnorePointer(
+                  child: Consumer<WindAnimationProvider>(
+                    builder: (ctx, wind, _) => WindParticleLayer(
+                      provider: wind,
+                      mapController: _mapController,
+                    ),
                   ),
+                ),
+                builder: (context, child) => TickerMode(
+                  enabled: !FishProvider.instance.isFishModalVisible,
+                  child: child!,
                 ),
               ),
               if (_selectedSpot != null)
@@ -1430,29 +1800,34 @@ class _MapScreenState extends State<MapScreen>
               child: Align(
                   alignment: Alignment.centerLeft,
                   child: Consumer<FishProvider>(builder: (ctx, fp, _) {
+                    if (fp.isFishModalVisible) {
+                      return const SizedBox.shrink();
+                    }
+                    if (!_isFishBarVisible) {
+                      return const SizedBox.shrink();
+                    }
                     final df = fp.allFish;
                     if (df.isEmpty) return const SizedBox.shrink();
-                    return AnimatedSlide(
-                        offset: _isFishBarVisible
-                            ? Offset.zero
-                            : const Offset(0, 2),
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.easeOutCubic,
-                        child: AnimatedOpacity(
-                            opacity: _isFishBarVisible ? 1.0 : 0.0,
-                            duration: const Duration(milliseconds: 200),
-                            child: _FishVerticalMenu(
-                                fishes: df,
-                                selectedFish: fp.selectedFish,
-                                onFishSelected: (f) =>
-                                    fp.selectFish(f, _spots, _currentPosition),
-                                onFishDeselected: fp.deselectFish)));
+                    return _FishVerticalMenu(
+                        fishes: df,
+                        selectedFish: fp.selectedFish,
+                        onFishSelected: (f) {
+                          if (_isFishBarVisible) {
+                            setState(() => _isFishBarVisible = false);
+                          }
+                          unawaited(fp.selectFish(
+                            f,
+                            _spots,
+                            _currentPosition,
+                          ));
+                        },
+                        onFishDeselected: fp.deselectFish);
                   }))),
           Positioned(
-              bottom: 8,
-              left: 8,
-              width: 96,
-              height: 96,
+              bottom: 16,
+              left: 16,
+              width: _mapBottomControlHeight,
+              height: _mapBottomControlHeight,
               child: Directionality(
                   textDirection: TextDirection.ltr,
                   child: _buildFishFilterButton())),
@@ -1503,31 +1878,16 @@ class _MapScreenState extends State<MapScreen>
                 left: 0,
                 right: 0,
                 child: _CompassRibbon(
-                    heading: _heading, courseOverGround: _courseOverGround)),
+                    magneticHeading: _magneticHeading,
+                    gpsCourseOverGround: _gpsCourseOverGround)),
           Positioned(
-            top: MediaQuery.of(context).padding.top + 80,
-            right: 16,
-            bottom: 100,
+            top: media.padding.top + (isLandscape ? 12 : 80),
+            right: 16 + media.padding.right,
+            bottom: isLandscape ? null : 100,
             child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildZoomIn(),
-                  const SizedBox(height: 8),
-                  _buildZoomOut(),
-                  const SizedBox(height: 8),
-                  _buildMyLocationButton(),
-                  const SizedBox(height: 8),
-                  ZoomButton(
-                    heroTag: 'compass_toggle',
-                    icon: _isCompassEnabled ? Icons.explore : Icons.explore_off,
-                    onTap: _toggleCompass,
-                  ),
-                  const SizedBox(height: 8),
-                  _buildToolsPanelToggleButton(),
-                  const SizedBox(height: 8),
-                  _buildWindToggleButton(),
-                ],
+              scrollDirection: isLandscape ? Axis.horizontal : Axis.vertical,
+              child: _buildPrimaryMapControls(
+                isLandscape ? Axis.horizontal : Axis.vertical,
               ),
             ),
           ),
@@ -1586,19 +1946,20 @@ class _MapScreenState extends State<MapScreen>
                                               scale: 0.8 + 0.2 * v, child: c)),
                                       child: GestureDetector(
                                           onTap: () {},
-                                          child: FishIntelligenceModal(
-                                              fish: fp.selectedFish!,
-                                              nearbySpots: fp.nearbySpots,
-                                              isLoadingNearby:
-                                                  fp.isLoadingNearby,
-                                              distanceText: _distanceText,
-                                              onSpotSelected: (s) {
-                                                fp.closeFishModal();
-                                                _selectSpot(s);
-                                              },
-                                              onClose: fp.closeFishModal,
-                                              currentPosition:
-                                                  _currentPosition)))))));
+                                          child: RepaintBoundary(
+                                              child: FishIntelligenceModal(
+                                                  fish: fp.selectedFish!,
+                                                  nearbySpots: fp.nearbySpots,
+                                                  isLoadingNearby:
+                                                      fp.isLoadingNearby,
+                                                  distanceText: _distanceText,
+                                                  onSpotSelected: (s) {
+                                                    fp.closeFishModal();
+                                                    _selectSpot(s);
+                                                  },
+                                                  onClose: fp.closeFishModal,
+                                                  currentPosition:
+                                                      _currentPosition))))))));
                 });
               }),
         ]));
@@ -1902,63 +2263,115 @@ class _MapScreenState extends State<MapScreen>
   }
 
   Widget _buildFishFilterButton() {
-    return GestureDetector(
-        onTap: () => setState(() {
-              _isFishBarVisible = !_isFishBarVisible;
-              _searchQuery = '';
-            }),
-        child: SizedBox(
-            width: 96,
-            height: 96,
-            child: ClipOval(
-                child: Image.asset('assets/images/blue_fish_button.png',
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const Center(
-                        child: Text('🐟', style: TextStyle(fontSize: 48)))))));
+    return Semantics(
+      button: true,
+      toggled: _isFishBarVisible,
+      label: context.tr(
+        _isFishBarVisible ? 'map.hideFish' : 'map.showFish',
+      ),
+      child: GestureDetector(
+          key: const ValueKey<String>('map-fish-filter-button'),
+          onTap: () => setState(() {
+                _isFishBarVisible = !_isFishBarVisible;
+                _searchQuery = '';
+              }),
+          child: SizedBox(
+              width: _mapBottomControlHeight,
+              height: _mapBottomControlHeight,
+              child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.asset('assets/images/fish_route_button.png',
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Center(
+                          child:
+                              Text('🐟', style: TextStyle(fontSize: 48))))))),
+    );
+  }
+
+  Widget _buildPrimaryMapControls(Axis direction) {
+    final controls = <Widget>[
+      _buildZoomIn(),
+      _buildZoomOut(),
+      _buildMyLocationButton(),
+      ZoomButton(
+        heroTag: 'compass_toggle',
+        semanticLabel: context.tr(
+          _isCompassEnabled ? 'map.disableCompass' : 'map.enableCompass',
+        ),
+        icon: _isCompassEnabled ? Icons.explore : Icons.explore_off,
+        onTap: _toggleCompass,
+      ),
+      _buildToolsPanelToggleButton(),
+      _buildWindToggleButton(),
+    ];
+    final horizontal = direction == Axis.horizontal;
+
+    return Flex(
+      direction: direction,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var index = 0; index < controls.length; index++) ...[
+          if (index > 0)
+            SizedBox(
+              width: horizontal ? 8 : 0,
+              height: horizontal ? 0 : 8,
+            ),
+          controls[index],
+        ],
+      ],
+    );
   }
 
   Widget _buildMyLocationButton() {
     final tc = ThemeColors.of(context);
-    return GestureDetector(
-        onTap: () async {
-          if (_currentPosition == null) {
-            await _initLocation();
-            if (_currentPosition != null && _positionSubscription == null) {
-              _initPositionStream();
+    return Semantics(
+      button: true,
+      label: context.tr('map.myLocation'),
+      child: GestureDetector(
+          onTap: () async {
+            if (_currentPosition == null) {
+              await _initLocation(requestAccess: true);
+              if (_currentPosition != null && _positionSubscription == null) {
+                _initPositionStream();
+              }
+              return;
             }
-            return;
-          }
-          if (_positionSubscription == null) _initPositionStream();
-          final pos =
-              LatLng(_currentPosition!.latitude, _currentPosition!.longitude);
-          if (!pos.latitude.isFinite || !pos.longitude.isFinite) return;
-          final z = (_currentZoom + 2).clamp(3.0, _maxZoom);
-          if (!z.isFinite) return;
-          _mapController.move(pos, z);
-          if (mounted) setState(() {});
-        },
-        child: Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-                color: tc.surface.withValues(alpha: 0.9),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: tc.glassBorder, width: 1.2),
-                boxShadow: [
-                  BoxShadow(
-                      color: tc.shadowColor,
-                      blurRadius: 12,
-                      offset: const Offset(0, 4))
-                ]),
-            child: Center(
-                child:
-                    Icon(Icons.my_location, color: tc.oceanMedium, size: 24))));
+            if (_positionSubscription == null) _initPositionStream();
+            final pos =
+                LatLng(_currentPosition!.latitude, _currentPosition!.longitude);
+            if (!pos.latitude.isFinite || !pos.longitude.isFinite) return;
+            final z = (_currentZoom + 2).clamp(3.0, _maxZoom);
+            if (!z.isFinite) return;
+            _cancelCameraFlight();
+            _mapController.move(pos, z);
+            if (mounted) setState(() {});
+          },
+          child: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                  color: tc.surface.withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: tc.glassBorder, width: 1.2),
+                  boxShadow: [
+                    BoxShadow(
+                        color: tc.shadowColor,
+                        blurRadius: 12,
+                        offset: const Offset(0, 4))
+                  ]),
+              child: Center(
+                  child: Icon(Icons.my_location,
+                      color: tc.oceanMedium, size: 24)))),
+    );
   }
 
   Widget _buildToolsPanelToggleButton() {
     return ZoomButton(
         key: const ValueKey<String>('map-tools-toggle'),
         heroTag: 'tpt',
+        semanticLabel: context.tr(
+          _showToolsPanel ? 'map.closeTools' : 'map.openTools',
+        ),
         icon: _showToolsPanel ? Icons.close : Icons.layers,
         onTap: () {
           final shouldOpen = !_showToolsPanel;
@@ -1978,12 +2391,16 @@ class _MapScreenState extends State<MapScreen>
 
   Widget _buildZoomIn() {
     return ZoomButton(
-        heroTag: 'zi', icon: Icons.add, onTap: () => _zoomTo(_currentZoom + 1));
+        heroTag: 'zi',
+        semanticLabel: context.tr('map.zoomIn'),
+        icon: Icons.add,
+        onTap: () => _zoomTo(_currentZoom + 1));
   }
 
   Widget _buildZoomOut() {
     return ZoomButton(
         heroTag: 'zo',
+        semanticLabel: context.tr('map.zoomOut'),
         icon: Icons.remove,
         onTap: () => _zoomTo(_currentZoom - 1));
   }
@@ -1992,41 +2409,46 @@ class _MapScreenState extends State<MapScreen>
     final tc = ThemeColors.of(context);
     final wind = context.watch<WindAnimationProvider>();
     final isOn = wind.isEnabled;
-    return GestureDetector(
-      onTap: () {
-        // Utiliser la position GPS si dispo, sinon le centre de la carte
-        final lat =
-            _currentPosition?.latitude ?? _mapController.camera.center.latitude;
-        final lon = _currentPosition?.longitude ??
-            _mapController.camera.center.longitude;
-        wind.toggleNearest(lat, lon);
-        if (mounted) setState(() {});
-      },
-      child: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: isOn
-              ? tc.oceanMedium.withValues(alpha: 0.9)
-              : tc.surface.withValues(alpha: 0.9),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isOn ? tc.oceanMedium : tc.glassBorder,
-            width: 1.2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: tc.shadowColor,
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+    return Semantics(
+      button: true,
+      toggled: isOn,
+      label: context.tr(isOn ? 'map.disableWind' : 'map.enableWind'),
+      child: GestureDetector(
+        onTap: () {
+          // Utiliser la position GPS si dispo, sinon le centre de la carte
+          final lat = _currentPosition?.latitude ??
+              _mapController.camera.center.latitude;
+          final lon = _currentPosition?.longitude ??
+              _mapController.camera.center.longitude;
+          wind.toggleNearest(lat, lon);
+          if (mounted) setState(() {});
+        },
+        child: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: isOn
+                ? tc.oceanMedium.withValues(alpha: 0.9)
+                : tc.surface.withValues(alpha: 0.9),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isOn ? tc.oceanMedium : tc.glassBorder,
+              width: 1.2,
             ),
-          ],
-        ),
-        child: Center(
-          child: Icon(
-            Icons.air,
-            color: isOn ? Colors.white : tc.textPrimary,
-            size: 24,
+            boxShadow: [
+              BoxShadow(
+                color: tc.shadowColor,
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Center(
+            child: Icon(
+              Icons.air,
+              color: isOn ? Colors.white : tc.textPrimary,
+              size: 24,
+            ),
           ),
         ),
       ),
@@ -2039,72 +2461,100 @@ class _MapScreenState extends State<MapScreen>
 // ═══════════════════════════════════════════════════════════════
 
 class _CompassRibbon extends StatelessWidget {
-  final double heading, courseOverGround;
-  const _CompassRibbon({required this.heading, required this.courseOverGround});
+  final double? magneticHeading, gpsCourseOverGround;
+  const _CompassRibbon({
+    required this.magneticHeading,
+    required this.gpsCourseOverGround,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final cog = courseOverGround.isNaN || courseOverGround == 0
-        ? 0.0
-        : courseOverGround;
-    final head = heading.isNaN ? 0.0 : heading;
+    final readings = CompassReadings(
+      magneticHeadingDegrees: magneticHeading,
+      gpsCourseOverGroundDegrees: gpsCourseOverGround,
+    );
+    final head = readings.magneticHeadingDegrees ?? 0;
     final topInset = MediaQuery.paddingOf(context).top;
+    const radius = BorderRadius.only(
+      bottomLeft: Radius.circular(20),
+      bottomRight: Radius.circular(20),
+    );
 
     return Semantics(
       container: true,
       label:
-          'Boussole, cap ${_valueText(head)}, route suivie ${_valueText(cog)}',
-      child: Container(
-        padding: EdgeInsets.fromLTRB(16, topInset + 5, 16, 8),
-        decoration: BoxDecoration(
-          color: const Color(0xEED6FBFA),
-          borderRadius: const BorderRadius.only(
-            bottomLeft: Radius.circular(20),
-            bottomRight: Radius.circular(20),
+          'Boussole, cap ${_valueText(readings.magneticHeadingDegrees)}, route suivie ${_valueText(readings.gpsCourseOverGroundDegrees)}',
+      child: RepaintBoundary(
+        child: Container(
+          key: const ValueKey<String>('map-active-compass-ribbon'),
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.38),
+                blurRadius: 18,
+                offset: const Offset(0, 6),
+              ),
+            ],
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.10),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              height: 39,
-              width: double.infinity,
-              child: CustomPaint(
-                painter: _CompassScalePainter(heading: head),
+          child: ClipRRect(
+            borderRadius: radius,
+            child: BackdropFilter(
+              filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+              child: Container(
+                padding: EdgeInsets.fromLTRB(16, topInset + 5, 16, 8),
+                decoration: BoxDecoration(
+                  borderRadius: radius,
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xB821252B),
+                      Color(0xD10A0C0F),
+                    ],
+                  ),
+                  border: Border.all(
+                    color: Colors.white24,
+                    width: 0.75,
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      height: 39,
+                      width: double.infinity,
+                      child: CustomPaint(
+                        painter: _CompassScalePainter(heading: head),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        for (final metric in readings.displayValues)
+                          Expanded(
+                            child: _CompassValue(
+                              key: ValueKey<String>(
+                                'map-compass-${metric.kind.name}',
+                              ),
+                              label: metric.label,
+                              value: _valueText(metric.degrees),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Expanded(
-                  child: _CompassValue(
-                    label: 'Course over ground',
-                    value: _valueText(cog),
-                  ),
-                ),
-                Expanded(
-                  child: _CompassValue(
-                    label: 'Heading',
-                    value: _valueText(head),
-                  ),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  String _valueText(double value) =>
-      value == 0 ? '--' : '${value.round()}° ${_gd(value)}';
+  String _valueText(double? value) =>
+      value == null ? '--' : '${value.round()}° ${_gd(value)}';
 
   String _gd(double d) {
     const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
@@ -2113,7 +2563,11 @@ class _CompassRibbon extends StatelessWidget {
 }
 
 class _CompassValue extends StatelessWidget {
-  const _CompassValue({required this.label, required this.value});
+  const _CompassValue({
+    super.key,
+    required this.label,
+    required this.value,
+  });
 
   final String label;
   final String value;
@@ -2128,7 +2582,7 @@ class _CompassValue extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(
-            color: Color(0xFF101820),
+            color: Color(0xFFCDD3D8),
             fontSize: 12,
             height: 1,
             fontWeight: FontWeight.w500,
@@ -2140,7 +2594,7 @@ class _CompassValue extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(
-            color: Color(0xFF05090C),
+            color: Color(0xFFF7F8F9),
             fontSize: 19,
             height: 1,
             fontWeight: FontWeight.w600,
@@ -2157,7 +2611,7 @@ class _CompassScalePainter extends CustomPainter {
   final double heading;
 
   static const _labelStyle = TextStyle(
-    color: Color(0xFF11191E),
+    color: Color(0xFFF1F3F5),
     fontSize: 12,
     height: 1,
     fontWeight: FontWeight.w600,
@@ -2171,7 +2625,7 @@ class _CompassScalePainter extends CustomPainter {
     final firstTick = ((normalizedHeading - visibleDegrees) / 5).floor() * 5;
     final lastTick = normalizedHeading + visibleDegrees;
     final tickPaint = Paint()
-      ..color = const Color(0xFF12191D)
+      ..color = const Color(0xFFD9DEE3)
       ..strokeCap = StrokeCap.square;
 
     for (var degree = firstTick; degree <= lastTick; degree += 5) {
@@ -2207,7 +2661,7 @@ class _CompassScalePainter extends CustomPainter {
       }
     }
 
-    final markerPaint = Paint()..color = const Color(0xFFFF453A);
+    final markerPaint = Paint()..color = const Color(0xFFFF4D47);
     final marker = ui.Path()
       ..moveTo(size.width / 2, 24)
       ..lineTo(size.width / 2 - 4.5, 34)

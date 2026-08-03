@@ -20,6 +20,34 @@ import 'package:spots_app/widgets/open_meteo_attribution.dart';
 import 'package:spots_app/utils/geo_utils.dart';
 import 'package:spots_app/theme.dart';
 
+@visibleForTesting
+String fallbackForecastSpotId(List<Map<String, dynamic>> spots) {
+  final validSpots = spots.where((spot) {
+    final id = spot['id'];
+    return id is String && id.trim().isNotEmpty;
+  }).toList()
+    ..sort(
+      (a, b) => (a['id'] as String)
+          .toLowerCase()
+          .compareTo((b['id'] as String).toLowerCase()),
+    );
+
+  if (validSpots.isEmpty) {
+    throw StateError('Aucun identifiant de spot météo valide.');
+  }
+
+  for (final spot in validSpots) {
+    final id = (spot['id'] as String).trim();
+    final name = (spot['name'] as String? ?? '').trim();
+    if (id.toLowerCase().contains('casablanca') ||
+        name.toLowerCase().contains('casablanca')) {
+      return id;
+    }
+  }
+
+  return (validSpots.first['id'] as String).trim();
+}
+
 class ForecastPage extends StatefulWidget {
   /// Si null, utilise la geolocalisation pour trouver le spot le plus proche.
   /// Sinon, utilise le spotId fourni directement.
@@ -93,15 +121,14 @@ class _ForecastPageState extends State<ForecastPage> {
 
   /// Trouve le spot le plus proche de la position GPS actuelle
   Future<String> _findNearestSpot() async {
-    // Verifier les permissions
-    LocationPermission perm = await Geolocator.checkPermission();
-    if (perm == LocationPermission.denied) {
-      perm = await Geolocator.requestPermission();
-    }
+    final fallbackSpotId = fallbackForecastSpotId(_availableSpots);
+
+    // Cette détection est facultative : elle ne demande jamais une permission
+    // au démarrage. Sans accès déjà accordé, Casablanca reste le repli stable.
+    final LocationPermission perm = await Geolocator.checkPermission();
     if (perm == LocationPermission.denied ||
         perm == LocationPermission.deniedForever) {
-      // GPS refuse → fallback sur le premier spot de la liste
-      return _availableSpots.first['id'] as String;
+      return fallbackSpotId;
     }
 
     try {
@@ -113,7 +140,7 @@ class _ForecastPageState extends State<ForecastPage> {
       );
 
       // Trouver le spot le plus proche
-      String nearestId = _availableSpots.first['id'] as String;
+      String nearestId = fallbackSpotId;
       double minDist = double.infinity;
 
       for (final spot in _availableSpots) {
@@ -130,7 +157,7 @@ class _ForecastPageState extends State<ForecastPage> {
       }
       return nearestId;
     } catch (_) {
-      return _availableSpots.first['id'] as String;
+      return fallbackSpotId;
     }
   }
 

@@ -22,11 +22,12 @@ class DioTileProvider extends TileProvider {
   DioTileProvider({
     Dio? dio,
     Map<String, String>? headers,
-  }) : _dio = dio ?? Dio(BaseOptions(
-           connectTimeout: const Duration(seconds: 5),
-           receiveTimeout: const Duration(seconds: 5),
-           headers: headers,
-         ));
+  }) : _dio = dio ??
+            Dio(BaseOptions(
+              connectTimeout: const Duration(seconds: 5),
+              receiveTimeout: const Duration(seconds: 5),
+              headers: headers,
+            ));
 
   @override
   ImageProvider getImage(TileCoordinates coordinates, TileLayer options) {

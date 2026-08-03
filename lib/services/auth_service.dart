@@ -197,6 +197,18 @@ class AuthService extends ChangeNotifier {
   /// Supprime le compte Firebase Auth et ses donnees Firestore.
   /// Retourne true si la suppression a reussi.
   Future<bool> deleteAccount() async {
+    if (_isLoading) return false;
+    _isLoading = true;
+    notifyListeners();
+    try {
+      return await _deleteAccountData();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> _deleteAccountData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return false;
 
@@ -247,6 +259,17 @@ class AuthService extends ChangeNotifier {
       return false;
     }
 
+    // Le compte Firebase n'existe plus. Fermer aussi la session Google locale
+    // évite qu'une connexion ultérieure réutilise silencieusement ce compte.
+    try {
+      await gsi.GoogleSignIn.instance.signOut();
+    } catch (e) {
+      debugPrint(
+        '[AuthService] Nettoyage de la session Google indisponible: '
+        '${e.runtimeType}',
+      );
+    }
+
     // 3. Nettoyer le stockage local au mieux. La suppression Firebase a
     // déjà réussi : une panne du stockage local ne doit pas faire croire à
     // l'utilisateur que son compte existe encore.
@@ -255,6 +278,7 @@ class AuthService extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('anonymous_user_id');
+      await prefs.remove('unread_personal_spot_badge_count');
     } catch (e) {
       debugPrint('[AuthService] Nettoyage SharedPreferences indisponible: $e');
     }
@@ -264,7 +288,6 @@ class AuthService extends ChangeNotifier {
     } catch (e) {
       debugPrint('[AuthService] Nettoyage SecureStorage indisponible: $e');
     }
-    notifyListeners();
     return true;
   }
 

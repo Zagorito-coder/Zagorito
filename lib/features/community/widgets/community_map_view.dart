@@ -13,6 +13,9 @@ import 'package:spots_app/l10n/app_localizations.dart';
 import 'package:spots_app/widgets/app_tile_layer.dart';
 import 'package:spots_app/widgets/boosterfish_page.dart';
 import 'package:spots_app/widgets/finite_marker_layer.dart';
+import 'package:spots_app/widgets/location_access_feedback.dart';
+
+const _likedHeartColor = Color(0xFF1877F2);
 
 class CommunityMapView extends StatefulWidget {
   const CommunityMapView({super.key});
@@ -27,8 +30,8 @@ class _CommunityMapViewState extends State<CommunityMapView> {
   late final Stream<List<CommunityCatch>> _catchesStream;
   late final Stream<WeeklyCommunityWinner?> _winnerStream;
   late Stream<Set<String>> _likesStream;
+  late Stream<List<CommunityBlockedUser>> _blockedUsersStream;
   StreamSubscription<User?>? _authSubscription;
-  final Set<String> _blockedDuringSession = {};
   String? _likesOwnerUid;
   String? _selectedId;
   int _zoomBand = 5;
@@ -42,12 +45,14 @@ class _CommunityMapViewState extends State<CommunityMapView> {
     _winnerStream = _repository.watchWeeklyWinner();
     _likesOwnerUid = FirebaseAuth.instance.currentUser?.uid;
     _likesStream = _repository.watchMyLikes();
+    _blockedUsersStream = _repository.watchBlockedUsers();
     _authSubscription = FirebaseAuth.instance.authStateChanges().listen(
       (user) {
         if (!mounted || user?.uid == _likesOwnerUid) return;
         setState(() {
           _likesOwnerUid = user?.uid;
           _likesStream = _repository.watchMyLikes();
+          _blockedUsersStream = _repository.watchBlockedUsers();
         });
       },
     );
@@ -66,124 +71,131 @@ class _CommunityMapViewState extends State<CommunityMapView> {
     return StreamBuilder<List<CommunityCatch>>(
       stream: _catchesStream,
       builder: (context, catchSnapshot) {
-        final catches = (catchSnapshot.data ?? const <CommunityCatch>[])
-            .where(
-              (item) => !_blockedDuringSession.contains(item.ownerUid),
-            )
-            .toList(growable: false);
-        final selected = _selectedCatch(catches);
-        return StreamBuilder<Set<String>>(
-          stream: _likesStream,
-          builder: (context, likesSnapshot) {
-            final likes = likesSnapshot.data ?? const <String>{};
-            return Stack(
-              children: [
-                Positioned.fill(
-                  child: FlutterMap(
-                    mapController: _mapController,
-                    options: MapOptions(
-                      initialCenter: const LatLng(30.5, -9.7),
-                      initialZoom: 5.2,
-                      minZoom: 3,
-                      maxZoom: 17,
-                      interactionOptions: const InteractionOptions(
-                        flags: InteractiveFlag.drag |
-                            InteractiveFlag.flingAnimation |
-                            InteractiveFlag.pinchZoom |
-                            InteractiveFlag.doubleTapZoom |
-                            InteractiveFlag.doubleTapDragZoom,
-                      ),
-                      onTap: (_, __) => _clearSelection(),
-                      onPositionChanged: (camera, _) {
-                        final next = camera.zoom.floor();
-                        if (next != _zoomBand && mounted) {
-                          setState(() => _zoomBand = next);
-                        }
-                      },
-                    ),
-                    children: [
-                      const AppTileLayer(style: MapStyle.satellite),
-                      if (palette.isDark)
-                        IgnorePointer(
-                          child: ColoredBox(
-                            color:
-                                const Color(0xFF001329).withValues(alpha: 0.34),
+        return StreamBuilder<List<CommunityBlockedUser>>(
+          stream: _blockedUsersStream,
+          builder: (context, blockedSnapshot) {
+            final blockedIds =
+                (blockedSnapshot.data ?? const <CommunityBlockedUser>[])
+                    .map((item) => item.uid)
+                    .toSet();
+            final catches = (catchSnapshot.data ?? const <CommunityCatch>[])
+                .where((item) => !blockedIds.contains(item.ownerUid))
+                .toList(growable: false);
+            final selected = _selectedCatch(catches);
+            return StreamBuilder<Set<String>>(
+              stream: _likesStream,
+              builder: (context, likesSnapshot) {
+                final likes = likesSnapshot.data ?? const <String>{};
+                return Stack(
+                  children: [
+                    Positioned.fill(
+                      child: FlutterMap(
+                        mapController: _mapController,
+                        options: MapOptions(
+                          initialCenter: const LatLng(30.5, -9.7),
+                          initialZoom: 5.2,
+                          minZoom: 3,
+                          maxZoom: 17,
+                          interactionOptions: const InteractionOptions(
+                            flags: InteractiveFlag.drag |
+                                InteractiveFlag.flingAnimation |
+                                InteractiveFlag.pinchZoom |
+                                InteractiveFlag.doubleTapZoom |
+                                InteractiveFlag.doubleTapDragZoom,
                           ),
+                          onTap: (_, __) => _clearSelection(),
+                          onPositionChanged: (camera, _) {
+                            final next = camera.zoom.floor();
+                            if (next != _zoomBand && mounted) {
+                              setState(() => _zoomBand = next);
+                            }
+                          },
                         ),
-                      AppMapAttribution(style: MapStyle.satellite),
-                      FiniteMarkerLayer(
-                        markers: _markers(catches, selected, palette),
+                        children: [
+                          const AppTileLayer(style: MapStyle.satellite),
+                          if (palette.isDark)
+                            IgnorePointer(
+                              child: ColoredBox(
+                                color: const Color(0xFF001329)
+                                    .withValues(alpha: 0.34),
+                              ),
+                            ),
+                          AppMapAttribution(style: MapStyle.satellite),
+                          FiniteMarkerLayer(
+                            markers: _markers(catches, selected, palette),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-                PositionedDirectional(
-                  top: 10,
-                  start: 12,
-                  child: _ApproximateZonePill(palette: palette),
-                ),
-                PositionedDirectional(
-                  top: 8,
-                  end: 10,
-                  child: Column(
-                    children: [
-                      _MapCircleButton(
-                        tooltip: context.tr('community.centerOnMe'),
-                        icon: _locating
-                            ? Icons.hourglass_top_rounded
-                            : Icons.my_location_rounded,
-                        palette: palette,
-                        onTap: _locating ? null : _centerOnUser,
-                      ),
-                      const SizedBox(height: 8),
-                      _MapCircleButton(
-                        tooltip: context.tr('community.fitCatches'),
-                        icon: Icons.center_focus_strong_rounded,
-                        palette: palette,
-                        onTap: catches.isEmpty ? null : () => _fit(catches),
-                      ),
-                    ],
-                  ),
-                ),
-                PositionedDirectional(
-                  top: 58,
-                  start: 12,
-                  end: 74,
-                  child: StreamBuilder<WeeklyCommunityWinner?>(
-                    stream: _winnerStream,
-                    builder: (context, snapshot) {
-                      final winner = snapshot.data;
-                      if (winner == null) return const SizedBox.shrink();
-                      return _WeeklyWinnerBanner(
-                        winner: winner,
-                        expanded: _winnerExpanded,
-                        palette: palette,
-                        onToggle: () => setState(
-                          () => _winnerExpanded = !_winnerExpanded,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.bottomCenter,
-                  child: _CatchShelf(
-                    catches: catches,
-                    selected: selected,
-                    likedIds: likes,
-                    loading: catchSnapshot.connectionState ==
-                            ConnectionState.waiting &&
-                        !catchSnapshot.hasData,
-                    error: catchSnapshot.hasError,
-                    palette: palette,
-                    onSelect: _select,
-                    onOpen: (item) => _openDetails(
-                      item,
-                      likes.contains(item.id),
                     ),
-                  ),
-                ),
-              ],
+                    PositionedDirectional(
+                      top: 10,
+                      start: 12,
+                      child: _ApproximateZonePill(palette: palette),
+                    ),
+                    PositionedDirectional(
+                      top: 8,
+                      end: 10,
+                      child: Column(
+                        children: [
+                          _MapCircleButton(
+                            tooltip: context.tr('community.centerOnMe'),
+                            icon: _locating
+                                ? Icons.hourglass_top_rounded
+                                : Icons.my_location_rounded,
+                            palette: palette,
+                            onTap: _locating ? null : _centerOnUser,
+                          ),
+                          const SizedBox(height: 8),
+                          _MapCircleButton(
+                            tooltip: context.tr('community.fitCatches'),
+                            icon: Icons.center_focus_strong_rounded,
+                            palette: palette,
+                            onTap: catches.isEmpty ? null : () => _fit(catches),
+                          ),
+                        ],
+                      ),
+                    ),
+                    PositionedDirectional(
+                      top: 58,
+                      start: 12,
+                      end: 74,
+                      child: StreamBuilder<WeeklyCommunityWinner?>(
+                        stream: _winnerStream,
+                        builder: (context, snapshot) {
+                          final winner = snapshot.data;
+                          if (winner == null) return const SizedBox.shrink();
+                          return _WeeklyWinnerBanner(
+                            winner: winner,
+                            expanded: _winnerExpanded,
+                            palette: palette,
+                            onToggle: () => setState(
+                              () => _winnerExpanded = !_winnerExpanded,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: _CatchShelf(
+                        catches: catches,
+                        selected: selected,
+                        likedIds: likes,
+                        loading: catchSnapshot.connectionState ==
+                                ConnectionState.waiting &&
+                            !catchSnapshot.hasData,
+                        error: catchSnapshot.hasError,
+                        palette: palette,
+                        onSelect: _select,
+                        onOpen: (item) => _openDetails(
+                          item,
+                          likes.contains(item.id),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             );
           },
         );
@@ -298,15 +310,7 @@ class _CommunityMapViewState extends State<CommunityMapView> {
   Future<void> _centerOnUser() async {
     setState(() => _locating = true);
     try {
-      if (!await Geolocator.isLocationServiceEnabled()) return;
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        return;
-      }
+      if (!await ensureLocationAccess(context)) return;
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.medium,
@@ -337,7 +341,6 @@ class _CommunityMapViewState extends State<CommunityMapView> {
     );
     if (!mounted || blockedUid == null) return;
     setState(() {
-      _blockedDuringSession.add(blockedUid);
       if (_selectedId == item.id) _selectedId = null;
     });
   }
@@ -677,8 +680,13 @@ class _CatchShelf extends StatelessWidget {
       for (final item in catches)
         if (item.id != selected?.id) item,
     ];
+    final viewportWidth = MediaQuery.sizeOf(context).width;
+    final cardWidth = math.min(
+      284.0,
+      math.max(240.0, viewportWidth * 0.74),
+    );
     return Container(
-      height: 240,
+      height: 260,
       decoration: BoxDecoration(
         color: palette.surface.withValues(alpha: palette.isDark ? 0.97 : 0.98),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(27)),
@@ -761,6 +769,7 @@ class _CatchShelf extends StatelessWidget {
                                 selected: selected?.id == item.id,
                                 liked: likedIds.contains(item.id),
                                 palette: palette,
+                                width: cardWidth,
                                 onTap: () {
                                   onSelect(item);
                                   onOpen(item);
@@ -813,6 +822,7 @@ class _PublicCatchCard extends StatelessWidget {
     required this.selected,
     required this.liked,
     required this.palette,
+    required this.width,
     required this.onTap,
   });
 
@@ -820,6 +830,7 @@ class _PublicCatchCard extends StatelessWidget {
   final bool selected;
   final bool liked;
   final BoosterFishPagePalette palette;
+  final double width;
   final VoidCallback onTap;
 
   @override
@@ -832,90 +843,151 @@ class _PublicCatchCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(15),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
-          width: 184,
+          width: width,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(15),
             border: Border.all(
               color: selected ? palette.accent : palette.divider,
               width: selected ? 2 : 1,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: selected
+                    ? palette.accent.withValues(alpha: 0.16)
+                    : palette.shadowColor,
+                blurRadius: selected ? 18 : 12,
+                offset: const Offset(0, 6),
+              ),
+            ],
           ),
           clipBehavior: Clip.antiAlias,
-          child: Row(
+          child: Column(
             children: [
-              SizedBox(
-                width: 75,
-                height: double.infinity,
+              Expanded(
                 child: CachedNetworkImage(
                   imageUrl: item.photoUrl,
+                  width: double.infinity,
                   fit: BoxFit.cover,
-                  placeholder: (_, __) => ColoredBox(color: palette.oceanDeep),
+                  placeholder: (_, __) => ColoredBox(
+                    color: palette.oceanDeep,
+                    child: Center(
+                      child: SizedBox.square(
+                        dimension: 24,
+                        child: CircularProgressIndicator(
+                          color: palette.accent,
+                          strokeWidth: 2,
+                        ),
+                      ),
+                    ),
+                  ),
                   errorWidget: (_, __, ___) => ColoredBox(
                     color: palette.oceanDeep,
-                    child: Icon(
-                      Icons.set_meal_rounded,
-                      color: palette.accent,
+                    child: Center(
+                      child: Icon(
+                        Icons.set_meal_rounded,
+                        color: palette.accent,
+                        size: 34,
+                      ),
                     ),
                   ),
                 ),
               ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(9, 8, 7, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.anglerName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: palette.textPrimary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        item.species,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: palette.textSecondary,
-                          fontSize: 10,
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        '${_formatWeight(item.weightKg)} kg',
-                        style: TextStyle(
-                          color: palette.accent,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      Row(
+              Container(
+                height: 62,
+                padding: const EdgeInsets.fromLTRB(10, 7, 11, 7),
+                decoration: BoxDecoration(
+                  color: palette.surfaceElevated,
+                  border: Border(
+                    top: BorderSide(color: palette.divider),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 15,
+                      backgroundColor: palette.oceanDeep,
+                      foregroundImage: item.avatarUrl.isEmpty
+                          ? null
+                          : CachedNetworkImageProvider(item.avatarUrl),
+                      child: item.avatarUrl.isEmpty
+                          ? Icon(
+                              Icons.person_rounded,
+                              color: palette.accent,
+                              size: 17,
+                            )
+                          : null,
+                    ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(
-                            liked
-                                ? Icons.favorite_rounded
-                                : Icons.favorite_border_rounded,
-                            size: 14,
-                            color: liked ? palette.error : palette.textMuted,
-                          ),
-                          const SizedBox(width: 3),
                           Text(
-                            '${item.likeCount}',
+                            item.anglerName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: palette.textMuted,
+                              color: palette.textPrimary,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.1,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            item.species,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: palette.textSecondary,
                               fontSize: 10,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 10),
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '${_formatWeight(item.weightKg)} kg',
+                          style: TextStyle(
+                            color: palette.accent,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              liked
+                                  ? Icons.favorite_rounded
+                                  : Icons.favorite_border_rounded,
+                              size: 14,
+                              color:
+                                  liked ? _likedHeartColor : palette.textMuted,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${item.likeCount}',
+                              style: TextStyle(
+                                color: palette.textMuted,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -950,6 +1022,26 @@ class _CatchDetailsSheetState extends State<_CatchDetailsSheet> {
   Widget build(BuildContext context) {
     final palette = BoosterFishPagePalette.of(context);
     final item = widget.item;
+    final likeColor = _liked ? _likedHeartColor : palette.textMuted;
+    final compactActionStyle = OutlinedButton.styleFrom(
+      foregroundColor: palette.textSecondary,
+      backgroundColor: palette.surfaceElevated.withValues(
+        alpha: palette.isDark ? 0.72 : 0.9,
+      ),
+      minimumSize: const Size(0, 40),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
+      side: BorderSide(color: palette.divider),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      textStyle: const TextStyle(
+        fontSize: 11.5,
+        fontWeight: FontWeight.w800,
+        letterSpacing: -0.1,
+      ),
+    );
     return DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.84,
@@ -1032,21 +1124,31 @@ class _CatchDetailsSheetState extends State<_CatchDetailsSheet> {
                       ],
                     ),
                   ),
-                  IconButton.filledTonal(
+                  IconButton(
                     tooltip: context.tr('community.like'),
                     onPressed: _busy ? null : _toggleLike,
+                    style: IconButton.styleFrom(
+                      minimumSize: const Size.square(38),
+                      maximumSize: const Size.square(38),
+                      padding: EdgeInsets.zero,
+                      backgroundColor: likeColor.withValues(alpha: 0.1),
+                      side: BorderSide(
+                        color: likeColor.withValues(alpha: 0.26),
+                      ),
+                    ),
                     icon: Icon(
                       _liked
                           ? Icons.favorite_rounded
                           : Icons.favorite_border_rounded,
-                      color: _liked ? palette.error : null,
+                      color: likeColor,
+                      size: 20,
                     ),
                   ),
                   const SizedBox(width: 4),
                   Text(
                     '$_likeCount',
                     style: TextStyle(
-                      color: palette.textPrimary,
+                      color: likeColor,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -1089,24 +1191,64 @@ class _CatchDetailsSheetState extends State<_CatchDetailsSheet> {
                 ),
               const SizedBox(height: 14),
               if (FirebaseAuth.instance.currentUser?.uid != item.ownerUid)
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _busy ? null : _report,
-                        icon: const Icon(Icons.flag_outlined),
-                        label: Text(context.tr('community.reportPost')),
+                SizedBox(
+                  height: 40,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _busy ? null : _report,
+                          style: compactActionStyle,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.flag_outlined,
+                                size: 15,
+                                color: palette.textMuted,
+                              ),
+                              const SizedBox(width: 5),
+                              Flexible(
+                                child: Text(
+                                  context.tr('community.reportPost'),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  softWrap: false,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 9),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _busy ? null : _block,
-                        icon: const Icon(Icons.block_rounded),
-                        label: Text(context.tr('community.blockUser')),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _busy ? null : _block,
+                          style: compactActionStyle,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.block_rounded,
+                                size: 15,
+                                color: palette.error.withValues(alpha: 0.82),
+                              ),
+                              const SizedBox(width: 5),
+                              Flexible(
+                                child: Text(
+                                  context.tr('community.blockUser'),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  softWrap: false,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 )
               else
                 OutlinedButton.icon(
@@ -1155,7 +1297,7 @@ class _CatchDetailsSheetState extends State<_CatchDetailsSheet> {
     final reason = await showDialog<String>(
       context: context,
       builder: (context) => SimpleDialog(
-        title: Text(context.tr('community.reportReason')),
+        title: Text(context.tr('community.reportPost')),
         children: [
           for (final reason in const [
             'child_safety',
@@ -1204,7 +1346,10 @@ class _CatchDetailsSheetState extends State<_CatchDetailsSheet> {
     if (confirmed != true) return;
     setState(() => _busy = true);
     try {
-      await widget.repository.blockUser(widget.item.ownerUid);
+      await widget.repository.blockUser(
+        blockedUid: widget.item.ownerUid,
+        blockedDisplayName: widget.item.anglerName,
+      );
       if (mounted) Navigator.pop(context, widget.item.ownerUid);
     } catch (_) {
       _message('community.actionFailed');

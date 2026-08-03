@@ -25,6 +25,8 @@ class AppTileLayer extends StatefulWidget {
 
 class _AppTileLayerState extends State<AppTileLayer> {
   static const _userAgentPackageName = 'com.zagorito.spots_app';
+  late final TileUpdateTransformer _tileUpdateTransformer =
+      TileUpdateTransformers.throttle(const Duration(milliseconds: 80));
   TileProvider? _networkTileProvider;
 
   TileProvider get _tileProvider {
@@ -35,6 +37,11 @@ class _AppTileLayerState extends State<AppTileLayer> {
                 '(+https://zagorito-coder.github.io/boosterfish/; '
                 'contact: booster2fish@gmail.com)',
           },
+          // Une coupure réseau ne doit pas transformer l'échec isolé d'une
+          // image de tuile en erreur Flutter fatale. Le cache reste consulté
+          // en priorité ; sans tuile exploitable, flutter_map affiche sa tuile
+          // transparente et la carte continue de fonctionner.
+          silenceExceptions: true,
           // Respecte les en-têtes HTTP des fournisseurs (obligatoire pour
           // tile.openstreetmap.org), évite les téléchargements répétés et
           // borne l'empreinte disque du cache partagé entre les fonds.
@@ -66,6 +73,7 @@ class _AppTileLayerState extends State<AppTileLayer> {
           tileProvider: _tileProvider,
           keepBuffer: 1,
           panBuffer: 0,
+          tileUpdateTransformer: _tileUpdateTransformer,
         );
       case MapStyle.dark:
         return TileLayer(
@@ -76,6 +84,7 @@ class _AppTileLayerState extends State<AppTileLayer> {
           tileProvider: _tileProvider,
           keepBuffer: 1,
           panBuffer: 0,
+          tileUpdateTransformer: _tileUpdateTransformer,
         );
       case MapStyle.standard:
         return TileLayer(
@@ -84,6 +93,7 @@ class _AppTileLayerState extends State<AppTileLayer> {
           tileProvider: _tileProvider,
           keepBuffer: 1,
           panBuffer: 0,
+          tileUpdateTransformer: _tileUpdateTransformer,
         );
       case MapStyle.offline:
         return const _OfflinePmTilesLayer();

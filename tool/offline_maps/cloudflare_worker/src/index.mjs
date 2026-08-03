@@ -32,6 +32,7 @@ const firebaseJwksUrl =
 const firebaseAppCheckJwksUrl =
   'https://firebaseappcheck.googleapis.com/v1/jwks';
 const maximumPhotoBytes = 2 * 1024 * 1024;
+const maximumDeleteAttempts = 3;
 const photoContentTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -59,6 +60,16 @@ function jsonResponse(status, payload) {
   });
 }
 
+function emptyResponse(status) {
+  return new Response(null, {
+    status,
+    headers: {
+      ...commonHeaders,
+      'Cache-Control': 'no-store',
+    },
+  });
+}
+
 function offlineObjectKey(request) {
   const path = new URL(request.url).pathname;
   if (path === '/' || path.includes('%2f') || path.includes('%2F')) return null;
@@ -74,10 +85,16 @@ function offlineObjectKey(request) {
   return allowedObjects.has(key) ? key : null;
 }
 
-function photoObjectKey(request) {
+function personalPhotoRoute(request) {
   const path = new URL(request.url).pathname;
-  const match = /^\/spot-photos\/([A-Za-z0-9_-]{20,96})$/.exec(path);
-  return match?.[1] ?? null;
+  // Keep the authenticated v1 mutation route until Play 1.0.2 is outside the
+  // supported install base. New clients use v2, where App Check is mandatory.
+  const match = /^\/spot-photos(-v2)?\/([A-Za-z0-9_-]{20,96})$/.exec(path);
+  if (match == null) return null;
+  return {
+    key: match[2],
+    requiresAppCheck: match[1] === '-v2',
+  };
 }
 
 function communityPhotoObjectKey(request) {
@@ -388,11 +405,48 @@ async function handlePhotoGet(request, bucket, key, actor) {
     return errorResponse(403, 'Forbidden');
   }
   const headers = responseHeaders(object, key, object.size);
-  headers.set('Cache-Control', 'public, max-age=3600, must-revalidate');
+  // Authenticated photos must never enter a shared or browser HTTP cache.
+  // `Vary` is kept as an additional defence if an intermediary ignores
+  // `private`/`no-store`.
+  headers.set('Cache-Control', 'private, no-store');
+  headers.set('Vary', 'Authorization');
   return new Response(request.method === 'HEAD' ? null : object.body, {
     status: 200,
     headers,
   });
+}
+
+async function readRequestBodyWithinLimit(request, maximumBytes) {
+  if (request.body == null) return new Uint8Array(0);
+
+  const reader = request.body.getReader();
+  const chunks = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      const chunk = value instanceof Uint8Array
+        ? value
+        : new Uint8Array(value);
+      totalBytes += chunk.byteLength;
+      if (totalBytes > maximumBytes) {
+        await reader.cancel('Photo exceeds the accepted size');
+        return null;
+      }
+      chunks.push(chunk);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
 }
 
 async function handlePhotoPut(request, bucket, key, ownerUid) {
@@ -421,11 +475,11 @@ async function handlePhotoPut(request, bucket, key, ownerUid) {
   ) {
     return errorResponse(403, 'Forbidden');
   }
-  const bytes = await request.arrayBuffer();
-  if (bytes.byteLength === 0 || bytes.byteLength > maximumPhotoBytes) {
+  const bytes = await readRequestBodyWithinLimit(request, maximumPhotoBytes);
+  if (bytes == null || bytes.byteLength === 0) {
     return errorResponse(413, 'Image exceeds 2 MB');
   }
-  if (!hasExpectedImageSignature(new Uint8Array(bytes), contentType)) {
+  if (!hasExpectedImageSignature(bytes, contentType)) {
     return errorResponse(415, 'Image content does not match its type');
   }
   await bucket.put(key, bytes, {
@@ -464,11 +518,28 @@ async function handlePublicPhotoGet(request, bucket, key) {
     : await bucket.get(key);
   if (object == null) return errorResponse(404, 'Not found');
   const headers = responseHeaders(object, key, object.size);
-  headers.set('Cache-Control', 'public, max-age=86400, must-revalidate');
+  // Community photos are revoked by deleting their R2 object. Do not allow a
+  // browser or intermediary to keep serving the bytes after that deletion.
+  headers.set('Cache-Control', 'no-store');
   return new Response(request.method === 'HEAD' ? null : object.body, {
     status: 200,
     headers,
   });
+}
+
+async function deleteObjectWithRetry(bucket, key) {
+  let lastError;
+  for (let attempt = 0; attempt < maximumDeleteAttempts; attempt += 1) {
+    try {
+      // R2 DELETE is idempotent. A retry is therefore safe when the first call
+      // deleted the object but its response was lost.
+      await bucket.delete(key);
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError ?? new Error('Unable to delete R2 object');
 }
 
 async function hasValidAdminKey(request, configuredKey) {
@@ -495,12 +566,12 @@ async function hasValidAdminKey(request, configuredKey) {
 
 async function handlePhotoDelete(bucket, key, ownerUid) {
   const object = await bucket.head(key);
-  if (object == null) return new Response(null, {status: 204});
+  if (object == null) return emptyResponse(204);
   if (object.customMetadata?.ownerUid !== ownerUid) {
     return errorResponse(403, 'Forbidden');
   }
-  await bucket.delete(key);
-  return new Response(null, {status: 204});
+  await deleteObjectWithRetry(bucket, key);
+  return emptyResponse(204);
 }
 
 export function createWorker({
@@ -517,7 +588,7 @@ export function createWorker({
   return {
     async fetch(request, env) {
     if (request.method === 'OPTIONS') {
-      return new Response(null, {status: 204, headers: commonHeaders});
+      return emptyResponse(204);
     }
 
     const adminPhotoKey = communityAdminPhotoObjectKey(request);
@@ -529,8 +600,8 @@ export function createWorker({
         return errorResponse(401, 'Unauthorized');
       }
       try {
-        await env.COMMUNITY_PHOTOS.delete(adminPhotoKey);
-        return new Response(null, {status: 204});
+        await deleteObjectWithRetry(env.COMMUNITY_PHOTOS, adminPhotoKey);
+        return emptyResponse(204);
       } catch {
         return errorResponse(503, 'Storage temporarily unavailable');
       }
@@ -585,8 +656,9 @@ export function createWorker({
       }
     }
 
-    const photoKey = photoObjectKey(request);
-    if (photoKey != null) {
+    const photoRoute = personalPhotoRoute(request);
+    if (photoRoute != null) {
+      const photoKey = photoRoute.key;
       try {
         if (
           request.method !== 'GET'
@@ -610,6 +682,12 @@ export function createWorker({
             photoKey,
             actor,
           );
+        }
+        if (photoRoute.requiresAppCheck) {
+          const appId = await authenticateAppRequest(request);
+          if (appId == null) {
+            return errorResponse(401, 'Invalid Firebase App Check token');
+          }
         }
         return request.method === 'PUT'
           ? await handlePhotoPut(request, env.SPOT_PHOTOS, photoKey, actor.uid)

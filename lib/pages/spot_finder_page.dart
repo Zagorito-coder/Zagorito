@@ -12,28 +12,34 @@ import 'package:spots_app/models/user_spot_selection_request.dart';
 
 class SpotFinderPage extends StatelessWidget {
   final List<Spot>? initialSpots;
+  final ValueListenable<bool>? isActive;
   final ValueListenable<int>? addSpotRequests;
   final ValueListenable<SpotSelectionRequest?>? spotSelectionRequests;
   final ValueListenable<UserSpotSelectionRequest?>? userSpotSelectionRequests;
   final VoidCallback? onOpenMySpots;
+  final VoidCallback? onPersonalSpotCreated;
 
   const SpotFinderPage({
     super.key,
     this.initialSpots,
+    this.isActive,
     this.addSpotRequests,
     this.spotSelectionRequests,
     this.userSpotSelectionRequests,
     this.onOpenMySpots,
+    this.onPersonalSpotCreated,
   });
 
   @override
   Widget build(BuildContext context) {
     return MapScreen(
       initialSpots: initialSpots,
+      isActive: isActive,
       addSpotRequests: addSpotRequests,
       spotSelectionRequests: spotSelectionRequests,
       userSpotSelectionRequests: userSpotSelectionRequests,
       onOpenMySpots: onOpenMySpots,
+      onPersonalSpotCreated: onPersonalSpotCreated,
     );
   }
 }

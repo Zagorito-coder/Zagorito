@@ -6,7 +6,12 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, kDebugMode, kIsWeb, TargetPlatform;
+    show
+        defaultTargetPlatform,
+        kIsWeb,
+        kReleaseMode,
+        TargetPlatform,
+        visibleForTesting;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemChrome, SystemUiMode;
 import 'package:provider/provider.dart';
@@ -52,6 +57,17 @@ class _SplashBootstrapState extends State<SplashBootstrap> {
         debugPrint('[SplashBootstrap] Firebase error: $e');
         rethrow;
       }
+
+      // App Check doit enregistrer son fournisseur d'attestation avant tout
+      // autre service Firebase. Sinon Auth, Firestore ou Crashlytics peuvent
+      // demander un jeton trop tôt, recevoir un jeton de remplacement, puis
+      // déclencher la limitation "Too many attempts".
+      //
+      // L'échec d'une attestation ne bloque pas le démarrage : la méthode
+      // sécurisée journalise l'erreur en debug et laisse l'application
+      // fonctionner hors ligne.
+      await _activateAppCheckSafely();
+
       try {
         await CrashReportingService.initialize();
       } catch (e) {
@@ -82,7 +98,6 @@ class _SplashBootstrapState extends State<SplashBootstrap> {
 
       // Ces initialisations ne sont pas nécessaires à la première frame.
       unawaited(fishProvider.loadFishData());
-      unawaited(_activateAppCheckSafely());
       unawaited(_initPremiumInBackground());
     } on SpotCatalogConfigurationException catch (e, st) {
       debugPrint('[SplashBootstrap] CONFIGURATION APK INVALIDE: $e\n$st');
@@ -119,9 +134,9 @@ class _SplashBootstrapState extends State<SplashBootstrap> {
 
     if (defaultTargetPlatform == TargetPlatform.android) {
       await FirebaseAppCheck.instance.activate(
-        providerAndroid: kDebugMode
-            ? const AndroidDebugProvider()
-            : const AndroidPlayIntegrityProvider(),
+        providerAndroid: appCheckAndroidProvider(
+          releaseMode: kReleaseMode,
+        ),
       );
       return;
     }
@@ -129,9 +144,9 @@ class _SplashBootstrapState extends State<SplashBootstrap> {
     if (defaultTargetPlatform == TargetPlatform.iOS ||
         defaultTargetPlatform == TargetPlatform.macOS) {
       await FirebaseAppCheck.instance.activate(
-        providerApple: kDebugMode
-            ? const AppleDebugProvider()
-            : const AppleDeviceCheckProvider(),
+        providerApple: appCheckAppleProvider(
+          releaseMode: kReleaseMode,
+        ),
       );
     }
   }
@@ -230,4 +245,25 @@ class _SplashBootstrapState extends State<SplashBootstrap> {
       ),
     );
   }
+}
+
+/// Les builds Debug et Profile sont installées localement et utilisent le
+/// fournisseur de développement. Seule la Release distribuable demande une
+/// attestation Play Integrity réelle.
+@visibleForTesting
+AndroidAppCheckProvider appCheckAndroidProvider({
+  required bool releaseMode,
+}) {
+  return releaseMode
+      ? const AndroidPlayIntegrityProvider()
+      : const AndroidDebugProvider();
+}
+
+@visibleForTesting
+AppleAppCheckProvider appCheckAppleProvider({
+  required bool releaseMode,
+}) {
+  return releaseMode
+      ? const AppleDeviceCheckProvider()
+      : const AppleDebugProvider();
 }

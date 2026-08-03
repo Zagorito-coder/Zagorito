@@ -31,6 +31,7 @@ void main() {
           '      _selectedUserSpot = null;\n'
           '      _pendingPersonalSpot = null;\n'
           "      _searchQuery = '';\n"
+          '      _isFishBarVisible = false;\n'
           '      _showToolsPanel = false;',
         ),
       );

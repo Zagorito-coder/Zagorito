@@ -4,17 +4,24 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:spots_app/l10n/app_localizations.dart';
 import 'package:spots_app/widgets/app_back_button.dart';
 import 'package:spots_app/widgets/boosterfish_page.dart';
 import 'package:spots_app/services/ad_service.dart';
 import 'package:spots_app/services/auth_service.dart';
+import 'package:spots_app/features/community/services/community_repository.dart';
 import 'package:spots_app/theme_controller.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class SettingsPage extends StatelessWidget {
-  const SettingsPage({super.key});
+  const SettingsPage({
+    super.key,
+    this.onOpenMySpots,
+  });
+
+  final VoidCallback? onOpenMySpots;
 
   @override
   Widget build(BuildContext context) {
@@ -22,100 +29,103 @@ class SettingsPage extends StatelessWidget {
       animation: ThemeController.instance,
       builder: (context, _) {
         final tc = BoosterFishPagePalette.of(context);
+        final auth = context.watch<AuthService>();
 
         return BoosterFishPageShell(
           child: CustomScrollView(
-            physics: const NeverScrollableScrollPhysics(),
+            key: const ValueKey('settings-scroll-view'),
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
             slivers: [
               SliverToBoxAdapter(child: _buildHero(context, tc)),
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildAccountSection(context, tc),
-                      _buildSectionHeading(
-                        context,
-                        tc,
-                        Icons.shield_outlined,
-                        context.tr('settings.privacySection'),
-                      ),
-                      _SettingsGroup(
-                        children: [
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 16),
+                sliver: SliverList.list(
+                  children: [
+                    _buildAccountSection(context, tc),
+                    const SizedBox(height: 12),
+                    _buildSectionHeading(
+                      context,
+                      tc,
+                      Icons.shield_outlined,
+                      context.tr('settings.privacySection'),
+                    ),
+                    const SizedBox(height: 7),
+                    _SettingsGroup(
+                      children: [
+                        _SettingsRow(
+                          icon: Icons.privacy_tip_outlined,
+                          iconColor: tc.success,
+                          title: context.tr('settings.privacyPolicy'),
+                          subtitle:
+                              context.tr('settings.privacyPolicySubtitle'),
+                          onTap: () => _openPrivacyPolicy(context),
+                        ),
+                        _SettingsRow(
+                          icon: Icons.description_outlined,
+                          iconColor: tc.textSecondary,
+                          title: context.tr('settings.termsOfService'),
+                          subtitle:
+                              context.tr('settings.termsOfServiceSubtitle'),
+                          onTap: () => _openTermsOfService(context),
+                        ),
+                        const _OpenSourceLicensesEntry(),
+                        const _AdvertisingPrivacyEntry(),
+                        if (auth.isLoggedIn)
                           _SettingsRow(
-                            icon: Icons.privacy_tip_outlined,
-                            iconColor: tc.success,
-                            title: context.tr('settings.privacyPolicy'),
+                            icon: Icons.delete_forever,
+                            iconColor: tc.error,
+                            title: context.tr('settings.deleteAccount'),
                             subtitle:
-                                context.tr('settings.privacyPolicySubtitle'),
-                            onTap: () => _openPrivacyPolicy(context),
+                                context.tr('settings.deleteAccountSubtitle'),
+                            trailing: auth.isLoading
+                                ? const SizedBox.square(
+                                    dimension: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : null,
+                            onTap: auth.isLoading
+                                ? null
+                                : () => _confirmDeleteAccount(context),
                           ),
-                          _SettingsRow(
-                            icon: Icons.description_outlined,
-                            iconColor: tc.textSecondary,
-                            title: context.tr('settings.termsOfService'),
-                            subtitle:
-                                context.tr('settings.termsOfServiceSubtitle'),
-                            onTap: () => _openTermsOfService(context),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _buildSectionHeading(
+                      context,
+                      tc,
+                      Icons.sailing_outlined,
+                      context.tr('settings.vesselCrew'),
+                    ),
+                    const SizedBox(height: 7),
+                    _SettingsGroup(
+                      children: [
+                        _PublicProfileSettingsRow(
+                          key: ValueKey(
+                            'public-profile-${context.watch<AuthService>().uid ?? 'guest'}',
                           ),
-                          const _AdvertisingPrivacyEntry(),
-                          if (context.watch<AuthService>().isLoggedIn)
-                            _SettingsRow(
-                              icon: Icons.delete_forever,
-                              iconColor: tc.error,
-                              title: context.tr('settings.deleteAccount'),
-                              subtitle:
-                                  context.tr('settings.deleteAccountSubtitle'),
-                              onTap: () => _confirmDeleteAccount(context),
-                            ),
-                        ],
-                      ),
-                      _buildSectionHeading(
-                        context,
-                        tc,
-                        Icons.sailing_outlined,
-                        context.tr('settings.vesselCrew'),
-                      ),
-                      _SettingsGroup(
-                        children: [
-                          _SettingsRow(
-                            icon: Icons.person,
-                            iconColor: tc.success,
-                            title: context.tr('settings.profile'),
-                            subtitle: context.tr('settings.profileSubtitle'),
-                            trailing: _UpdatePill(
-                              text: context.tr('settings.updateCredentials'),
-                            ),
-                            onTap: () => _showEditProfileDialog(context, tc),
-                          ),
+                          onOpen: () => _showEditProfileDialog(context, tc),
+                        ),
+                        if (onOpenMySpots != null)
                           _SettingsRow(
                             icon: Icons.anchor,
                             iconColor: tc.oceanLight,
                             title: context.tr('settings.mySpots'),
                             subtitle: context.tr('settings.mySpotsSubtitle'),
-                            onTap: () => _showComingSoon(
-                                context, context.tr('settings.mySpots')),
+                            onTap: onOpenMySpots!,
                           ),
-                          _SettingsRow(
-                            icon: Icons.people,
-                            iconColor: const Color(0xFF7C3AED),
-                            title: context.tr('settings.crewManagement'),
-                            subtitle:
-                                context.tr('settings.crewManagementSubtitle'),
-                            onTap: () => _showComingSoon(
-                                context, context.tr('settings.crewManagement')),
-                          ),
-                        ],
-                      ),
-                      _GoodFishingBanner(
-                        title: context.tr('settings.goodFishingTitle'),
-                        subtitle: context.tr('settings.goodFishingSubtitle'),
-                      ),
-                    ],
-                  ),
+                        const _BlockedUsersSettingsRow(),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _GoodFishingBanner(
+                      title: context.tr('settings.goodFishingTitle'),
+                      subtitle: context.tr('settings.goodFishingSubtitle'),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -126,13 +136,21 @@ class SettingsPage extends StatelessWidget {
   }
 
   Widget _buildHero(BuildContext context, BoosterFishPagePalette tc) {
+    final textScale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
     return SizedBox(
-      height: 125,
+      height: 125 + (textScale - 1) * 38,
       child: Stack(
         fit: StackFit.expand,
         children: [
           const ColoredBox(color: Color(0xFF071A3A)),
-          Image.asset('assets/settings_hero.png', fit: BoxFit.cover),
+          Image.asset(
+            'assets/settings_hero.webp',
+            fit: BoxFit.cover,
+            cacheWidth: (MediaQuery.sizeOf(context).width *
+                    MediaQuery.devicePixelRatioOf(context))
+                .clamp(480, 1080)
+                .round(),
+          ),
           Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
@@ -224,7 +242,7 @@ class SettingsPage extends StatelessWidget {
           title,
           style: TextStyle(
             color: tc.accent,
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: FontWeight.w800,
             letterSpacing: 1.2,
           ),
@@ -441,16 +459,6 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
-  void _showComingSoon(BuildContext context, String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          context.trArgs('settings.comingSoon', args: {'feature': feature}),
-        ),
-      ),
-    );
-  }
-
   Future<void> _openTermsOfService(BuildContext context) async {
     const url =
         'https://zagorito-coder.github.io/boosterfish/terms-of-service/';
@@ -521,47 +529,817 @@ class SettingsPage extends StatelessWidget {
     }
   }
 
-  Future<void> _showEditProfileDialog(
+  Future<bool> _showEditProfileDialog(
       BuildContext context, BoosterFishPagePalette tc) async {
     final auth = context.read<AuthService>();
-    final nameCtrl = TextEditingController(text: auth.displayName ?? '');
-    final email = auth.email ?? '';
-    final photoUrl = auth.photoUrl;
-    try {
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: tc.surface,
-          title: Text(context.tr('settings.editProfile')),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
-            CircleAvatar(
-              radius: 40,
-              backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
-              child:
-                  photoUrl == null ? const Icon(Icons.person, size: 40) : null,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: nameCtrl,
-              decoration: InputDecoration(
-                labelText: context.tr('settings.name'),
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(12))),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(email, style: TextStyle(color: tc.textMuted, fontSize: 13)),
-          ]),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(context.tr('common.close'))),
-          ],
+    if (!auth.isLoggedIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr('settings.profileSignInRequired'))),
+      );
+      return false;
+    }
+
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _PublicProfileSheet(),
+    );
+    if (saved == true && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr('settings.publicIdentitySaved'))),
+      );
+    }
+    return saved == true;
+  }
+}
+
+class _BlockedUsersSettingsRow extends StatelessWidget {
+  const _BlockedUsersSettingsRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthService>();
+    if (!auth.isLoggedIn) {
+      return _SettingsRow(
+        icon: Icons.people_outline_rounded,
+        iconColor: const Color(0xFF7C3AED),
+        title: context.tr('settings.crewManagement'),
+        subtitle: context.tr('settings.blockedUsersSubtitle'),
+        onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.tr('settings.profileSignInRequired')),
+          ),
         ),
       );
-    } finally {
-      nameCtrl.dispose();
     }
+
+    return StreamBuilder<List<CommunityBlockedUser>>(
+      stream: CommunityRepository.instance.watchBlockedUsers(),
+      builder: (context, snapshot) {
+        final count = snapshot.data?.length ?? 0;
+        return _SettingsRow(
+          icon: Icons.people_outline_rounded,
+          iconColor: const Color(0xFF7C3AED),
+          title: context.tr('settings.crewManagement'),
+          subtitle: count == 0
+              ? context.tr('settings.blockedUsersSubtitle')
+              : context.trArgs(
+                  'settings.blockedUsersCount',
+                  args: {'count': '$count'},
+                ),
+          onTap: () => showModalBottomSheet<void>(
+            context: context,
+            isScrollControlled: true,
+            useSafeArea: true,
+            backgroundColor: Colors.transparent,
+            builder: (_) => const _BlockedUsersSheet(),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _BlockedUsersSheet extends StatefulWidget {
+  const _BlockedUsersSheet();
+
+  @override
+  State<_BlockedUsersSheet> createState() => _BlockedUsersSheetState();
+}
+
+class _BlockedUsersSheetState extends State<_BlockedUsersSheet> {
+  String? _busyUid;
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = BoosterFishPagePalette.of(context);
+    final height = MediaQuery.sizeOf(context).height * 0.72;
+    return Container(
+      height: height,
+      decoration: BoxDecoration(
+        color: tc.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        border: Border.all(color: tc.borderStrong),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.24),
+            blurRadius: 32,
+            offset: const Offset(0, -8),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 10),
+          Container(
+            width: 42,
+            height: 4,
+            decoration: BoxDecoration(
+              color: tc.textSecondary.withValues(alpha: 0.34),
+              borderRadius: BorderRadius.circular(99),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 12, 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF7C3AED).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.groups_2_outlined,
+                    color: Color(0xFF7C3AED),
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        context.tr('settings.crewManagement'),
+                        style: TextStyle(
+                          color: tc.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        context.tr('settings.blockedUsersHelp'),
+                        style: TextStyle(
+                          color: tc.textSecondary,
+                          fontSize: 12,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: tc.divider),
+          Expanded(
+            child: StreamBuilder<List<CommunityBlockedUser>>(
+              stream: CommunityRepository.instance.watchBlockedUsers(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting &&
+                    !snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return _BlockedUsersEmptyState(
+                    icon: Icons.cloud_off_rounded,
+                    title: context.tr('settings.blockedUsersLoadError'),
+                    subtitle: context.tr('settings.blockedUsersRetry'),
+                  );
+                }
+                final users = snapshot.data ?? const <CommunityBlockedUser>[];
+                if (users.isEmpty) {
+                  return _BlockedUsersEmptyState(
+                    icon: Icons.verified_user_outlined,
+                    title: context.tr('settings.noBlockedUsers'),
+                    subtitle: context.tr('settings.noBlockedUsersSubtitle'),
+                  );
+                }
+                return ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
+                  itemCount: users.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 9),
+                  itemBuilder: (context, index) {
+                    final user = users[index];
+                    final displayName = user.displayName.isEmpty
+                        ? context.tr('settings.blockedUserFallback')
+                        : user.displayName;
+                    final busy = _busyUid == user.uid;
+                    return Container(
+                      padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+                      decoration: BoxDecoration(
+                        color: tc.surfaceElevated,
+                        borderRadius: BorderRadius.circular(17),
+                        border: Border.all(color: tc.borderStrong),
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 20,
+                            backgroundColor:
+                                tc.textSecondary.withValues(alpha: 0.11),
+                            child: Icon(
+                              Icons.person_off_outlined,
+                              color: tc.textSecondary,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 11),
+                          Expanded(
+                            child: Text(
+                              displayName,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: tc.textPrimary,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          OutlinedButton.icon(
+                            onPressed: busy
+                                ? null
+                                : () => _confirmUnblock(user, displayName),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(0, 38),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 11),
+                              foregroundColor: tc.oceanLight,
+                              side: BorderSide(
+                                color: tc.oceanLight.withValues(alpha: 0.46),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            icon: busy
+                                ? SizedBox(
+                                    width: 15,
+                                    height: 15,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: tc.oceanLight,
+                                    ),
+                                  )
+                                : const Icon(Icons.lock_open_rounded, size: 16),
+                            label: Text(
+                              context.tr('settings.unblock'),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmUnblock(
+    CommunityBlockedUser user,
+    String displayName,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(context.tr('settings.unblock')),
+        content: Text(
+          context.trArgs(
+            'settings.unblockConfirm',
+            args: {'name': displayName},
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(context.tr('common.cancel')),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.lock_open_rounded, size: 17),
+            label: Text(context.tr('settings.unblock')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _busyUid = user.uid);
+    try {
+      await CommunityRepository.instance.unblockUser(user.uid);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr('settings.unblockSuccess'))),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr('settings.unblockError'))),
+      );
+    } finally {
+      if (mounted) setState(() => _busyUid = null);
+    }
+  }
+}
+
+class _BlockedUsersEmptyState extends StatelessWidget {
+  const _BlockedUsersEmptyState({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = BoosterFishPagePalette.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 62,
+              height: 62,
+              decoration: BoxDecoration(
+                color: tc.success.withValues(alpha: 0.10),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: tc.success, size: 28),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: tc.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: tc.textSecondary,
+                fontSize: 12,
+                height: 1.35,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PublicProfileSettingsRow extends StatefulWidget {
+  const _PublicProfileSettingsRow({
+    super.key,
+    required this.onOpen,
+  });
+
+  final Future<bool> Function() onOpen;
+
+  @override
+  State<_PublicProfileSettingsRow> createState() =>
+      _PublicProfileSettingsRowState();
+}
+
+class _PublicProfileSettingsRowState extends State<_PublicProfileSettingsRow> {
+  bool _showUpdateHint = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedPreference();
+  }
+
+  Future<void> _loadSavedPreference() async {
+    if (!context.read<AuthService>().isLoggedIn) return;
+    try {
+      final profile = await CommunityRepository.instance.loadPublicProfile();
+      if (!mounted) return;
+      setState(() => _showUpdateHint = !profile.hasSavedPreference);
+    } catch (_) {
+      // En cas de panne réseau, l'indicateur reste visible et le profil
+      // demeure accessible. Aucune erreur de chargement ne bloque Paramètres.
+    }
+  }
+
+  Future<void> _openProfile() async {
+    final saved = await widget.onOpen();
+    if (saved && mounted) {
+      setState(() => _showUpdateHint = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = BoosterFishPagePalette.of(context);
+    return _SettingsRow(
+      icon: Icons.person,
+      iconColor: tc.success,
+      title: context.tr('settings.profile'),
+      subtitle: context.tr('settings.profileSubtitle'),
+      trailing: _showUpdateHint
+          ? _UpdatePill(
+              text: context.tr('settings.updateCredentials'),
+            )
+          : null,
+      onTap: _openProfile,
+    );
+  }
+}
+
+class _PublicProfileSheet extends StatefulWidget {
+  const _PublicProfileSheet();
+
+  @override
+  State<_PublicProfileSheet> createState() => _PublicProfileSheetState();
+}
+
+class _PublicProfileSheetState extends State<_PublicProfileSheet> {
+  final _nicknameController = TextEditingController();
+  bool _anonymous = false;
+  bool _loading = true;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    final auth = context.read<AuthService>();
+    final fallback = auth.displayName?.trim() ?? '';
+    try {
+      final profile = await CommunityRepository.instance.loadPublicProfile();
+      if (!mounted) return;
+      _nicknameController.text = profile.publicDisplayName.isNotEmpty
+          ? profile.publicDisplayName
+          : fallback;
+      setState(() {
+        _anonymous = profile.publishAnonymously;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      _nicknameController.text = fallback;
+      setState(() {
+        _loading = false;
+        _error = context.tr('settings.publicIdentityLoadError');
+      });
+    }
+  }
+
+  Future<void> _save() async {
+    final nickname = _nicknameController.text.trim();
+    if (!_anonymous && (nickname.length < 2 || nickname.length > 40)) {
+      setState(() {
+        _error = context.tr('settings.publicIdentityNicknameError');
+      });
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await CommunityRepository.instance.savePublicProfile(
+        publishAnonymously: _anonymous,
+        publicDisplayName: nickname,
+      );
+      if (mounted) Navigator.of(context).pop(true);
+    } on FormatException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _error = context.tr('settings.publicIdentitySaveError');
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _nicknameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = BoosterFishPagePalette.of(context);
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 10,
+          right: 10,
+          bottom: MediaQuery.viewInsetsOf(context).bottom + 10,
+        ),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.88,
+          ),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: tc.surface.withValues(alpha: 0.98),
+              borderRadius: const BorderRadius.all(Radius.circular(28)),
+              border: Border.all(color: tc.accent.withValues(alpha: 0.42)),
+              boxShadow: [
+                BoxShadow(
+                  color: tc.accent.withValues(alpha: 0.16),
+                  blurRadius: 30,
+                  offset: const Offset(0, -8),
+                ),
+              ],
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 42,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: tc.textMuted.withValues(alpha: 0.45),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [tc.oceanMedium, tc.oceanDeep],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: tc.accent.withValues(alpha: 0.3),
+                              blurRadius: 16,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(Icons.public_rounded,
+                            color: Colors.white, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              context.tr('settings.publicIdentityTitle'),
+                              style: TextStyle(
+                                color: tc.textPrimary,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              context.tr('settings.publicIdentitySubtitle'),
+                              style: TextStyle(
+                                color: tc.textSecondary,
+                                fontSize: 11,
+                                height: 1.25,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  if (_loading)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 32),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else ...[
+                    _IdentityChoice(
+                      icon: Icons.visibility_off_rounded,
+                      title: context.tr('settings.publicIdentityAnonymous'),
+                      selected: _anonymous,
+                      onTap: () => setState(() {
+                        _anonymous = true;
+                        _error = null;
+                      }),
+                    ),
+                    const SizedBox(height: 8),
+                    _IdentityChoice(
+                      icon: Icons.badge_outlined,
+                      title: context.tr('settings.publicIdentityNickname'),
+                      selected: !_anonymous,
+                      onTap: () => setState(() {
+                        _anonymous = false;
+                        _error = null;
+                      }),
+                    ),
+                    const SizedBox(height: 12),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 180),
+                      child: _anonymous
+                          ? _PublicPreview(
+                              key: const ValueKey('anonymous-preview'),
+                              name: CommunityRepository.anonymousDisplayName,
+                              tc: tc,
+                            )
+                          : TextField(
+                              key: const ValueKey('nickname-field'),
+                              controller: _nicknameController,
+                              enabled: !_saving,
+                              maxLength: 40,
+                              textCapitalization: TextCapitalization.words,
+                              decoration: InputDecoration(
+                                labelText: context
+                                    .tr('settings.publicIdentityNickname'),
+                                hintText: context
+                                    .tr('settings.publicIdentityNicknameHint'),
+                                filled: true,
+                                fillColor: tc.surfaceElevated,
+                                counterText: '',
+                                prefixIcon: Icon(Icons.alternate_email_rounded,
+                                    color: tc.accent),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                            ),
+                    ),
+                    if (!_anonymous) ...[
+                      const SizedBox(height: 10),
+                      ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: _nicknameController,
+                        builder: (context, value, _) => _PublicPreview(
+                          name: value.text.trim().isEmpty
+                              ? context.tr('settings.userFallback')
+                              : value.text.trim(),
+                          tc: tc,
+                        ),
+                      ),
+                    ],
+                    if (_error != null) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        _error!,
+                        style: TextStyle(color: tc.error, fontSize: 11),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: _saving ? null : _save,
+                      icon: _saving
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.check_rounded),
+                      label: Text(context.tr('settings.publicIdentitySave')),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                        backgroundColor: tc.oceanMedium,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _IdentityChoice extends StatelessWidget {
+  const _IdentityChoice({
+    required this.icon,
+    required this.title,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = BoosterFishPagePalette.of(context);
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: title,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          decoration: BoxDecoration(
+            color: selected
+                ? tc.accent.withValues(alpha: 0.12)
+                : tc.surfaceElevated.withValues(alpha: 0.58),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected ? tc.accent : tc.borderStrong,
+              width: selected ? 1.2 : 0.7,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(icon,
+                  color: selected ? tc.accent : tc.textSecondary, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: tc.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Icon(
+                selected
+                    ? Icons.radio_button_checked_rounded
+                    : Icons.radio_button_off_rounded,
+                color: selected ? tc.accent : tc.textMuted,
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PublicPreview extends StatelessWidget {
+  const _PublicPreview({super.key, required this.name, required this.tc});
+
+  final String name;
+  final BoosterFishPagePalette tc;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: tc.navy.withValues(alpha: tc.isDark ? 0.7 : 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: tc.accent.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.preview_rounded, color: tc.accent, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '${context.tr('settings.publicIdentityPreview')}: $name',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: tc.textSecondary, fontSize: 11),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -666,8 +1444,9 @@ class _SettingsRow extends StatelessWidget {
       hint: subtitle,
       child: InkWell(
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 56),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           child: Row(
             children: [
               Container(
@@ -686,7 +1465,7 @@ class _SettingsRow extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      maxLines: 2,
+                      maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: tc.textPrimary,
@@ -697,12 +1476,12 @@ class _SettingsRow extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       subtitle,
-                      maxLines: 2,
+                      maxLines: 4,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: tc.textSecondary,
-                        fontSize: 10,
-                        height: 1.2,
+                        fontSize: 12,
+                        height: 1.25,
                       ),
                     ),
                   ],
@@ -720,6 +1499,59 @@ class _SettingsRow extends StatelessWidget {
   }
 }
 
+class _OpenSourceLicensesEntry extends StatefulWidget {
+  const _OpenSourceLicensesEntry();
+
+  @override
+  State<_OpenSourceLicensesEntry> createState() =>
+      _OpenSourceLicensesEntryState();
+}
+
+class _OpenSourceLicensesEntryState extends State<_OpenSourceLicensesEntry> {
+  PackageInfo? _packageInfo;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPackageInfo();
+  }
+
+  Future<void> _loadPackageInfo() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      if (mounted) setState(() => _packageInfo = packageInfo);
+    } catch (_) {
+      // Les licences restent accessibles si Android ne fournit pas la version.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = BoosterFishPagePalette.of(context);
+    final packageInfo = _packageInfo;
+    final installedVersion = packageInfo == null
+        ? null
+        : '${packageInfo.version} (${packageInfo.buildNumber})';
+    final baseSubtitle = context.tr('settings.openSourceLicensesSubtitle');
+
+    return _SettingsRow(
+      icon: Icons.info_outline_rounded,
+      iconColor: tc.oceanLight,
+      title: context.tr('settings.openSourceLicenses'),
+      subtitle: installedVersion == null
+          ? baseSubtitle
+          : '$baseSubtitle\n${context.tr('settings.appVersion')} '
+              '$installedVersion',
+      onTap: () => showLicensePage(
+        context: context,
+        applicationName: 'BoosterFish',
+        applicationVersion: installedVersion,
+        applicationLegalese: '© 2026 BoosterFish',
+      ),
+    );
+  }
+}
+
 class _UpdatePill extends StatelessWidget {
   final String text;
 
@@ -729,8 +1561,8 @@ class _UpdatePill extends StatelessWidget {
   Widget build(BuildContext context) {
     final tc = BoosterFishPagePalette.of(context);
     return Container(
-      constraints: const BoxConstraints(maxWidth: 86),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      constraints: const BoxConstraints(maxWidth: 100, minHeight: 36),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
       decoration: BoxDecoration(
         color: tc.success.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
@@ -739,12 +1571,12 @@ class _UpdatePill extends StatelessWidget {
       child: Text(
         text,
         textAlign: TextAlign.center,
-        maxLines: 2,
+        maxLines: 3,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           color: tc.success,
-          fontSize: 8,
-          height: 1.15,
+          fontSize: 10,
+          height: 1.2,
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -760,15 +1592,22 @@ class _GoodFishingBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textScale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
     return ClipRRect(
       borderRadius: BorderRadius.circular(22),
       child: SizedBox(
-        height: 58,
+        height: 64 + (textScale - 1) * 28,
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Image.asset('assets/settings_fishing_banner.png',
-                fit: BoxFit.cover),
+            Image.asset(
+              'assets/settings_fishing_banner.webp',
+              fit: BoxFit.cover,
+              cacheWidth: (MediaQuery.sizeOf(context).width *
+                      MediaQuery.devicePixelRatioOf(context))
+                  .clamp(480, 1080)
+                  .round(),
+            ),
             DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -818,7 +1657,7 @@ class _GoodFishingBanner extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.82),
-                            fontSize: 9,
+                            fontSize: 11,
                             height: 1.25,
                           ),
                         ),

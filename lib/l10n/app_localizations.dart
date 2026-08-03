@@ -1,6 +1,6 @@
 // ============================================================
 //  app_localizations.dart — Système de localisation i18n
-//  Langues : Français (par défaut) 🇫🇷, English 🇬🇧, العربية 🇸🇦, Español 🇪🇸
+//  Langues : Français (par défaut) 🇫🇷, English 🇬🇧, العربية 🇲🇦, Español 🇪🇸
 // ============================================================
 
 import 'dart:convert';
@@ -12,7 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 enum AppLanguage {
   french('fr', 'Français', '🇫🇷'),
   english('en', 'English', '🇬🇧'),
-  arabic('ar', 'العربية', '🇸🇦'),
+  arabic('ar', 'العربية', '🇲🇦'),
   spanish('es', 'Español', '🇪🇸');
 
   final String code;
@@ -115,7 +115,8 @@ class AppLocalizations {
     return Localizations.of<AppLocalizations>(context, AppLocalizations)!;
   }
 
-  static const LocalizationsDelegate<AppLocalizations> delegate = _AppLocalizationsDelegate();
+  static const LocalizationsDelegate<AppLocalizations> delegate =
+      _AppLocalizationsDelegate();
 
   static const List<Locale> supportedLocales = [
     Locale('fr', ''),
@@ -167,7 +168,8 @@ class AppLocalizations {
   }
 }
 
-class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
+class _AppLocalizationsDelegate
+    extends LocalizationsDelegate<AppLocalizations> {
   const _AppLocalizationsDelegate();
 
   @override

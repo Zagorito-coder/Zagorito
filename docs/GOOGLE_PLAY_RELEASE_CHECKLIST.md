@@ -1,7 +1,7 @@
 # BoosterFish — fiche de publication Google Play
 
-Version candidate en cours de validation : **1.0.4 (7)**
-Dernière mise à jour : **30 juillet 2026**
+Version candidate en cours de validation : **1.0.6 (11)**
+Dernière mise à jour : **3 août 2026**
 
 Cette fiche décrit l'état réel de l'application et les réponses à reporter dans
 Google Play Console. Toute modification future des SDK, de l'authentification,
@@ -76,7 +76,7 @@ leur contenu corresponde aux fichiers `docs/` de cette version.
 | Autres contenus générés par les utilisateurs | Espèce, poids, zone, montage, appât, notes et conseil associés à une prise publiée ; informations d'un spot personnel | Oui | Oui pour une publication volontaire | Facultatif | Fonctionnalité de l'application ; sécurité/prévention des abus |
 | Informations sur l'application et performances — journaux de plantage | Piles de crash et ANR Firebase Crashlytics, état technique pertinent de l'application | Oui | Non¹ | Requise dans la version Release | Analyses |
 | Informations sur l'application et performances — diagnostics | Métadonnées techniques Crashlytics ; temps de lancement, blocages, consommation d'énergie et diagnostics du SDK publicitaire | Oui | Oui pour les signaux publicitaires ; non¹ pour Crashlytics | Requise dans la version Release et lorsque les annonces sont diffusées | Analyses ; prévention de la fraude, sécurité et conformité ; publicité ou marketing |
-| Appareil ou autres identifiants | Identifiant publicitaire Android, App Set ID et identifiants de compte publicitaire ; jeton FCM transmis par le client Cloud Functions ; UUID d'installation Crashlytics et jeton d'intégrité App Check/Play Integrity | Oui | Oui pour Google Mobile Ads ; non¹ pour Firebase | Requise lorsque les annonces, le diagnostic Release, l'attestation ou les appels serveur sont utilisés | Fonctionnalité de l'application ; publicité ou marketing ; analyses ; prévention de la fraude, sécurité et conformité |
+| Appareil ou autres identifiants | Identifiant publicitaire Android, App Set ID et identifiants de compte publicitaire ; identifiant d'installation Firebase ; UUID d'installation Crashlytics et jeton d'intégrité App Check/Play Integrity | Oui | Oui pour Google Mobile Ads ; non¹ pour Firebase | Requise lorsque les annonces, le diagnostic Release, l'attestation ou les appels serveur sont utilisés | Fonctionnalité de l'application ; publicité ou marketing ; analyses ; prévention de la fraude, sécurité et conformité |
 
 ¹ Firebase Auth, Google Sign-In et Firebase Crashlytics sont utilisés comme
 prestataires de service respectivement pour l'authentification et le diagnostic.

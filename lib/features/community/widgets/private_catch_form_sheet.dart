@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:spots_app/features/community/models/private_catch.dart';
 import 'package:spots_app/l10n/app_localizations.dart';
 import 'package:spots_app/widgets/boosterfish_page.dart';
+import 'package:spots_app/widgets/location_access_feedback.dart';
 
 class PrivateCatchFormResult {
   const PrivateCatchFormResult({
@@ -348,19 +349,7 @@ class _PrivateCatchFormSheetState extends State<PrivateCatchFormSheet> {
   Future<void> _useCurrentLocation() async {
     setState(() => _locating = true);
     try {
-      if (!await Geolocator.isLocationServiceEnabled()) {
-        _showLocationError();
-        return;
-      }
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        _showLocationError();
-        return;
-      }
+      if (!await ensureLocationAccess(context)) return;
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,

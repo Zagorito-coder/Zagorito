@@ -47,6 +47,16 @@ void main() {
     expect(source, isNot(contains('DisabledMapCachingProvider')));
     expect(source, contains('BoosterFish Android'));
     expect(source, contains('contact: booster2fish@gmail.com'));
+    expect(
+      source,
+      contains('TileUpdateTransformers.throttle'),
+      reason: 'Le vol de caméra ne doit pas déclencher une requête par frame.',
+    );
+    expect(
+      source,
+      contains('silenceExceptions: true'),
+      reason: 'Une panne réseau de tuile doit afficher une tuile transparente.',
+    );
   });
 
   testWidgets(
@@ -64,6 +74,11 @@ void main() {
           tester.widget<TileLayer>(find.byType(TileLayer)).tileProvider;
 
       expect(restoredProvider, isNot(same(initialProvider)));
+
+      // Ferme le flux de tuiles et son éventuel délai de limitation avant que
+      // le binding de test vérifie l'absence de timers résiduels.
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 100));
     },
   );
 }

@@ -23,6 +23,9 @@ void main() {
     expect(result.hourlyPoints.first.windWaveHeight, 2.8);
     expect(result.hourlyPoints.first.windSpeedKmh, 18);
     expect(result.hourlyPoints.first.windDirectionDeg, 225);
+    expect(result.hourlyPoints.first.pressureHpa, 1014);
+    expect(result.hourlyPoints.first.precipitationProbabilityPct, 18);
+    expect(result.hourlyPoints.first.relativeHumidityPct, 72);
     expect(result.low, -0.35);
     expect(result.high, 1.08);
   });
@@ -74,6 +77,46 @@ void main() {
       throwsFormatException,
     );
   });
+
+  test('la météo GFS absente reste rétrocompatible', () {
+    final document = _conditionsDocument(
+      tideHeights: const [0.1, 0.4, 0.2],
+      waveHeights: const [1.1, 1.2, 1.3],
+    )..remove('gfs');
+
+    final result = TideConditionsMapper.fromDocument(
+      document,
+      fallbackLocation: 'Fallback',
+      now: DateTime.utc(2026, 7, 26, 1).toLocal(),
+    );
+
+    expect(result.hourlyPoints.first.pressureHpa, isNull);
+    expect(result.hourlyPoints.first.precipitationProbabilityPct, isNull);
+    expect(result.hourlyPoints.first.relativeHumidityPct, isNull);
+  });
+
+  test('ignore les valeurs GFS hors limites', () {
+    final document = _conditionsDocument(
+      tideHeights: const [0.1, 0.4, 0.2],
+      waveHeights: const [1.1, 1.2, 1.3],
+    );
+    final gfs = document['gfs'] as Map<String, dynamic>;
+    final slots = gfs['hourly'] as List<Map<String, dynamic>>;
+    slots.first
+      ..['pressureHpa'] = 400
+      ..['precipitationProbabilityPct'] = 150
+      ..['relativeHumidityPct'] = -2;
+
+    final result = TideConditionsMapper.fromDocument(
+      document,
+      fallbackLocation: 'Fallback',
+      now: DateTime.utc(2026, 7, 26, 1).toLocal(),
+    );
+
+    expect(result.hourlyPoints.first.pressureHpa, isNull);
+    expect(result.hourlyPoints.first.precipitationProbabilityPct, isNull);
+    expect(result.hourlyPoints.first.relativeHumidityPct, isNull);
+  });
 }
 
 Map<String, dynamic> _conditionsDocument({
@@ -110,5 +153,16 @@ Map<String, dynamic> _conditionsDocument({
     },
     'tide': {'hourly': tideSlots},
     'weather': {'hourly': weatherSlots},
+    'gfs': {
+      'model': 'GFS ~13km',
+      'hourly': [
+        {
+          'time': '2026-07-26T00:00',
+          'pressureHpa': 1014,
+          'precipitationProbabilityPct': 18,
+          'relativeHumidityPct': 72,
+        },
+      ],
+    },
   };
 }

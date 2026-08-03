@@ -502,6 +502,7 @@ class _PrivateCatchesViewState extends State<PrivateCatchesView> {
       CommunityFailure.ownPostLike => 'community.ownPostLike',
       CommunityFailure.postUnavailable => 'community.postUnavailable',
       CommunityFailure.permissionDenied => 'community.permissionDenied',
+      CommunityFailure.appCheckUnavailable => 'community.appCheckUnavailable',
       CommunityFailure.unavailable => 'community.unavailable',
     };
   }

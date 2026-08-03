@@ -95,10 +95,10 @@ class CommunityPhotoService {
     try {
       appCheckToken = await _appCheck.getToken(false);
     } catch (_) {
-      throw const CommunityException(CommunityFailure.permissionDenied);
+      throw const CommunityException(CommunityFailure.appCheckUnavailable);
     }
     if (appCheckToken == null || appCheckToken.isEmpty) {
-      throw const CommunityException(CommunityFailure.permissionDenied);
+      throw const CommunityException(CommunityFailure.appCheckUnavailable);
     }
     return {
       'Authorization': 'Bearer $token',

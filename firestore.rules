@@ -40,7 +40,7 @@ service cloud.firestore {
           )
           || (
             request.resource.data.photoUrl.matches(
-              '^https://boosterfish-offline-maps\\.boosterfish-maps\\.workers\\.dev/spot-photos/[A-Za-z0-9_-]{20,96}(\\?v=[0-9]+)?$'
+              '^https://boosterfish-offline-maps\\.boosterfish-maps\\.workers\\.dev/spot-photos(-v2)?/[A-Za-z0-9_-]{20,96}(\\?v=[0-9]+)?$'
             )
             && request.resource.data.photoObjectKey.matches(
               '^[A-Za-z0-9_-]{20,96}$'
@@ -160,6 +160,17 @@ service cloud.firestore {
         );
     }
 
+    function hasValidCommunityAvatar() {
+      return request.resource.data.avatarUrl is string
+        && request.resource.data.avatarUrl.size() <= 1024
+        && (
+          request.resource.data.avatarUrl == ''
+          || request.resource.data.avatarUrl.matches(
+            '^https://lh3\\.googleusercontent\\.com/[A-Za-z0-9_./%=-]+(\\?[A-Za-z0-9_&.=%-]+)?$'
+          )
+        );
+    }
+
     function hasValidCommunityCatch(userId) {
       return request.resource.data.keys().hasOnly([
           'schemaVersion',
@@ -188,12 +199,7 @@ service cloud.firestore {
         && request.resource.data.anglerName is string
         && request.resource.data.anglerName.size() > 0
         && request.resource.data.anglerName.size() <= 80
-        && request.resource.data.avatarUrl is string
-        && request.resource.data.avatarUrl.size() <= 1024
-        && (
-          request.resource.data.avatarUrl == ''
-          || request.resource.data.avatarUrl.matches('^https://.+$')
-        )
+        && hasValidCommunityAvatar()
         && hasValidCommunityPhoto(userId)
         && request.resource.data.species is string
         && request.resource.data.species.size() > 0
@@ -451,6 +457,26 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time;
     }
 
+    // Préférence d’identité publique, séparée du consentement UGC. Le nom
+    // Google et l’adresse e-mail ne sont jamais écrits dans ce document.
+    match /community_public_profiles/{userId} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.keys().hasOnly([
+          'schemaVersion',
+          'ownerUid',
+          'publicDisplayName',
+          'publishAnonymously',
+          'updatedAt'
+        ])
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.ownerUid == userId
+        && request.resource.data.publicDisplayName is string
+        && request.resource.data.publicDisplayName.size() <= 40
+        && request.resource.data.publishAnonymously is bool
+        && request.resource.data.updatedAt == request.time;
+    }
+
     // Verrou serveur de la limite d'une publication toutes les 24 heures.
     match /community_publish_state/{userId} {
       allow read, delete: if isOwner(userId);
@@ -485,8 +511,13 @@ service cloud.firestore {
     // Signalements distincts, non modifiables après envoi. Les modérateurs
     // les lisent via l'Admin SDK qui contourne ces règles.
     match /community_reports/{reportId} {
-      allow read, delete: if isSignedIn()
+      allow read: if isSignedIn()
         && resource.data.reporterUid == request.auth.uid;
+      // Un signalement est une preuve de modération immuable. Sa suppression
+      // est réservée aux fonctions Admin lors du retrait de la publication ou
+      // de la suppression du compte. Cela empêche delete/recreate d'augmenter
+      // artificiellement reportCount.
+      allow delete: if false;
       allow create: if isSignedIn()
         && request.resource.data.keys().hasOnly([
           'schemaVersion',
@@ -506,6 +537,12 @@ service cloud.firestore {
             /databases/$(database)/documents/community_catches/$(request.resource.data.postId)
           ).data.ownerUid
         && request.resource.data.postOwnerUid != request.auth.uid
+        && get(
+          /databases/$(database)/documents/community_catches/$(request.resource.data.postId)
+        ).data.status == 'published'
+        && get(
+          /databases/$(database)/documents/community_catches/$(request.resource.data.postId)
+        ).data.expiresAt > request.time
         && request.resource.data.reason in [
           'child_safety',
           'false_catch',
@@ -527,11 +564,19 @@ service cloud.firestore {
           'schemaVersion',
           'ownerUid',
           'blockedUid',
+          'blockedDisplayName',
           'createdAt'
         ])
         && request.resource.data.schemaVersion == 1
         && request.resource.data.ownerUid == userId
         && request.resource.data.blockedUid == blockedUserId
+        && (
+          !('blockedDisplayName' in request.resource.data)
+          || (
+            request.resource.data.blockedDisplayName is string
+            && request.resource.data.blockedDisplayName.size() <= 80
+          )
+        )
         && request.resource.data.createdAt == request.time;
     }
 
@@ -539,6 +584,15 @@ service cloud.firestore {
     match /community_state/{documentId} {
       allow read: if documentId == 'weekly_winner';
       allow write: if false;
+    }
+
+    // État interne et file de nettoyage R2 exclusivement serveur.
+    match /community_internal/{documentId} {
+      allow read, write: if false;
+    }
+
+    match /community_cleanup_tasks/{taskId} {
+      allow read, write: if false;
     }
 
   }

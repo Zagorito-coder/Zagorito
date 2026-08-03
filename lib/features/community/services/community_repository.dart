@@ -10,6 +10,46 @@ import 'package:spots_app/features/community/services/community_photo_service.da
 import 'package:spots_app/features/community/services/community_privacy.dart';
 import 'package:spots_app/features/community/services/private_catch_repository.dart';
 
+/// Identité affichée dans la galerie publique, indépendante du nom du compte
+/// Google. Les valeurs par défaut conservent le comportement historique.
+class CommunityPublicProfile {
+  const CommunityPublicProfile({
+    required this.publicDisplayName,
+    required this.publishAnonymously,
+    required this.hasSavedPreference,
+  });
+
+  final String publicDisplayName;
+  final bool publishAnonymously;
+  final bool hasSavedPreference;
+}
+
+/// Entrée privée visible uniquement par le pêcheur qui a effectué le blocage.
+class CommunityBlockedUser {
+  const CommunityBlockedUser({
+    required this.uid,
+    required this.displayName,
+    required this.blockedAt,
+  });
+
+  final String uid;
+  final String displayName;
+  final DateTime? blockedAt;
+
+  static CommunityBlockedUser fromDocument(
+    QueryDocumentSnapshot<Map<String, dynamic>> document,
+  ) {
+    final data = document.data();
+    final rawName = data['blockedDisplayName'];
+    final rawDate = data['createdAt'];
+    return CommunityBlockedUser(
+      uid: document.id,
+      displayName: rawName is String ? rawName.trim() : '',
+      blockedAt: rawDate is Timestamp ? rawDate.toDate() : null,
+    );
+  }
+}
+
 class CommunityRepository {
   CommunityRepository({
     FirebaseFirestore? firestore,
@@ -27,15 +67,83 @@ class CommunityRepository {
 
   static final instance = CommunityRepository();
   static const termsVersion = 1;
+  static const publicProfileCollection = 'community_public_profiles';
+  static const anonymousDisplayName = 'Pêcheur anonyme';
 
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
   final FirebaseFunctions _functions;
   final CommunityPhotoService _photoService;
   final PrivateCatchRepository _privateRepository;
+  CommunityPublicProfile? _publicProfileCache;
+  String? _publicProfileCacheUid;
 
   CollectionReference<Map<String, dynamic>> get _catches =>
       _firestore.collection('community_catches');
+
+  Future<CommunityPublicProfile> loadPublicProfile() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      return const CommunityPublicProfile(
+        publicDisplayName: '',
+        publishAnonymously: true,
+        hasSavedPreference: false,
+      );
+    }
+    if (_publicProfileCacheUid == user.uid && _publicProfileCache != null) {
+      return _publicProfileCache!;
+    }
+
+    final fallback = CommunityPublicProfile(
+      publicDisplayName: _fallbackPublicName(user),
+      publishAnonymously: false,
+      hasSavedPreference: false,
+    );
+    final snapshot = await _firestore
+        .collection(publicProfileCollection)
+        .doc(user.uid)
+        .get();
+    final data = snapshot.data();
+    final savedName = data?['publicDisplayName'];
+    final profile = CommunityPublicProfile(
+      publicDisplayName: savedName is String && savedName.trim().isNotEmpty
+          ? savedName.trim()
+          : fallback.publicDisplayName,
+      publishAnonymously: data?['publishAnonymously'] == true,
+      hasSavedPreference: snapshot.exists,
+    );
+    _publicProfileCacheUid = user.uid;
+    _publicProfileCache = profile;
+    return profile;
+  }
+
+  Future<void> savePublicProfile({
+    required bool publishAnonymously,
+    required String publicDisplayName,
+  }) async {
+    final user = _requireUser();
+    final cleanName = publicDisplayName.trim();
+    if (!publishAnonymously &&
+        (cleanName.length < 2 || cleanName.length > 40)) {
+      throw const FormatException(
+        'Le surnom public doit contenir entre 2 et 40 caractères.',
+      );
+    }
+    final profile = CommunityPublicProfile(
+      publicDisplayName: publishAnonymously ? '' : cleanName,
+      publishAnonymously: publishAnonymously,
+      hasSavedPreference: true,
+    );
+    await _firestore.collection(publicProfileCollection).doc(user.uid).set({
+      'schemaVersion': 1,
+      'ownerUid': user.uid,
+      'publicDisplayName': profile.publicDisplayName,
+      'publishAnonymously': profile.publishAnonymously,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    _publicProfileCacheUid = user.uid;
+    _publicProfileCache = profile;
+  }
 
   Stream<List<CommunityCatch>> watchActiveCatches() {
     final now = Timestamp.now();
@@ -45,16 +153,12 @@ class CommunityRepository {
         .orderBy('expiresAt', descending: true)
         .limit(CommunityCatch.maximumPublicItems)
         .snapshots()
-        .asyncMap((snapshot) async {
-      final blocked = await _blockedUserIds();
+        .map((snapshot) {
       final current = DateTime.now();
       final items = snapshot.docs
           .map(CommunityCatch.fromDocument)
           .whereType<CommunityCatch>()
-          .where(
-            (item) =>
-                item.isActiveAt(current) && !blocked.contains(item.ownerUid),
-          )
+          .where((item) => item.isActiveAt(current))
           .toList(growable: false)
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return items;
@@ -144,6 +248,7 @@ class CommunityRepository {
       final expiresAt = Timestamp.fromDate(
         DateTime.now().add(CommunityCatch.publicationLifetime),
       );
+      final publicName = await _publicName(user);
       await _firestore.runTransaction((transaction) async {
         final stateSnapshot = await transaction.get(state);
         final lastPublishedAt = stateSnapshot.data()?['lastPublishedAt'];
@@ -160,7 +265,7 @@ class CommunityRepository {
         transaction.set(document, {
           'schemaVersion': 1,
           'ownerUid': user.uid,
-          'anglerName': _publicName(user),
+          'anglerName': publicName,
           'avatarUrl': _safeAvatarUrl(user.photoURL),
           'photoUrl': uploaded!.url,
           'photoObjectKey': uploaded.objectKey,
@@ -304,9 +409,29 @@ class CommunityRepository {
     });
   }
 
-  Future<void> blockUser(String blockedUid) async {
+  Stream<List<CommunityBlockedUser>> watchBlockedUsers() {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return Stream.value(const <CommunityBlockedUser>[]);
+    return _firestore
+        .collection('community_blocks')
+        .doc(uid)
+        .collection('users')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map(CommunityBlockedUser.fromDocument)
+              .toList(growable: false),
+        );
+  }
+
+  Future<void> blockUser({
+    required String blockedUid,
+    required String blockedDisplayName,
+  }) async {
     final user = _requireUser();
     if (blockedUid == user.uid) return;
+    final cleanName = blockedDisplayName.trim();
     await _firestore
         .collection('community_blocks')
         .doc(user.uid)
@@ -316,8 +441,20 @@ class CommunityRepository {
       'schemaVersion': 1,
       'ownerUid': user.uid,
       'blockedUid': blockedUid,
+      'blockedDisplayName': cleanName.length <= 80 ? cleanName : '',
       'createdAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  Future<void> unblockUser(String blockedUid) async {
+    final user = _requireUser();
+    if (blockedUid == user.uid) return;
+    await _firestore
+        .collection('community_blocks')
+        .doc(user.uid)
+        .collection('users')
+        .doc(blockedUid)
+        .delete();
   }
 
   Future<void> deleteAllForCurrentUser() async {
@@ -336,17 +473,6 @@ class CommunityRepository {
             : CommunityFailure.unavailable,
       );
     }
-  }
-
-  Future<Set<String>> _blockedUserIds() async {
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) return const {};
-    final snapshot = await _firestore
-        .collection('community_blocks')
-        .doc(uid)
-        .collection('users')
-        .get();
-    return snapshot.docs.map((document) => document.id).toSet();
   }
 
   User _requireUser() {
@@ -375,7 +501,28 @@ class CommunityRepository {
     }
   }
 
-  static String _publicName(User user) {
+  Future<String> _publicName(User user) async {
+    try {
+      final profile = await loadPublicProfile();
+      if (profile.publishAnonymously) return anonymousDisplayName;
+      if (profile.publicDisplayName.isNotEmpty) {
+        return profile.publicDisplayName;
+      }
+    } catch (error, stackTrace) {
+      // L’identité publique est optionnelle : une panne de son document ne
+      // doit jamais empêcher une publication déjà valide.
+      debugPrint(
+        '[CommunityRepository] Public profile unavailable: $error\n$stackTrace',
+      );
+    }
+    final displayName = user.displayName?.trim() ?? '';
+    if (displayName.isEmpty) return 'Pêcheur BoosterFish';
+    return displayName.length <= 80
+        ? displayName
+        : displayName.substring(0, 80);
+  }
+
+  static String _fallbackPublicName(User user) {
     final displayName = user.displayName?.trim() ?? '';
     if (displayName.isEmpty) return 'Pêcheur BoosterFish';
     return displayName.length <= 80
@@ -384,10 +531,7 @@ class CommunityRepository {
   }
 
   static String _safeAvatarUrl(String? value) {
-    final uri = Uri.tryParse(value ?? '');
-    if (uri == null || uri.scheme != 'https' || !uri.hasAuthority) return '';
-    final normalized = uri.toString();
-    return normalized.length <= 1024 ? normalized : '';
+    return safeCommunityAvatarUrl(value);
   }
 
   static String _zoneName(PrivateCatch item) {

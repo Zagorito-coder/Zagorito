@@ -1,0 +1,135 @@
+name: Mobile and backend quality
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - main
+      - 'fix/**'
+      - 'release/**'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flutter-quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout sans credentials persistants
+        run: |
+          git init .
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git -c protocol.version=2 fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach FETCH_HEAD
+
+      - name: Installer Flutter 3.44.4
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.44.4'
+          channel: stable
+          cache: true
+
+      - name: Créer la configuration de test protégée
+        env:
+          CSV_ENCRYPTION_KEY: ${{ secrets.CSV_ENCRYPTION_KEY }}
+        run: |
+          if [ -z "${CSV_ENCRYPTION_KEY//[[:space:]]/}" ]; then
+            echo "::error::Le secret CSV_ENCRYPTION_KEY est obligatoire pour valider le catalogue chiffré."
+            exit 1
+          fi
+          umask 077
+          printf 'CSV_ENCRYPTION_KEY=%s\n' "$CSV_ENCRYPTION_KEY" > .env
+
+      - name: Résoudre les dépendances Flutter
+        run: flutter pub get
+
+      - name: Vérifier le format Dart
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Analyse statique Flutter
+        run: flutter analyze
+
+      - name: Tests Flutter complets avec contrôle du catalogue
+        # Les références visuelles du tableau de bord sont générées sur le Mac
+        # de release. Linux rasterise les polices et pixels différemment : la CI
+        # conserve tous les tests fonctionnels/widgets et laisse ce contrôle
+        # visuel dépendant de l'hôte à la suite locale de pré-release.
+        run: flutter test --dart-define-from-file=.env --exclude-tags=host-golden
+
+      - name: Effacer la configuration de test
+        if: always()
+        run: rm -f .env
+
+  backend-quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout sans credentials persistants
+        run: |
+          git init .
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git -c protocol.version=2 fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach FETCH_HEAD
+
+      - name: Installer Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            functions/package-lock.json
+            firebase_functions/package-lock.json
+
+      - name: Installer Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements-harvest.txt
+
+      - name: Installer Java pour l’émulateur Firestore
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Installer et auditer les dépendances Node
+        run: |
+          npm ci --ignore-scripts --prefix functions
+          npm audit --omit=dev --audit-level=high --prefix functions
+          npm ci --ignore-scripts --prefix firebase_functions
+          npm audit --audit-level=high --prefix firebase_functions
+
+      - name: Tester les Cloud Functions communautaires
+        run: npm test --prefix firebase_functions
+
+      - name: Tester les règles Firestore dans l’émulateur
+        run: >-
+          npx --yes firebase-tools@15.22.4 emulators:exec
+          --project demo-boosterfish
+          --only firestore
+          "node firebase_functions/firestore.rules.test.js &&
+          node --test firebase_functions/index.emulator.test.js"
+
+      - name: Tester le Worker Cloudflare
+        run: node --test tool/offline_maps/cloudflare_worker/test/worker_test.mjs
+
+      - name: Vérifier la syntaxe du Worker
+        run: |
+          node --check tool/offline_maps/cloudflare_worker/src/index.mjs
+          node --check tool/offline_maps/cloudflare_worker/test/worker_test.mjs
+
+      - name: Installer et vérifier les dépendances Python
+        run: |
+          python -m pip install --disable-pip-version-check -r requirements-harvest.txt
+          python -m pip check
+
+      - name: Tester la récolte météo
+        run: python -m unittest discover -s tests_python -p 'test_*.py'

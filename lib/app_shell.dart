@@ -1,12 +1,13 @@
 // ============================================================
 //  app_shell.dart — Shell de navigation principal
-//  BottomNavBar custom avec : Home, Fish, Add, Map, Settings
+//  BottomNavBar custom avec : Accueil, Marées, Spots, Mes spots, Paramètres
 //  + Bouton toggle thème Clair/Sombre intégré
 // ============================================================
 
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spots_app/theme.dart';
 import 'package:spots_app/theme_controller.dart';
 import 'package:spots_app/l10n/app_localizations.dart';
@@ -33,32 +34,48 @@ final GlobalKey<AppShellState> appShellKey = GlobalKey<AppShellState>();
 /// Shell principal de l'application avec navigation par onglets
 class AppShell extends StatefulWidget {
   final List<Spot>? initialSpots;
-  const AppShell({super.key, this.initialSpots});
+
+  @visibleForTesting
+  final Widget Function(int index)? pageBuilderForTesting;
+
+  const AppShell({
+    super.key,
+    this.initialSpots,
+    this.pageBuilderForTesting,
+  });
 
   @override
   State<AppShell> createState() => AppShellState();
 }
 
 class AppShellState extends State<AppShell> {
+  static const _personalSpotBadgePreferenceKey =
+      'unread_personal_spot_badge_count';
+
   int _currentIndex = 3;
 
   late final List<Widget?> _pages;
   late final ValueNotifier<int> _addSpotRequests;
+  late final ValueNotifier<bool> _mapIsActive;
   late final ValueNotifier<SpotSelectionRequest?> _spotSelectionRequests;
   late final ValueNotifier<UserSpotSelectionRequest?>
       _userSpotSelectionRequests;
   int _spotSelectionSerial = 0;
   int _userSpotSelectionSerial = 0;
   bool _showAds = false;
+  int _personalSpotBadgeCount = 0;
+  bool _personalSpotBadgeChangedLocally = false;
 
   @override
   void initState() {
     super.initState();
     _addSpotRequests = ValueNotifier<int>(0);
+    _mapIsActive = ValueNotifier<bool>(_currentIndex == 3);
     _spotSelectionRequests = ValueNotifier<SpotSelectionRequest?>(null);
     _userSpotSelectionRequests = ValueNotifier<UserSpotSelectionRequest?>(null);
     _pages = List<Widget?>.filled(5, null);
     _pages[_currentIndex] = _buildPage(_currentIndex);
+    unawaited(_restorePersonalSpotBadge());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future<void>.delayed(const Duration(seconds: 1), () {
         if (!mounted) return;
@@ -69,9 +86,11 @@ class AppShellState extends State<AppShell> {
   }
 
   Widget _buildPage(int index) {
+    final testPageBuilder = widget.pageBuilderForTesting;
+    if (testPageBuilder != null) return testPageBuilder(index);
     return switch (index) {
       0 => HomePageWrapper(initialSpots: widget.initialSpots),
-      1 => const SpeciesPageWrapper(),
+      1 => const TidePage(embeddedInBottomNavigation: true),
       2 => MySpotsPage(
           onAddSpot: openSpotCreation,
           onOpenFavorite: openFavoriteSpot,
@@ -79,10 +98,12 @@ class AppShellState extends State<AppShell> {
         ),
       3 => SpotFinderPage(
           initialSpots: widget.initialSpots,
+          isActive: _mapIsActive,
           addSpotRequests: _addSpotRequests,
           spotSelectionRequests: _spotSelectionRequests,
           userSpotSelectionRequests: _userSpotSelectionRequests,
           onOpenMySpots: () => navigateTo(2),
+          onPersonalSpotCreated: notifyPersonalSpotCreated,
         ),
       4 => const SettingsPageWrapper(),
       _ => const SizedBox.shrink(),
@@ -92,10 +113,52 @@ class AppShellState extends State<AppShell> {
   /// Navigue vers un onglet spécifique
   void navigateTo(int index) {
     if (index < 0 || index >= _pages.length) return;
+    final openedMySpots = index == 2;
+    _mapIsActive.value = index == 3;
     setState(() {
       _pages[index] ??= _buildPage(index);
       _currentIndex = index;
+      if (openedMySpots) {
+        _personalSpotBadgeChangedLocally = true;
+        _personalSpotBadgeCount = 0;
+      }
     });
+    if (openedMySpots) {
+      unawaited(_persistPersonalSpotBadge(0));
+    }
+  }
+
+  Future<void> _restorePersonalSpotBadge() async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      final storedCount =
+          preferences.getInt(_personalSpotBadgePreferenceKey) ?? 0;
+      if (!mounted || _personalSpotBadgeChangedLocally) return;
+      setState(() {
+        _personalSpotBadgeCount = storedCount.clamp(0, 999);
+      });
+    } catch (error) {
+      debugPrint('[AppShell] Badge Mes spots indisponible: $error');
+    }
+  }
+
+  void notifyPersonalSpotCreated() {
+    if (!mounted) return;
+    setState(() {
+      _personalSpotBadgeChangedLocally = true;
+      _personalSpotBadgeCount = (_personalSpotBadgeCount + 1).clamp(0, 999);
+    });
+    unawaited(_persistPersonalSpotBadge(_personalSpotBadgeCount));
+  }
+
+  Future<void> _persistPersonalSpotBadge(int count) async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setInt(_personalSpotBadgePreferenceKey, count);
+    } catch (error) {
+      debugPrint(
+          '[AppShell] Persistance du badge Mes spots impossible: $error');
+    }
   }
 
   void openSpotCreation() {
@@ -128,6 +191,7 @@ class AppShellState extends State<AppShell> {
   @override
   void dispose() {
     _addSpotRequests.dispose();
+    _mapIsActive.dispose();
     _spotSelectionRequests.dispose();
     _userSpotSelectionRequests.dispose();
     super.dispose();
@@ -235,9 +299,9 @@ class AppShellState extends State<AppShell> {
                       ),
                       Expanded(
                         child: _NavItem(
-                          itemKey: const ValueKey<String>('bottom-nav-fish'),
-                          icon: Icons.set_meal_rounded,
-                          label: context.tr('bottomNav.fish'),
+                          itemKey: const ValueKey<String>('bottom-nav-tides'),
+                          icon: Icons.waves_rounded,
+                          label: context.tr('bottomNav.tides'),
                           isActive: _currentIndex == 1,
                           onTap: () => navigateTo(1),
                         ),
@@ -257,6 +321,7 @@ class AppShellState extends State<AppShell> {
                           icon: Icons.add_location_alt_rounded,
                           label: context.tr('bottomNav.addSpot'),
                           isActive: _currentIndex == 2,
+                          badgeCount: _personalSpotBadgeCount,
                           onTap: () => navigateTo(2),
                         ),
                       ),
@@ -291,6 +356,7 @@ class _NavItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool isActive;
+  final int badgeCount;
   final VoidCallback onTap;
 
   const _NavItem({
@@ -298,6 +364,7 @@ class _NavItem extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.isActive,
+    this.badgeCount = 0,
     required this.onTap,
   });
 
@@ -309,6 +376,7 @@ class _NavItem extends StatelessWidget {
       button: true,
       selected: isActive,
       label: label,
+      value: badgeCount > 0 ? '$badgeCount' : null,
       excludeSemantics: true,
       child: InkResponse(
         key: itemKey,
@@ -365,6 +433,47 @@ class _NavItem extends StatelessWidget {
                           blurRadius: 6,
                         ),
                       ],
+                    ),
+                  ),
+                ),
+              if (badgeCount > 0)
+                Positioned(
+                  top: 4,
+                  right: 10,
+                  child: IgnorePointer(
+                    child: Container(
+                      key: const ValueKey<String>(
+                        'personal-spot-notification-badge',
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 5),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFF365F),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: tc.surface, width: 1.4),
+                        boxShadow: [
+                          BoxShadow(
+                            color:
+                                const Color(0xFFFF365F).withValues(alpha: 0.34),
+                            blurRadius: 7,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        badgeCount > 99 ? '99+' : '$badgeCount',
+                        maxLines: 1,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          height: 1,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -477,11 +586,11 @@ class HomePageWrapper extends StatelessWidget {
     return HomePage(
       initialSpots: initialSpots,
       onNavigateToSpots: () => appShellKey.currentState?.navigateTo(3),
-      onNavigateToSpecies: () => appShellKey.currentState?.navigateTo(1),
+      onNavigateToSpecies: () => _goTo(context, const SpeciesPage()),
       onNavigateToTechniques: () => _goTo(context, const TechniquesPage()),
       onNavigateToCommunity: () => _goTo(context, const CommunityPage()),
       onNavigateToShops: () => _goTo(context, const ShopsPage()),
-      onNavigateToTides: () => _goTo(context, const TidePage()),
+      onNavigateToTides: () => appShellKey.currentState?.navigateTo(1),
       // Debug route / bouton caché : long-press sur "Marées" dans le drawer
       onNavigateToTidesV2: () => _goTo(context, const ForecastPage()),
     );
@@ -494,20 +603,13 @@ class HomePageWrapper extends StatelessWidget {
   }
 }
 
-class SpeciesPageWrapper extends StatelessWidget {
-  const SpeciesPageWrapper({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const SpeciesPage();
-  }
-}
-
 class SettingsPageWrapper extends StatelessWidget {
   const SettingsPageWrapper({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const SettingsPage();
+    return SettingsPage(
+      onOpenMySpots: () => appShellKey.currentState?.navigateTo(2),
+    );
   }
 }

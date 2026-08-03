@@ -35,12 +35,19 @@ class _CommunityPageState extends State<CommunityPage> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(14, 0, 14, 9),
                 child: Container(
-                  height: 40,
-                  padding: const EdgeInsets.all(3),
+                  height: 64,
+                  padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
                     color: palette.surfaceElevated,
-                    borderRadius: BorderRadius.circular(99),
-                    border: Border.all(color: palette.divider),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: palette.borderStrong),
+                    boxShadow: [
+                      BoxShadow(
+                        color: palette.shadowColor,
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
                   ),
                   child: Row(
                     children: [
@@ -135,35 +142,70 @@ class _SectionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Material(
-        color: selected ? palette.accent : Colors.transparent,
-        borderRadius: BorderRadius.circular(99),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(99),
-          onTap: onTap,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 17,
-                color: selected ? Colors.white : palette.textSecondary,
-              ),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: selected ? Colors.white : palette.textSecondary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(
+          gradient: selected
+              ? LinearGradient(
+                  colors: [palette.accent, palette.oceanMedium],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: palette.accent.withValues(alpha: 0.28),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : const [],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: onTap,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? Colors.white.withValues(alpha: 0.18)
+                        : palette.accent.withValues(alpha: 0.11),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 20,
+                    color: selected ? Colors.white : palette.accent,
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 9),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: selected ? Colors.white : palette.textPrimary,
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

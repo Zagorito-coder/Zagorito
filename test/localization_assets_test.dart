@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:spots_app/l10n/app_localizations.dart';
 
 void main() {
   test('les quatre catalogues de langue ont les mêmes clés non vides', () {
@@ -27,6 +28,11 @@ void main() {
         isTrue,
         reason: 'Traduction vide dans ${entry.key}',
       );
+      expect(
+        entry.value['drawer.tidesPro'],
+        entry.value['home.tidesProTitle'],
+        reason: 'Le menu et la carte Marées Pro divergent dans ${entry.key}',
+      );
     }
 
     expect(catalogs['fr']!['map.searchHint'], 'Rechercher un spot...');
@@ -49,6 +55,13 @@ void main() {
     expect(referenceKeys, isNot(contains('mySpots.saveAndSubmit')));
     expect(referenceKeys, isNot(contains('mySpots.reviewNotice')));
     expect(referenceKeys, isNot(contains('mySpots.status.pending')));
+  });
+
+  test('la langue arabe utilise le drapeau marocain sans changer de locale',
+      () {
+    expect(AppLanguage.arabic.flag, '🇲🇦');
+    expect(AppLanguage.arabic.code, 'ar');
+    expect(AppLanguage.arabic.locale.languageCode, 'ar');
   });
 }
 

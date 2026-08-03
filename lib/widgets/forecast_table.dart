@@ -44,7 +44,8 @@ class WindModelSlot {
     if (json == null || json.isEmpty) return const WindModelSlot();
     double? n(String k) => (json[k] as num?)?.toDouble();
     // Verifier qu'au moins un champ essentiel est present
-    final hasData = json.containsKey('wind_speed_kt') || json.containsKey('temp_c');
+    final hasData =
+        json.containsKey('wind_speed_kt') || json.containsKey('temp_c');
     if (!hasData) return const WindModelSlot();
     return WindModelSlot(
       windSpeedKt: n('wind_speed_kt'),
@@ -99,7 +100,8 @@ class WaveModelSlot {
   factory WaveModelSlot.fromJson(Map<String, dynamic>? json) {
     if (json == null || json.isEmpty) return const WaveModelSlot();
     double? n(String k) => (json[k] as num?)?.toDouble();
-    final hasData = json.containsKey('wave_height_m') || json.containsKey('swell_wave_height');
+    final hasData = json.containsKey('wave_height_m') ||
+        json.containsKey('swell_wave_height');
     if (!hasData) return const WaveModelSlot();
     return WaveModelSlot(
       waveHeightM: n('wave_height_m'),
@@ -276,8 +278,10 @@ class _ForecastTableState extends State<ForecastTable> {
   @override
   void initState() {
     super.initState();
-    _headerController.addListener(() => _sync(_headerController, _bodyController));
-    _bodyController.addListener(() => _sync(_bodyController, _headerController));
+    _headerController
+        .addListener(() => _sync(_headerController, _bodyController));
+    _bodyController
+        .addListener(() => _sync(_bodyController, _headerController));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       widget.onReady?.call(_scrollToSlot);
     });
@@ -310,7 +314,8 @@ class _ForecastTableState extends State<ForecastTable> {
   void _notifyVisibleSlot() {
     if (!_bodyController.hasClients || widget.onSlotScrolled == null) return;
     final offset = _bodyController.offset;
-    final idx = (offset / widget.columnWidth).floor().clamp(0, widget.slots.length - 1);
+    final idx =
+        (offset / widget.columnWidth).floor().clamp(0, widget.slots.length - 1);
     widget.onSlotScrolled!(idx);
   }
 
@@ -324,12 +329,47 @@ class _ForecastTableState extends State<ForecastTable> {
   List<String> get _labels {
     switch (widget.model) {
       case TableModel.root:
-        return ['kts', 'rafales', '', 'houle m', 'periode s', '', 'temp C', 'nuages %', 'pluie %', 'note'];
+        return [
+          'kts',
+          'rafales',
+          '',
+          'houle m',
+          'periode s',
+          '',
+          'temp C',
+          'nuages %',
+          'pluie %',
+          'note'
+        ];
       case TableModel.wind:
       case TableModel.hires:
-        return ['kts', 'rafales', '', 'temp C', 'nuage B', 'nuage M', 'nuage H', 'pluie %', 'hPa', 'humidite'];
+        return [
+          'kts',
+          'rafales',
+          '',
+          'temp C',
+          'nuage B',
+          'nuage M',
+          'nuage H',
+          'pluie %',
+          'hPa',
+          'humidite'
+        ];
       case TableModel.wave:
-        return ['tot. m', 'per. s', '', 'S1 m', 'S1 s', '', 'S2 m', 'S2 s', '', 'VV m', 'VV s', ''];
+        return [
+          'tot. m',
+          'per. s',
+          '',
+          'S1 m',
+          'S1 s',
+          '',
+          'S2 m',
+          'S2 s',
+          '',
+          'VV m',
+          'VV s',
+          ''
+        ];
     }
   }
 
@@ -361,8 +401,7 @@ class _ForecastTableState extends State<ForecastTable> {
                 Text(
                   widget.runLabel,
                   style: TextStyle(
-                      color: dark ? Colors.white54 : Colors.grey,
-                      fontSize: 12),
+                      color: dark ? Colors.white54 : Colors.grey, fontSize: 12),
                 ),
               ],
             ),
@@ -429,8 +468,7 @@ class _ForecastTableState extends State<ForecastTable> {
           ),
           child: Text(text,
               style: TextStyle(
-                  fontSize: 10,
-                  color: dark ? Colors.white54 : Colors.grey)),
+                  fontSize: 10, color: dark ? Colors.white54 : Colors.grey)),
         );
       });
 
@@ -465,8 +503,7 @@ class _ForecastTableState extends State<ForecastTable> {
                     color: dark ? Colors.white70 : Colors.black87)),
             Text(hour,
                 style: TextStyle(
-                    fontSize: 9,
-                    color: dark ? Colors.white38 : Colors.grey)),
+                    fontSize: 9, color: dark ? Colors.white38 : Colors.grey)),
           ],
         ),
       );
@@ -501,16 +538,16 @@ class _ForecastTableState extends State<ForecastTable> {
       children: [
         _valueCell(s.windSpeedKnots.toStringAsFixed(1),
             _Palette.wind(s.windSpeedKnots)),
-        _valueCell(s.windGustKnots.toStringAsFixed(1),
-            _Palette.wind(s.windGustKnots)),
+        _valueCell(
+            s.windGustKnots.toStringAsFixed(1), _Palette.wind(s.windGustKnots)),
         _arrowCell(s.windDirectionDeg),
         _valueCell(
             s.waveHeightM.toStringAsFixed(1), _Palette.wave(s.waveHeightM)),
-        _valueCell(s.wavePeriodS.toStringAsFixed(0),
-            _Palette.wave(s.wavePeriodS / 2)),
+        _valueCell(
+            s.wavePeriodS.toStringAsFixed(0), _Palette.wave(s.wavePeriodS / 2)),
         _arrowCell(s.waveDirectionDeg),
-        _valueCell(s.temperatureC.toString(),
-            _Palette.temperature(s.temperatureC)),
+        _valueCell(
+            s.temperatureC.toString(), _Palette.temperature(s.temperatureC)),
         s.cloudCoverPct != null
             ? _valueCell('${s.cloudCoverPct}', _Palette.cloud(s.cloudCoverPct!))
             : _emptyCell(),
@@ -546,11 +583,9 @@ class _ForecastTableState extends State<ForecastTable> {
             m?.tempC != null
                 ? _Palette.temperature(m!.tempC!.round())
                 : Colors.grey[200]!),
-        _valueCell(
-            m?.cloudLowPct != null ? '${m!.cloudLowPct!.round()}' : '-',
+        _valueCell(m?.cloudLowPct != null ? '${m!.cloudLowPct!.round()}' : '-',
             Colors.transparent),
-        _valueCell(
-            m?.cloudMidPct != null ? '${m!.cloudMidPct!.round()}' : '-',
+        _valueCell(m?.cloudMidPct != null ? '${m!.cloudMidPct!.round()}' : '-',
             Colors.transparent),
         _valueCell(
             m?.cloudHighPct != null ? '${m!.cloudHighPct!.round()}' : '-',
@@ -561,14 +596,10 @@ class _ForecastTableState extends State<ForecastTable> {
                 ? _Palette.precip(m!.precipProbPct!.round())
                 : Colors.grey[200]!),
         _valueCell(
-            m?.pressureMsl != null
-                ? m!.pressureMsl!.toStringAsFixed(0)
-                : '-',
+            m?.pressureMsl != null ? m!.pressureMsl!.toStringAsFixed(0) : '-',
             Colors.transparent),
         _valueCell(
-            m?.relHumidityPct != null
-                ? '${m!.relHumidityPct!.round()}%'
-                : '-',
+            m?.relHumidityPct != null ? '${m!.relHumidityPct!.round()}%' : '-',
             Colors.transparent),
       ],
     );
@@ -596,9 +627,7 @@ class _ForecastTableState extends State<ForecastTable> {
                 ? _Palette.wave(m!.swellHeightM!)
                 : Colors.grey[200]!),
         _valueCell(
-            m?.swellPeriodS != null
-                ? m!.swellPeriodS!.toStringAsFixed(0)
-                : '-',
+            m?.swellPeriodS != null ? m!.swellPeriodS!.toStringAsFixed(0) : '-',
             Colors.transparent),
         _arrowCell(m?.swellDirDeg ?? 0),
         // Houle secondaire
@@ -662,8 +691,8 @@ class _ForecastTableState extends State<ForecastTable> {
           height: _rowHeight,
           child: Center(
               child: Text('-',
-                  style: TextStyle(
-                      color: dark ? Colors.white30 : Colors.grey))),
+                  style:
+                      TextStyle(color: dark ? Colors.white30 : Colors.grey))),
         );
       });
 
@@ -689,8 +718,8 @@ class _ForecastTableState extends State<ForecastTable> {
               mainAxisSize: MainAxisSize.min,
               children: List.generate(
                 count.clamp(0, 5),
-                (_) => const Icon(Icons.star,
-                    size: 12, color: Color(0xFFF5A623)),
+                (_) =>
+                    const Icon(Icons.star, size: 12, color: Color(0xFFF5A623)),
               ),
             ),
           ),

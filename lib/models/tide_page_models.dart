@@ -14,6 +14,9 @@ class HourlyCard {
   final String windDirection;
   final double waveHeight;
   final int temp;
+  final double? pressureHpa;
+  final double? precipitationProbabilityPct;
+  final double? relativeHumidityPct;
   final bool isIdeal;
   final bool isNow;
   final int wavePeriod; // secondes, NOUVEAU
@@ -30,6 +33,9 @@ class HourlyCard {
     required this.windDirection,
     required this.waveHeight,
     required this.temp,
+    this.pressureHpa,
+    this.precipitationProbabilityPct,
+    this.relativeHumidityPct,
     this.isIdeal = false,
     this.isNow = false,
     this.wavePeriod = 7,

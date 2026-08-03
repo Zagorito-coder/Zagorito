@@ -28,6 +28,35 @@ const projectId = 'demo-boosterfish';
 const [host, portText] = process.env.FIRESTORE_EMULATOR_HOST.split(':');
 let environment;
 
+function personalSpotData(ownerUid, photoRoute = 'spot-photos-v2') {
+  const objectKey = 'abcdefghijklmnopqrst-1234567890';
+  return {
+    schemaVersion: 1,
+    ownerUid,
+    name: 'Spot test',
+    latitude: 33.5925,
+    longitude: -7.6,
+    locationKey: '33.593_-7.600',
+    notes: '',
+    dangerNotes: '',
+    photoUrl:
+      `https://boosterfish-offline-maps.boosterfish-maps.workers.dev/` +
+      `${photoRoute}/${objectKey}?v=1785686400000`,
+    photoObjectKey: objectKey,
+    status: 'pending',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+}
+
+async function createPersonalSpot(db, ownerUid, spotId, photoRoute) {
+  const data = personalSpotData(ownerUid, photoRoute);
+  const batch = writeBatch(db);
+  batch.set(doc(db, 'users', ownerUid, 'spots', spotId), data);
+  batch.set(doc(db, 'spot_submissions', spotId), data);
+  await batch.commit();
+}
+
 function catchData(ownerUid, expiresAt) {
   const objectKey = `${ownerUid}_abcdefghijklmnopqrstuvwx`;
   return {
@@ -68,7 +97,13 @@ async function seedAcceptedProfile(uid) {
   });
 }
 
-async function publish(db, uid, postId, photoOwnerUid = uid) {
+async function publish(
+  db,
+  uid,
+  postId,
+  photoOwnerUid = uid,
+  overrides = {},
+) {
   const batch = writeBatch(db);
   const data = catchData(
     uid,
@@ -79,6 +114,7 @@ async function publish(db, uid, postId, photoOwnerUid = uid) {
     doc(db, 'community_catches', postId),
     {
       ...data,
+      ...overrides,
       photoObjectKey: objectKey,
       photoUrl:
         `https://boosterfish-offline-maps.boosterfish-maps.workers.dev/` +
@@ -109,6 +145,27 @@ test.after(async () => {
   await environment.cleanup();
 });
 
+test('personal spot batch accepts secure v2 and legacy photo URLs', async () => {
+  const ownerUid = 'spot-owner';
+  const ownerDb = environment.authenticatedContext(ownerUid).firestore();
+
+  await assertSucceeds(
+    createPersonalSpot(ownerDb, ownerUid, 'secure-v2', 'spot-photos-v2'),
+  );
+  await assertSucceeds(
+    createPersonalSpot(ownerDb, ownerUid, 'legacy-v1', 'spot-photos'),
+  );
+});
+
+test('personal spot batch rejects an untrusted photo route', async () => {
+  const ownerUid = 'spot-owner';
+  const ownerDb = environment.authenticatedContext(ownerUid).firestore();
+
+  await assertFails(
+    createPersonalSpot(ownerDb, ownerUid, 'untrusted', 'other-photos'),
+  );
+});
+
 test('publication requires consent and the atomic 24-hour state write',
     async () => {
   const ownerUid = 'owner-1';
@@ -132,6 +189,43 @@ test('publication requires consent and the atomic 24-hour state write',
   );
   await assertSucceeds(publish(ownerDb, ownerUid, 'first-publication'));
   await assertFails(publish(ownerDb, ownerUid, 'second-publication'));
+});
+
+test('publication only accepts the strict Google avatar host', async () => {
+  const allowedUid = 'avatar-allowed';
+  await seedAcceptedProfile(allowedUid);
+  await assertSucceeds(publish(
+    environment.authenticatedContext(allowedUid).firestore(),
+    allowedUid,
+    'allowed-avatar',
+    allowedUid,
+    {
+      avatarUrl:
+        'https://lh3.googleusercontent.com/a/avatar_ABC-123=s96-c?sz=96',
+    },
+  ));
+
+  for (const [uid, avatarUrl] of [
+    ['avatar-tracker', 'https://tracker.example/avatar.png'],
+    [
+      'avatar-lookalike',
+      'https://lh3.googleusercontent.com.tracker.example/avatar.png',
+    ],
+    [
+      'avatar-credentials',
+      'https://tracker.example@lh3.googleusercontent.com/avatar.png',
+    ],
+    ['avatar-port', 'https://lh3.googleusercontent.com:444/avatar.png'],
+  ]) {
+    await seedAcceptedProfile(uid);
+    await assertFails(publish(
+      environment.authenticatedContext(uid).firestore(),
+      uid,
+      `${uid}-post`,
+      uid,
+      {avatarUrl},
+    ));
+  }
 });
 
 test('active feed query is public while unbounded feed queries are denied',
@@ -279,6 +373,143 @@ test('reports and blocks cannot target the current user', async () => {
       },
     ),
   );
+});
+
+test('blocked anglers remain private and can be unblocked by their owner',
+    async () => {
+  const ownerUid = 'block-owner';
+  const blockedUid = 'blocked-user';
+  const ownerDb = environment.authenticatedContext(ownerUid).firestore();
+  const block = doc(
+    ownerDb,
+    'community_blocks',
+    ownerUid,
+    'users',
+    blockedUid,
+  );
+  await assertSucceeds(setDoc(block, {
+    schemaVersion: 1,
+    ownerUid,
+    blockedUid,
+    blockedDisplayName: 'Pêcheur Test',
+    createdAt: serverTimestamp(),
+  }));
+
+  const outsiderDb = environment
+      .authenticatedContext('block-outsider')
+      .firestore();
+  await assertFails(getDocs(
+    collection(outsiderDb, 'community_blocks', ownerUid, 'users'),
+  ));
+  await assertFails(deleteDoc(doc(
+    outsiderDb,
+    'community_blocks',
+    ownerUid,
+    'users',
+    blockedUid,
+  )));
+  await assertSucceeds(deleteDoc(block));
+});
+
+test('legacy blocks stay valid while malformed display names are rejected',
+    async () => {
+  const ownerUid = 'legacy-block-owner';
+  const ownerDb = environment.authenticatedContext(ownerUid).firestore();
+  const baseData = {
+    schemaVersion: 1,
+    ownerUid,
+    createdAt: serverTimestamp(),
+  };
+  await assertSucceeds(setDoc(
+    doc(ownerDb, 'community_blocks', ownerUid, 'users', 'legacy-user'),
+    {...baseData, blockedUid: 'legacy-user'},
+  ));
+  await assertFails(setDoc(
+    doc(ownerDb, 'community_blocks', ownerUid, 'users', 'invalid-name'),
+    {
+      ...baseData,
+      blockedUid: 'invalid-name',
+      blockedDisplayName: 'x'.repeat(81),
+    },
+  ));
+  await assertFails(setDoc(
+    doc(ownerDb, 'community_blocks', ownerUid, 'users', 'extra-field'),
+    {
+      ...baseData,
+      blockedUid: 'extra-field',
+      blockedDisplayName: 'Pêcheur Test',
+      email: 'forbidden@example.test',
+    },
+  ));
+});
+
+test('a report cannot be deleted, updated, or recreated by its author',
+    async () => {
+  const ownerUid = 'reported-owner';
+  const reporterUid = 'reporter-1';
+  await seedAcceptedProfile(ownerUid);
+  await publish(
+    environment.authenticatedContext(ownerUid).firestore(),
+    ownerUid,
+    'reported-post',
+  );
+  const reporterDb = environment
+    .authenticatedContext(reporterUid)
+    .firestore();
+  const report = doc(
+    reporterDb,
+    'community_reports',
+    `${reporterUid}_reported-post`,
+  );
+  const data = {
+    schemaVersion: 1,
+    reporterUid,
+    postId: 'reported-post',
+    postOwnerUid: ownerUid,
+    reason: 'other',
+    status: 'pending',
+    createdAt: serverTimestamp(),
+  };
+  await assertSucceeds(setDoc(report, data));
+  await assertFails(deleteDoc(report));
+  await assertFails(setDoc(report, {...data, reason: 'privacy'}));
+});
+
+test('reports are rejected for expired or non-published catches', async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    const admin = context.firestore();
+    await setDoc(doc(admin, 'community_catches', 'under-review'), {
+      ...catchData(
+        'owner-1',
+        Timestamp.fromMillis(Date.now() + 60 * 60 * 1000),
+      ),
+      status: 'under_review',
+      createdAt: Timestamp.now(),
+    });
+    await setDoc(doc(admin, 'community_catches', 'expired-report-target'), {
+      ...catchData(
+        'owner-1',
+        Timestamp.fromMillis(Date.now() - 60 * 1000),
+      ),
+      createdAt: Timestamp.fromMillis(Date.now() - 8 * 24 * 60 * 60 * 1000),
+    });
+  });
+  const reporterUid = 'reporter-1';
+  const reporterDb = environment.authenticatedContext(reporterUid).firestore();
+  for (const postId of ['under-review', 'expired-report-target']) {
+    await assertFails(setDoc(
+      doc(reporterDb, 'community_reports', `${reporterUid}_${postId}`),
+      {
+        schemaVersion: 1,
+        reporterUid,
+        postId,
+        postOwnerUid: 'owner-1',
+        reason: 'other',
+        status: 'pending',
+        createdAt: serverTimestamp(),
+      },
+    ));
+  }
 });
 
 test('only the owner can remove a published catch', async () => {

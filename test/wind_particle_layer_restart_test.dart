@@ -31,6 +31,9 @@ Finder get _windPaint => find.byWidgetPredicate(
           widget is CustomPaint && widget.painter is WindParticlePainter,
     );
 
+WindParticlePainter _painter(WidgetTester tester) =>
+    tester.widget<CustomPaint>(_windPaint).painter! as WindParticlePainter;
+
 void main() {
   testWidgets(
     'le vent redémarre dès la première trame après plusieurs désactivations',
@@ -64,6 +67,7 @@ void main() {
 
       await tester.pump(const Duration(milliseconds: 40));
       expect(_windPaint, findsOneWidget);
+      expect(_painter(tester).currentParticles, isNotEmpty);
 
       // Simule une première utilisation suffisamment longue pour que l'ancien
       // compteur de trames soit nettement supérieur à zéro.
@@ -85,4 +89,78 @@ void main() {
       expect(_windPaint, findsOneWidget);
     },
   );
+
+  testWidgets('le rendu se suspend pendant un mouvement de carte',
+      (tester) async {
+    final provider = _FakeWindProvider();
+    final mapController = MapController();
+    addTearDown(provider.dispose);
+    addTearDown(mapController.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SizedBox(
+          width: 400,
+          height: 700,
+          child: FlutterMap(
+            mapController: mapController,
+            options: const MapOptions(
+              initialCenter: LatLng(30.5, -9.7),
+              initialZoom: 8,
+            ),
+            children: [
+              WindParticleLayer(
+                provider: provider,
+                mapController: mapController,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(_painter(tester).currentParticles, isNotEmpty);
+
+    mapController.move(const LatLng(31, -9), 9);
+    await tester.pump();
+    expect(_painter(tester).currentParticles, isEmpty);
+
+    await tester.pump(const Duration(milliseconds: 220));
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(_painter(tester).currentParticles, isNotEmpty);
+  });
+
+  testWidgets('respecte la réduction des animations système', (tester) async {
+    final provider = _FakeWindProvider();
+    final mapController = MapController();
+    addTearDown(provider.dispose);
+    addTearDown(mapController.dispose);
+
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(
+          size: Size(400, 700),
+          disableAnimations: true,
+        ),
+        child: MaterialApp(
+          home: FlutterMap(
+            mapController: mapController,
+            options: const MapOptions(
+              initialCenter: LatLng(30.5, -9.7),
+              initialZoom: 8,
+            ),
+            children: [
+              WindParticleLayer(
+                provider: provider,
+                mapController: mapController,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(_windPaint, findsNothing);
+  });
 }

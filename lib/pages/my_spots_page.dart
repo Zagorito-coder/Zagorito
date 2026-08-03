@@ -232,10 +232,11 @@ class _MapShelfState extends State<_MapShelf> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final mapHeight =
-            (constraints.maxHeight * 0.43).clamp(225.0, 380.0).toDouble();
+            (constraints.maxHeight * 0.55).clamp(260.0, 430.0).toDouble();
+        final restingShelfTop = (mapHeight - 14).clamp(246.0, 416.0).toDouble();
         final shelfTop = _selectedSpotId == null
-            ? mapHeight - 22
-            : (mapHeight - 92).clamp(130.0, mapHeight - 22).toDouble();
+            ? restingShelfTop
+            : (mapHeight - 48).clamp(212.0, restingShelfTop).toDouble();
         return Column(
           children: [
             Padding(
@@ -585,6 +586,7 @@ class _CollectionShelf extends StatelessWidget {
     final selectedFavorite = !isPersonal
         ? favorites.where((spot) => spot.id == selectedSpotId).firstOrNull
         : null;
+    final hasSelection = selectedPersonal != null || selectedFavorite != null;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -593,8 +595,8 @@ class _CollectionShelf extends StatelessWidget {
         decoration: BoxDecoration(
           color: palette.background,
           borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(27),
-            topRight: Radius.circular(27),
+            topLeft: Radius.circular(23),
+            topRight: Radius.circular(23),
           ),
           border: Border(
             top: BorderSide(color: palette.borderStrong, width: 1),
@@ -608,42 +610,70 @@ class _CollectionShelf extends StatelessWidget {
           ],
         ),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 7, 14, 10),
+          padding: const EdgeInsets.fromLTRB(14, 6, 14, 7),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Align(
                 child: Container(
-                  width: 42,
-                  height: 4,
+                  width: 38,
+                  height: 3,
                   decoration: BoxDecoration(
                     color: palette.borderStrong,
                     borderRadius: BorderRadius.circular(3),
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                context.tr(
-                  isPersonal
-                      ? 'mySpots.personalTitle'
-                      : 'mySpots.favoritesTitle',
-                ),
-                style: TextStyle(
-                  color: palette.textPrimary,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.35,
-                ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      context.tr(
+                        isPersonal
+                            ? 'mySpots.personalTitle'
+                            : 'mySpots.favoritesTitle',
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: palette.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.35,
+                      ),
+                    ),
+                  ),
+                  if (hasSelection)
+                    IconButton(
+                      key: const ValueKey<String>('clear-shelf-selection'),
+                      onPressed: onClearSelection,
+                      tooltip: context.tr('common.back'),
+                      padding: EdgeInsets.zero,
+                      visualDensity: const VisualDensity(
+                        horizontal: -4,
+                        vertical: -4,
+                      ),
+                      constraints: const BoxConstraints.tightFor(
+                        width: 28,
+                        height: 26,
+                      ),
+                      icon: Icon(
+                        Icons.close_rounded,
+                        size: 18,
+                        color: palette.textSecondary,
+                      ),
+                    ),
+                ],
               ),
-              const SizedBox(height: 3),
+              const SizedBox(height: 2),
               Row(
                 children: [
                   Icon(
                     isPersonal
                         ? Icons.lock_outline_rounded
                         : Icons.favorite_border_rounded,
-                    size: 14,
+                    size: 13,
                     color: palette.textSecondary,
                   ),
                   const SizedBox(width: 6),
@@ -658,96 +688,89 @@ class _CollectionShelf extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: palette.textSecondary,
-                        fontSize: 11,
+                        fontSize: 10.5,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 7),
               Expanded(
                 child: isEmpty
                     ? _ShelfEmptyState(
                         personal: isPersonal,
                         onAddSpot: onAddSpot,
                       )
-                    : Column(
-                        children: [
-                          SizedBox(
-                            height: 112,
-                            child: ListView.separated(
-                              key: ValueKey<String>(
-                                isPersonal
-                                    ? 'personal-spots-shelf'
-                                    : 'favorite-spots-shelf',
-                              ),
-                              scrollDirection: Axis.horizontal,
-                              physics: const BouncingScrollPhysics(),
-                              itemCount: isPersonal
-                                  ? personal.length
-                                  : favorites.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(width: 8),
-                              itemBuilder: (context, index) {
-                                if (isPersonal) {
-                                  final spot = personal[index];
-                                  return _SpotPreviewTile(
-                                    id: spot.id,
-                                    name: spot.name,
-                                    photoUrl: spot.photoUrl,
-                                    selected: spot.id == selectedSpotId,
-                                    onTap: () => onSelectSpot(spot.id),
-                                    onOpenMap: () => onOpenPersonal(spot),
-                                  );
-                                }
-                                final spot = favorites[index];
-                                return _SpotPreviewTile(
-                                  id: spot.id,
-                                  name: spot.name,
-                                  selected: spot.id == selectedSpotId,
-                                  onTap: () => onSelectSpot(spot.id),
-                                  onOpenMap: () => onOpenFavorite(spot),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(height: 7),
-                          Expanded(
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 180),
-                              child: selectedPersonal != null
-                                  ? _PersonalShelfCard(
-                                      key: ValueKey<String>(
-                                        'personal-details-${selectedPersonal.id}',
-                                      ),
-                                      spot: selectedPersonal,
-                                      onOpen: () =>
-                                          onOpenPersonal(selectedPersonal),
-                                    )
-                                  : selectedFavorite != null
-                                      ? _FavoriteShelfCard(
-                                          key: ValueKey<String>(
-                                            'favorite-details-${selectedFavorite.id}',
-                                          ),
-                                          spot: selectedFavorite,
-                                          onOpen: () =>
-                                              onOpenFavorite(selectedFavorite),
-                                        )
-                                      : const _SelectionHint(),
-                            ),
-                          ),
-                        ],
+                    : AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 180),
+                        child: selectedPersonal != null
+                            ? _PersonalShelfCard(
+                                key: ValueKey<String>(
+                                  'personal-details-${selectedPersonal.id}',
+                                ),
+                                spot: selectedPersonal,
+                                onOpen: () => onOpenPersonal(selectedPersonal),
+                              )
+                            : selectedFavorite != null
+                                ? _FavoriteShelfCard(
+                                    key: ValueKey<String>(
+                                      'favorite-details-${selectedFavorite.id}',
+                                    ),
+                                    spot: selectedFavorite,
+                                    onOpen: () =>
+                                        onOpenFavorite(selectedFavorite),
+                                  )
+                                : ListView.separated(
+                                    key: ValueKey<String>(
+                                      isPersonal
+                                          ? 'personal-spots-shelf'
+                                          : 'favorite-spots-shelf',
+                                    ),
+                                    scrollDirection: Axis.horizontal,
+                                    physics: const BouncingScrollPhysics(),
+                                    itemCount: isPersonal
+                                        ? personal.length
+                                        : favorites.length,
+                                    separatorBuilder: (_, __) =>
+                                        const SizedBox(width: 8),
+                                    itemBuilder: (context, index) {
+                                      if (isPersonal) {
+                                        final spot = personal[index];
+                                        return _SpotPreviewTile(
+                                          id: spot.id,
+                                          name: spot.name,
+                                          photoUrl: spot.photoUrl,
+                                          selected: false,
+                                          onTap: () => onSelectSpot(spot.id),
+                                          onOpenMap: () => onOpenPersonal(spot),
+                                        );
+                                      }
+                                      final spot = favorites[index];
+                                      return _SpotPreviewTile(
+                                        id: spot.id,
+                                        name: spot.name,
+                                        selected: false,
+                                        onTap: () => onSelectSpot(spot.id),
+                                        onOpenMap: () => onOpenFavorite(spot),
+                                      );
+                                    },
+                                  ),
                       ),
               ),
-              const SizedBox(height: 9),
+              const SizedBox(height: 6),
               SizedBox(
-                height: 43,
+                height: 36,
                 child: OutlinedButton.icon(
                   key: const ValueKey<String>('add-personal-spot-from-shelf'),
                   onPressed: atLimit ? null : onAddSpot,
                   style: OutlinedButton.styleFrom(
                     foregroundColor: palette.accent,
+                    minimumSize: const Size(0, 36),
+                    maximumSize: const Size(double.infinity, 36),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: const VisualDensity(vertical: -3),
                     side: BorderSide(
                       color: atLimit
                           ? palette.border
@@ -761,6 +784,7 @@ class _CollectionShelf extends StatelessWidget {
                     atLimit
                         ? Icons.lock_rounded
                         : Icons.add_circle_outline_rounded,
+                    size: 19,
                   ),
                   label: Text(
                     context.tr(
@@ -770,7 +794,11 @@ class _CollectionShelf extends StatelessWidget {
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      height: 1.05,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
               ),
@@ -811,7 +839,7 @@ class _SpotPreviewTile extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
         child: Container(
-          width: 124,
+          width: 136,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
@@ -847,12 +875,12 @@ class _SpotPreviewTile extends StatelessWidget {
                 ),
               ),
               SizedBox(
-                height: 39,
+                height: 29,
                 child: Row(
                   children: [
                     Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.only(left: 9, right: 3),
+                        padding: const EdgeInsets.only(left: 8, right: 2),
                         child: Text(
                           name,
                           maxLines: 1,
@@ -860,7 +888,7 @@ class _SpotPreviewTile extends StatelessWidget {
                           style: TextStyle(
                             color:
                                 selected ? palette.accent : palette.textPrimary,
-                            fontSize: 11,
+                            fontSize: 10.5,
                             fontWeight: FontWeight.w900,
                           ),
                         ),
@@ -874,11 +902,11 @@ class _SpotPreviewTile extends StatelessWidget {
                         onTap: onOpenMap,
                         borderRadius: BorderRadius.circular(11),
                         child: Padding(
-                          padding: const EdgeInsets.all(9),
+                          padding: const EdgeInsets.all(5),
                           child: Icon(
                             Icons.navigation_rounded,
                             color: palette.accent,
-                            size: 18,
+                            size: 17,
                           ),
                         ),
                       ),
@@ -888,26 +916,6 @@ class _SpotPreviewTile extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SelectionHint extends StatelessWidget {
-  const _SelectionHint();
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = _ShelfPalette.of(context);
-    return Center(
-      child: Text(
-        context.tr('mySpots.selectSpotHint'),
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          color: palette.textSecondary,
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -930,12 +938,17 @@ class _DetailLine extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: color, size: 11),
-        const SizedBox(width: 4),
+        Icon(icon, color: color, size: 16),
+        const SizedBox(width: 7),
         Expanded(
           child: Text(
             text,
-            style: TextStyle(color: color, fontSize: 8.5, height: 1.2),
+            style: TextStyle(
+              color: color,
+              fontSize: 13,
+              height: 1.35,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ],
@@ -1007,138 +1020,151 @@ class _PersonalShelfCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = _ShelfPalette.of(context);
-    return Container(
-      key: ValueKey<String>('personal-spot-popup-${spot.id}'),
-      decoration: BoxDecoration(
-        color: palette.surface,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: palette.borderStrong),
-        boxShadow: palette.softShadow,
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(
-              width: 76,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Stack(
-                  fit: StackFit.expand,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {},
+      child: Container(
+        key: ValueKey<String>('personal-spot-popup-${spot.id}'),
+        decoration: BoxDecoration(
+          color: palette.surface,
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: palette.borderStrong),
+          boxShadow: palette.softShadow,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                width: 84,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _SpotVisual(id: spot.id, photoUrl: spot.photoUrl),
+                      const _PhotoScrim(),
+                      Positioned(
+                        left: 5,
+                        top: 5,
+                        child: _PrivateChip(palette: palette),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Column(
                   children: [
-                    _SpotVisual(id: spot.id, photoUrl: spot.photoUrl),
-                    const _PhotoScrim(),
-                    Positioned(
-                      left: 5,
-                      top: 5,
-                      child: _PrivateChip(palette: palette),
+                    Expanded(
+                      child: Scrollbar(
+                        radius: const Radius.circular(3),
+                        thickness: 3,
+                        child: SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          padding: const EdgeInsets.only(right: 6),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                spot.name,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: palette.textPrimary,
+                                  fontSize: 16,
+                                  height: 1.15,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                '${spot.latitude.toStringAsFixed(5)}, '
+                                '${spot.longitude.toStringAsFixed(5)}',
+                                style: TextStyle(
+                                  color: palette.accent,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              if (spot.notes.trim().isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                _DetailLine(
+                                  icon: Icons.notes_rounded,
+                                  text: spot.notes,
+                                  color: palette.textSecondary,
+                                ),
+                              ],
+                              if (spot.dangerNotes.trim().isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                _DetailLine(
+                                  icon: Icons.warning_amber_rounded,
+                                  text: spot.dangerNotes,
+                                  color: palette.error,
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Divider(height: 9, color: palette.border),
+                    SizedBox(
+                      height: 38,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _CardAction(
+                              key: ValueKey<String>(
+                                'open-personal-map-${spot.id}',
+                              ),
+                              label: context.tr('mySpots.openOnMap'),
+                              icon: Icons.navigation_rounded,
+                              color: palette.accent,
+                              onTap: onOpen,
+                            ),
+                          ),
+                          Container(
+                              width: 1, height: 17, color: palette.border),
+                          SizedBox(
+                            width: 42,
+                            child: _CardAction(
+                              key: ValueKey<String>(
+                                'edit-personal-spot-${spot.id}',
+                              ),
+                              label: context.tr('common.edit'),
+                              icon: Icons.edit_outlined,
+                              color: palette.textSecondary,
+                              onTap: () => _edit(context),
+                              iconOnly: true,
+                            ),
+                          ),
+                          Container(
+                              width: 1, height: 17, color: palette.border),
+                          SizedBox(
+                            width: 42,
+                            child: _CardAction(
+                              key: ValueKey<String>(
+                                'delete-personal-spot-${spot.id}',
+                              ),
+                              label: context.tr('common.delete'),
+                              icon: Icons.delete_outline_rounded,
+                              color: palette.error,
+                              onTap: () => _delete(context),
+                              iconOnly: true,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(width: 9),
-            Expanded(
-              child: Column(
-                children: [
-                  Expanded(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            spot.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: palette.textPrimary,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${spot.latitude.toStringAsFixed(5)}, '
-                            '${spot.longitude.toStringAsFixed(5)}',
-                            style: TextStyle(
-                              color: palette.accent,
-                              fontSize: 8.5,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          if (spot.notes.trim().isNotEmpty) ...[
-                            const SizedBox(height: 3),
-                            _DetailLine(
-                              icon: Icons.notes_rounded,
-                              text: spot.notes,
-                              color: palette.textSecondary,
-                            ),
-                          ],
-                          if (spot.dangerNotes.trim().isNotEmpty) ...[
-                            const SizedBox(height: 3),
-                            _DetailLine(
-                              icon: Icons.warning_amber_rounded,
-                              text: spot.dangerNotes,
-                              color: palette.error,
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-                  Divider(height: 5, color: palette.border),
-                  SizedBox(
-                    height: 27,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: _CardAction(
-                            key: ValueKey<String>(
-                              'open-personal-map-${spot.id}',
-                            ),
-                            label: context.tr('mySpots.openOnMap'),
-                            icon: Icons.navigation_rounded,
-                            color: palette.accent,
-                            onTap: onOpen,
-                          ),
-                        ),
-                        Container(width: 1, height: 17, color: palette.border),
-                        SizedBox(
-                          width: 42,
-                          child: _CardAction(
-                            key: ValueKey<String>(
-                              'edit-personal-spot-${spot.id}',
-                            ),
-                            label: context.tr('common.edit'),
-                            icon: Icons.edit_outlined,
-                            color: palette.textSecondary,
-                            onTap: () => _edit(context),
-                            iconOnly: true,
-                          ),
-                        ),
-                        Container(width: 1, height: 17, color: palette.border),
-                        SizedBox(
-                          width: 42,
-                          child: _CardAction(
-                            key: ValueKey<String>(
-                              'delete-personal-spot-${spot.id}',
-                            ),
-                            label: context.tr('common.delete'),
-                            icon: Icons.delete_outline_rounded,
-                            color: palette.error,
-                            onTap: () => _delete(context),
-                            iconOnly: true,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1411,12 +1437,12 @@ class _CardAction extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(8),
           child: iconOnly
-              ? Center(child: Icon(icon, color: color, size: 18))
+              ? Center(child: Icon(icon, color: color, size: 20))
               : Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(icon, color: color, size: 14),
-                    const SizedBox(width: 3),
+                    Icon(icon, color: color, size: 17),
+                    const SizedBox(width: 5),
                     Flexible(
                       child: Text(
                         label,
@@ -1424,7 +1450,7 @@ class _CardAction extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: color,
-                          fontSize: 8.5,
+                          fontSize: 11.5,
                           fontWeight: FontWeight.w800,
                         ),
                       ),

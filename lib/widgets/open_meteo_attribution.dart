@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../l10n/app_localizations.dart';
 
 /// Attribution exigée par les licences des données météo et marines.
 ///
@@ -38,24 +39,24 @@ class OpenMeteoAttribution extends StatelessWidget {
       padding: padding,
       child: Semantics(
         container: true,
-        label: 'Sources des prévisions météorologiques et marines',
+        label: context.tr('attribution.forecastSourcesSemantics'),
         child: Wrap(
           alignment: WrapAlignment.center,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            Text('Données : ', style: style),
+            Text(context.tr('attribution.dataPrefix'), style: style),
             _AttributionLink(
               label: 'Open-Meteo',
               style: linkStyle,
               onTap: () => _open(_openMeteoUri),
             ),
-            Text(' · Modèles : ', style: style),
+            Text(context.tr('attribution.modelsPrefix'), style: style),
             _AttributionLink(
               label: 'DWD',
               style: linkStyle,
               onTap: () => _open(_dwdUri),
             ),
-            Text(' · Prévisions indicatives', style: style),
+            Text(context.tr('attribution.indicativeForecasts'), style: style),
           ],
         ),
       ),
