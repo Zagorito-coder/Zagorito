@@ -2,7 +2,7 @@ name: spots_app
 description: Application de spots de pêche côtière
 publish_to: 'none'
 
-version: 1.0.6+10
+version: 1.0.6+11
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

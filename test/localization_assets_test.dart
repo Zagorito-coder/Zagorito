@@ -28,6 +28,11 @@ void main() {
         isTrue,
         reason: 'Traduction vide dans ${entry.key}',
       );
+      expect(
+        entry.value['drawer.tidesPro'],
+        entry.value['home.tidesProTitle'],
+        reason: 'Le menu et la carte Marées Pro divergent dans ${entry.key}',
+      );
     }
 
     expect(catalogs['fr']!['map.searchHint'], 'Rechercher un spot...');

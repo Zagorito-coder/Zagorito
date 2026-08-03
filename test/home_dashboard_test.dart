@@ -301,7 +301,7 @@ void main() {
     for (final label in const [
       'Accueil',
       'Marées',
-      'Marées avancées',
+      'Marées Pro',
       'Spots',
       'Poissons',
       'Techniques',
