@@ -323,6 +323,8 @@ class _ForecastPageState extends State<ForecastPage> {
       return _buildHeader(forecast);
     }
 
+    final colors = ThemeColors.of(context);
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
       child: Row(
@@ -334,9 +336,17 @@ class _ForecastPageState extends State<ForecastPage> {
               child: DropdownButton<String>(
                 value: _currentSpotId,
                 isExpanded: true,
-                style:
-                    const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                icon: const Icon(Icons.arrow_drop_down, size: 20),
+                dropdownColor: colors.surface,
+                style: TextStyle(
+                  color: colors.textPrimary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+                icon: Icon(
+                  Icons.arrow_drop_down,
+                  size: 20,
+                  color: colors.textSecondary,
+                ),
                 items: _availableSpots.map((spot) {
                   return DropdownMenuItem<String>(
                     value: spot['id'] as String,
