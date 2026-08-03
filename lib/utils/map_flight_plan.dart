@@ -18,6 +18,7 @@ final class MapFlightPlan {
   });
 
   static const frameInterval = Duration(milliseconds: 40);
+  static const tileLoadingAllowance = Duration(milliseconds: 500);
 
   final LatLng start;
   final LatLng target;
@@ -50,10 +51,12 @@ final class MapFlightPlan {
         .min(safeStartZoom, suggestedCruiseZoom)
         .clamp(3.0, safeTargetZoom)
         .toDouble();
-    final durationMs = (750 + (math.log(1 + safeDistance) / math.ln10) * 300)
-        .round()
-        .clamp(750, 1800)
-        .toInt();
+    final adaptiveDurationMs =
+        (750 + (math.log(1 + safeDistance) / math.ln10) * 300)
+            .round()
+            .clamp(750, 1800)
+            .toInt();
+    final durationMs = adaptiveDurationMs + tileLoadingAllowance.inMilliseconds;
 
     return MapFlightPlan._(
       start: start,

@@ -29,8 +29,12 @@ void main() {
         );
 
     expect(plan(100).duration, greaterThan(plan(1).duration));
-    expect(plan(100000).duration, const Duration(milliseconds: 1800));
-    expect(plan(0).duration, const Duration(milliseconds: 750));
+    expect(plan(100000).duration, const Duration(milliseconds: 2300));
+    expect(plan(0).duration, const Duration(milliseconds: 1250));
+    expect(
+      MapFlightPlan.tileLoadingAllowance,
+      const Duration(milliseconds: 500),
+    );
   });
 
   test('le trajet choisit le chemin court à travers l’antiméridien', () {
