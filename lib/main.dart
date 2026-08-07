@@ -1157,9 +1157,15 @@ class _MapScreenState extends State<MapScreen>
   }
 
   void _updateVisibleSpots() {
-    if (_spots.isEmpty) return;
+    if (!mounted || _spots.isEmpty) return;
     try {
-      _applyBoundsFilter(_mapController.camera.visibleBounds);
+      final bounds = _mapController.camera.visibleBounds;
+      if (!mounted) return;
+      // Le catalogue peut finir de charger après la dernière frame de la
+      // carte, surtout sur les appareils lents. Sans setState, la liste est
+      // bien calculée mais les marqueurs restent invisibles jusqu'au prochain
+      // zoom ou déplacement.
+      setState(() => _applyBoundsFilter(bounds));
     } catch (_) {}
   }
 
