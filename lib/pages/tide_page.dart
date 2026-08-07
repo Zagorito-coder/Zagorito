@@ -11,6 +11,7 @@ import '../models/tide_page_models.dart' as tm;
 import '../models/tide_data.dart' as tide_data;
 import '../services/forecast_firestore_service.dart';
 import '../services/tide_service.dart' as tide_svc;
+import '../services/casablanca_tide_reference.dart';
 import '../theme_controller.dart';
 import '../widgets/app_back_button.dart';
 import '../widgets/open_meteo_attribution.dart';
@@ -26,6 +27,7 @@ Color get _glassBorder =>
 
 const Color _accent = Color(0xFF00D4FF);
 const Color _green = Color(0xFF00FF88);
+const Color _activityHigh = Color(0xFF0B8F6A);
 const Color _amber = Color(0xFFFFB800);
 const Color _red = Color(0xFFFF6B6B);
 
@@ -83,11 +85,27 @@ tm.TideData _fromTideService(
           p.time.day == today.day)
       .toList();
 
-  final tidePoints =
-      (todayOnly.isNotEmpty ? todayOnly : src.hourlyPoints).map((p) {
+  final usesCasablancaReference =
+      src.location.toLowerCase().contains('casablanca');
+  final todayStart = DateTime(today.year, today.month, today.day);
+  final chartSourcePoints = usesCasablancaReference
+      ? _casablancaReferencePoints(
+          todayStart,
+          const Duration(days: 1),
+        )
+      : (todayOnly.isNotEmpty ? todayOnly : src.hourlyPoints);
+
+  final tidePoints = chartSourcePoints.map((p) {
     final t = p.time.hour + p.time.minute / 60.0;
     return tm.TidePoint(time: t, height: p.height);
   }).toList();
+
+  final chartLow = tidePoints.isEmpty
+      ? src.low
+      : tidePoints.map((point) => point.height).reduce(math.min);
+  final chartHigh = tidePoints.isEmpty
+      ? src.high
+      : tidePoints.map((point) => point.height).reduce(math.max);
 
   final hourlyCards = <tm.HourlyCard>[];
   for (int h = 0; h < 24; h++) {
@@ -107,8 +125,8 @@ tm.TideData _fromTideService(
     final trend = hh >= prev ? 'montante' : 'descendante';
 
     final isNow = h == currentHour;
-    final activity =
-        ((hh - src.low) / (src.high - src.low).clamp(0.01, 10)).clamp(0.0, 1.0);
+    final activity = ((hh - chartLow) / (chartHigh - chartLow).clamp(0.01, 10))
+        .clamp(0.0, 1.0);
     final score = (activity * 100).round();
     String level;
     String label;
@@ -163,6 +181,26 @@ tm.TideData _fromTideService(
           gfsPoint?.precipitationProbabilityPct,
       relativeHumidityPct:
           matchPoint?.relativeHumidityPct ?? gfsPoint?.relativeHumidityPct,
+      windGustKmh: matchPoint?.windGustKmh ?? gfsPoint?.windGustKmh,
+      visibilityKm: matchPoint?.visibilityKm ?? gfsPoint?.visibilityKm,
+      cloudCoverPct: matchPoint?.cloudCoverPct ?? gfsPoint?.cloudCoverPct,
+      precipitationMm: matchPoint?.precipitationMm ?? gfsPoint?.precipitationMm,
+      swellHeightM: matchPoint?.swellHeightM ?? gfsPoint?.swellHeightM,
+      swellPeriodS: matchPoint?.swellPeriodS ?? gfsPoint?.swellPeriodS,
+      swellDirectionDeg:
+          matchPoint?.swellDirectionDeg ?? gfsPoint?.swellDirectionDeg,
+      secondarySwellHeightM:
+          matchPoint?.secondarySwellHeightM ?? gfsPoint?.secondarySwellHeightM,
+      secondarySwellPeriodS:
+          matchPoint?.secondarySwellPeriodS ?? gfsPoint?.secondarySwellPeriodS,
+      secondarySwellDirectionDeg: matchPoint?.secondarySwellDirectionDeg ??
+          gfsPoint?.secondarySwellDirectionDeg,
+      seaSurfaceTemperatureC: matchPoint?.seaSurfaceTemperatureC ??
+          gfsPoint?.seaSurfaceTemperatureC,
+      oceanCurrentSpeedKmh:
+          matchPoint?.oceanCurrentSpeedKmh ?? gfsPoint?.oceanCurrentSpeedKmh,
+      oceanCurrentDirectionDeg: matchPoint?.oceanCurrentDirectionDeg ??
+          gfsPoint?.oceanCurrentDirectionDeg,
       isIdeal: activity > 0.7,
       isNow: isNow,
       wavePeriod: wavePeriodH.round(),
@@ -214,7 +252,12 @@ tm.TideData _fromTideService(
   }
 
   final upcomingEvents = <tm.TideEvent>[];
-  final sourcePoints = src.hourlyPoints;
+  final sourcePoints = usesCasablancaReference
+      ? _casablancaReferencePoints(
+          todayStart,
+          const Duration(days: 2),
+        )
+      : src.hourlyPoints;
   for (int i = 1; i < sourcePoints.length - 1; i++) {
     final previous = sourcePoints[i - 1].height;
     final current = sourcePoints[i].height;
@@ -290,6 +333,21 @@ tm.TideData _fromTideService(
       gust: 0,
     ),
   );
+}
+
+List<tide_data.TidePoint> _casablancaReferencePoints(
+  DateTime startLocal,
+  Duration duration,
+) {
+  const step = Duration(minutes: 1);
+  final count = duration.inMinutes ~/ step.inMinutes;
+  return List<tide_data.TidePoint>.generate(count + 1, (index) {
+    final localTime = startLocal.add(Duration(minutes: index));
+    return tide_data.TidePoint(
+      time: localTime,
+      height: CasablancaTideReference.heightAtUtc(localTime.toUtc()),
+    );
+  }, growable: false);
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -635,6 +693,8 @@ class _TidePageState extends State<TidePage>
             SliverToBoxAdapter(child: _buildCurrentTideRibbon()),
             SliverToBoxAdapter(child: _buildCurveCard()),
             SliverToBoxAdapter(child: _buildHourlyActivitySection()),
+            SliverToBoxAdapter(child: _buildMarineConditionsPanel()),
+            SliverToBoxAdapter(child: _buildAtmosphereVisibilityPanel()),
             SliverToBoxAdapter(child: _buildConditionsPanel()),
             SliverToBoxAdapter(child: _buildEventsPanel()),
             const SliverToBoxAdapter(
@@ -898,8 +958,9 @@ class _TidePageState extends State<TidePage>
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 color: _levelColor(_data.overallLevel),
-                                fontSize: 11.5,
+                                fontSize: 12.5,
                                 fontWeight: FontWeight.w800,
+                                letterSpacing: 0.25,
                               ),
                             ),
                           ),
@@ -918,57 +979,79 @@ class _TidePageState extends State<TidePage>
                           height: 1.35,
                         ),
                       ),
-                      const SizedBox(height: 5),
-                      Text(
-                        context.tr('tide.bestHours').toUpperCase(),
-                        style: TextStyle(
-                          color: _txt(0.48),
-                          fontSize: 7,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 5,
-                        children: _data.bestHours
-                            .map(
-                              (hour) => Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _accent.withValues(alpha: 0.10),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: _accent.withValues(alpha: 0.42),
-                                    width: 0.7,
+                      const SizedBox(height: 4),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  context.tr('tide.bestHours').toUpperCase(),
+                                  style: TextStyle(
+                                    color: _txt(0.48),
+                                    fontSize: 7,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1,
                                   ),
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.schedule_rounded,
-                                      size: 11,
-                                      color: _accent,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      hour,
-                                      style: TextStyle(
-                                        color: _accent,
-                                        fontSize: 8.5,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ],
+                                const SizedBox(height: 3),
+                                Wrap(
+                                  spacing: 6,
+                                  runSpacing: 5,
+                                  children: _data.bestHours
+                                      .map(
+                                        (hour) => Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: _accent.withValues(
+                                              alpha: 0.10,
+                                            ),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                            border: Border.all(
+                                              color: _accent.withValues(
+                                                alpha: 0.42,
+                                              ),
+                                              width: 0.7,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(
+                                                Icons.schedule_rounded,
+                                                size: 11,
+                                                color: _accent,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                hour,
+                                                style: const TextStyle(
+                                                  color: _accent,
+                                                  fontSize: 8.5,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
                                 ),
-                              ),
-                            )
-                            .toList(),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          _FishActivityIndicator(
+                            level: _data.overallLevel,
+                            animation: _ctrl,
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -1198,11 +1281,25 @@ class _TidePageState extends State<TidePage>
                           highTideShort: context.tr('tide.highTide'),
                           lowTideShort: context.tr('tide.lowTide'),
                           isDark: _isDark,
+                          fixedChartDatumScale: _data.location
+                              .toLowerCase()
+                              .contains('casablanca'),
                         ),
                       ),
                     ),
                   ),
                 ),
+                if (_data.location.toLowerCase().contains('casablanca')) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    context.tr('tide.tideCurveJrcSource'),
+                    style: TextStyle(
+                      color: _txt(0.42),
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -1329,6 +1426,276 @@ class _TidePageState extends State<TidePage>
                       }),
                 ))));
   }
+
+  Widget _buildMarineConditionsPanel() {
+    final selected = _data.hourlyCards[_selectedHourIndex];
+    return _buildDetailedConditionsPanel(
+      title: context.tr('tide.marineConditions'),
+      rows: [
+        [
+          _DetailedCondition(
+            icon: Icons.thermostat_rounded,
+            label: context.tr('tide.waterTemperature'),
+            value: _temperatureValue(selected.seaSurfaceTemperatureC),
+          ),
+          _DetailedCondition(
+            icon: Icons.multiple_stop_rounded,
+            label: context.tr('tide.oceanCurrent'),
+            value: _speedDirectionValue(
+              selected.oceanCurrentSpeedKmh,
+              selected.oceanCurrentDirectionDeg,
+            ),
+          ),
+        ],
+        [
+          _DetailedCondition(
+            icon: Icons.waves_rounded,
+            label: context.tr('tide.primarySwell'),
+            value: _swellValue(
+              selected.swellHeightM,
+              selected.swellPeriodS,
+              selected.swellDirectionDeg,
+            ),
+          ),
+          _DetailedCondition(
+            icon: Icons.water_rounded,
+            label: context.tr('tide.secondarySwell'),
+            value: _swellValue(
+              selected.secondarySwellHeightM,
+              selected.secondarySwellPeriodS,
+              selected.secondarySwellDirectionDeg,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildAtmosphereVisibilityPanel() {
+    final selected = _data.hourlyCards[_selectedHourIndex];
+    final pressure = selected.pressureHpa;
+    final pressureValue = pressure == null
+        ? context.tr('tide.unavailable')
+        : '${pressure.round()} hPa';
+    return _buildDetailedConditionsPanel(
+      title: context.tr('tide.atmosphereVisibility'),
+      rows: [
+        [
+          _DetailedCondition(
+            icon: Icons.air_rounded,
+            label: context.tr('tide.windGusts'),
+            value: selected.windGustKmh == null
+                ? context.tr('tide.unavailable')
+                : '${selected.windGustKmh!.round()} km/h',
+          ),
+          _DetailedCondition(
+            icon: Icons.speed_rounded,
+            label: context.tr('tide.pressure'),
+            value: pressureValue,
+            valueIcon: pressure == null
+                ? null
+                : _pressureTrendIcon(_selectedHourIndex),
+          ),
+          _DetailedCondition(
+            icon: Icons.umbrella_rounded,
+            label: context.tr('tide.rain'),
+            value: _rainValue(selected),
+          ),
+        ],
+        [
+          _DetailedCondition(
+            icon: Icons.visibility_rounded,
+            label: context.tr('tide.visibility'),
+            value: selected.visibilityKm == null
+                ? context.tr('tide.unavailable')
+                : '${_compactNumber(selected.visibilityKm!)} km',
+          ),
+          _DetailedCondition(
+            icon: Icons.cloud_outlined,
+            label: context.tr('tide.cloudCover'),
+            value: selected.cloudCoverPct == null
+                ? context.tr('tide.unavailable')
+                : '${selected.cloudCoverPct!.round()} %',
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildDetailedConditionsPanel({
+    required String title,
+    required List<List<_DetailedCondition>> rows,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 5, 16, 3),
+      child: _glassPanel(
+        borderRadius: BorderRadius.circular(15),
+        padding: const EdgeInsets.fromLTRB(9, 9, 9, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title.toUpperCase(),
+              style: TextStyle(
+                color: _txt(0.68),
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.75,
+              ),
+            ),
+            const SizedBox(height: 7),
+            for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) ...[
+              SizedBox(
+                height: 66,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var cellIndex = 0;
+                        cellIndex < rows[rowIndex].length;
+                        cellIndex++) ...[
+                      Expanded(
+                        child: _detailedConditionCell(
+                          rows[rowIndex][cellIndex],
+                        ),
+                      ),
+                      if (cellIndex != rows[rowIndex].length - 1)
+                        _conditionDivider(height: 56),
+                    ],
+                  ],
+                ),
+              ),
+              if (rowIndex != rows.length - 1) ...[
+                Container(
+                  height: 0.7,
+                  color: _glassBorder.withValues(alpha: 0.52),
+                ),
+                const SizedBox(height: 2),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _detailedConditionCell(_DetailedCondition condition) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 29,
+            child: Icon(
+              condition.icon,
+              color:
+                  _isDark ? const Color(0xFF62DDF4) : const Color(0xFF078AAA),
+              size: 23,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  condition.label.toUpperCase(),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: _txt(0.52),
+                    fontSize: 7.6,
+                    height: 1.05,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.55,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        condition.value,
+                        maxLines: condition.valueIcon == null ? 2 : 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: _txt(0.94),
+                          fontSize: condition.valueIcon == null ? 10.8 : 9.8,
+                          height: 1.1,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    if (condition.valueIcon != null) ...[
+                      const SizedBox(width: 2),
+                      Icon(
+                        condition.valueIcon,
+                        size: 13,
+                        color: _isDark
+                            ? const Color(0xFF65D8EC)
+                            : const Color(0xFF087F9E),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _temperatureValue(double? temperature) => temperature == null
+      ? context.tr('tide.unavailable')
+      : '${_compactNumber(temperature)} °C';
+
+  String _speedDirectionValue(double? speed, double? direction) {
+    if (speed == null) return context.tr('tide.unavailable');
+    final compass = direction == null ? null : _degToCompass(direction);
+    return '${_compactNumber(speed)} km/h${compass == null ? '' : ' · $compass'}';
+  }
+
+  String _swellValue(double? height, double? period, double? direction) {
+    if (height == null && period == null && direction == null) {
+      return context.tr('tide.unavailable');
+    }
+    final parts = <String>[];
+    if (height != null) parts.add('${_compactNumber(height)} m');
+    if (period != null) parts.add('${_compactNumber(period)} s');
+    if (direction != null) parts.add(_degToCompass(direction));
+    return parts.join(' · ');
+  }
+
+  String _rainValue(tm.HourlyCard selected) {
+    final amount = selected.precipitationMm;
+    final probability = selected.precipitationProbabilityPct;
+    if (amount == null && probability == null) {
+      return context.tr('tide.unavailable');
+    }
+    final parts = <String>[];
+    if (amount != null) parts.add('${_compactNumber(amount)} mm');
+    if (probability != null) parts.add('${probability.round()} %');
+    return parts.join(' · ');
+  }
+
+  IconData _pressureTrendIcon(int selectedIndex) {
+    final current = _data.hourlyCards[selectedIndex].pressureHpa;
+    if (current == null || selectedIndex == 0) {
+      return Icons.trending_flat_rounded;
+    }
+    final comparisonIndex = math.max(0, selectedIndex - 3);
+    final previous = _data.hourlyCards[comparisonIndex].pressureHpa;
+    if (previous == null) return Icons.trending_flat_rounded;
+    final difference = current - previous;
+    if (difference >= 0.8) return Icons.trending_up_rounded;
+    if (difference <= -0.8) return Icons.trending_down_rounded;
+    return Icons.trending_flat_rounded;
+  }
+
+  String _compactNumber(double value) => value == value.roundToDouble()
+      ? value.round().toString()
+      : value.toStringAsFixed(1);
 
   Widget _buildConditionsPanel() {
     final selected = _data.hourlyCards[_selectedHourIndex];
@@ -1658,10 +2025,131 @@ class PositionedSafetyInfo extends StatelessWidget {
 }
 
 // ═════════════════════════════════════════════════════════════
+class _DetailedCondition {
+  final IconData icon;
+  final String label;
+  final String value;
+  final IconData? valueIcon;
+
+  const _DetailedCondition({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.valueIcon,
+  });
+}
+
+class _FishActivityIndicator extends StatelessWidget {
+  final String level;
+  final Animation<double> animation;
+
+  const _FishActivityIndicator({
+    required this.level,
+    required this.animation,
+  });
+
+  int get _fishCount => switch (level) {
+        'high' => 3,
+        'mid' => 2,
+        _ => 1,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final count = _fishCount;
+    final color = _levelColor(level);
+    return Semantics(
+      label: context.trArgs(
+        'tide.activityFishIndicator',
+        args: {'count': '$count'},
+      ),
+      child: SizedBox(
+        width: 86,
+        height: 33,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 280),
+          switchInCurve: Curves.easeOutCubic,
+          child: AnimatedBuilder(
+            key: ValueKey(count),
+            animation: animation,
+            builder: (context, _) {
+              final progress = Curves.easeOutCubic.transform(animation.value);
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: List.generate(count, (index) {
+                  final sizes = count == 3
+                      ? const [26.0, 20.0, 15.0]
+                      : count == 2
+                          ? const [26.0, 19.0]
+                          : const [26.0];
+                  final opacity =
+                      (0.96 - index * 0.18).clamp(0.55, 1.0).toDouble();
+                  final fishHeight = sizes[index];
+                  return Padding(
+                    padding: EdgeInsets.only(left: index == 0 ? 0 : 2),
+                    child: Transform.translate(
+                      offset: Offset((1 - progress) * (12 + index * 5), 0),
+                      child: Opacity(
+                        opacity: opacity * progress,
+                        child: SizedBox(
+                          width: fishHeight * 1.28,
+                          height: fishHeight,
+                          child: CustomPaint(
+                            painter: _FishSilhouettePainter(color),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FishSilhouettePainter extends CustomPainter {
+  final Color color;
+
+  const _FishSilhouettePainter(this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill
+      ..isAntiAlias = true;
+    final tail = Path()
+      ..moveTo(size.width * 0.30, size.height * 0.50)
+      ..lineTo(0, size.height * 0.12)
+      ..lineTo(size.width * 0.05, size.height * 0.50)
+      ..lineTo(0, size.height * 0.88)
+      ..close();
+    canvas.drawPath(tail, paint);
+    canvas.drawOval(
+      Rect.fromLTWH(
+        size.width * 0.22,
+        size.height * 0.18,
+        size.width * 0.76,
+        size.height * 0.64,
+      ),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _FishSilhouettePainter oldDelegate) =>
+      oldDelegate.color != color;
+}
+
 Color _levelColor(String level) {
   switch (level) {
     case 'high':
-      return _green;
+      return _activityHigh;
     case 'mid':
       return _amber;
     case 'low':
@@ -1807,7 +2295,7 @@ class _CircularGauge extends StatelessWidget {
                           width: 6,
                           height: 6,
                           decoration: BoxDecoration(
-                              color: _green.withValues(alpha: 0.8),
+                              color: _levelColor(level).withValues(alpha: 0.82),
                               shape: BoxShape.circle))),
               ])));
         });
@@ -1834,8 +2322,7 @@ class _GaugePainter extends CustomPainter {
       ..color = color
       ..style = PaintingStyle.stroke
       ..strokeWidth = stroke
-      ..strokeCap = StrokeCap.round
-      ..maskFilter = const MaskFilter.blur(BlurStyle.solid, 2.5);
+      ..strokeCap = StrokeCap.round;
     canvas.drawArc(Rect.fromCircle(center: c, radius: r), math.pi * 0.75,
         math.pi * 1.5 * progress, false, fg);
   }
@@ -1982,6 +2469,7 @@ class _PillCurvePainter extends CustomPainter {
   final String highTideShort;
   final String lowTideShort;
   final bool isDark;
+  final bool fixedChartDatumScale;
   _PillCurvePainter(
       {required this.points,
       required this.events,
@@ -1989,7 +2477,8 @@ class _PillCurvePainter extends CustomPainter {
       required this.nowLabel,
       required this.highTideShort,
       required this.lowTideShort,
-      required this.isDark});
+      required this.isDark,
+      required this.fixedChartDatumScale});
 
   static const double _padL = 14.0,
       _padR = 38.0,
@@ -2014,14 +2503,17 @@ class _PillCurvePainter extends CustomPainter {
     final range = (maxH - minH).clamp(0.02, 100.0);
     final paddedMin = minH - range * 0.1;
     final paddedRange = range * 1.2;
+    final axisMin = fixedChartDatumScale ? 0.0 : paddedMin;
+    final axisRange = fixedChartDatumScale ? 5.0 : paddedRange;
+    final tickCount = fixedChartDatumScale ? 5 : 4;
 
     double xFor(double t) => _padL + (t / 24.0) * w;
-    double yFor(double v) => chartTop + h - ((v - paddedMin) / paddedRange) * h;
+    double yFor(double v) => chartTop + h - ((v - axisMin) / axisRange) * h;
 
-    final decimals = range < 0.5 ? 2 : 1;
-    for (int i = 0; i <= 4; i++) {
-      final v = paddedMin + paddedRange * i / 4;
-      final gy = chartTop + h - h * i / 4;
+    final decimals = fixedChartDatumScale ? 0 : (range < 0.5 ? 2 : 1);
+    for (int i = 0; i <= tickCount; i++) {
+      final v = axisMin + axisRange * i / tickCount;
+      final gy = chartTop + h - h * i / tickCount;
       canvas.drawLine(
           Offset(_padL, gy),
           Offset(_padL + w, gy),
@@ -2125,7 +2617,10 @@ class _PillCurvePainter extends CustomPainter {
       const hPad = 10.0;
       final pillW = tp.width + hPad * 2 + 8;
       const pillH = 24.0;
-      double px = (targetX - pillW / 2).clamp(0.0, size.width - pillW);
+      // Les étiquettes restent dans la zone de tracé afin de ne jamais
+      // recouvrir l'échelle verticale 0–5 m réservée à droite.
+      final maxPillX = math.max(_padL, _padL + w - pillW);
+      double px = (targetX - pillW / 2).clamp(_padL, maxPillX);
       double py = _topMargin;
       var rect = Rect.fromLTWH(px, py, pillW, pillH);
       int guard = 0;
@@ -2183,5 +2678,6 @@ class _PillCurvePainter extends CustomPainter {
       old.nowLabel != nowLabel ||
       old.highTideShort != highTideShort ||
       old.lowTideShort != lowTideShort ||
-      old.isDark != isDark;
+      old.isDark != isDark ||
+      old.fixedChartDatumScale != fixedChartDatumScale;
 }

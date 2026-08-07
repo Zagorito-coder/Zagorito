@@ -16,6 +16,16 @@ void main() {
       'tide.tideAt',
       'tide.nextExtremes',
       'tide.hourlyActivity',
+      'tide.marineConditions',
+      'tide.atmosphereVisibility',
+      'tide.waterTemperature',
+      'tide.oceanCurrent',
+      'tide.primarySwell',
+      'tide.secondarySwell',
+      'tide.windGusts',
+      'tide.visibility',
+      'tide.cloudCover',
+      'tide.activityFishIndicator',
       'tide.currentConditions',
       'tide.pressure',
       'tide.rain',
@@ -56,5 +66,15 @@ void main() {
       attributionSource,
       contains("context.tr('attribution.indicativeForecasts')"),
     );
+  });
+
+  test('l’indicateur visuel respecte les trois niveaux d’activité', () {
+    final tideSource = File('lib/pages/tide_page.dart').readAsStringSync();
+
+    expect(tideSource, contains("'high' => 3"));
+    expect(tideSource, contains("'mid' => 2"));
+    expect(tideSource, contains("_ => 1"));
+    expect(
+        tideSource, contains('const Color _activityHigh = Color(0xFF0B8F6A)'));
   });
 }
