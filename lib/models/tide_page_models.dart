@@ -17,6 +17,19 @@ class HourlyCard {
   final double? pressureHpa;
   final double? precipitationProbabilityPct;
   final double? relativeHumidityPct;
+  final double? windGustKmh;
+  final double? visibilityKm;
+  final double? cloudCoverPct;
+  final double? precipitationMm;
+  final double? swellHeightM;
+  final double? swellPeriodS;
+  final double? swellDirectionDeg;
+  final double? secondarySwellHeightM;
+  final double? secondarySwellPeriodS;
+  final double? secondarySwellDirectionDeg;
+  final double? seaSurfaceTemperatureC;
+  final double? oceanCurrentSpeedKmh;
+  final double? oceanCurrentDirectionDeg;
   final bool isIdeal;
   final bool isNow;
   final int wavePeriod; // secondes, NOUVEAU
@@ -36,6 +49,19 @@ class HourlyCard {
     this.pressureHpa,
     this.precipitationProbabilityPct,
     this.relativeHumidityPct,
+    this.windGustKmh,
+    this.visibilityKm,
+    this.cloudCoverPct,
+    this.precipitationMm,
+    this.swellHeightM,
+    this.swellPeriodS,
+    this.swellDirectionDeg,
+    this.secondarySwellHeightM,
+    this.secondarySwellPeriodS,
+    this.secondarySwellDirectionDeg,
+    this.seaSurfaceTemperatureC,
+    this.oceanCurrentSpeedKmh,
+    this.oceanCurrentDirectionDeg,
     this.isIdeal = false,
     this.isNow = false,
     this.wavePeriod = 7,

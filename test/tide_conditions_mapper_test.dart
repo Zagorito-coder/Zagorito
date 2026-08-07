@@ -26,6 +26,19 @@ void main() {
     expect(result.hourlyPoints.first.pressureHpa, 1014);
     expect(result.hourlyPoints.first.precipitationProbabilityPct, 18);
     expect(result.hourlyPoints.first.relativeHumidityPct, 72);
+    expect(result.hourlyPoints.first.windGustKmh, 32);
+    expect(result.hourlyPoints.first.visibilityKm, 14);
+    expect(result.hourlyPoints.first.cloudCoverPct, 42);
+    expect(result.hourlyPoints.first.precipitationMm, 0.4);
+    expect(result.hourlyPoints.first.swellHeightM, 1.2);
+    expect(result.hourlyPoints.first.swellPeriodS, 11);
+    expect(result.hourlyPoints.first.swellDirectionDeg, 315);
+    expect(result.hourlyPoints.first.secondarySwellHeightM, 0.5);
+    expect(result.hourlyPoints.first.secondarySwellPeriodS, 7);
+    expect(result.hourlyPoints.first.secondarySwellDirectionDeg, 270);
+    expect(result.hourlyPoints.first.seaSurfaceTemperatureC, 19.2);
+    expect(result.hourlyPoints.first.oceanCurrentSpeedKmh, 0.8);
+    expect(result.hourlyPoints.first.oceanCurrentDirectionDeg, 45);
     expect(result.low, -0.35);
     expect(result.high, 1.08);
   });
@@ -105,7 +118,10 @@ void main() {
     slots.first
       ..['pressureHpa'] = 400
       ..['precipitationProbabilityPct'] = 150
-      ..['relativeHumidityPct'] = -2;
+      ..['relativeHumidityPct'] = -2
+      ..['visibilityKm'] = 300
+      ..['seaSurfaceTemperatureC'] = 80
+      ..['oceanCurrentDirectionDeg'] = 800;
 
     final result = TideConditionsMapper.fromDocument(
       document,
@@ -116,6 +132,9 @@ void main() {
     expect(result.hourlyPoints.first.pressureHpa, isNull);
     expect(result.hourlyPoints.first.precipitationProbabilityPct, isNull);
     expect(result.hourlyPoints.first.relativeHumidityPct, isNull);
+    expect(result.hourlyPoints.first.visibilityKm, isNull);
+    expect(result.hourlyPoints.first.seaSurfaceTemperatureC, isNull);
+    expect(result.hourlyPoints.first.oceanCurrentDirectionDeg, isNull);
   });
 }
 
@@ -161,6 +180,19 @@ Map<String, dynamic> _conditionsDocument({
           'pressureHpa': 1014,
           'precipitationProbabilityPct': 18,
           'relativeHumidityPct': 72,
+          'windGustKmh': 32,
+          'visibilityKm': 14,
+          'cloudCoverPct': 42,
+          'precipitationMm': 0.4,
+          'swellHeightM': 1.2,
+          'swellPeriodS': 11,
+          'swellDirectionDeg': 315,
+          'secondarySwellHeightM': 0.5,
+          'secondarySwellPeriodS': 7,
+          'secondarySwellDirectionDeg': 270,
+          'seaSurfaceTemperatureC': 19.2,
+          'oceanCurrentSpeedKmh': 0.8,
+          'oceanCurrentDirectionDeg': 45,
         },
       ],
     },

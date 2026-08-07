@@ -15,12 +15,38 @@ class GfsWeatherPoint {
   final double? pressureHpa;
   final double? precipitationProbabilityPct;
   final double? relativeHumidityPct;
+  final double? windGustKmh;
+  final double? visibilityKm;
+  final double? cloudCoverPct;
+  final double? precipitationMm;
+  final double? swellHeightM;
+  final double? swellPeriodS;
+  final double? swellDirectionDeg;
+  final double? secondarySwellHeightM;
+  final double? secondarySwellPeriodS;
+  final double? secondarySwellDirectionDeg;
+  final double? seaSurfaceTemperatureC;
+  final double? oceanCurrentSpeedKmh;
+  final double? oceanCurrentDirectionDeg;
 
   const GfsWeatherPoint({
     required this.dateTime,
     this.pressureHpa,
     this.precipitationProbabilityPct,
     this.relativeHumidityPct,
+    this.windGustKmh,
+    this.visibilityKm,
+    this.cloudCoverPct,
+    this.precipitationMm,
+    this.swellHeightM,
+    this.swellPeriodS,
+    this.swellDirectionDeg,
+    this.secondarySwellHeightM,
+    this.secondarySwellPeriodS,
+    this.secondarySwellDirectionDeg,
+    this.seaSurfaceTemperatureC,
+    this.oceanCurrentSpeedKmh,
+    this.oceanCurrentDirectionDeg,
   });
 }
 
@@ -206,6 +232,7 @@ class ForecastFirestoreService {
         }
         final models = _asStringMap(slot['models']);
         final wind = _asStringMap(models?['wind']);
+        final wave = _asStringMap(models?['wave']);
         final pressure = _boundedNumber(
           wind,
           'pressure_msl',
@@ -224,14 +251,108 @@ class ForecastFirestoreService {
           minimum: 0,
           maximum: 100,
         );
-        if (pressure == null && rain == null && humidity == null) continue;
-        points.add(
-          GfsWeatherPoint(
-            dateTime: dateTime,
-            pressureHpa: pressure,
-            precipitationProbabilityPct: rain,
-            relativeHumidityPct: humidity,
+        final windGustKnots = _boundedNumber(
+              wind,
+              'wind_gust_kt',
+              minimum: 0,
+              maximum: 220,
+            ) ??
+            _boundedNumber(
+              slot,
+              'wind_gust_kt',
+              minimum: 0,
+              maximum: 220,
+            );
+        final visibilityMeters = _boundedNumber(
+          wind,
+          'visibility_m',
+          minimum: 0,
+          maximum: 100000,
+        );
+        final values = GfsWeatherPoint(
+          dateTime: dateTime,
+          pressureHpa: pressure,
+          precipitationProbabilityPct: rain,
+          relativeHumidityPct: humidity,
+          windGustKmh: windGustKnots == null ? null : windGustKnots * 1.852,
+          visibilityKm:
+              visibilityMeters == null ? null : visibilityMeters / 1000,
+          cloudCoverPct: _boundedNumber(
+                wind,
+                'cloud_total_pct',
+                minimum: 0,
+                maximum: 100,
+              ) ??
+              _boundedNumber(
+                slot,
+                'cloud_pct',
+                minimum: 0,
+                maximum: 100,
+              ),
+          precipitationMm: _boundedNumber(
+            wind,
+            'precipitation_mm',
+            minimum: 0,
+            maximum: 500,
           ),
+          swellHeightM: _boundedNumber(
+            wave,
+            'swell_height_m',
+            minimum: 0,
+            maximum: 40,
+          ),
+          swellPeriodS: _boundedNumber(
+            wave,
+            'swell_period_s',
+            minimum: 0,
+            maximum: 60,
+          ),
+          swellDirectionDeg: _boundedNumber(
+            wave,
+            'swell_dir_deg',
+            minimum: 0,
+            maximum: 360,
+          ),
+          secondarySwellHeightM: _boundedNumber(
+            wave,
+            'swell2_height_m',
+            minimum: 0,
+            maximum: 40,
+          ),
+          secondarySwellPeriodS: _boundedNumber(
+            wave,
+            'swell2_period_s',
+            minimum: 0,
+            maximum: 60,
+          ),
+          secondarySwellDirectionDeg: _boundedNumber(
+            wave,
+            'swell2_dir_deg',
+            minimum: 0,
+            maximum: 360,
+          ),
+          seaSurfaceTemperatureC: _boundedNumber(
+            wave,
+            'sst_c',
+            minimum: -5,
+            maximum: 45,
+          ),
+          oceanCurrentSpeedKmh: _boundedNumber(
+            wave,
+            'ocean_current_velocity_kmh',
+            minimum: 0,
+            maximum: 30,
+          ),
+          oceanCurrentDirectionDeg: _boundedNumber(
+            wave,
+            'ocean_current_direction_deg',
+            minimum: 0,
+            maximum: 360,
+          ),
+        );
+        if (!_hasUsefulGfsValue(values)) continue;
+        points.add(
+          values,
         );
       }
     }
@@ -264,6 +385,24 @@ class ForecastFirestoreService {
     }
     return value;
   }
+
+  static bool _hasUsefulGfsValue(GfsWeatherPoint point) =>
+      point.pressureHpa != null ||
+      point.precipitationProbabilityPct != null ||
+      point.relativeHumidityPct != null ||
+      point.windGustKmh != null ||
+      point.visibilityKm != null ||
+      point.cloudCoverPct != null ||
+      point.precipitationMm != null ||
+      point.swellHeightM != null ||
+      point.swellPeriodS != null ||
+      point.swellDirectionDeg != null ||
+      point.secondarySwellHeightM != null ||
+      point.secondarySwellPeriodS != null ||
+      point.secondarySwellDirectionDeg != null ||
+      point.seaSurfaceTemperatureC != null ||
+      point.oceanCurrentSpeedKmh != null ||
+      point.oceanCurrentDirectionDeg != null;
 
   /// Recupere une seule fois les previsions d'un spot.
   static Future<SpotForecast?> fetchSpot(String spotId) async {
