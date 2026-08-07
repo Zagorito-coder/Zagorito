@@ -281,6 +281,14 @@ def _safe_num(v, default=None):
         return default
 
 
+def _hourly_num(hourly, key, index, default=None):
+    """Lit une variable horaire optionnelle sans faire échouer la récolte."""
+    values = hourly.get(key)
+    if not isinstance(values, (list, tuple)) or index >= len(values):
+        return default
+    return _safe_num(values[index], default)
+
+
 def _error_summary(error):
     """Résumé sûr pour les logs : ne jamais imprimer une URL avec apikey."""
     if isinstance(error, ValueError):
@@ -328,13 +336,20 @@ HOURLY_COMMON_WIND = (
     "precipitation_probability,pressure_msl,relative_humidity_2m"
 )
 
+# Les trois mesures supplémentaires sont demandées uniquement au GFS, qui
+# les publie officiellement. Le flux ECMWF reste inchangé afin qu'une variable
+# optionnelle non prise en charge ne bloque jamais la récolte haute résolution.
+HOURLY_GFS_WIND = (
+    f"{HOURLY_COMMON_WIND},cloud_cover,precipitation,visibility"
+)
+
 HOURLY_WAVE = (
     "wave_height,wave_period,wave_direction,"
     "swell_wave_height,swell_wave_period,swell_wave_direction,"
     "secondary_swell_wave_height,secondary_swell_wave_period,"
     "secondary_swell_wave_direction,"
     "wind_wave_height,wind_wave_period,wind_wave_direction,"
-    "sea_surface_temperature"
+    "sea_surface_temperature,ocean_current_velocity,ocean_current_direction"
 )
 
 
@@ -399,7 +414,7 @@ def fetch_wind_model(lat, lon):
     url = FORECAST_BASE_URL
     params = _base_params(lat, lon)
     params.update({
-        "hourly": HOURLY_COMMON_WIND,
+        "hourly": HOURLY_GFS_WIND,
         "daily": "sunrise,sunset",
         "wind_speed_unit": "ms",
         "models": "gfs_seamless",
@@ -515,9 +530,12 @@ def _extract_wind_model_slot(wind_data, wind_by_time, t):
         "cloud_low_pct": _safe_num(h["cloud_cover_low"][i]),
         "cloud_mid_pct": _safe_num(h["cloud_cover_mid"][i]),
         "cloud_high_pct": _safe_num(h["cloud_cover_high"][i]),
+        "cloud_total_pct": _hourly_num(h, "cloud_cover", i),
+        "precipitation_mm": _hourly_num(h, "precipitation", i),
         "precip_prob_pct": _safe_num(h["precipitation_probability"][i]),
         "pressure_msl": _safe_num(h["pressure_msl"][i]),
         "rel_humidity_pct": _safe_num(h["relative_humidity_2m"][i]),
+        "visibility_m": _hourly_num(h, "visibility", i),
     }
 
 
@@ -535,9 +553,12 @@ def _extract_hires_model_slot(hires_data, hires_by_time, t):
         "cloud_low_pct": _safe_num(h["cloud_cover_low"][i]),
         "cloud_mid_pct": _safe_num(h["cloud_cover_mid"][i]),
         "cloud_high_pct": _safe_num(h["cloud_cover_high"][i]),
+        "cloud_total_pct": _hourly_num(h, "cloud_cover", i),
+        "precipitation_mm": _hourly_num(h, "precipitation", i),
         "precip_prob_pct": _safe_num(h["precipitation_probability"][i]),
         "pressure_msl": _safe_num(h["pressure_msl"][i]),
         "rel_humidity_pct": _safe_num(h["relative_humidity_2m"][i]),
+        "visibility_m": _hourly_num(h, "visibility", i),
     }
 
 
@@ -561,6 +582,12 @@ def _extract_wave_model_slot(wave_data, wave_by_time, t):
         "windwave_period_s": _safe_num(h["wind_wave_period"][i]),
         "windwave_dir_deg": _safe_num(h["wind_wave_direction"][i]),
         "sst_c": _safe_num(h["sea_surface_temperature"][i]),
+        "ocean_current_velocity_kmh": _hourly_num(
+            h, "ocean_current_velocity", i
+        ),
+        "ocean_current_direction_deg": _hourly_num(
+            h, "ocean_current_direction", i
+        ),
     }
 
 
@@ -703,30 +730,56 @@ def validate_payload(days_payload):
 
 
 def build_conditions_gfs_summary(days_payload, max_days=CONDITIONS_GFS_DAYS):
-    """Construit le résumé GFS minimal consommé par les écrans légers.
+    """Construit le résumé horaire consommé par la page Marées.
 
-    Le tableau Marées Pro conserve son document complet. Ici, seules pression,
-    probabilité de pluie et humidité sont dupliquées pour deux jours maximum.
-    Les valeurs absentes restent ``None`` et seront affichées comme
-    indisponibles par l'application.
+    Les mesures restent dans le document ``conditions`` déjà lu par
+    l'application : aucune lecture Firestore supplémentaire n'est nécessaire.
+    Les valeurs absentes restent ``None`` et ne sont jamais remplacées par un
+    faux zéro.
     """
     hourly = []
     for day in days_payload[:max_days]:
         for slot in day.get("slots", []):
-            wind = (slot.get("models") or {}).get("wind") or {}
+            models = slot.get("models") or {}
+            wind = models.get("wind") or {}
+            wave = models.get("wave") or {}
+            gust_knots = wind.get("wind_gust_kt")
+            visibility_m = wind.get("visibility_m")
             values = {
                 "time": slot.get("hour"),
+                "windGustKmh": (
+                    round(gust_knots * 1.852, 1)
+                    if gust_knots is not None
+                    else None
+                ),
+                "visibilityKm": (
+                    round(visibility_m / 1000.0, 1)
+                    if visibility_m is not None
+                    else None
+                ),
+                "cloudCoverPct": wind.get("cloud_total_pct"),
+                "precipitationMm": wind.get("precipitation_mm"),
                 "precipitationProbabilityPct": wind.get("precip_prob_pct"),
                 "pressureHpa": wind.get("pressure_msl"),
                 "relativeHumidityPct": wind.get("rel_humidity_pct"),
+                "swellHeightM": wave.get("swell_height_m"),
+                "swellPeriodS": wave.get("swell_period_s"),
+                "swellDirectionDeg": wave.get("swell_dir_deg"),
+                "secondarySwellHeightM": wave.get("swell2_height_m"),
+                "secondarySwellPeriodS": wave.get("swell2_period_s"),
+                "secondarySwellDirectionDeg": wave.get("swell2_dir_deg"),
+                "seaSurfaceTemperatureC": wave.get("sst_c"),
+                "oceanCurrentSpeedKmh": wave.get(
+                    "ocean_current_velocity_kmh"
+                ),
+                "oceanCurrentDirectionDeg": wave.get(
+                    "ocean_current_direction_deg"
+                ),
             }
             if values["time"] and any(
                 values[key] is not None
-                for key in (
-                    "precipitationProbabilityPct",
-                    "pressureHpa",
-                    "relativeHumidityPct",
-                )
+                for key in values
+                if key != "time"
             ):
                 hourly.append(values)
 

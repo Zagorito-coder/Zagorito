@@ -203,16 +203,31 @@ class SpotCatalogTests(unittest.TestCase):
 
 
 class ConditionsGfsSummaryTests(unittest.TestCase):
-    def test_summary_keeps_only_two_days_and_three_lightweight_metrics(self):
+    def test_summary_keeps_two_days_and_all_tide_page_metrics(self):
         def slot(time, pressure):
             return {
                 "hour": time,
                 "models": {
                     "wind": {
                         "wind_speed_kt": 12.5,
+                        "wind_gust_kt": 20.0,
                         "pressure_msl": pressure,
+                        "precipitation_mm": 0.4,
                         "precip_prob_pct": 18.0,
                         "rel_humidity_pct": 72.0,
+                        "cloud_total_pct": 42.0,
+                        "visibility_m": 14000.0,
+                    },
+                    "wave": {
+                        "swell_height_m": 1.2,
+                        "swell_period_s": 11.0,
+                        "swell_dir_deg": 315.0,
+                        "swell2_height_m": 0.5,
+                        "swell2_period_s": 7.0,
+                        "swell2_dir_deg": 270.0,
+                        "sst_c": 19.2,
+                        "ocean_current_velocity_kmh": 0.8,
+                        "ocean_current_direction_deg": 45.0,
                     },
                     "hires": {"pressure_msl": 999.0},
                 },
@@ -228,16 +243,25 @@ class ConditionsGfsSummaryTests(unittest.TestCase):
 
         self.assertEqual("GFS ~13km", result["model"])
         self.assertEqual(2, len(result["hourly"]))
-        self.assertEqual(
-            {
-                "time": "2026-08-01T00:00",
-                "precipitationProbabilityPct": 18.0,
-                "pressureHpa": 1014.2,
-                "relativeHumidityPct": 72.0,
-            },
-            result["hourly"][0],
-        )
-        self.assertNotIn("wind_speed_kt", result["hourly"][0])
+        first = result["hourly"][0]
+        self.assertEqual("2026-08-01T00:00", first["time"])
+        self.assertEqual(37.0, first["windGustKmh"])
+        self.assertEqual(14.0, first["visibilityKm"])
+        self.assertEqual(42.0, first["cloudCoverPct"])
+        self.assertEqual(0.4, first["precipitationMm"])
+        self.assertEqual(18.0, first["precipitationProbabilityPct"])
+        self.assertEqual(1014.2, first["pressureHpa"])
+        self.assertEqual(72.0, first["relativeHumidityPct"])
+        self.assertEqual(1.2, first["swellHeightM"])
+        self.assertEqual(11.0, first["swellPeriodS"])
+        self.assertEqual(315.0, first["swellDirectionDeg"])
+        self.assertEqual(0.5, first["secondarySwellHeightM"])
+        self.assertEqual(7.0, first["secondarySwellPeriodS"])
+        self.assertEqual(270.0, first["secondarySwellDirectionDeg"])
+        self.assertEqual(19.2, first["seaSurfaceTemperatureC"])
+        self.assertEqual(0.8, first["oceanCurrentSpeedKmh"])
+        self.assertEqual(45.0, first["oceanCurrentDirectionDeg"])
+        self.assertNotIn("wind_speed_kt", first)
 
     def test_summary_ignores_slots_without_any_requested_metric(self):
         result = harvest_forecast.build_conditions_gfs_summary([
