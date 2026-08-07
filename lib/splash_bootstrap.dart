@@ -25,7 +25,6 @@ import 'package:spots_app/providers/premium_provider.dart';
 import 'package:spots_app/services/offline_map_service.dart';
 import 'package:spots_app/services/crash_reporting_service.dart';
 import 'package:spots_app/services/spot_service.dart';
-import 'package:spots_app/theme.dart';
 import 'package:spots_app/l10n/app_localizations.dart';
 
 class SplashBootstrap extends StatefulWidget {
@@ -181,9 +180,8 @@ class _SplashBootstrapState extends State<SplashBootstrap> {
 
   @override
   Widget build(BuildContext context) {
-    final tc = ThemeColors.of(context);
     return Scaffold(
-      backgroundColor: tc.background,
+      backgroundColor: const Color(0xFF071529),
       body: SafeArea(
         child: Center(
           child: Padding(
@@ -194,8 +192,10 @@ class _SplashBootstrapState extends State<SplashBootstrap> {
                 children: [
                   Image.asset(
                     'assets/logo.png',
-                    width: 100,
-                    height: 100,
+                    width: 132,
+                    height: 132,
+                    filterQuality: FilterQuality.high,
+                    semanticLabel: 'BoosterFish',
                   ),
                   const SizedBox(height: 24),
                   if (_error == null) ...[
@@ -203,15 +203,15 @@ class _SplashBootstrapState extends State<SplashBootstrap> {
                       width: 200,
                       child: LinearProgressIndicator(
                         value: _progress > 0.0 ? _progress : null,
-                        backgroundColor: tc.surfaceLight,
-                        color: tc.oceanLight,
+                        backgroundColor: Colors.white.withValues(alpha: 0.12),
+                        color: const Color(0xFF11C9F2),
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
                     const SizedBox(height: 16),
                     Text(context.tr(_status),
-                        style:
-                            TextStyle(color: tc.textSecondary, fontSize: 13)),
+                        style: const TextStyle(
+                            color: Color(0xFFB8C8DB), fontSize: 13)),
                   ] else ...[
                     const Icon(Icons.error_outline,
                         color: Colors.redAccent, size: 48),
@@ -227,8 +227,8 @@ class _SplashBootstrapState extends State<SplashBootstrap> {
                       child: SingleChildScrollView(
                         child: Text(context.tr(_error!),
                             textAlign: TextAlign.center,
-                            style: TextStyle(
-                                color: tc.textSecondary, fontSize: 12)),
+                            style: const TextStyle(
+                                color: Color(0xFFB8C8DB), fontSize: 12)),
                       ),
                     ),
                     const SizedBox(height: 24),

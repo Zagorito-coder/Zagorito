@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Silhouette dédiée aux icônes thématiques Android 13+. -->
+<!-- Silhouette bouclier + poisson dédiée aux icônes thématiques Android 13+. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -8,5 +8,5 @@
     <path
         android:fillColor="#FFFFFFFF"
         android:fillType="evenOdd"
-        android:pathData="M54,12C35.8,12 22,26.1 22,44.7C22,67.8 54,96 54,96C54,96 86,67.8 86,44.7C86,26.1 72.2,12 54,12ZM54,22C66.6,22 76,31.5 76,44.7C76,57.2 62.2,73.3 54,81.8C45.8,73.3 32,57.2 32,44.7C32,31.5 41.4,22 54,22ZM37,45.7C43.4,37.3 57.8,35.6 67.7,41.5L79,35.4L76.6,45.7L79,56L67.7,49.9C57.8,55.8 43.4,54.1 37,45.7ZM48,43.7C46.9,43.7 46,44.6 46,45.7C46,46.8 46.9,47.7 48,47.7C49.1,47.7 50,46.8 50,45.7C50,44.6 49.1,43.7 48,43.7Z" />
+        android:pathData="M54,8L90,26V49C90,73 75,92 54,102C33,92 18,73 18,49V26L54,8ZM54,18L28,31V49C28,66 38,81 54,90C70,81 80,66 80,49V31L54,18ZM32,55C40,43 57,39 70,46L83,40L79,52L83,64L70,57C57,65 40,65 32,55ZM65,47A3,3 0,1 0,65,53A3,3 0,1 0,65,47Z" />
 </vector>
