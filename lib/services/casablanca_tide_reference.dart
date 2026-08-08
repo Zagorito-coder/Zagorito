@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import '../models/tide_data.dart';
+
 /// Prédiction harmonique locale de la hauteur de marée à Casablanca.
 ///
 /// Les 69 constituants proviennent du marégraphe Casablanca (33.610001,
@@ -30,6 +32,70 @@ class CasablancaTideReference {
     }
     return rawHeight * _bmiScale + _bmiOffsetMeters;
   }
+
+  /// Remplace uniquement les niveaux bruts relatifs au niveau moyen de la mer
+  /// par les hauteurs locales Casablanca/BMI. Les vagues, le vent et toutes
+  /// les autres conditions du document publié restent strictement inchangés.
+  static TideData calibrateForecast(
+    TideData source, {
+    DateTime? now,
+  }) {
+    if (source.hourlyPoints.isEmpty) return source;
+
+    final calibratedPoints = source.hourlyPoints
+        .map(
+          (point) => _withHeight(
+            point,
+            heightAtUtc(point.time.toUtc()),
+          ),
+        )
+        .toList(growable: false);
+    final low = calibratedPoints.map((point) => point.height).reduce(math.min);
+    final high = calibratedPoints.map((point) => point.height).reduce(math.max);
+    final referenceTime = now ?? DateTime.now();
+    final nextPoint = calibratedPoints
+            .where((point) => point.time.isAfter(referenceTime))
+            .firstOrNull ??
+        calibratedPoints.last;
+
+    return TideData(
+      hourlyPoints: calibratedPoints,
+      low: low,
+      high: high,
+      next: nextPoint.height,
+      waveHeight: source.waveHeight,
+      location: source.location,
+      generatedAt: source.generatedAt,
+      astro: source.astro,
+    );
+  }
+
+  static TidePoint _withHeight(TidePoint point, double calibratedHeight) =>
+      TidePoint(
+        time: point.time,
+        height: calibratedHeight,
+        windDirectionDeg: point.windDirectionDeg,
+        wavePeriod: point.wavePeriod,
+        windWaveHeight: point.windWaveHeight,
+        temperatureC: point.temperatureC,
+        windSpeedKmh: point.windSpeedKmh,
+        pressureHpa: point.pressureHpa,
+        precipitationProbabilityPct: point.precipitationProbabilityPct,
+        relativeHumidityPct: point.relativeHumidityPct,
+        windGustKmh: point.windGustKmh,
+        visibilityKm: point.visibilityKm,
+        cloudCoverPct: point.cloudCoverPct,
+        precipitationMm: point.precipitationMm,
+        swellHeightM: point.swellHeightM,
+        swellPeriodS: point.swellPeriodS,
+        swellDirectionDeg: point.swellDirectionDeg,
+        secondarySwellHeightM: point.secondarySwellHeightM,
+        secondarySwellPeriodS: point.secondarySwellPeriodS,
+        secondarySwellDirectionDeg: point.secondarySwellDirectionDeg,
+        seaSurfaceTemperatureC: point.seaSurfaceTemperatureC,
+        oceanCurrentSpeedKmh: point.oceanCurrentSpeedKmh,
+        oceanCurrentDirectionDeg: point.oceanCurrentDirectionDeg,
+      );
 
   static const double _meanLevelMeters = 2.26953266573745;
 

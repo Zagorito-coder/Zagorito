@@ -9,6 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 
 import '../models/tide_data.dart';
+import 'casablanca_tide_reference.dart';
 import 'tide_conditions_mapper.dart';
 
 class TideService {
@@ -83,10 +84,13 @@ class TideService {
           return TideData.fallback(location: station.name);
         }
 
-        return TideConditionsMapper.fromDocument(
+        final mapped = TideConditionsMapper.fromDocument(
           data,
           fallbackLocation: station.name,
         );
+        return station.id == 'casablanca'
+            ? CasablancaTideReference.calibrateForecast(mapped)
+            : mapped;
       } catch (error) {
         debugPrint(
           '[TideService] Conditions publiees indisponibles '

@@ -175,7 +175,7 @@ void main() {
       'Marées Pro',
       'Prévisions détaillées\net coefficients pour\nles experts.',
       'Encyclopédie',
-      '72 espèces répertoriées\navec conseils et périodes\nfavorables.',
+      '23 espèces répertoriées\navec conseils et périodes\nfavorables.',
       'Techniques',
       'Guides pratiques pour\nmaîtriser chaque\ntechnique.',
       'Communauté',
@@ -228,7 +228,7 @@ void main() {
     for (final description in const [
       'Consultez les marées\nen temps réel pour\nmieux planifier.',
       'Prévisions détaillées\net coefficients pour\nles experts.',
-      '72 espèces répertoriées\navec conseils et périodes\nfavorables.',
+      '23 espèces répertoriées\navec conseils et périodes\nfavorables.',
       'Guides pratiques pour\nmaîtriser chaque\ntechnique.',
       'Rejoignez les pêcheurs,\npartagez vos prises et\nastuces.',
       'Trouvez le matériel\nidéal près de\nvos spots.',

@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:spots_app/models/tide_data.dart';
+import 'package:spots_app/services/astronomy_service.dart';
 import 'package:spots_app/services/casablanca_tide_reference.dart';
 
 void main() {
@@ -61,5 +63,50 @@ void main() {
       isNot(contains('height.clamp(0.0, 5.0)')),
       reason: 'Écrêter les valeurs fausserait les extrema de marée.',
     );
+  });
+
+  test('calibre le niveau Casablanca sans altérer les conditions marines', () {
+    final now = DateTime.utc(2026, 8, 8, 12);
+    final source = TideData(
+      hourlyPoints: [
+        TidePoint(
+          time: now.subtract(const Duration(hours: 1)),
+          height: -0.9,
+          windDirectionDeg: 315,
+          wavePeriod: 8,
+          windWaveHeight: 1.2,
+          windSpeedKmh: 22,
+          pressureHpa: 1014,
+        ),
+        TidePoint(
+          time: now.add(const Duration(hours: 1)),
+          height: -0.8,
+          windDirectionDeg: 320,
+          wavePeriod: 9,
+          windWaveHeight: 1.3,
+          windSpeedKmh: 24,
+          pressureHpa: 1015,
+        ),
+      ],
+      low: -0.9,
+      high: -0.8,
+      next: -0.8,
+      waveHeight: 1.3,
+      location: 'Casablanca, Maroc',
+      astro: AstroData.fallback(),
+    );
+
+    final calibrated = CasablancaTideReference.calibrateForecast(
+      source,
+      now: now,
+    );
+
+    expect(calibrated.next, greaterThan(0));
+    expect(calibrated.low, greaterThanOrEqualTo(0));
+    expect(calibrated.hourlyPoints.first.windWaveHeight, 1.2);
+    expect(calibrated.hourlyPoints.first.windSpeedKmh, 22);
+    expect(calibrated.hourlyPoints.first.pressureHpa, 1014);
+    expect(calibrated.waveHeight, source.waveHeight);
+    expect(calibrated.astro, same(source.astro));
   });
 }
