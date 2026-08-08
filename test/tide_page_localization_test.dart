@@ -77,4 +77,23 @@ void main() {
     expect(
         tideSource, contains('const Color _activityHigh = Color(0xFF0B8F6A)'));
   });
+
+  test('les panneaux météo partagent la même échelle typographique', () {
+    final tideSource = File('lib/pages/tide_page.dart').readAsStringSync();
+
+    expect(
+      RegExp('fontSize: _conditionSectionTitleFontSize')
+          .allMatches(tideSource)
+          .length,
+      3,
+    );
+    expect(
+      RegExp('fontSize: _conditionLabelFontSize').allMatches(tideSource).length,
+      3,
+    );
+    expect(
+      RegExp('_conditionValueFontSize').allMatches(tideSource).length,
+      5,
+    );
+  });
 }

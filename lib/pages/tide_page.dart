@@ -370,6 +370,9 @@ class _TidePageState extends State<TidePage>
   static const _clockInterval = Duration(minutes: 1);
   static const _refreshAfter = Duration(minutes: 15);
   static const _retryAfter = Duration(minutes: 2);
+  static const _conditionSectionTitleFontSize = 10.0;
+  static const _conditionLabelFontSize = 7.6;
+  static const _conditionValueFontSize = 10.8;
 
   late final AnimationController _ctrl;
   late final List<Animation<double>> _fadeAnims;
@@ -1538,7 +1541,7 @@ class _TidePageState extends State<TidePage>
               title.toUpperCase(),
               style: TextStyle(
                 color: _txt(0.68),
-                fontSize: 10,
+                fontSize: _conditionSectionTitleFontSize,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.75,
               ),
@@ -1604,7 +1607,7 @@ class _TidePageState extends State<TidePage>
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: _txt(0.52),
-                    fontSize: 7.6,
+                    fontSize: _conditionLabelFontSize,
                     height: 1.05,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.55,
@@ -1620,7 +1623,9 @@ class _TidePageState extends State<TidePage>
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: _txt(0.94),
-                          fontSize: condition.valueIcon == null ? 10.8 : 9.8,
+                          fontSize: condition.valueIcon == null
+                              ? _conditionValueFontSize
+                              : 9.8,
                           height: 1.1,
                           fontWeight: FontWeight.w800,
                         ),
@@ -1711,7 +1716,7 @@ class _TidePageState extends State<TidePage>
               context.tr('tide.currentConditions').toUpperCase(),
               style: TextStyle(
                 color: _txt(0.64),
-                fontSize: 8.5,
+                fontSize: _conditionSectionTitleFontSize,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 1,
               ),
@@ -1861,7 +1866,7 @@ class _TidePageState extends State<TidePage>
           label,
           style: TextStyle(
             color: _txt(0.50),
-            fontSize: 7,
+            fontSize: _conditionLabelFontSize,
             fontWeight: FontWeight.w700,
             letterSpacing: 0.7,
           ),
@@ -1875,7 +1880,7 @@ class _TidePageState extends State<TidePage>
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: _txt(0.92),
-              fontSize: 8.5,
+              fontSize: _conditionValueFontSize,
               height: 1.12,
               fontWeight: FontWeight.w700,
             ),
@@ -1899,7 +1904,7 @@ class _TidePageState extends State<TidePage>
               context.tr('tide.upcomingTideEvents').toUpperCase(),
               style: TextStyle(
                 color: _txt(0.64),
-                fontSize: 8.5,
+                fontSize: _conditionSectionTitleFontSize,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.9,
               ),
@@ -1955,7 +1960,7 @@ class _TidePageState extends State<TidePage>
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: color,
-                    fontSize: 6.5,
+                    fontSize: _conditionLabelFontSize,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -1966,7 +1971,7 @@ class _TidePageState extends State<TidePage>
             _formatDecimalTime(event.time),
             style: TextStyle(
               color: color,
-              fontSize: 11,
+              fontSize: _conditionValueFontSize,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -1976,7 +1981,7 @@ class _TidePageState extends State<TidePage>
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: _txt(0.78),
-              fontSize: 7.5,
+              fontSize: _conditionValueFontSize,
               fontWeight: FontWeight.w600,
             ),
           ),
