@@ -47,6 +47,15 @@ void main() {
       '609fff074b102336e875655b2d09ea5c42ed3837f3ec74550c8e8cbe68caa5db',
     );
     _expectSize(source.path, 512);
+
+    final vectorSource = File(
+      'assets/brand/boosterfish_logo_vector.svg',
+    );
+    expect(vectorSource.existsSync(), isTrue);
+    expect(
+      sha256.convert(vectorSource.readAsBytesSync()).toString(),
+      'c10734eecdc5a5f0ba29035d05af4aa7dcfb8a37b41d0dd4e5bad079188e2efa',
+    );
   });
 
   test('le logo Flutter est détouré et conserve un sujet visible', () {
@@ -119,16 +128,24 @@ void main() {
     }
   });
 
-  test('les splash natifs affichent le logo transparent', () {
+  test('le splash Android utilise le tracé vectoriel transparent', () {
     final launchBackground = File(
       'android/app/src/main/res/drawable/launch_background.xml',
     ).readAsStringSync();
     final android12Style = File(
       'android/app/src/main/res/values-v31/styles.xml',
     ).readAsStringSync();
-    expect(launchBackground, contains('@drawable/launch_logo'));
+    final launchVector = File(
+      'android/app/src/main/res/drawable/launch_logo_vector.xml',
+    ).readAsStringSync();
+    expect(launchBackground, contains('@drawable/launch_logo_vector'));
     expect(android12Style, contains('windowSplashScreenAnimatedIcon'));
-    expect(android12Style, contains('@drawable/launch_logo'));
+    expect(android12Style, contains('@drawable/launch_logo_vector'));
+    expect(launchVector, contains('android:width="192dp"'));
+    expect(launchVector, contains('android:scaleX="0.074"'));
+    expect(launchVector, contains('android:pathData='));
+    expect(launchVector, contains('#FF38BDF8'));
+    expect(launchVector, isNot(contains('splash_background')));
 
     final androidColors = File(
       'android/app/src/main/res/values/colors.xml',

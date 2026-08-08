@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:image/image.dart' as image;
 
 const _sourcePath = 'assets/brand/boosterfish_icon_512.png';
+const _vectorSourcePath = 'assets/brand/boosterfish_logo_vector.svg';
 
 double _smoothstep(double value) {
   final t = value.clamp(0.0, 1.0);
@@ -114,6 +115,65 @@ void _writeWindowsIcon(image.Image source) {
   stdout.writeln('generated ${file.path} (${sizes.length} frames)');
 }
 
+void _writeAndroidSplashVector() {
+  final sourceFile = File(_vectorSourcePath);
+  if (!sourceFile.existsSync()) {
+    stderr.writeln('Missing $_vectorSourcePath');
+    exitCode = 2;
+    return;
+  }
+  final source = sourceFile.readAsStringSync();
+  final group = RegExp(
+    r'<g[^>]*fill="url\(#fishGrad\)"[^>]*>([\s\S]*?)</g>',
+  ).firstMatch(source);
+  final path = group == null
+      ? null
+      : RegExp(r'<path\s+d="([\s\S]*?)"\s*/>').firstMatch(group.group(1)!);
+  if (path == null) {
+    stderr.writeln('Unable to find the BoosterFish vector path.');
+    exitCode = 2;
+    return;
+  }
+  final pathData = path.group(1)!.replaceAll(RegExp(r'\s+'), ' ').trim();
+  final vector = '''<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="192dp"
+    android:height="192dp"
+    android:viewportWidth="1254"
+    android:viewportHeight="1254">
+    <!-- 74 % safe zone: the Android 12 splash mask never crops the shield. -->
+    <group
+        android:scaleX="0.074"
+        android:scaleY="-0.074"
+        android:translateX="163.02"
+        android:translateY="1090.98">
+        <path
+            android:fillType="nonZero"
+            android:pathData="$pathData">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:startX="1254"
+                    android:startY="12540"
+                    android:endX="11913"
+                    android:endY="1254"
+                    android:type="linear">
+                    <item android:color="#FF0EA5E9" android:offset="0" />
+                    <item android:color="#FF38BDF8" android:offset="0.45" />
+                    <item android:color="#FF93E4FB" android:offset="1" />
+                </gradient>
+            </aapt:attr>
+        </path>
+    </group>
+</vector>
+''';
+  final output = File(
+    'android/app/src/main/res/drawable/launch_logo_vector.xml',
+  )..parent.createSync(recursive: true);
+  output.writeAsStringSync(vector);
+  stdout.writeln('generated ${output.path} (vector)');
+}
+
 void main() {
   final sourceFile = File(_sourcePath);
   if (!sourceFile.existsSync()) {
@@ -130,6 +190,9 @@ void main() {
 
   final transparentLogo = _extractTransparentLogo(source);
   final androidSafeLogo = _withAndroidSafeZone(transparentLogo);
+
+  _writeAndroidSplashVector();
+  if (exitCode != 0) return;
 
   // Flutter brand assets.
   _writePng('assets/logo.png', transparentLogo);
