@@ -373,6 +373,9 @@ class _TidePageState extends State<TidePage>
   static const _conditionSectionTitleFontSize = 10.0;
   static const _conditionLabelFontSize = 7.6;
   static const _conditionValueFontSize = 10.8;
+  // La zone historique mesurait 140 px. 238 px correspond exactement à +70 %
+  // et laisse respirer les libellés HM/BM sans modifier les données tracées.
+  static const _tideCurveCanvasHeight = 238.0;
 
   late final AnimationController _ctrl;
   late final List<Animation<double>> _fadeAnims;
@@ -1244,7 +1247,7 @@ class _TidePageState extends State<TidePage>
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: _glassPanel(
-            padding: const EdgeInsets.fromLTRB(10, 10, 10, 6),
+            padding: const EdgeInsets.fromLTRB(14, 14, 12, 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1257,9 +1260,9 @@ class _TidePageState extends State<TidePage>
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: _txt(0.88),
-                          fontSize: 11.5,
+                          fontSize: 13.5,
                           fontWeight: FontWeight.w700,
-                          letterSpacing: 0.5,
+                          letterSpacing: 0.45,
                         ),
                       ),
                     ),
@@ -1268,9 +1271,9 @@ class _TidePageState extends State<TidePage>
                     _legend(context.tr('tide.lowTide'), _red),
                   ],
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 8),
                 SizedBox(
-                  height: 140,
+                  height: _tideCurveCanvasHeight,
                   child: ValueListenableBuilder<DateTime>(
                     valueListenable: _clockNotifier,
                     builder: (context, now, _) => RepaintBoundary(
@@ -1293,13 +1296,14 @@ class _TidePageState extends State<TidePage>
                   ),
                 ),
                 if (_data.location.toLowerCase().contains('casablanca')) ...[
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 7),
                   Text(
                     context.tr('tide.tideCurveJrcSource'),
                     style: TextStyle(
                       color: _txt(0.42),
-                      fontSize: 8.5,
+                      fontSize: 10.5,
                       fontWeight: FontWeight.w500,
+                      height: 1.25,
                     ),
                   ),
                 ],
@@ -1314,11 +1318,18 @@ class _TidePageState extends State<TidePage>
   Widget _legend(String label, Color color) {
     return Row(mainAxisSize: MainAxisSize.min, children: [
       Container(
-          width: 8,
-          height: 8,
+          width: 9,
+          height: 9,
           decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-      const SizedBox(width: 4),
-      Text(label, style: TextStyle(color: _txt(0.5), fontSize: 10)),
+      const SizedBox(width: 5),
+      Text(
+        label,
+        style: TextStyle(
+          color: _txt(0.58),
+          fontSize: 11.5,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     ]);
   }
 
@@ -2485,11 +2496,11 @@ class _PillCurvePainter extends CustomPainter {
       required this.isDark,
       required this.fixedChartDatumScale});
 
-  static const double _padL = 14.0,
-      _padR = 38.0,
-      _pillZoneH = 46.0,
-      _hourZoneH = 22.0,
-      _topMargin = 4.0;
+  static const double _padL = 18.0,
+      _padR = 44.0,
+      _pillZoneH = 98.0,
+      _hourZoneH = 30.0,
+      _topMargin = 6.0;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -2530,8 +2541,8 @@ class _PillCurvePainter extends CustomPainter {
               text: '${v.toStringAsFixed(decimals)}m',
               style: TextStyle(
                   color: _txt(0.45),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w500)),
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600)),
           textDirection: TextDirection.ltr)
         ..layout();
       tp.paint(canvas, Offset(_padL + w + 8, gy - tp.height / 2));
@@ -2563,24 +2574,24 @@ class _PillCurvePainter extends CustomPainter {
         Paint()
           ..color = _accent.withValues(alpha: 0.5)
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 4
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6));
+          ..strokeWidth = 5
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7));
     canvas.drawPath(
         surface,
         Paint()
           ..color = _accent
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.2
+          ..strokeWidth = 2.8
           ..strokeCap = StrokeCap.round);
 
     for (final p in sampled) {
       final pt = Offset(xFor(p.time), yFor(p.height));
       canvas.drawCircle(
-          pt, 5, Paint()..color = _accent.withValues(alpha: 0.25));
-      canvas.drawCircle(pt, 3, Paint()..color = _accent);
+          pt, 6.5, Paint()..color = _accent.withValues(alpha: 0.25));
+      canvas.drawCircle(pt, 3.8, Paint()..color = _accent);
     }
 
-    final hourLabelY = chartBottom + 10;
+    final hourLabelY = chartBottom + 8;
     for (final hh in [0, 3, 6, 9, 12, 15, 18, 21, 24]) {
       final hx = xFor(hh.toDouble());
       final label = hh == 24 ? '24h' : '${hh}h';
@@ -2589,8 +2600,8 @@ class _PillCurvePainter extends CustomPainter {
               text: label,
               style: TextStyle(
                   color: _txt(0.55),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600)),
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700)),
           textDirection: TextDirection.ltr)
         ..layout();
       tp.paint(
@@ -2605,7 +2616,7 @@ class _PillCurvePainter extends CustomPainter {
         Offset(nx, chartBottom),
         Paint()
           ..color = _green.withValues(alpha: 0.7)
-          ..strokeWidth = 2);
+          ..strokeWidth = 2.4);
 
     final placedPills = <Rect>[];
     void drawPill(double targetX, String text, Color color, String symbol,
@@ -2615,13 +2626,13 @@ class _PillCurvePainter extends CustomPainter {
               text: text,
               style: TextStyle(
                   color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700)),
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800)),
           textDirection: TextDirection.ltr)
         ..layout();
-      const hPad = 10.0;
-      final pillW = tp.width + hPad * 2 + 8;
-      const pillH = 24.0;
+      const hPad = 11.0;
+      final pillW = tp.width + hPad * 2 + 9;
+      const pillH = 28.0;
       // Les étiquettes restent dans la zone de tracé afin de ne jamais
       // recouvrir l'échelle verticale 0–5 m réservée à droite.
       final maxPillX = math.max(_padL, _padL + w - pillW);
@@ -2629,13 +2640,13 @@ class _PillCurvePainter extends CustomPainter {
       double py = _topMargin;
       var rect = Rect.fromLTWH(px, py, pillW, pillH);
       int guard = 0;
-      while (placedPills.any((r) => r.overlaps(rect.inflate(4))) && guard < 3) {
-        py += pillH + 4;
+      while (placedPills.any((r) => r.overlaps(rect.inflate(5))) && guard < 2) {
+        py += pillH + 5;
         rect = Rect.fromLTWH(px, py, pillW, pillH);
         guard++;
       }
       placedPills.add(rect);
-      canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(12)),
+      canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(14)),
           Paint()..color = color);
       tp.paint(canvas,
           Offset(rect.left + hPad + 8, rect.top + (pillH - tp.height) / 2));
@@ -2644,8 +2655,8 @@ class _PillCurvePainter extends CustomPainter {
               text: symbol,
               style: TextStyle(
                   color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700)),
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800)),
           textDirection: TextDirection.ltr)
         ..layout();
       symTp.paint(canvas,
@@ -2663,7 +2674,7 @@ class _PillCurvePainter extends CustomPainter {
           isHigh ? '▲' : '▼');
       canvas.drawCircle(Offset(ex, yFor(e.height)), 5,
           Paint()..color = isHigh ? _accent : _red);
-      canvas.drawCircle(Offset(ex, yFor(e.height)), 8,
+      canvas.drawCircle(Offset(ex, yFor(e.height)), 9.5,
           Paint()..color = (isHigh ? _accent : _red).withValues(alpha: 0.25));
     }
   }
