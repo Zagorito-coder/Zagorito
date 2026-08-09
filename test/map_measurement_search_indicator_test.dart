@@ -56,6 +56,19 @@ void main() {
           ),
         ),
       );
+
+      await tester.pump();
+      await tester.pump();
+
+      final initialSpotsLayer =
+          tester.widget<SpotsCanvasLayer>(find.byType(SpotsCanvasLayer));
+      expect(
+        initialSpotsLayer.visibleSpots,
+        contains(officialSpot),
+        reason:
+            'Le catalogue initial doit être rendu sans attendre une interaction avec la carte.',
+      );
+
       await tester.pump(const Duration(milliseconds: 300));
 
       const indicatorKey = ValueKey<String>('map-measurement-search-indicator');
