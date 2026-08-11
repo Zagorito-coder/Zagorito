@@ -14,7 +14,7 @@ void main() {
     expect(
       source,
       contains(
-        'https://zagorito-coder.github.io/boosterfish/terms-of-service/',
+        'https://www.boosterfish.com/terms-of-service/',
       ),
     );
     expect(source, contains('community.acceptAndContinue'));
@@ -102,7 +102,7 @@ void main() {
     expect(terms, contains('id="child-safety"'));
     expect(terms, contains('CSAE'));
     expect(terms, contains('CSAM'));
-    expect(terms, contains('booster2fish@gmail.com'));
+    expect(terms, contains('support@boosterfish.com'));
   });
 
   test('les requêtes globales de suppression ont leurs index Firestore', () {

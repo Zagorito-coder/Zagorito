@@ -265,7 +265,7 @@ class ShopService {
             'Content-Type': 'application/x-www-form-urlencoded',
             'Accept': 'application/json',
             'User-Agent':
-                'BoosterFish/1.0 (+https://zagorito-coder.github.io/boosterfish/privacy-policy/)',
+                'BoosterFish/1.0 (+https://www.boosterfish.com/privacy-policy/)',
           },
           body: {'data': query},
         ).timeout(requestTimeout);

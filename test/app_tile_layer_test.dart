@@ -46,7 +46,7 @@ void main() {
     expect(source, contains('BuiltInMapCachingProvider.getOrCreateInstance'));
     expect(source, isNot(contains('DisabledMapCachingProvider')));
     expect(source, contains('BoosterFish Android'));
-    expect(source, contains('contact: booster2fish@gmail.com'));
+    expect(source, contains('contact: support@boosterfish.com'));
     expect(
       source,
       contains('TileUpdateTransformers.throttle'),

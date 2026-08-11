@@ -19,7 +19,7 @@ void main() {
   test('les deux pages légales affichent la même date actuelle', () {
     final privacy = File('docs/privacy_policy.html').readAsStringSync();
     final terms = File('docs/terms_of_service.html').readAsStringSync();
-    const currentDate = 'Dernière mise à jour : 3 août 2026';
+    const currentDate = 'Dernière mise à jour : 11 août 2026';
 
     expect(privacy, contains(currentDate));
     expect(terms, contains(currentDate));

@@ -222,7 +222,7 @@ Manuel / validation :
    - image de présentation 1 024 × 500 ;
    - vidéo YouTube si elle est conservée.
 8. Choisir la disponibilité par pays/régions.
-9. Retirer ou remplacer http://www.boosterfish.com tant que le site n'est pas
+9. Utiliser https://www.boosterfish.com comme site officiel maintenant qu'il est
    réellement opérationnel en HTTPS.
 10. Vérifier abonnement Open-Meteo, secret distant, fraîcheur Firestore et
     dernière exécution automatique planifiée.
