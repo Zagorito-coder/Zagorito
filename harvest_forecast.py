@@ -230,7 +230,7 @@ CONDITIONS_SPOT_IDS = {
     "tanger_maroc": "tanger",
     "essaouira_maroc": "essaouira",
 }
-CONDITIONS_GFS_DAYS = 2
+CONDITIONS_GFS_DAYS = 10
 
 
 # ---------------------------------------------------------------------------
@@ -340,7 +340,7 @@ HOURLY_COMMON_WIND = (
 # les publie officiellement. Le flux ECMWF reste inchangé afin qu'une variable
 # optionnelle non prise en charge ne bloque jamais la récolte haute résolution.
 HOURLY_GFS_WIND = (
-    f"{HOURLY_COMMON_WIND},cloud_cover,precipitation,visibility"
+    f"{HOURLY_COMMON_WIND},cloud_cover,precipitation,visibility,weather_code"
 )
 
 HOURLY_WAVE = (
@@ -536,6 +536,7 @@ def _extract_wind_model_slot(wind_data, wind_by_time, t):
         "pressure_msl": _safe_num(h["pressure_msl"][i]),
         "rel_humidity_pct": _safe_num(h["relative_humidity_2m"][i]),
         "visibility_m": _hourly_num(h, "visibility", i),
+        "weather_code": _hourly_num(h, "weather_code", i),
     }
 
 
@@ -661,6 +662,7 @@ def build_days_payload(wind_json, hires_json, wave_json, daily_json):
             "temp_c": round(temp_c) if temp_c is not None else None,
             "cloud_pct": round(cloud_total),
             "precip_pct": precip,
+            "weather_code": _hourly_num(w_data, "weather_code", i),
             "rating": compute_rating(wind_kt, wave_h, precip),
             # nouveau sous-objet additif
             "models": {
@@ -747,6 +749,11 @@ def build_conditions_gfs_summary(days_payload, max_days=CONDITIONS_GFS_DAYS):
             visibility_m = wind.get("visibility_m")
             values = {
                 "time": slot.get("hour"),
+                "windSpeedKmh": (
+                    round(slot["wind_speed_kt"] * 1.852, 1)
+                    if slot.get("wind_speed_kt") is not None
+                    else None
+                ),
                 "windGustKmh": (
                     round(gust_knots * 1.852, 1)
                     if gust_knots is not None
@@ -758,6 +765,21 @@ def build_conditions_gfs_summary(days_payload, max_days=CONDITIONS_GFS_DAYS):
                     else None
                 ),
                 "cloudCoverPct": wind.get("cloud_total_pct"),
+                "windDirectionDeg": slot.get("wind_dir_deg"),
+                "weatherCode": (
+                    round(slot["weather_code"])
+                    if slot.get("weather_code") is not None
+                    else None
+                ),
+                "temperatureC": slot.get("temp_c"),
+                "waveHeightM": slot.get("wave_height_m"),
+                "wavePeriodS": slot.get("wave_period_s"),
+                "waveDirectionDeg": slot.get("wave_dir_deg"),
+                "activityScore": (
+                    round(slot["rating"] * 20)
+                    if slot.get("rating") is not None
+                    else None
+                ),
                 "precipitationMm": wind.get("precipitation_mm"),
                 "precipitationProbabilityPct": wind.get("precip_prob_pct"),
                 "pressureHpa": wind.get("pressure_msl"),
