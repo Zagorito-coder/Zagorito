@@ -203,10 +203,18 @@ class SpotCatalogTests(unittest.TestCase):
 
 
 class ConditionsGfsSummaryTests(unittest.TestCase):
-    def test_summary_keeps_two_days_and_all_tide_page_metrics(self):
+    def test_summary_keeps_ten_days_and_all_tide_page_metrics(self):
         def slot(time, pressure):
             return {
                 "hour": time,
+                "wind_speed_kt": 12.5,
+                "wind_dir_deg": 220.0,
+                "wave_height_m": 1.4,
+                "wave_period_s": 9.0,
+                "wave_dir_deg": 315.0,
+                "temp_c": 23,
+                "weather_code": 2.0,
+                "rating": 4,
                 "models": {
                     "wind": {
                         "wind_speed_kt": 12.5,
@@ -234,23 +242,34 @@ class ConditionsGfsSummaryTests(unittest.TestCase):
             }
 
         days = [
-            {"slots": [slot("2026-08-01T00:00", 1014.2)]},
-            {"slots": [slot("2026-08-02T00:00", 1012.8)]},
-            {"slots": [slot("2026-08-03T00:00", 1009.1)]},
+            {
+                "slots": [
+                    slot(f"2026-08-{day:02d}T00:00", 1015.0 - day)
+                ]
+            }
+            for day in range(1, 12)
         ]
 
         result = harvest_forecast.build_conditions_gfs_summary(days)
 
         self.assertEqual("GFS ~13km", result["model"])
-        self.assertEqual(2, len(result["hourly"]))
+        self.assertEqual(10, len(result["hourly"]))
         first = result["hourly"][0]
         self.assertEqual("2026-08-01T00:00", first["time"])
+        self.assertEqual(23.2, first["windSpeedKmh"])
+        self.assertEqual(220.0, first["windDirectionDeg"])
+        self.assertEqual(2, first["weatherCode"])
+        self.assertEqual(23, first["temperatureC"])
+        self.assertEqual(1.4, first["waveHeightM"])
+        self.assertEqual(9.0, first["wavePeriodS"])
+        self.assertEqual(315.0, first["waveDirectionDeg"])
+        self.assertEqual(80, first["activityScore"])
         self.assertEqual(37.0, first["windGustKmh"])
         self.assertEqual(14.0, first["visibilityKm"])
         self.assertEqual(42.0, first["cloudCoverPct"])
         self.assertEqual(0.4, first["precipitationMm"])
         self.assertEqual(18.0, first["precipitationProbabilityPct"])
-        self.assertEqual(1014.2, first["pressureHpa"])
+        self.assertEqual(1014.0, first["pressureHpa"])
         self.assertEqual(72.0, first["relativeHumidityPct"])
         self.assertEqual(1.2, first["swellHeightM"])
         self.assertEqual(11.0, first["swellPeriodS"])
