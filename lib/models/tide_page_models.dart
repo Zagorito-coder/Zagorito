@@ -68,6 +68,54 @@ class HourlyCard {
   });
 }
 
+class HourlyForecastSlot {
+  final DateTime time;
+  final double? windSpeedKmh;
+  final double? windGustKmh;
+  final double? windDirectionDeg;
+  final int? weatherCode;
+  final double? temperatureC;
+  final double? pressureHpa;
+  final double? waveHeightM;
+  final double? wavePeriodS;
+  final double? waveDirectionDeg;
+  final double? precipitationProbabilityPct;
+  final double? cloudCoverPct;
+  final int? activityScore;
+
+  const HourlyForecastSlot({
+    required this.time,
+    this.windSpeedKmh,
+    this.windGustKmh,
+    this.windDirectionDeg,
+    this.weatherCode,
+    this.temperatureC,
+    this.pressureHpa,
+    this.waveHeightM,
+    this.wavePeriodS,
+    this.waveDirectionDeg,
+    this.precipitationProbabilityPct,
+    this.cloudCoverPct,
+    this.activityScore,
+  });
+}
+
+class HourlyForecastDay {
+  final DateTime date;
+  final List<HourlyForecastSlot> slots;
+
+  const HourlyForecastDay({required this.date, required this.slots});
+
+  int? get averageActivityScore {
+    final scores = slots
+        .map((slot) => slot.activityScore)
+        .whereType<int>()
+        .toList(growable: false);
+    if (scores.isEmpty) return null;
+    return (scores.reduce((a, b) => a + b) / scores.length).round();
+  }
+}
+
 class TideEvent {
   final String type; // "high" | "low"
   final double time; // heure décimale ex: 6.5 = 06h30
@@ -138,6 +186,7 @@ class TideData {
   final String location;
   final DateTime? generatedAt;
   final List<HourlyCard> hourlyCards;
+  final List<HourlyForecastDay> hourlyForecastDays;
   final List<TidePoint> tidePoints;
   final List<TideEvent> tideEvents;
   final List<TideEvent> upcomingEvents;
@@ -155,6 +204,7 @@ class TideData {
     required this.location,
     this.generatedAt,
     required this.hourlyCards,
+    this.hourlyForecastDays = const [],
     required this.tidePoints,
     required this.tideEvents,
     required this.upcomingEvents,

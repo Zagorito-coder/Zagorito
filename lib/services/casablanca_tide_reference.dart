@@ -60,6 +60,7 @@ class CasablancaTideReference {
 
     return TideData(
       hourlyPoints: calibratedPoints,
+      hourlyForecast: source.hourlyForecast,
       low: low,
       high: high,
       next: nextPoint.height,

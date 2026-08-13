@@ -34,6 +34,17 @@ void main() {
       'tide.forecastDisclaimer',
       'tide.hourSemantics',
       'tide.unavailableShort',
+      'tide.viewSelector',
+      'tide.todayTides',
+      'tide.forecasts',
+      'tide.availableDayForecast',
+      'tide.hourlyForecastUnavailable',
+      'tide.forecastDaySemantics',
+      'tide.activityScoreCompact',
+      'tide.maxWindCompact',
+      'tide.hour',
+      'tide.weather',
+      'tide.air',
     ]) {
       expect(tideSource, contains(key), reason: 'Clé absente: $key');
     }
@@ -95,5 +106,42 @@ void main() {
       RegExp('_conditionValueFontSize').allMatches(tideSource).length,
       5,
     );
+  });
+
+  test('le modèle 10 jours reste vertical et ne construit que le jour ouvert',
+      () {
+    final tideSource = File('lib/pages/tide_page.dart').readAsStringSync();
+    final sectionStart =
+        tideSource.indexOf('Widget _buildHourlyForecastSection');
+    final sectionEnd = tideSource.indexOf('Widget _buildMarineConditions');
+    final sectionSource = tideSource.substring(sectionStart, sectionEnd);
+
+    expect(sectionSource, contains('_buildForecastAccordion'));
+    expect(sectionSource, contains('if (isExpanded)'));
+    expect(sectionSource, isNot(contains('AnimatedSize')));
+    expect(sectionSource, contains('isExpanded'));
+    expect(sectionSource, isNot(contains('Axis.horizontal')));
+    expect(sectionSource, contains('height: 72'));
+    expect(
+      sectionSource,
+      isNot(contains('BoxConstraints(minHeight: 72)')),
+    );
+    expect(tideSource, contains('_buildHourlyScroller'));
+    expect(tideSource, contains('_buildTideModeSelector'));
+    expect(tideSource, contains('if (_showForecasts)'));
+  });
+
+  test("les panneaux retardés deviennent visibles à l'activation de l'onglet",
+      () {
+    final tideSource = File('lib/pages/tide_page.dart').readAsStringSync();
+    final synchronizationStart =
+        tideSource.indexOf('void _synchronizeActivity()');
+    final synchronizationEnd =
+        tideSource.indexOf('void _updateClock()', synchronizationStart);
+    final synchronizationSource =
+        tideSource.substring(synchronizationStart, synchronizationEnd);
+
+    expect(synchronizationSource, contains('if (!_ctrl.isCompleted)'));
+    expect(synchronizationSource, contains('_ctrl.value = 1'));
   });
 }

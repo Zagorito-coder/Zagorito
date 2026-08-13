@@ -57,9 +57,45 @@ class TidePoint {
   });
 }
 
+/// Prévision météo/marine légère à trois heures, destinée uniquement au
+/// tableau vertical de la page Marées. Elle est publiée dans le même document
+/// Firestore que les marées afin de ne pas ajouter de lecture côté mobile.
+class HourlyForecastPoint {
+  final DateTime time;
+  final double? windSpeedKmh;
+  final double? windGustKmh;
+  final double? windDirectionDeg;
+  final int? weatherCode;
+  final double? temperatureC;
+  final double? pressureHpa;
+  final double? waveHeightM;
+  final double? wavePeriodS;
+  final double? waveDirectionDeg;
+  final double? precipitationProbabilityPct;
+  final double? cloudCoverPct;
+  final int? activityScore;
+
+  const HourlyForecastPoint({
+    required this.time,
+    this.windSpeedKmh,
+    this.windGustKmh,
+    this.windDirectionDeg,
+    this.weatherCode,
+    this.temperatureC,
+    this.pressureHpa,
+    this.waveHeightM,
+    this.wavePeriodS,
+    this.waveDirectionDeg,
+    this.precipitationProbabilityPct,
+    this.cloudCoverPct,
+    this.activityScore,
+  });
+}
+
 /// Données de marées complètes pour affichage, enrichies avec données astronomiques
 class TideData {
   final List<TidePoint> hourlyPoints;
+  final List<HourlyForecastPoint> hourlyForecast;
   final double low; // Marée basse (minimum)
   final double high; // Marée haute (maximum)
   final double next; // Prochaine hauteur prévue
@@ -70,6 +106,7 @@ class TideData {
 
   const TideData({
     required this.hourlyPoints,
+    this.hourlyForecast = const [],
     required this.low,
     required this.high,
     required this.next,
@@ -83,6 +120,7 @@ class TideData {
   factory TideData.fallback({String location = 'Casablanca Morocco'}) {
     return TideData(
       hourlyPoints: const [],
+      hourlyForecast: const [],
       low: 0.0,
       high: 0.0,
       next: 0.0,

@@ -234,6 +234,7 @@ class TideConditionsMapper {
     final location = (data['name'] as String?)?.trim();
     return TideData(
       hourlyPoints: points,
+      hourlyForecast: _parseHourlyForecast(gfsSlots, referenceTime),
       low: low,
       high: high,
       next: next.height,
@@ -297,6 +298,136 @@ class TideConditionsMapper {
   static DateTime? _parseTimestamp(dynamic value) {
     if (value is! String || value.trim().isEmpty) return null;
     return DateTime.tryParse(value.trim())?.toLocal();
+  }
+
+  static List<HourlyForecastPoint> _parseHourlyForecast(
+    dynamic rawSlots,
+    DateTime referenceTime,
+  ) {
+    if (rawSlots is! List<dynamic>) return const [];
+
+    final firstDay = DateTime(
+      referenceTime.year,
+      referenceTime.month,
+      referenceTime.day,
+    );
+    final parsed = <HourlyForecastPoint>[];
+    for (final raw in rawSlots) {
+      final slot = _asMap(raw);
+      final time = _parseLocalForecastTime(slot?['time']);
+      if (slot == null || time == null) continue;
+      final day = DateTime(time.year, time.month, time.day);
+      if (day.isBefore(firstDay)) continue;
+
+      final weatherCode = _boundedNumber(
+        slot,
+        'weatherCode',
+        minimum: 0,
+        maximum: 99,
+      );
+      final activity = _boundedNumber(
+        slot,
+        'activityScore',
+        minimum: 0,
+        maximum: 100,
+      );
+      parsed.add(
+        HourlyForecastPoint(
+          time: time,
+          windSpeedKmh: _boundedNumber(
+            slot,
+            'windSpeedKmh',
+            minimum: 0,
+            maximum: 400,
+          ),
+          windGustKmh: _boundedNumber(
+            slot,
+            'windGustKmh',
+            minimum: 0,
+            maximum: 400,
+          ),
+          windDirectionDeg: _boundedNumber(
+            slot,
+            'windDirectionDeg',
+            minimum: 0,
+            maximum: 360,
+          ),
+          weatherCode: weatherCode?.round(),
+          temperatureC: _boundedNumber(
+            slot,
+            'temperatureC',
+            minimum: -60,
+            maximum: 60,
+          ),
+          pressureHpa: _boundedNumber(
+            slot,
+            'pressureHpa',
+            minimum: 800,
+            maximum: 1200,
+          ),
+          waveHeightM: _boundedNumber(
+                slot,
+                'waveHeightM',
+                minimum: 0,
+                maximum: 40,
+              ) ??
+              _boundedNumber(
+                slot,
+                'swellHeightM',
+                minimum: 0,
+                maximum: 40,
+              ),
+          wavePeriodS: _boundedNumber(
+                slot,
+                'wavePeriodS',
+                minimum: 0,
+                maximum: 60,
+              ) ??
+              _boundedNumber(
+                slot,
+                'swellPeriodS',
+                minimum: 0,
+                maximum: 60,
+              ),
+          waveDirectionDeg: _boundedNumber(
+                slot,
+                'waveDirectionDeg',
+                minimum: 0,
+                maximum: 360,
+              ) ??
+              _boundedNumber(
+                slot,
+                'swellDirectionDeg',
+                minimum: 0,
+                maximum: 360,
+              ),
+          precipitationProbabilityPct: _boundedNumber(
+            slot,
+            'precipitationProbabilityPct',
+            minimum: 0,
+            maximum: 100,
+          ),
+          cloudCoverPct: _boundedNumber(
+            slot,
+            'cloudCoverPct',
+            minimum: 0,
+            maximum: 100,
+          ),
+          activityScore: activity?.round(),
+        ),
+      );
+    }
+
+    parsed.sort((a, b) => a.time.compareTo(b.time));
+    final acceptedDays = <String>{};
+    final result = <HourlyForecastPoint>[];
+    for (final point in parsed) {
+      final key = '${point.time.year}-${point.time.month}-${point.time.day}';
+      if (!acceptedDays.contains(key) && acceptedDays.length >= 10) break;
+      acceptedDays.add(key);
+      result.add(point);
+    }
+    return List.unmodifiable(result);
   }
 
   static Map<String, dynamic>? _asMap(dynamic value) {
