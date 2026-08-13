@@ -39,6 +39,15 @@ void main() {
     expect(result.hourlyPoints.first.seaSurfaceTemperatureC, 19.2);
     expect(result.hourlyPoints.first.oceanCurrentSpeedKmh, 0.8);
     expect(result.hourlyPoints.first.oceanCurrentDirectionDeg, 45);
+    expect(result.hourlyForecast, hasLength(1));
+    expect(result.hourlyForecast.first.windSpeedKmh, 18);
+    expect(result.hourlyForecast.first.windDirectionDeg, 225);
+    expect(result.hourlyForecast.first.weatherCode, 1);
+    expect(result.hourlyForecast.first.temperatureC, 24);
+    expect(result.hourlyForecast.first.waveHeightM, 1.1);
+    expect(result.hourlyForecast.first.wavePeriodS, 9);
+    expect(result.hourlyForecast.first.waveDirectionDeg, 310);
+    expect(result.hourlyForecast.first.activityScore, 80);
     expect(result.low, -0.35);
     expect(result.high, 1.08);
   });
@@ -136,6 +145,33 @@ void main() {
     expect(result.hourlyPoints.first.seaSurfaceTemperatureC, isNull);
     expect(result.hourlyPoints.first.oceanCurrentDirectionDeg, isNull);
   });
+
+  test('limite la prévision détaillée aux dix premiers jours', () {
+    final document = _conditionsDocument(
+      tideHeights: const [0.1, 0.4, 0.2],
+      waveHeights: const [1.1, 1.2, 1.3],
+    );
+    final gfs = document['gfs'] as Map<String, dynamic>;
+    gfs['hourly'] = List.generate(11, (index) {
+      final day = 26 + index;
+      final time = DateTime(2026, 7, day);
+      return {
+        'time': time.toIso8601String(),
+        'windSpeedKmh': 18,
+        'waveHeightM': 1.1,
+      };
+    });
+
+    final result = TideConditionsMapper.fromDocument(
+      document,
+      fallbackLocation: 'Fallback',
+      now: DateTime(2026, 7, 26, 1),
+    );
+
+    expect(result.hourlyForecast, hasLength(10));
+    expect(result.hourlyForecast.first.time.day, 26);
+    expect(result.hourlyForecast.last.time, DateTime(2026, 8, 4));
+  });
 }
 
 Map<String, dynamic> _conditionsDocument({
@@ -181,6 +217,14 @@ Map<String, dynamic> _conditionsDocument({
           'precipitationProbabilityPct': 18,
           'relativeHumidityPct': 72,
           'windGustKmh': 32,
+          'windSpeedKmh': 18,
+          'windDirectionDeg': 225,
+          'weatherCode': 1,
+          'temperatureC': 24,
+          'waveHeightM': 1.1,
+          'wavePeriodS': 9,
+          'waveDirectionDeg': 310,
+          'activityScore': 80,
           'visibilityKm': 14,
           'cloudCoverPct': 42,
           'precipitationMm': 0.4,

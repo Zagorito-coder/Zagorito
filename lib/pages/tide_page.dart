@@ -207,6 +207,12 @@ tm.TideData _fromTideService(
     ));
   }
 
+  final hourlyForecastDays = _groupHourlyForecast(
+    src.hourlyForecast,
+    hourlyCards,
+    today,
+  );
+
   final events = <tm.TideEvent>[];
   if (tidePoints.length >= 3) {
     for (int i = 1; i < tidePoints.length - 1; i++) {
@@ -305,6 +311,7 @@ tm.TideData _fromTideService(
     location: src.location,
     generatedAt: src.generatedAt,
     hourlyCards: hourlyCards,
+    hourlyForecastDays: hourlyForecastDays,
     tidePoints: tidePoints,
     tideEvents: events,
     upcomingEvents: upcomingEvents.isEmpty ? events : upcomingEvents,
@@ -333,6 +340,78 @@ tm.TideData _fromTideService(
       gust: 0,
     ),
   );
+}
+
+List<tm.HourlyForecastDay> _groupHourlyForecast(
+  List<tide_data.HourlyForecastPoint> source,
+  List<tm.HourlyCard> todayCards,
+  DateTime today,
+) {
+  final todayDate = DateTime(today.year, today.month, today.day);
+  final grouped = <DateTime, List<tm.HourlyForecastSlot>>{};
+
+  for (final point in source) {
+    final date = DateTime(point.time.year, point.time.month, point.time.day);
+    final todayCard = date == todayDate
+        ? todayCards
+            .where((card) => (card.hour - point.time.hour).abs() <= 1)
+            .firstOrNull
+        : null;
+    grouped.putIfAbsent(date, () => <tm.HourlyForecastSlot>[]).add(
+          tm.HourlyForecastSlot(
+            time: point.time,
+            windSpeedKmh: point.windSpeedKmh ?? todayCard?.windSpeed.toDouble(),
+            windGustKmh: point.windGustKmh ?? todayCard?.windGustKmh,
+            windDirectionDeg: point.windDirectionDeg,
+            weatherCode: point.weatherCode,
+            temperatureC: point.temperatureC ?? todayCard?.temp.toDouble(),
+            pressureHpa: point.pressureHpa ?? todayCard?.pressureHpa,
+            waveHeightM: point.waveHeightM ?? todayCard?.waveHeight,
+            wavePeriodS: point.wavePeriodS ?? todayCard?.wavePeriod.toDouble(),
+            waveDirectionDeg: point.waveDirectionDeg,
+            precipitationProbabilityPct: point.precipitationProbabilityPct ??
+                todayCard?.precipitationProbabilityPct,
+            cloudCoverPct: point.cloudCoverPct ?? todayCard?.cloudCoverPct,
+            activityScore: point.activityScore ?? todayCard?.activityScore,
+          ),
+        );
+  }
+
+  // Rétrocompatibilité pendant le premier cycle de publication du résumé
+  // 10 jours : les données du jour déjà chargées restent toujours visibles.
+  if (!grouped.containsKey(todayDate) && todayCards.isNotEmpty) {
+    grouped[todayDate] = todayCards
+        .where((card) => card.hour % 3 == 0)
+        .map(
+          (card) => tm.HourlyForecastSlot(
+            time: DateTime(
+              todayDate.year,
+              todayDate.month,
+              todayDate.day,
+              card.hour,
+            ),
+            windSpeedKmh: card.windSpeed.toDouble(),
+            windGustKmh: card.windGustKmh,
+            temperatureC: card.temp.toDouble(),
+            pressureHpa: card.pressureHpa,
+            waveHeightM: card.waveHeight,
+            wavePeriodS: card.wavePeriod.toDouble(),
+            precipitationProbabilityPct: card.precipitationProbabilityPct,
+            cloudCoverPct: card.cloudCoverPct,
+            activityScore: card.activityScore,
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  final days = grouped.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
+  return days.take(10).map((entry) {
+    final slots = entry.value..sort((a, b) => a.time.compareTo(b.time));
+    return tm.HourlyForecastDay(
+      date: entry.key,
+      slots: List.unmodifiable(slots),
+    );
+  }).toList(growable: false);
 }
 
 List<tide_data.TidePoint> _casablancaReferencePoints(
@@ -388,6 +467,8 @@ class _TidePageState extends State<TidePage>
   Timer? _clockTimer;
   int _selectedHourIndex = 0;
   bool _followsCurrentHour = true;
+  int _expandedForecastDayIndex = 0;
+  bool _showForecasts = false;
   bool _loadInProgress = false;
   bool _isVisible = false;
   bool _appIsResumed = true;
@@ -452,7 +533,6 @@ class _TidePageState extends State<TidePage>
           if (mounted) _autoScroll();
         });
       }
-
       final gfsWeather = await gfsFuture;
       if (!mounted || gfsWeather == null || d.hourlyPoints.isEmpty) return;
       setState(() {
@@ -501,10 +581,11 @@ class _TidePageState extends State<TidePage>
                 curve: Curves.easeOut)),
       );
     });
+    // La page Marées est conservée dans un onglet dont les tickers peuvent
+    // être suspendus avant sa première apparition. Les informations ne doivent
+    // jamais dépendre d'une animation décorative pour devenir visibles.
+    _ctrl.value = 1;
     _updateClock();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _ctrl.forward();
-    });
   }
 
   @override
@@ -526,6 +607,14 @@ class _TidePageState extends State<TidePage>
 
   void _synchronizeActivity() {
     if (_isVisible && _appIsResumed) {
+      // TidePage reste montée dans la navigation principale pendant qu'un
+      // autre onglet est actif. TickerMode suspend alors le contrôleur
+      // d'apparition ; sur certains appareils, les éléments retardés de la
+      // moitié basse conservaient une opacité nulle au retour sur Marées.
+      // Une transition décorative ne doit jamais masquer des informations
+      // essentielles : dès que l'onglet redevient visible, on force son état
+      // final. Les animations locales (accordéon, sélection) restent actives.
+      if (!_ctrl.isCompleted) _ctrl.value = 1;
       _startClock();
       _maybeRefreshData();
     } else {
@@ -548,7 +637,7 @@ class _TidePageState extends State<TidePage>
     if (currentIndex < 0 || currentIndex == _selectedHourIndex) return;
     setState(() => _selectedHourIndex = currentIndex);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _isVisible) _autoScroll();
+      if (mounted && _isVisible && !_showForecasts) _autoScroll();
     });
   }
 
@@ -597,9 +686,10 @@ class _TidePageState extends State<TidePage>
     if (_scrollController.hasClients) {
       final offset = _selectedHourIndex * 47.0 - 80;
       _scrollController.animateTo(
-          offset.clamp(0, _scrollController.position.maxScrollExtent),
-          duration: const Duration(milliseconds: 800),
-          curve: Curves.easeOutCubic);
+        offset.clamp(0, _scrollController.position.maxScrollExtent),
+        duration: const Duration(milliseconds: 800),
+        curve: Curves.easeOutCubic,
+      );
     }
   }
 
@@ -695,19 +785,24 @@ class _TidePageState extends State<TidePage>
           physics: const BouncingScrollPhysics(),
           slivers: [
             SliverToBoxAdapter(child: _buildHeader()),
-            SliverToBoxAdapter(child: _buildScoreCard()),
-            SliverToBoxAdapter(child: _buildCurrentTideRibbon()),
-            SliverToBoxAdapter(child: _buildCurveCard()),
-            SliverToBoxAdapter(child: _buildHourlyActivitySection()),
-            SliverToBoxAdapter(child: _buildMarineConditionsPanel()),
-            SliverToBoxAdapter(child: _buildAtmosphereVisibilityPanel()),
-            SliverToBoxAdapter(child: _buildConditionsPanel()),
-            SliverToBoxAdapter(child: _buildEventsPanel()),
-            const SliverToBoxAdapter(
-              child: OpenMeteoAttribution(
-                padding: EdgeInsets.fromLTRB(16, 3, 16, 2),
+            SliverToBoxAdapter(child: _buildTideModeSelector()),
+            if (_showForecasts) ...[
+              SliverToBoxAdapter(child: _buildHourlyForecastSection()),
+            ] else ...[
+              SliverToBoxAdapter(child: _buildScoreCard()),
+              SliverToBoxAdapter(child: _buildCurrentTideRibbon()),
+              SliverToBoxAdapter(child: _buildCurveCard()),
+              SliverToBoxAdapter(child: _buildHourlyActivitySection()),
+              SliverToBoxAdapter(child: _buildMarineConditionsPanel()),
+              SliverToBoxAdapter(child: _buildAtmosphereVisibilityPanel()),
+              SliverToBoxAdapter(child: _buildConditionsPanel()),
+              SliverToBoxAdapter(child: _buildEventsPanel()),
+              const SliverToBoxAdapter(
+                child: OpenMeteoAttribution(
+                  padding: EdgeInsets.fromLTRB(16, 3, 16, 2),
+                ),
               ),
-            ),
+            ],
             const SliverPadding(padding: EdgeInsets.only(bottom: 6)),
           ],
         ),
@@ -1333,6 +1428,99 @@ class _TidePageState extends State<TidePage>
     ]);
   }
 
+  Widget _buildTideModeSelector() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 5, 16, 5),
+      child: Semantics(
+        container: true,
+        label: context.tr('tide.viewSelector'),
+        child: Container(
+          height: 46,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: _isDark ? const Color(0xC9081A2C) : const Color(0xEAF5FBFE),
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(
+              color: _glassBorder.withValues(alpha: 0.72),
+              width: 0.8,
+            ),
+          ),
+          child: Row(
+            children: [
+              _buildTideModeButton(
+                label: context.tr('tide.todayTides'),
+                icon: Icons.water_rounded,
+                selected: !_showForecasts,
+                onTap: () {
+                  if (!_showForecasts) return;
+                  setState(() => _showForecasts = false);
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) _autoScroll();
+                  });
+                },
+              ),
+              const SizedBox(width: 4),
+              _buildTideModeButton(
+                label: context.tr('tide.forecasts'),
+                icon: Icons.calendar_month_rounded,
+                selected: _showForecasts,
+                onTap: () {
+                  if (_showForecasts) return;
+                  setState(() => _showForecasts = true);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTideModeButton({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: Semantics(
+        button: true,
+        selected: selected,
+        child: Material(
+          color: selected ? _accent : Colors.transparent,
+          borderRadius: BorderRadius.circular(11),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(11),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 16,
+                  color: selected ? Colors.white : _txt(0.62),
+                ),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: selected ? Colors.white : _txt(0.72),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildHourlyActivitySection() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 7, 16, 4),
@@ -1363,7 +1551,7 @@ class _TidePageState extends State<TidePage>
         ),
         child: Column(
           children: [
-            _buildHourlyTitle(),
+            _buildOriginalHourlyTitle(),
             _buildHourlyScroller(),
           ],
         ),
@@ -1371,74 +1559,672 @@ class _TidePageState extends State<TidePage>
     );
   }
 
-  Widget _buildHourlyTitle() {
-    return FadeTransition(
-        opacity: _fadeAnims[3],
-        child: SlideTransition(
-            position: _slideAnims[3],
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(10, 9, 10, 4),
-              child: Row(children: [
-                Container(
-                    width: 4,
-                    height: 18,
-                    decoration: BoxDecoration(
-                        color: _accent,
-                        borderRadius: BorderRadius.circular(2))),
-                const SizedBox(width: 8),
-                Text(context.tr('tide.hourlyActivity').toUpperCase(),
-                    style: TextStyle(
-                        color: _txt(0.9),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.4)),
-                const Spacer(),
-                Text(context.tr('tide.swipeToExplore'),
-                    style: TextStyle(color: _txt(0.45), fontSize: 8.5)),
-              ]),
-            )));
+  Widget _buildOriginalHourlyTitle() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 9, 10, 4),
+      child: Row(children: [
+        Container(
+          width: 4,
+          height: 18,
+          decoration: BoxDecoration(
+            color: _accent,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          context.tr('tide.hourlyActivity').toUpperCase(),
+          style: TextStyle(
+            color: _txt(0.9),
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.4,
+          ),
+        ),
+        const Spacer(),
+        Text(
+          context.tr('tide.swipeToExplore'),
+          style: TextStyle(color: _txt(0.45), fontSize: 8.5),
+        ),
+      ]),
+    );
   }
 
   Widget _buildHourlyScroller() {
-    return FadeTransition(
-        opacity: _fadeAnims[4],
-        child: SlideTransition(
-            position: _slideAnims[4],
-            child: SizedBox(
-                height: 82,
-                child: ShaderMask(
-                  shaderCallback: (bounds) => const LinearGradient(
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                      colors: [
-                        Colors.transparent,
-                        Colors.white,
-                        Colors.white,
-                        Colors.transparent
+    return SizedBox(
+      height: 82,
+      child: ShaderMask(
+        shaderCallback: (bounds) => const LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [
+            Colors.transparent,
+            Colors.white,
+            Colors.white,
+            Colors.transparent,
+          ],
+          stops: [0.0, 0.05, 0.95, 1.0],
+        ).createShader(bounds),
+        blendMode: BlendMode.dstIn,
+        child: ListView.builder(
+          controller: _scrollController,
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          itemCount: _data.hourlyCards.length,
+          itemBuilder: (context, index) {
+            final card = _data.hourlyCards[index];
+            return Padding(
+              padding: const EdgeInsets.only(right: 3),
+              child: _HourlyCardWidget(
+                card: card,
+                isSelected: index == _selectedHourIndex,
+                onTap: () => _onCardTap(index),
+                animation: _ctrl,
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHourlyForecastSection() {
+    final forecastDays = _data.hourlyForecastDays;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 7, 16, 4),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: _isDark
+                ? const [Color(0xFF071A2B), Color(0xFF0A2638)]
+                : const [Color(0xFFF9FDFF), Color(0xFFE4F5FB)],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: _isDark
+                ? _accent.withValues(alpha: 0.46)
+                : const Color(0xFF3F9ED3).withValues(alpha: 0.68),
+            width: 0.9,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: (_isDark ? _accent : const Color(0xFF126AA4))
+                  .withValues(alpha: _isDark ? 0.15 : 0.13),
+              blurRadius: 18,
+              offset: const Offset(0, 7),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            _buildForecastTitle(forecastDays.length),
+            if (forecastDays.isEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
+                child: Text(
+                  context.tr('tide.hourlyForecastUnavailable'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: _txt(0.56), fontSize: 11),
+                ),
+              )
+            else
+              _buildForecastAccordion(forecastDays),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildForecastTitle(int availableDays) {
+    // Cette page est conservée dans la navigation principale avec TickerMode
+    // désactivé lorsqu'elle est hors écran. Une animation d'entrée pilotée par
+    // le contrôleur global pouvait alors rester suspendue et laisser ce titre,
+    // l'accordéon et les panneaux suivants totalement transparents. Le contenu
+    // essentiel reste toujours peint ; seules les animations locales
+    // d'ouverture des journées sont conservées.
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 9, 10, 4),
+      child: Row(children: [
+        Container(
+            width: 4,
+            height: 18,
+            decoration: BoxDecoration(
+                color: _accent, borderRadius: BorderRadius.circular(2))),
+        const SizedBox(width: 8),
+        Text(context.tr('tide.hourlyActivity').toUpperCase(),
+            style: TextStyle(
+                color: _txt(0.9),
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.4)),
+        const Spacer(),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: _accent.withValues(alpha: _isDark ? 0.11 : 0.08),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: _accent.withValues(alpha: 0.32),
+              width: 0.7,
+            ),
+          ),
+          child: Text(
+            context.trArgs(
+              'tide.availableDayForecast',
+              args: {'count': '$availableDays'},
+            ),
+            style: TextStyle(
+              color:
+                  _isDark ? const Color(0xFF79E6F8) : const Color(0xFF066E8C),
+              fontSize: 8.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  Widget _buildForecastAccordion(List<tm.HourlyForecastDay> days) {
+    final safeExpanded = _expandedForecastDayIndex.clamp(0, days.length - 1);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(7, 4, 7, 8),
+      child: Column(
+        children: List.generate(days.length, (index) {
+          final isExpanded = index == safeExpanded;
+          return Padding(
+            padding: EdgeInsets.only(top: index == 0 ? 0 : 5),
+            child: _buildForecastDay(
+              days[index],
+              index: index,
+              isExpanded: isExpanded,
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildForecastDay(
+    tm.HourlyForecastDay day, {
+    required int index,
+    required bool isExpanded,
+  }) {
+    final score = day.averageActivityScore;
+    final dayLabel = MaterialLocalizations.of(context)
+        .formatMediumDate(day.date)
+        .toUpperCase();
+    final summaryColor = _activityColor(score);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: _isDark ? const Color(0xB8081A2C) : const Color(0xDDF9FDFF),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isExpanded
+                ? _accent.withValues(alpha: _isDark ? 0.62 : 0.75)
+                : _glassBorder.withValues(alpha: 0.48),
+            width: isExpanded ? 1 : 0.65,
+          ),
+        ),
+        child: Column(
+          children: [
+            Semantics(
+              button: true,
+              expanded: isExpanded,
+              label: context.trArgs(
+                'tide.forecastDaySemantics',
+                args: {'day': dayLabel},
+              ),
+              child: InkWell(
+                onTap: () => setState(() {
+                  _expandedForecastDayIndex = index;
+                }),
+                child: SizedBox(
+                  height: 48,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 11),
+                    child: Row(
+                      children: [
+                        AnimatedRotation(
+                          turns: isExpanded ? 0.25 : 0,
+                          duration: const Duration(milliseconds: 260),
+                          curve: Curves.easeOutCubic,
+                          child: Icon(
+                            Icons.chevron_right_rounded,
+                            color: isExpanded ? _accent : _txt(0.5),
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            dayLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: _txt(0.92),
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.32,
+                            ),
+                          ),
+                        ),
+                        if (score != null) ...[
+                          Container(
+                            width: 7,
+                            height: 7,
+                            decoration: BoxDecoration(
+                              color: summaryColor,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: summaryColor.withValues(alpha: 0.35),
+                                  blurRadius: 6,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            context.trArgs(
+                              'tide.activityScoreCompact',
+                              args: {'score': '$score'},
+                            ),
+                            style: TextStyle(
+                              color: _txt(0.6),
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                       ],
-                      stops: [
-                        0.0,
-                        0.05,
-                        0.95,
-                        1.0
-                      ]).createShader(bounds),
-                  blendMode: BlendMode.dstIn,
-                  child: ListView.builder(
-                      controller: _scrollController,
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      itemCount: _data.hourlyCards.length,
-                      itemBuilder: (context, index) {
-                        final card = _data.hourlyCards[index];
-                        return Padding(
-                            padding: const EdgeInsets.only(right: 3),
-                            child: _HourlyCardWidget(
-                                card: card,
-                                isSelected: index == _selectedHourIndex,
-                                onTap: () => _onCardTap(index),
-                                animation: _ctrl));
-                      }),
-                ))));
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (isExpanded)
+              Column(
+                children: [
+                  _buildForecastColumnHeader(),
+                  for (var rowIndex = 0;
+                      rowIndex < day.slots.length;
+                      rowIndex++)
+                    _buildForecastRow(
+                      day.slots[rowIndex],
+                      isLast: rowIndex == day.slots.length - 1,
+                    ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildForecastColumnHeader() {
+    final style = TextStyle(
+      color: _txt(0.48),
+      fontSize: 8.2,
+      fontWeight: FontWeight.w900,
+      letterSpacing: 0.35,
+    );
+    return Container(
+      height: 29,
+      decoration: BoxDecoration(
+        color: _isDark
+            ? Colors.black.withValues(alpha: 0.15)
+            : const Color(0xFFDEEFF5).withValues(alpha: 0.72),
+        border: Border(
+          top: BorderSide(color: _glassBorder.withValues(alpha: 0.4)),
+          bottom: BorderSide(color: _glassBorder.withValues(alpha: 0.4)),
+        ),
+      ),
+      child: Row(
+        children: [
+          _forecastHeaderCell(context.tr('tide.hour'), 11, style),
+          _forecastHeaderCell(context.tr('tide.wind'), 27, style),
+          _forecastHeaderCell(context.tr('tide.weather'), 13, style),
+          _forecastHeaderCell(context.tr('tide.air'), 21, style),
+          _forecastHeaderCell(context.tr('tide.waves'), 28, style),
+        ],
+      ),
+    );
+  }
+
+  Widget _forecastHeaderCell(String label, int flex, TextStyle style) {
+    return Expanded(
+      flex: flex,
+      child: Text(
+        label.toUpperCase(),
+        textAlign: TextAlign.center,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: style,
+      ),
+    );
+  }
+
+  Widget _buildForecastRow(
+    tm.HourlyForecastSlot slot, {
+    required bool isLast,
+  }) {
+    final now = DateTime.now();
+    final isCurrentSlot = slot.time.year == now.year &&
+        slot.time.month == now.month &&
+        slot.time.day == now.day &&
+        now.hour >= slot.time.hour &&
+        now.hour < slot.time.hour + 3;
+    final activityColor = _activityColor(slot.activityScore);
+    final icon = _weatherIcon(slot);
+    final weatherColor = _weatherColor(slot);
+    final windDirection = slot.windDirectionDeg;
+    final waveDirection = slot.waveDirectionDeg;
+    return Semantics(
+      button: _isToday(slot.time),
+      selected: isCurrentSlot,
+      label: context.trArgs(
+        'tide.hourSemantics',
+        args: {'hour': slot.time.hour.toString()},
+      ),
+      child: InkWell(
+        onTap: _isToday(slot.time)
+            ? () {
+                final index = _data.hourlyCards.indexWhere(
+                  (card) => card.hour == slot.time.hour,
+                );
+                if (index >= 0) _onCardTap(index);
+              }
+            : null,
+        child: Container(
+          // Une hauteur finie est indispensable ici : la ligne étire ses
+          // cellules verticalement. Avec une simple hauteur minimale, le Row
+          // recevait une hauteur non bornée dans la Column et toute la partie
+          // située sous le titre pouvait ne pas être peinte sur Android.
+          height: 72,
+          decoration: BoxDecoration(
+            color: isCurrentSlot
+                ? _accent.withValues(alpha: _isDark ? 0.1 : 0.08)
+                : null,
+            border: Border(
+              bottom: isLast
+                  ? BorderSide.none
+                  : BorderSide(
+                      color: _glassBorder.withValues(alpha: 0.27),
+                      width: 0.6,
+                    ),
+              left: BorderSide(
+                color: activityColor,
+                width: 3,
+              ),
+            ),
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 340;
+              final primarySize = compact ? 11.0 : 12.2;
+              final secondarySize = compact ? 7.4 : 8.2;
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    flex: 11,
+                    child: _forecastCell(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 3,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isCurrentSlot
+                              ? _accent.withValues(alpha: 0.18)
+                              : _txt(0.055),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${slot.time.hour.toString().padLeft(2, '0')}h',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: isCurrentSlot ? _accent : _txt(0.88),
+                            fontSize: compact ? 9.5 : 10.2,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 27,
+                    child: _forecastCell(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (windDirection != null)
+                            Transform.rotate(
+                              angle: windDirection * math.pi / 180,
+                              child: Icon(
+                                Icons.navigation_rounded,
+                                color: _accent,
+                                size: compact ? 14 : 16,
+                              ),
+                            ),
+                          if (windDirection != null) const SizedBox(width: 3),
+                          Flexible(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _kmhValue(slot.windSpeedKmh),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: _txt(0.94),
+                                    fontSize: primarySize,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                Text(
+                                  slot.windGustKmh == null
+                                      ? context.tr('tide.unavailableShort')
+                                      : context.trArgs(
+                                          'tide.maxWindCompact',
+                                          args: {
+                                            'speed':
+                                                '${slot.windGustKmh!.round()}',
+                                          },
+                                        ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: _txt(0.48),
+                                    fontSize: secondarySize,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 13,
+                    child: _forecastCell(
+                      child: Icon(
+                        icon,
+                        color: weatherColor,
+                        size: compact ? 21 : 24,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 21,
+                    child: _forecastCell(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _temperatureValue(slot.temperatureC),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: _isDark
+                                  ? const Color(0xFFFFC26A)
+                                  : const Color(0xFF8A4B00),
+                              fontSize: primarySize,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          Text(
+                            slot.pressureHpa == null
+                                ? context.tr('tide.unavailableShort')
+                                : '${slot.pressureHpa!.round()} hPa',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: _txt(0.55),
+                              fontSize: secondarySize,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 28,
+                    child: _forecastCell(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (waveDirection != null)
+                            Transform.rotate(
+                              angle: waveDirection * math.pi / 180,
+                              child: Icon(
+                                Icons.near_me_rounded,
+                                color: _isDark
+                                    ? const Color(0xFF67DFF3)
+                                    : const Color(0xFF087E9F),
+                                size: compact ? 13 : 15,
+                              ),
+                            ),
+                          if (waveDirection != null) const SizedBox(width: 3),
+                          Flexible(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _meterValue(slot.waveHeightM),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: _txt(0.94),
+                                    fontSize: primarySize,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                Text(
+                                  _waveDetails(slot),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: _txt(0.48),
+                                    fontSize: secondarySize,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _forecastCell({required Widget child}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 9),
+      child: Center(child: child),
+    );
+  }
+
+  bool _isToday(DateTime time) {
+    final now = DateTime.now();
+    return time.year == now.year &&
+        time.month == now.month &&
+        time.day == now.day;
+  }
+
+  String _kmhValue(double? value) => value == null
+      ? context.tr('tide.unavailableShort')
+      : '${value.round()} km/h';
+
+  String _meterValue(double? value) => value == null
+      ? context.tr('tide.unavailableShort')
+      : '${_compactNumber(value)} m';
+
+  String _waveDetails(tm.HourlyForecastSlot slot) {
+    final parts = <String>[];
+    if (slot.waveDirectionDeg != null) {
+      parts.add('${slot.waveDirectionDeg!.round()}°');
+    }
+    if (slot.wavePeriodS != null) {
+      parts.add('${slot.wavePeriodS!.round()} s');
+    }
+    return parts.isEmpty
+        ? context.tr('tide.unavailableShort')
+        : parts.join(' · ');
+  }
+
+  Color _activityColor(int? score) {
+    if (score == null) return _txt(0.24);
+    if (score >= 75) return _activityHigh;
+    if (score >= 45) return _amber;
+    return _red;
+  }
+
+  IconData _weatherIcon(tm.HourlyForecastSlot slot) {
+    final code = slot.weatherCode;
+    if (code != null) {
+      if (code >= 95) return Icons.thunderstorm_rounded;
+      if (code >= 71) return Icons.ac_unit_rounded;
+      if (code >= 51) return Icons.water_drop_rounded;
+      if (code >= 45) return Icons.foggy;
+      if (code >= 3) return Icons.cloud_rounded;
+      if (code >= 1) return Icons.wb_cloudy_rounded;
+    }
+    if ((slot.precipitationProbabilityPct ?? 0) >= 45) {
+      return Icons.water_drop_rounded;
+    }
+    if ((slot.cloudCoverPct ?? 0) >= 65) return Icons.cloud_rounded;
+    final isNight = slot.time.hour < 6 || slot.time.hour >= 20;
+    return isNight ? Icons.nightlight_round : Icons.wb_sunny_rounded;
+  }
+
+  Color _weatherColor(tm.HourlyForecastSlot slot) {
+    final icon = _weatherIcon(slot);
+    if (icon == Icons.wb_sunny_rounded) return const Color(0xFFFFBF3F);
+    if (icon == Icons.nightlight_round) return const Color(0xFF91B7FF);
+    if (icon == Icons.water_drop_rounded ||
+        icon == Icons.thunderstorm_rounded) {
+      return const Color(0xFF43BFF0);
+    }
+    return _txt(0.64);
   }
 
   Widget _buildMarineConditionsPanel() {
@@ -2354,11 +3140,14 @@ class _HourlyCardWidget extends StatelessWidget {
   final bool isSelected;
   final VoidCallback onTap;
   final Animation<double> animation;
-  const _HourlyCardWidget(
-      {required this.card,
-      required this.isSelected,
-      required this.onTap,
-      required this.animation});
+
+  const _HourlyCardWidget({
+    required this.card,
+    required this.isSelected,
+    required this.onTap,
+    required this.animation,
+  });
+
   @override
   Widget build(BuildContext context) {
     final selectedText = _isDark ? Colors.white : const Color(0xFF07364A);
