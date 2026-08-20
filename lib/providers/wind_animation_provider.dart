@@ -11,7 +11,6 @@
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:spots_app/services/forecast_firestore_service.dart';
-import 'package:spots_app/utils/geo_utils.dart';
 
 /// Vecteur vent pre-calcule pour le CustomPainter.
 class WindVector {
@@ -103,19 +102,19 @@ class WindAnimationProvider extends ChangeNotifier {
         return;
       }
 
-      String nearestId = spots.first['id'] as String;
-      double minDist = double.infinity;
-      for (final s in spots) {
-        final d = haversineKm(
-          lat,
-          lon,
-          (s['latitude'] as num).toDouble(),
-          (s['longitude'] as num).toDouble(),
-        );
-        if (d < minDist) {
-          minDist = d;
-          nearestId = s['id'] as String;
-        }
+      final nearestId =
+          ForecastFirestoreService.nearestWeatherStationIdWithinRadius(
+        stations: spots,
+        latitude: lat,
+        longitude: lon,
+      );
+      if (nearestId == null) {
+        _error = 'Aucune station météo disponible à moins de '
+            '${ForecastFirestoreService.maximumWeatherStationDistanceKm.toInt()} km';
+        _isEnabled = false;
+        _isLoading = false;
+        notifyListeners();
+        return;
       }
 
       await _loadSpotData(nearestId);

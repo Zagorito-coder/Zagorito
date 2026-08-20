@@ -1,7 +1,7 @@
 # BoosterFish — fiche de publication Google Play
 
 Version candidate en cours de validation : **1.0.6 (14)**
-Dernière mise à jour : **7 août 2026**
+Dernière mise à jour : **11 août 2026**
 
 Cette fiche décrit l'état réel de l'application et les réponses à reporter dans
 Google Play Console. Toute modification future des SDK, de l'authentification,
@@ -11,16 +11,15 @@ fiche et la politique de confidentialité.
 ## URLs publiques
 
 - Politique de confidentialité :
-  `https://zagorito-coder.github.io/boosterfish/privacy-policy/`
+  `https://www.boosterfish.com/privacy-policy/`
 - Conditions d'utilisation :
-  `https://zagorito-coder.github.io/boosterfish/terms-of-service/`
+  `https://www.boosterfish.com/terms-of-service/`
 - Suppression de compte :
-  `https://zagorito-coder.github.io/boosterfish/privacy-policy/#account-deletion`
+  `https://www.boosterfish.com/privacy-policy/#account-deletion`
   (section dédiée, étapes dans l'application et lien de demande sans
   réinstallation).
-- Contact temporaire : `booster2fish@gmail.com`
-- Contact professionnel prévu après configuration Hostinger :
-  `support@boosterfish.com`
+- Site officiel : `https://www.boosterfish.com/`
+- Contact professionnel : `support@boosterfish.com`
 
 Les pages publiques doivent être republiées avant l'envoi en examen afin que
 leur contenu corresponde aux fichiers `docs/` de cette version.
@@ -154,12 +153,12 @@ fournisseur ou un SDK de cartographie est ajouté.
 - **Standards de sécurité des mineurs :** même si l'application reste classée
   dans la catégorie Sports, sa fonction communautaire publie des photos et
   profils. Utiliser l'ancre publique
-  `https://zagorito-coder.github.io/boosterfish/terms-of-service/#child-safety`,
+  `https://www.boosterfish.com/terms-of-service/#child-safety`,
   certifier le signalement intégré (motif dédié « Sécurité ou exploitation d'un
   mineur »), le retrait des contenus CSAM connus et leur signalement aux
   autorités compétentes selon le droit applicable. Désigner dans Play Console
   un responsable nominatif capable de traiter ces alertes ; l'adresse de
-  contact actuelle est `booster2fish@gmail.com`.
+  contact actuelle est `support@boosterfish.com`.
 - **Classement du contenu :** refaire le questionnaire en déclarant le contenu
   généré par les utilisateurs, la présence de publicité et les
   liens/contacts externes réels.

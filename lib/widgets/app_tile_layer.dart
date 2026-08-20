@@ -34,8 +34,8 @@ class _AppTileLayerState extends State<AppTileLayer> {
         NetworkTileProvider(
           headers: {
             'User-Agent': 'BoosterFish Android '
-                '(+https://zagorito-coder.github.io/boosterfish/; '
-                'contact: booster2fish@gmail.com)',
+                '(+https://www.boosterfish.com/; '
+                'contact: support@boosterfish.com)',
           },
           // Une coupure réseau ne doit pas transformer l'échec isolé d'une
           // image de tuile en erreur Flutter fatale. Le cache reste consulté

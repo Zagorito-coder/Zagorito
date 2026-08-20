@@ -2330,7 +2330,6 @@ class _TidePageState extends State<TidePage>
                         slot,
                         compact: compact,
                         primarySize: primarySize,
-                        secondarySize: secondarySize,
                       ),
                     ),
                   ),
@@ -2354,7 +2353,6 @@ class _TidePageState extends State<TidePage>
     tm.HourlyForecastSlot slot, {
     required bool compact,
     required double primarySize,
-    required double secondarySize,
   }) {
     final extremum = slot.tideExtremum;
     final height = extremum?.heightM ?? slot.tideHeightM;
@@ -2405,7 +2403,7 @@ class _TidePageState extends State<TidePage>
             maxLines: 1,
             style: TextStyle(
               color: color,
-              fontSize: secondarySize,
+              fontSize: compact ? 9.5 : 10.2,
               fontWeight: FontWeight.w800,
             ),
           ),

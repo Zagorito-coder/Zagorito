@@ -598,9 +598,8 @@ Le thème de l'application a changé après la création de l'ancienne fiche.
 - textes et descriptions si les anciennes images ne correspondent plus ;
 - cohérence de la fiche avec la page Home, la carte, Communauté et Mes spots.
 
-L'URL `http://www.boosterfish.com` ne doit pas rester comme site officiel tant
-que le domaine n'est pas réellement lancé. La remplacer par une URL publique
-valide ou la laisser vide selon le champ Play Console.
+L'URL `https://www.boosterfish.com` est désormais le site officiel. La conserver
+dans les champs Play Console et vérifier sa disponibilité avant chaque envoi.
 
 ### 7.7 Météo et données distantes
 
@@ -626,7 +625,7 @@ fraîcheur du cron et des secrets doit être reconfirmée.
 3. **Fiche Play Store obsolète.**
    Les visuels ne doivent pas présenter l'ancien thème.
 4. **URL de site non opérationnelle.**
-   Ne pas afficher `http://www.boosterfish.com` comme site réel.
+   Afficher `https://www.boosterfish.com` comme site officiel.
 5. **Parcours communautaires complémentaires non tous documentés.**
    Le like avec un second compte, le signalement, le blocage et le retrait
    doivent être confirmés avant promotion, même si la publication et App Check

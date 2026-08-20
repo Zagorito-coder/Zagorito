@@ -10,11 +10,12 @@ fonctions présentes dans la candidate Release installée sur appareil physique.
 - Catégorie : `Sports`
 - Contient des annonces : `Oui`
 - Achats intégrés ou abonnements : `Non`
-- Adresse de contact : `booster2fish@gmail.com`
+- Site Web : `https://www.boosterfish.com/`
+- Adresse de contact : `support@boosterfish.com`
 - Politique de confidentialité :
-  `https://zagorito-coder.github.io/boosterfish/privacy-policy/`
+  `https://www.boosterfish.com/privacy-policy/`
 - Suppression de compte :
-  `https://zagorito-coder.github.io/boosterfish/privacy-policy/#account-deletion`
+  `https://www.boosterfish.com/privacy-policy/#account-deletion`
 
 ## Description courte
 
@@ -69,16 +70,18 @@ Git. Instructions en anglais :
 
 1. `01_accueil_dark.jpg` — Accueil sombre avec marées, vent, état de la mer,
    activité et accès aux espaces pêcheurs.
-2. `02_marees_dark.jpg` — Marée actuelle, prochains extrêmes et courbe locale
+2. `01_accueil_light.jpg` — Même accueil en mode clair, avec le logo actuel,
+   les six espaces pêcheurs et les indicateurs de sortie.
+3. `02_marees_dark.jpg` — Marée actuelle, prochains extrêmes et courbe locale
    de Casablanca sur 24 heures.
-3. `03_conditions_marines_dark.jpg` — Conditions marines, houles, courant,
+4. `03_conditions_marines_dark.jpg` — Conditions marines, houles, courant,
    pression, pluie, visibilité et nébulosité.
-4. `04_detail_spot_dark.jpg` — Spot bilingue sur carte satellite avec espèces,
+5. `04_detail_spot_dark.jpg` — Spot bilingue sur carte satellite avec espèces,
    prudence, vent et lieux voisins.
-5. `05_encyclopedie_dark.jpg` — Encyclopédie sombre avec recherche, filtres et
+6. `05_encyclopedie_dark.jpg` — Encyclopédie sombre avec recherche, filtres et
    fiches de poissons.
 
-Les captures finales sont des vues authentiques de l'application Android en
-mode sombre. Les barres système et la bannière publicitaire de test ont été
+Les captures finales sont des vues authentiques de l'application Android dans
+ses deux thèmes. Les barres système et la bannière publicitaire de test ont été
 retirées par recadrage uniquement ; aucun élément fonctionnel de l'interface
 n'a été inventé ou retouché.

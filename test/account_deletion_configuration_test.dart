@@ -49,6 +49,6 @@ void main() {
 
     expect(policy, contains('id="account-deletion"'));
     expect(policy, contains('Supprimer mon compte'));
-    expect(policy, contains('mailto:booster2fish@gmail.com'));
+    expect(policy, contains('mailto:support@boosterfish.com'));
   });
 }
