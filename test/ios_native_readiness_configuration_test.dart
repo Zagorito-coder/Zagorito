@@ -31,14 +31,19 @@ void main() {
       }
     });
 
-    test('la configuration Firebase iOS est embarquée dans Runner', () {
+    test('la configuration Firebase iOS est référencée sans être publiée', () {
       final project =
           File('ios/Runner.xcodeproj/project.pbxproj').readAsStringSync();
+      final gitIgnore = File('.gitignore').readAsStringSync();
 
-      expect(File('ios/Runner/GoogleService-Info.plist').existsSync(), isTrue);
       expect(
         project,
         contains('GoogleService-Info.plist in Resources'),
+      );
+      expect(
+        gitIgnore,
+        contains('ios/Runner/GoogleService-Info.plist'),
+        reason: 'Le plist Firebase natif ne doit pas être publié dans Git.',
       );
     });
 
