@@ -68,6 +68,21 @@ class HourlyCard {
   });
 }
 
+/// Extrême de marée associé au créneau de prévision de 3 heures le plus
+/// proche. Les données proviennent du même moteur harmonique que les vues
+/// « Marées aujourd'hui » et « Coefficients ».
+class TideForecastExtremum {
+  const TideForecastExtremum({
+    required this.time,
+    required this.heightM,
+    required this.isHigh,
+  });
+
+  final DateTime time;
+  final double heightM;
+  final bool isHigh;
+}
+
 class HourlyForecastSlot {
   final DateTime time;
   final double? windSpeedKmh;
@@ -83,6 +98,9 @@ class HourlyForecastSlot {
   final double? precipitationProbabilityPct;
   final double? cloudCoverPct;
   final int? activityScore;
+  final double? tideHeightM;
+  final bool? tideIsRising;
+  final TideForecastExtremum? tideExtremum;
 
   const HourlyForecastSlot({
     required this.time,
@@ -99,7 +117,36 @@ class HourlyForecastSlot {
     this.precipitationProbabilityPct,
     this.cloudCoverPct,
     this.activityScore,
+    this.tideHeightM,
+    this.tideIsRising,
+    this.tideExtremum,
   });
+
+  HourlyForecastSlot copyWithTide({
+    required double tideHeightM,
+    required bool tideIsRising,
+    TideForecastExtremum? tideExtremum,
+  }) {
+    return HourlyForecastSlot(
+      time: time,
+      windSpeedKmh: windSpeedKmh,
+      windGustKmh: windGustKmh,
+      windDirectionDeg: windDirectionDeg,
+      weatherCode: weatherCode,
+      isDay: isDay,
+      temperatureC: temperatureC,
+      pressureHpa: pressureHpa,
+      waveHeightM: waveHeightM,
+      wavePeriodS: wavePeriodS,
+      waveDirectionDeg: waveDirectionDeg,
+      precipitationProbabilityPct: precipitationProbabilityPct,
+      cloudCoverPct: cloudCoverPct,
+      activityScore: activityScore,
+      tideHeightM: tideHeightM,
+      tideIsRising: tideIsRising,
+      tideExtremum: tideExtremum,
+    );
+  }
 }
 
 class HourlyForecastDay {

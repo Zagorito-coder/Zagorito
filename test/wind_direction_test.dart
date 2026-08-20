@@ -19,4 +19,11 @@ void main() {
       closeTo(140 * math.pi / 180, 1e-12),
     );
   });
+
+  test('la houle utilise son sens de propagation et non sa provenance', () {
+    expect(
+      waveFlowAngleRadians(330),
+      closeTo(150 * math.pi / 180, 1e-12),
+    );
+  });
 }

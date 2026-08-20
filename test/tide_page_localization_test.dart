@@ -5,6 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   test('la page Marées localise tous ses textes visibles et accessibles', () {
     final tideSource = File('lib/pages/tide_page.dart').readAsStringSync();
+    final coefficientsSource =
+        File('lib/widgets/tide_coefficients_view.dart').readAsStringSync();
+    final localizedTideSource = '$tideSource\n$coefficientsSource';
     final attributionSource =
         File('lib/widgets/open_meteo_attribution.dart').readAsStringSync();
 
@@ -45,8 +48,18 @@ void main() {
       'tide.hour',
       'tide.weather',
       'tide.air',
+      'tide.coefficients',
+      'tide.coefficientTitle',
+      'tide.localIndex',
+      'tide.tidalRange',
+      'tide.localHarmonicCalculation',
+      'tide.monthlyCycle',
+      'tide.moroccanTraditionalReading',
+      'tide.culturalReadingDisclaimer',
+      'tide.localHarmonicIndicative',
+      'tide.coefficientInfoBody',
     ]) {
-      expect(tideSource, contains(key), reason: 'Clé absente: $key');
+      expect(localizedTideSource, contains(key), reason: 'Clé absente: $key');
     }
 
     for (final forbidden in const [
@@ -128,7 +141,35 @@ void main() {
     );
     expect(tideSource, contains('_buildHourlyScroller'));
     expect(tideSource, contains('_buildTideModeSelector'));
-    expect(tideSource, contains('if (_showForecasts)'));
+    expect(
+      tideSource,
+      contains('_selectedTideView == _TideView.forecasts'),
+    );
+    expect(
+      tideSource,
+      contains('_selectedTideView == _TideView.coefficients'),
+    );
+    expect(tideSource, contains('_loadCoefficientMonth'));
+  });
+
+  test('le volet Coefficients sépare calcul scientifique et lecture culturelle',
+      () {
+    final source =
+        File('lib/services/tide_coefficient_service.dart').readAsStringSync();
+    final widgetSource =
+        File('lib/widgets/tide_coefficients_view.dart').readAsStringSync();
+
+    expect(source, contains('CasablancaTideReference.heightAtUtc'));
+    expect(source, contains('localIndexForRange'));
+    expect(source, isNot(contains('AstronomyService')));
+    expect(
+      widgetSource,
+      contains("context.tr('tide.culturalReadingDisclaimer')"),
+    );
+    expect(
+      widgetSource,
+      contains("context.tr('tide.localHarmonicIndicative')"),
+    );
   });
 
   test("les panneaux retardés deviennent visibles à l'activation de l'onglet",

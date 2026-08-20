@@ -6,15 +6,19 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/tide_page_models.dart' as tm;
 import '../models/tide_data.dart' as tide_data;
 import '../services/forecast_firestore_service.dart';
 import '../services/tide_service.dart' as tide_svc;
 import '../services/casablanca_tide_reference.dart';
+import '../services/tide_coefficient_service.dart';
+import '../services/tide_forecast_presentation_service.dart';
 import '../theme_controller.dart';
 import '../widgets/app_back_button.dart';
 import '../widgets/open_meteo_attribution.dart';
+import '../widgets/tide_coefficients_view.dart';
 import '../l10n/app_localizations.dart';
 import '../utils/wind_direction.dart';
 
@@ -208,11 +212,16 @@ tm.TideData _fromTideService(
     ));
   }
 
-  final hourlyForecastDays = _groupHourlyForecast(
+  final groupedHourlyForecastDays = _groupHourlyForecast(
     src.hourlyForecast,
     hourlyCards,
     today,
   );
+  final hourlyForecastDays = usesCasablancaReference
+      ? TideForecastPresentationService.attachCasablancaTides(
+          groupedHourlyForecastDays,
+        )
+      : groupedHourlyForecastDays;
 
   final events = <tm.TideEvent>[];
   if (tidePoints.length >= 3) {
@@ -432,6 +441,8 @@ List<tide_data.TidePoint> _casablancaReferencePoints(
 }
 
 // ═════════════════════════════════════════════════════════════
+enum _TideView { today, forecasts, coefficients }
+
 class TidePage extends StatefulWidget {
   const TidePage({
     super.key,
@@ -470,7 +481,11 @@ class _TidePageState extends State<TidePage>
   int _selectedHourIndex = 0;
   bool _followsCurrentHour = true;
   int _expandedForecastDayIndex = 0;
-  bool _showForecasts = false;
+  _TideView _selectedTideView = _TideView.today;
+  LocalTideCoefficientMonth? _coefficientMonth;
+  bool _coefficientLoading = false;
+  Object? _coefficientError;
+  int _selectedCoefficientDay = DateTime.now().day;
   bool _loadInProgress = false;
   bool _isVisible = false;
   bool _appIsResumed = true;
@@ -639,7 +654,9 @@ class _TidePageState extends State<TidePage>
     if (currentIndex < 0 || currentIndex == _selectedHourIndex) return;
     setState(() => _selectedHourIndex = currentIndex);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _isVisible && !_showForecasts) _autoScroll();
+      if (mounted && _isVisible && _selectedTideView == _TideView.today) {
+        _autoScroll();
+      }
     });
   }
 
@@ -715,6 +732,109 @@ class _TidePageState extends State<TidePage>
     });
   }
 
+  Future<void> _loadCoefficientMonth() async {
+    if (_coefficientMonth != null || _coefficientLoading) return;
+    setState(() {
+      _coefficientLoading = true;
+      _coefficientError = null;
+    });
+    try {
+      final now = DateTime.now();
+      final result = await compute(
+        buildCasablancaTideCoefficientMonth,
+        DateTime(now.year, now.month),
+      );
+      if (!mounted) return;
+      setState(() {
+        _coefficientMonth = result;
+        _selectedCoefficientDay = now.day.clamp(1, result.days.length);
+        _coefficientLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _coefficientLoading = false;
+        _coefficientError = error;
+      });
+    }
+  }
+
+  Widget _buildCoefficientSection() {
+    final month = _coefficientMonth;
+    if (month != null) {
+      return TideCoefficientsView(
+        month: month,
+        selectedDay: _selectedCoefficientDay,
+        onSelectedDayChanged: (day) {
+          if (day == _selectedCoefficientDay) return;
+          setState(() => _selectedCoefficientDay = day);
+        },
+        isDark: _isDark,
+      );
+    }
+    if (_coefficientLoading) {
+      return const SizedBox(
+        height: 360,
+        child: Center(child: CircularProgressIndicator(color: _accent)),
+      );
+    }
+    return SizedBox(
+      height: 360,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.waves_rounded, color: _txt(0.58), size: 42),
+              const SizedBox(height: 12),
+              Text(
+                context.tr('tide.marineDataUnavailable'),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: _txt(0.86),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (_coefficientError != null) ...[
+                const SizedBox(height: 12),
+                OutlinedButton(
+                  onPressed: _loadCoefficientMonth,
+                  child: Text(context.tr('tide.retry')),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showCoefficientInfo() {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor:
+            _isDark ? const Color(0xFF071A2B) : const Color(0xFFF7FCFF),
+        title: Text(
+          context.tr('tide.coefficientInfoTitle'),
+          style: TextStyle(color: _txt(0.96)),
+        ),
+        content: Text(
+          context.tr('tide.coefficientInfoBody'),
+          style: TextStyle(color: _txt(0.78), height: 1.45),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(context.tr('tide.understood')),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -788,8 +908,10 @@ class _TidePageState extends State<TidePage>
           slivers: [
             SliverToBoxAdapter(child: _buildHeader()),
             SliverToBoxAdapter(child: _buildTideModeSelector()),
-            if (_showForecasts) ...[
+            if (_selectedTideView == _TideView.forecasts) ...[
               SliverToBoxAdapter(child: _buildHourlyForecastSection()),
+            ] else if (_selectedTideView == _TideView.coefficients) ...[
+              SliverToBoxAdapter(child: _buildCoefficientSection()),
             ] else ...[
               SliverToBoxAdapter(child: _buildScoreCard()),
               SliverToBoxAdapter(child: _buildCurrentTideRibbon()),
@@ -947,31 +1069,69 @@ class _TidePageState extends State<TidePage>
                             letterSpacing: 1.7,
                           ),
                         ),
-                        Text(
-                          context.tr('tide.title').toUpperCase(),
-                          style: TextStyle(
-                            color: _txt(1),
-                            fontSize: 21,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.5,
+                        SizedBox(
+                          width: double.infinity,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: AlignmentDirectional.centerStart,
+                            child: Text(
+                              context
+                                  .tr(
+                                    _selectedTideView == _TideView.coefficients
+                                        ? 'tide.coefficientTitle'
+                                        : 'tide.title',
+                                  )
+                                  .toUpperCase(),
+                              maxLines: 1,
+                              softWrap: false,
+                              style: TextStyle(
+                                color: _txt(1),
+                                fontSize: 21,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  ValueListenableBuilder<DateTime>(
-                    valueListenable: _clockNotifier,
-                    builder: (context, time, _) => Text(
-                      '${time.hour.toString().padLeft(2, '0')}:'
-                      '${time.minute.toString().padLeft(2, '0')}',
-                      style: TextStyle(
-                        color: _txt(0.9),
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        fontFeatures: const [FontFeature.tabularFigures()],
+                  if (_selectedTideView == _TideView.coefficients)
+                    Semantics(
+                      button: true,
+                      label: context.tr('tide.coefficientInfoTitle'),
+                      child: InkWell(
+                        onTap: _showCoefficientInfo,
+                        customBorder: const CircleBorder(),
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: _glassBorder),
+                          ),
+                          child: Icon(
+                            Icons.info_outline_rounded,
+                            color: _txt(0.9),
+                            size: 22,
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    ValueListenableBuilder<DateTime>(
+                      valueListenable: _clockNotifier,
+                      builder: (context, time, _) => Text(
+                        '${time.hour.toString().padLeft(2, '0')}:'
+                        '${time.minute.toString().padLeft(2, '0')}',
+                        style: TextStyle(
+                          color: _txt(0.9),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
               const SizedBox(height: 3),
@@ -1451,11 +1611,10 @@ class _TidePageState extends State<TidePage>
             children: [
               _buildTideModeButton(
                 label: context.tr('tide.todayTides'),
-                icon: Icons.water_rounded,
-                selected: !_showForecasts,
+                selected: _selectedTideView == _TideView.today,
                 onTap: () {
-                  if (!_showForecasts) return;
-                  setState(() => _showForecasts = false);
+                  if (_selectedTideView == _TideView.today) return;
+                  setState(() => _selectedTideView = _TideView.today);
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     if (mounted) _autoScroll();
                   });
@@ -1464,11 +1623,20 @@ class _TidePageState extends State<TidePage>
               const SizedBox(width: 4),
               _buildTideModeButton(
                 label: context.tr('tide.forecasts'),
-                icon: Icons.calendar_month_rounded,
-                selected: _showForecasts,
+                selected: _selectedTideView == _TideView.forecasts,
                 onTap: () {
-                  if (_showForecasts) return;
-                  setState(() => _showForecasts = true);
+                  if (_selectedTideView == _TideView.forecasts) return;
+                  setState(() => _selectedTideView = _TideView.forecasts);
+                },
+              ),
+              const SizedBox(width: 4),
+              _buildTideModeButton(
+                label: context.tr('tide.coefficients'),
+                selected: _selectedTideView == _TideView.coefficients,
+                onTap: () {
+                  if (_selectedTideView == _TideView.coefficients) return;
+                  setState(() => _selectedTideView = _TideView.coefficients);
+                  _loadCoefficientMonth();
                 },
               ),
             ],
@@ -1480,7 +1648,6 @@ class _TidePageState extends State<TidePage>
 
   Widget _buildTideModeButton({
     required String label,
-    required IconData icon,
     required bool selected,
     required VoidCallback onTap,
   }) {
@@ -1489,32 +1656,46 @@ class _TidePageState extends State<TidePage>
         button: true,
         selected: selected,
         child: Material(
-          color: selected ? _accent : Colors.transparent,
+          color: Colors.transparent,
           borderRadius: BorderRadius.circular(11),
           child: InkWell(
             onTap: onTap,
             borderRadius: BorderRadius.circular(11),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                Icon(
-                  icon,
-                  size: 16,
-                  color: selected ? Colors.white : _txt(0.62),
-                ),
-                const SizedBox(width: 6),
-                Flexible(
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: Text(
                     label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: selected ? Colors.white : _txt(0.72),
-                      fontSize: 10.5,
+                      color: selected ? _accent : _txt(0.62),
+                      fontSize: 10,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                 ),
+                if (selected)
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Container(
+                      height: 2,
+                      margin: const EdgeInsets.symmetric(horizontal: 6),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        color: _accent,
+                        boxShadow: [
+                          BoxShadow(
+                            color: _accent.withValues(alpha: 0.75),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -1888,11 +2069,12 @@ class _TidePageState extends State<TidePage>
       ),
       child: Row(
         children: [
-          _forecastHeaderCell(context.tr('tide.hour'), 11, style),
-          _forecastHeaderCell(context.tr('tide.wind'), 27, style),
-          _forecastHeaderCell(context.tr('tide.weather'), 13, style),
-          _forecastHeaderCell(context.tr('tide.air'), 21, style),
-          _forecastHeaderCell(context.tr('tide.waves'), 28, style),
+          _forecastHeaderCell(context.tr('tide.hour'), 10, style),
+          _forecastHeaderCell(context.tr('tide.wind'), 23, style),
+          _forecastHeaderCell(context.tr('tide.weather'), 11, style),
+          _forecastHeaderCell(context.tr('tide.air'), 17, style),
+          _forecastHeaderCell(context.tr('tide.waves'), 20, style),
+          _forecastHeaderCell(context.tr('tide.title'), 19, style),
         ],
       ),
     );
@@ -1974,7 +2156,7 @@ class _TidePageState extends State<TidePage>
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
-                    flex: 11,
+                    flex: 10,
                     child: _forecastCell(
                       child: Container(
                         padding: const EdgeInsets.symmetric(
@@ -2000,7 +2182,7 @@ class _TidePageState extends State<TidePage>
                     ),
                   ),
                   Expanded(
-                    flex: 27,
+                    flex: 23,
                     child: _forecastCell(
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -2048,7 +2230,7 @@ class _TidePageState extends State<TidePage>
                     ),
                   ),
                   Expanded(
-                    flex: 13,
+                    flex: 11,
                     child: _forecastCell(
                       child: Icon(
                         icon,
@@ -2058,7 +2240,7 @@ class _TidePageState extends State<TidePage>
                     ),
                   ),
                   Expanded(
-                    flex: 21,
+                    flex: 17,
                     child: _forecastCell(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -2092,14 +2274,14 @@ class _TidePageState extends State<TidePage>
                     ),
                   ),
                   Expanded(
-                    flex: 28,
+                    flex: 20,
                     child: _forecastCell(
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           if (waveDirection != null)
                             Transform.rotate(
-                              angle: waveDirection * math.pi / 180,
+                              angle: waveFlowAngleRadians(waveDirection),
                               child: Icon(
                                 Icons.near_me_rounded,
                                 color: _isDark
@@ -2141,6 +2323,17 @@ class _TidePageState extends State<TidePage>
                       ),
                     ),
                   ),
+                  Expanded(
+                    flex: 19,
+                    child: _forecastCell(
+                      child: _buildForecastTideCell(
+                        slot,
+                        compact: compact,
+                        primarySize: primarySize,
+                        secondarySize: secondarySize,
+                      ),
+                    ),
+                  ),
                 ],
               );
             },
@@ -2155,6 +2348,74 @@ class _TidePageState extends State<TidePage>
       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 9),
       child: Center(child: child),
     );
+  }
+
+  Widget _buildForecastTideCell(
+    tm.HourlyForecastSlot slot, {
+    required bool compact,
+    required double primarySize,
+    required double secondarySize,
+  }) {
+    final extremum = slot.tideExtremum;
+    final height = extremum?.heightM ?? slot.tideHeightM;
+    if (height == null) {
+      return Text(
+        context.tr('tide.unavailableShort'),
+        style: TextStyle(
+          color: _txt(0.48),
+          fontSize: primarySize,
+          fontWeight: FontWeight.w800,
+        ),
+      );
+    }
+
+    final isHigh = extremum?.isHigh;
+    final isRising = slot.tideIsRising ?? false;
+    final color = isHigh == true
+        ? const Color(0xFF35D66F)
+        : isHigh == false
+            ? _accent
+            : _txt(0.48);
+    final icon = isHigh == true
+        ? Icons.trending_up_rounded
+        : isHigh == false
+            ? Icons.trending_down_rounded
+            : isRising
+                ? Icons.north_east_rounded
+                : Icons.south_east_rounded;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: color, size: compact ? 15 : 17),
+        const SizedBox(height: 1),
+        Text(
+          _meterValue(height),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: _txt(0.92),
+            fontSize: primarySize,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        if (extremum != null)
+          Text(
+            _formatForecastEventTime(extremum.time),
+            maxLines: 1,
+            style: TextStyle(
+              color: color,
+              fontSize: secondarySize,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+      ],
+    );
+  }
+
+  String _formatForecastEventTime(DateTime time) {
+    return '${time.hour.toString().padLeft(2, '0')}:'
+        '${time.minute.toString().padLeft(2, '0')}';
   }
 
   bool _isToday(DateTime time) {
