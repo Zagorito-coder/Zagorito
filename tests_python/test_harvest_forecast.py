@@ -1,11 +1,125 @@
 import threading
 import time
 import unittest
+from datetime import datetime, timedelta, timezone
 from unittest import mock
 
 import requests
 
 import harvest_forecast
+
+
+def _valid_days(day_count=10):
+    """Payload GFS local UTC+1 : 01/04/.../22, huit pas natifs par jour."""
+    first_day = datetime(2026, 8, 1)
+    days = []
+    for day_index in range(day_count):
+        current_day = first_day + timedelta(days=day_index)
+        slots = []
+        for hour in range(1, 24, 3):
+            slot_time = current_day.replace(hour=hour)
+            slots.append(
+                {
+                    "hour": slot_time.isoformat(timespec="minutes"),
+                    "wind_speed_kt": 10.0,
+                    "wind_dir_deg": 320.0,
+                    "wave_height_m": 1.1,
+                    "wave_period_s": 9.0,
+                    "wave_dir_deg": 305.0,
+                    "temp_c": 24,
+                    "weather_code": 1.0,
+                    "is_day": 1.0,
+                    "rating": 4,
+                    "models": {
+                        "wind": {
+                            "wind_speed_kt": 10.0,
+                            "wind_gust_kt": 12.0,
+                            "wind_dir_deg": 320.0,
+                            "pressure_msl": 1014.0,
+                            "precipitation_mm": 0.0,
+                            "precip_prob_pct": 0.0,
+                            "rel_humidity_pct": 70.0,
+                            "cloud_total_pct": 5.0,
+                            "visibility_m": 20000.0,
+                        },
+                        "hires": {"wind_speed_kt": 9.0},
+                        "wave": {
+                            "wave_height_m": 1.1,
+                            "wave_period_s": 9.0,
+                            "wave_dir_deg": 305.0,
+                            "swell_height_m": 0.8,
+                            "swell_period_s": 10.0,
+                            "swell_dir_deg": 300.0,
+                        },
+                    },
+                }
+            )
+        days.append(
+            {
+                "date": current_day.date().isoformat(),
+                "slots": slots,
+            }
+        )
+    return days
+
+
+class _FakeSnapshot:
+    def __init__(self, data):
+        self.exists = data is not None
+        self._data = data
+
+    def to_dict(self):
+        return self._data
+
+
+class _FakeDocument:
+    def __init__(self, database, collection_name, document_id):
+        self.database = database
+        self.collection_name = collection_name
+        self.document_id = document_id
+
+    @property
+    def key(self):
+        return self.collection_name, self.document_id
+
+    def get(self):
+        return _FakeSnapshot(self.database.documents.get(self.key))
+
+
+class _FakeCollection:
+    def __init__(self, database, name):
+        self.database = database
+        self.name = name
+
+    def document(self, document_id):
+        return _FakeDocument(self.database, self.name, document_id)
+
+
+class _FakeBatch:
+    def __init__(self):
+        self.operations = []
+        self.commit_count = 0
+
+    def set(self, reference, data, merge=False):
+        self.operations.append((reference.key, data, merge))
+
+    def commit(self):
+        self.commit_count += 1
+
+
+class _FakeDatabase:
+    def __init__(self, documents=None):
+        self.documents = {} if documents is None else documents
+        self.last_batch = None
+        self.batch_count = 0
+
+    def collection(self, name):
+        return _FakeCollection(self, name)
+
+    def batch(self):
+        self.batch_count += 1
+        self.last_batch = _FakeBatch()
+        return self.last_batch
 
 
 class FakeResponse:
@@ -112,7 +226,7 @@ class FetchJsonTests(unittest.TestCase):
 
 
 class StationCollectionTests(unittest.TestCase):
-    def test_station_model_failure_is_isolated(self):
+    def test_station_model_failure_stops_following_model_calls(self):
         spot = {"id": "test", "name": "Test", "lat": 1.0, "lon": 2.0}
 
         def success(_lat, _lon):
@@ -121,12 +235,13 @@ class StationCollectionTests(unittest.TestCase):
         def failure(_lat, _lon):
             raise requests.ReadTimeout("timeout")
 
+        wave_fetcher = mock.Mock(side_effect=AssertionError("appel interdit"))
         result = harvest_forecast._fetch_station_models(
             spot,
             fetchers=(
                 ("wind", success),
                 ("hires", failure),
-                ("wave", success),
+                ("wave", wave_fetcher),
             ),
         )
 
@@ -134,7 +249,8 @@ class StationCollectionTests(unittest.TestCase):
         self.assertIsNone(result["models"]["hires"])
         self.assertIsInstance(result["errors"]["hires"], requests.ReadTimeout)
         self.assertIsNotNone(result["models"]["wind"])
-        self.assertIsNotNone(result["models"]["wave"])
+        self.assertNotIn("wave", result["models"])
+        wave_fetcher.assert_not_called()
 
     def test_parallel_iterator_is_bounded_and_returns_every_spot(self):
         spots = [
@@ -187,6 +303,7 @@ class SpotCatalogTests(unittest.TestCase):
     def test_known_inland_cells_keep_their_validated_coastal_coordinates(self):
         by_id = {spot["id"]: spot for spot in harvest_forecast.SPOTS}
         expected = {
+            "casablanca_maroc": (33.5971, -7.6315),
             "tunis_tunisie": (36.82, 10.30),
             "basra_irak": (29.97, 48.47),
             "tetouan_maroc": (35.62, -5.27),
@@ -202,6 +319,310 @@ class SpotCatalogTests(unittest.TestCase):
             )
 
 
+class NativeGfsStepTests(unittest.TestCase):
+    def test_casablanca_utc_plus_one_uses_01_04_07_local_slots(self):
+        self.assertTrue(
+            harvest_forecast._is_native_gfs_step(
+                "2026-08-14T01:00",
+                3600,
+            )
+        )
+        self.assertTrue(
+            harvest_forecast._is_native_gfs_step(
+                "2026-08-14T04:00",
+                3600,
+            )
+        )
+        self.assertFalse(
+            harvest_forecast._is_native_gfs_step(
+                "2026-08-14T00:00",
+                3600,
+            )
+        )
+
+    def test_utc_and_negative_offsets_remain_aligned_to_gfs(self):
+        self.assertTrue(
+            harvest_forecast._is_native_gfs_step(
+                "2026-08-14T03:00",
+                0,
+            )
+        )
+        self.assertTrue(
+            harvest_forecast._is_native_gfs_step(
+                "2026-08-13T23:00",
+                -3600,
+            )
+        )
+
+
+class PayloadValidationTests(unittest.TestCase):
+    def test_ten_complete_consecutive_native_gfs_days_are_valid(self):
+        harvest_forecast.validate_payload(_valid_days(), utc_offset_seconds=3600)
+
+    def test_less_than_ten_days_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "10 requis"):
+            harvest_forecast.validate_payload(
+                _valid_days(day_count=9),
+                utc_offset_seconds=3600,
+            )
+
+    def test_day_with_less_than_eight_slots_is_rejected(self):
+        days = _valid_days()
+        days[3]["slots"].pop()
+
+        with self.assertRaisesRegex(ValueError, "exactement 8"):
+            harvest_forecast.validate_payload(days, utc_offset_seconds=3600)
+
+    def test_non_native_local_slot_is_rejected(self):
+        days = _valid_days()
+        days[0]["slots"][0]["hour"] = "2026-08-01T00:00"
+
+        with self.assertRaisesRegex(ValueError, "pas GFS UTC"):
+            harvest_forecast.validate_payload(days, utc_offset_seconds=3600)
+
+    def test_duplicate_or_unsorted_dates_are_rejected(self):
+        duplicated = _valid_days()
+        duplicated[1]["date"] = duplicated[0]["date"]
+        with self.assertRaisesRegex(ValueError, "uniques"):
+            harvest_forecast.validate_payload(
+                duplicated,
+                utc_offset_seconds=3600,
+            )
+
+        unsorted = _valid_days()
+        unsorted[0], unsorted[1] = unsorted[1], unsorted[0]
+        with self.assertRaisesRegex(ValueError, "triées"):
+            harvest_forecast.validate_payload(
+                unsorted,
+                utc_offset_seconds=3600,
+            )
+
+
+class ProductionWriteAndVerificationTests(unittest.TestCase):
+    def setUp(self):
+        self.spot = {
+            "id": "test_spot",
+            "name": "Test côtier",
+            "lat": 33.1,
+            "lon": -7.2,
+        }
+        self.run_id = "123-2-deadbeef"
+        self.started = datetime(2026, 8, 14, 10, 0, tzinfo=timezone.utc)
+        self.updated = self.started + timedelta(minutes=1)
+
+    def _documents(self):
+        days = _valid_days()
+        weather = {
+            "forecast_run_id": self.run_id,
+            "spot_id": self.spot["id"],
+            "last_update": self.updated,
+            "location_name": self.spot["name"],
+            "latitude": self.spot["lat"],
+            "longitude": self.spot["lon"],
+            "utc_offset_seconds": 3600,
+            "days": days,
+        }
+        index = {
+            "forecast_run_id": self.run_id,
+            "spot_id": self.spot["id"],
+            "last_update": self.updated,
+            "name": self.spot["name"],
+            "latitude": self.spot["lat"],
+            "longitude": self.spot["lon"],
+        }
+        gfs = harvest_forecast.build_conditions_gfs_summary(
+            days,
+            forecast_run_id=self.run_id,
+            spot_id=self.spot["id"],
+            last_update=self.updated,
+        )
+        return {
+            ("spots_meteo", self.spot["id"]): weather,
+            ("spots_index", self.spot["id"]): index,
+            ("conditions", "test_condition"): {"gfs": gfs},
+        }
+
+    def test_station_publication_keeps_exactly_ten_validated_days(self):
+        station_result = {
+            "spot": self.spot,
+            "models": {
+                "wind": {"hourly": {"time": []}, "utc_offset_seconds": 3600},
+                "hires": {"hourly": {"time": []}},
+                "wave": {"hourly": {"time": []}},
+            },
+            "errors": {},
+        }
+        with mock.patch.object(
+            harvest_forecast,
+            "build_days_payload",
+            return_value=(_valid_days(day_count=15), 23.0),
+        ):
+            publication = harvest_forecast._build_station_publication(
+                station_result,
+                self.run_id,
+                conditions_spot_ids={self.spot["id"]: "test_condition"},
+            )
+
+        self.assertEqual(10, len(publication["weather_doc"]["days"]))
+        self.assertEqual(
+            80,
+            len(publication["conditions_summary"]["hourly"]),
+        )
+
+    def test_global_write_uses_one_atomic_batch_for_251_documents(self):
+        database = _FakeDatabase()
+        spots = [
+            {
+                "id": f"spot_{index:03d}",
+                "name": f"Spot {index:03d}",
+                "lat": float(index) / 10,
+                "lon": -float(index) / 10,
+            }
+            for index in range(123)
+        ]
+        conditions_spot_ids = {
+            spot["id"]: f"condition_{index}"
+            for index, spot in enumerate(spots[:5])
+        }
+        publications = []
+        for spot in spots:
+            summary = None
+            if spot["id"] in conditions_spot_ids:
+                summary = {
+                    "forecast_run_id": self.run_id,
+                    "spot_id": spot["id"],
+                }
+            publications.append(
+                {
+                    "spot": spot,
+                    "weather_doc": {
+                        "forecast_run_id": self.run_id,
+                        "spot_id": spot["id"],
+                        "location_name": spot["name"],
+                        "latitude": spot["lat"],
+                        "longitude": spot["lon"],
+                    },
+                    "conditions_summary": summary,
+                }
+            )
+
+        write_count = harvest_forecast._write_forecast_batch(
+            database,
+            publications,
+            self.run_id,
+            conditions_spot_ids=conditions_spot_ids,
+        )
+
+        batch = database.last_batch
+        self.assertEqual(251, write_count)
+        self.assertEqual(1, database.batch_count)
+        self.assertEqual(1, batch.commit_count)
+        self.assertEqual(251, len(batch.operations))
+        self.assertEqual(123, sum(op[0][0] == "spots_meteo" for op in batch.operations))
+        self.assertEqual(123, sum(op[0][0] == "spots_index" for op in batch.operations))
+        self.assertEqual(5, sum(op[0][0] == "conditions" for op in batch.operations))
+
+    def test_station_failure_before_publication_creates_no_batch_or_commit(self):
+        database = _FakeDatabase()
+        failed_result = {
+            "spot": self.spot,
+            "models": {"wind": None},
+            "errors": {"wind": requests.ReadTimeout("timeout")},
+        }
+
+        with self.assertRaisesRegex(RuntimeError, "modèle wind indisponible"):
+            harvest_forecast._prepare_and_publish_forecasts(
+                database,
+                [failed_result],
+                self.run_id,
+                expected_spot_count=1,
+                conditions_spot_ids={},
+            )
+
+        self.assertEqual(0, database.batch_count)
+        self.assertIsNone(database.last_batch)
+
+    def test_late_station_build_failure_still_creates_no_batch_or_commit(self):
+        database = _FakeDatabase()
+        first_spot = dict(self.spot)
+        second_spot = {**self.spot, "id": "second_spot"}
+        first_publication = {
+            "spot": first_spot,
+            "weather_doc": {"days": _valid_days()},
+            "conditions_summary": None,
+        }
+        with mock.patch.object(
+            harvest_forecast,
+            "_build_station_publication",
+            side_effect=[first_publication, RuntimeError("build invalide")],
+        ):
+            with self.assertRaisesRegex(RuntimeError, "build invalide"):
+                harvest_forecast._prepare_and_publish_forecasts(
+                    database,
+                    [{"spot": first_spot}, {"spot": second_spot}],
+                    self.run_id,
+                    expected_spot_count=2,
+                    conditions_spot_ids={},
+                )
+
+        self.assertEqual(0, database.batch_count)
+        self.assertIsNone(database.last_batch)
+
+    def test_post_write_verification_accepts_matching_fresh_documents(self):
+        database = _FakeDatabase(self._documents())
+
+        harvest_forecast.verify_production_state(
+            database,
+            [self.spot],
+            self.run_id,
+            self.started,
+            conditions_spot_ids={self.spot["id"]: "test_condition"},
+            now=self.updated + timedelta(minutes=1),
+        )
+
+    def test_post_write_verification_rejects_wrong_run_id(self):
+        documents = self._documents()
+        documents[("spots_index", self.spot["id"])]["forecast_run_id"] = "old-run"
+        database = _FakeDatabase(documents)
+
+        with self.assertRaisesRegex(RuntimeError, "run id incorrect"):
+            harvest_forecast.verify_production_state(
+                database,
+                [self.spot],
+                self.run_id,
+                self.started,
+                conditions_spot_ids={self.spot["id"]: "test_condition"},
+                now=self.updated + timedelta(minutes=1),
+            )
+
+    def test_post_write_verification_rejects_stale_document(self):
+        documents = self._documents()
+        documents[("spots_meteo", self.spot["id"])]["last_update"] = (
+            self.started - timedelta(hours=1)
+        )
+        database = _FakeDatabase(documents)
+
+        with self.assertRaisesRegex(RuntimeError, "antérieur au run"):
+            harvest_forecast.verify_production_state(
+                database,
+                [self.spot],
+                self.run_id,
+                self.started,
+                conditions_spot_ids={self.spot["id"]: "test_condition"},
+                now=self.updated + timedelta(minutes=1),
+            )
+
+    def test_missing_model_fails_fast(self):
+        station_result = {
+            "spot": self.spot,
+            "models": {"wind": {}, "hires": None, "wave": {}},
+            "errors": {"hires": requests.ReadTimeout("timeout")},
+        }
+
+        with self.assertRaisesRegex(RuntimeError, "modèle hires indisponible"):
+            harvest_forecast._require_station_models(station_result)
+
+
 class ConditionsGfsSummaryTests(unittest.TestCase):
     def test_summary_keeps_ten_days_and_all_tide_page_metrics(self):
         def slot(time, pressure):
@@ -214,6 +635,7 @@ class ConditionsGfsSummaryTests(unittest.TestCase):
                 "wave_dir_deg": 315.0,
                 "temp_c": 23,
                 "weather_code": 2.0,
+                "is_day": 0.0,
                 "rating": 4,
                 "models": {
                     "wind": {
@@ -250,15 +672,25 @@ class ConditionsGfsSummaryTests(unittest.TestCase):
             for day in range(1, 12)
         ]
 
-        result = harvest_forecast.build_conditions_gfs_summary(days)
+        update_time = datetime(2026, 8, 14, tzinfo=timezone.utc)
+        result = harvest_forecast.build_conditions_gfs_summary(
+            days,
+            forecast_run_id="run-1",
+            spot_id="casablanca_maroc",
+            last_update=update_time,
+        )
 
         self.assertEqual("GFS ~13km", result["model"])
+        self.assertEqual("run-1", result["forecast_run_id"])
+        self.assertEqual("casablanca_maroc", result["spot_id"])
+        self.assertEqual(update_time, result["last_update"])
         self.assertEqual(10, len(result["hourly"]))
         first = result["hourly"][0]
         self.assertEqual("2026-08-01T00:00", first["time"])
         self.assertEqual(23.2, first["windSpeedKmh"])
         self.assertEqual(220.0, first["windDirectionDeg"])
         self.assertEqual(2, first["weatherCode"])
+        self.assertEqual(0, first["isDay"])
         self.assertEqual(23, first["temperatureC"])
         self.assertEqual(1.4, first["waveHeightM"])
         self.assertEqual(9.0, first["wavePeriodS"])

@@ -107,6 +107,12 @@ class SpotForecast {
 class ForecastFirestoreService {
   static final _db = FirebaseFirestore.instance;
   static const _gfsCacheDuration = Duration(minutes: 20);
+
+  /// Rayon maximal volontairement conservateur pour associer une position à
+  /// une station météo publiée. Au-delà de 75 km, une prévision régionale peut
+  /// ne plus représenter correctement les conditions côtières recherchées.
+  static const double maximumWeatherStationDistanceKm = 75.0;
+
   static final Map<String, _GfsCacheEntry> _gfsCache = {};
   static final Map<String, Future<GfsWeatherTimeline?>> _gfsRequests = {};
   static List<Map<String, dynamic>>? _spotIndexCache;
@@ -139,38 +145,65 @@ class ForecastFirestoreService {
     required double latitude,
     required double longitude,
   }) async {
-    if (!latitude.isFinite ||
-        !longitude.isFinite ||
-        latitude < -90 ||
-        latitude > 90 ||
-        longitude < -180 ||
-        longitude > 180) {
-      return null;
-    }
+    if (!_validCoordinates(latitude, longitude)) return null;
 
     final spots = _spotIndexCache ??= await listAvailableSpots();
     if (spots.isEmpty) return null;
 
-    Map<String, dynamic>? nearest;
+    final spotId = nearestWeatherStationIdWithinRadius(
+      stations: spots,
+      latitude: latitude,
+      longitude: longitude,
+    );
+    return spotId == null ? null : fetchGfsWeather(spotId);
+  }
+
+  /// Retourne l'identifiant de la station la plus proche uniquement si elle se
+  /// trouve dans le rayon strict de 75 km. Cette fonction pure permet de
+  /// garantir le même comportement dans le client et dans les tests, sans accès
+  /// Firestore.
+  static String? nearestWeatherStationIdWithinRadius({
+    required Iterable<Map<String, dynamic>> stations,
+    required double latitude,
+    required double longitude,
+  }) {
+    if (!_validCoordinates(latitude, longitude)) return null;
+
+    String? nearestId;
     var shortestDistance = double.infinity;
-    for (final spot in spots) {
-      final spotLatitude = (spot['latitude'] as num?)?.toDouble();
-      final spotLongitude = (spot['longitude'] as num?)?.toDouble();
-      if (spotLatitude == null || spotLongitude == null) continue;
+    for (final station in stations) {
+      final id = station['id'];
+      final stationLatitude = (station['latitude'] as num?)?.toDouble();
+      final stationLongitude = (station['longitude'] as num?)?.toDouble();
+      if (id is! String ||
+          id.trim().isEmpty ||
+          stationLatitude == null ||
+          stationLongitude == null ||
+          !_validCoordinates(stationLatitude, stationLongitude)) {
+        continue;
+      }
       final distance = haversineKm(
         latitude,
         longitude,
-        spotLatitude,
-        spotLongitude,
+        stationLatitude,
+        stationLongitude,
       );
-      if (distance < shortestDistance) {
+      if (distance <= maximumWeatherStationDistanceKm &&
+          distance < shortestDistance) {
         shortestDistance = distance;
-        nearest = spot;
+        nearestId = id;
       }
     }
-    final spotId = nearest?['id'] as String?;
-    return spotId == null ? null : fetchGfsWeather(spotId);
+    return nearestId;
   }
+
+  static bool _validCoordinates(double latitude, double longitude) =>
+      latitude.isFinite &&
+      longitude.isFinite &&
+      latitude >= -90 &&
+      latitude <= 90 &&
+      longitude >= -180 &&
+      longitude <= 180;
 
   static Future<GfsWeatherTimeline?> fetchGfsWeather(String spotId) {
     final cached = _gfsCache[spotId];

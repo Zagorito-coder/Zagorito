@@ -17,7 +17,6 @@ import 'package:spots_app/services/forecast_firestore_service.dart';
 import 'package:spots_app/widgets/forecast_table.dart';
 import 'package:spots_app/widgets/app_back_button.dart';
 import 'package:spots_app/widgets/open_meteo_attribution.dart';
-import 'package:spots_app/utils/geo_utils.dart';
 import 'package:spots_app/theme.dart';
 
 @visibleForTesting
@@ -46,6 +45,27 @@ String fallbackForecastSpotId(List<Map<String, dynamic>> spots) {
   }
 
   return (validSpots.first['id'] as String).trim();
+}
+
+/// Sélectionne une station selon la disponibilité réelle de la position.
+///
+/// Une position absente conserve le repli explicite et déterministe existant.
+/// Lorsqu'une position est connue, aucune station située au-delà du rayon
+/// professionnel de 75 km n'est substituée silencieusement.
+@visibleForTesting
+String? forecastSpotIdForPosition({
+  required List<Map<String, dynamic>> spots,
+  required double? latitude,
+  required double? longitude,
+}) {
+  if (latitude == null || longitude == null) {
+    return fallbackForecastSpotId(spots);
+  }
+  return ForecastFirestoreService.nearestWeatherStationIdWithinRadius(
+    stations: spots,
+    latitude: latitude,
+    longitude: longitude,
+  );
 }
 
 class ForecastPage extends StatefulWidget {
@@ -100,11 +120,22 @@ class _ForecastPageState extends State<ForecastPage> {
       }
 
       // 2. Determiner quel spot utiliser
-      String spotId;
+      String? spotId;
       if (widget.spotId != null) {
         spotId = widget.spotId!;
       } else {
         spotId = await _findNearestSpot();
+      }
+
+      if (spotId == null) {
+        if (!mounted) return;
+        setState(() {
+          _error = 'Aucune station météo disponible à moins de '
+              '${ForecastFirestoreService.maximumWeatherStationDistanceKm.toInt()} km '
+              'de votre position.';
+          _isLoading = false;
+        });
+        return;
       }
 
       // 3. Charger les previsions
@@ -120,7 +151,7 @@ class _ForecastPageState extends State<ForecastPage> {
   }
 
   /// Trouve le spot le plus proche de la position GPS actuelle
-  Future<String> _findNearestSpot() async {
+  Future<String?> _findNearestSpot() async {
     final fallbackSpotId = fallbackForecastSpotId(_availableSpots);
 
     // Cette détection est facultative : elle ne demande jamais une permission
@@ -139,23 +170,11 @@ class _ForecastPageState extends State<ForecastPage> {
         ),
       );
 
-      // Trouver le spot le plus proche
-      String nearestId = fallbackSpotId;
-      double minDist = double.infinity;
-
-      for (final spot in _availableSpots) {
-        final dist = haversineKm(
-          pos.latitude,
-          pos.longitude,
-          spot['latitude'] as double,
-          spot['longitude'] as double,
-        );
-        if (dist < minDist) {
-          minDist = dist;
-          nearestId = spot['id'] as String;
-        }
-      }
-      return nearestId;
+      return forecastSpotIdForPosition(
+        spots: _availableSpots,
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+      );
     } catch (_) {
       return fallbackSpotId;
     }
