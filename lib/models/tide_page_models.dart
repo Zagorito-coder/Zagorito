@@ -89,6 +89,7 @@ class HourlyForecastSlot {
   final double? windGustKmh;
   final double? windDirectionDeg;
   final int? weatherCode;
+  final bool? isDay;
   final double? temperatureC;
   final double? pressureHpa;
   final double? waveHeightM;
@@ -107,6 +108,7 @@ class HourlyForecastSlot {
     this.windGustKmh,
     this.windDirectionDeg,
     this.weatherCode,
+    this.isDay,
     this.temperatureC,
     this.pressureHpa,
     this.waveHeightM,

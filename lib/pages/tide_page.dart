@@ -20,6 +20,7 @@ import '../widgets/app_back_button.dart';
 import '../widgets/open_meteo_attribution.dart';
 import '../widgets/tide_coefficients_view.dart';
 import '../l10n/app_localizations.dart';
+import '../utils/wind_direction.dart';
 
 // ── Palette adaptative ──────────────────────────────────────
 bool get _isDark => ThemeController.instance.isDark;
@@ -373,6 +374,7 @@ List<tm.HourlyForecastDay> _groupHourlyForecast(
             windGustKmh: point.windGustKmh ?? todayCard?.windGustKmh,
             windDirectionDeg: point.windDirectionDeg,
             weatherCode: point.weatherCode,
+            isDay: point.isDay,
             temperatureC: point.temperatureC ?? todayCard?.temp.toDouble(),
             pressureHpa: point.pressureHpa ?? todayCard?.pressureHpa,
             waveHeightM: point.waveHeightM ?? todayCard?.waveHeight,
@@ -2187,7 +2189,7 @@ class _TidePageState extends State<TidePage>
                         children: [
                           if (windDirection != null)
                             Transform.rotate(
-                              angle: windDirection * math.pi / 180,
+                              angle: windFlowAngleRadians(windDirection),
                               child: Icon(
                                 Icons.navigation_rounded,
                                 color: _accent,
@@ -2211,15 +2213,7 @@ class _TidePageState extends State<TidePage>
                                   ),
                                 ),
                                 Text(
-                                  slot.windGustKmh == null
-                                      ? context.tr('tide.unavailableShort')
-                                      : context.trArgs(
-                                          'tide.maxWindCompact',
-                                          args: {
-                                            'speed':
-                                                '${slot.windGustKmh!.round()}',
-                                          },
-                                        ),
+                                  _windDetails(slot),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
@@ -2452,6 +2446,24 @@ class _TidePageState extends State<TidePage>
         : parts.join(' · ');
   }
 
+  String _windDetails(tm.HourlyForecastSlot slot) {
+    final parts = <String>[];
+    if (slot.windDirectionDeg != null) {
+      parts.add('${slot.windDirectionDeg!.round()}°');
+    }
+    if (slot.windGustKmh != null) {
+      parts.add(
+        context.trArgs(
+          'tide.maxWindCompact',
+          args: {'speed': '${slot.windGustKmh!.round()}'},
+        ),
+      );
+    }
+    return parts.isEmpty
+        ? context.tr('tide.unavailableShort')
+        : parts.join(' · ');
+  }
+
   Color _activityColor(int? score) {
     if (score == null) return _txt(0.24);
     if (score >= 75) return _activityHigh;
@@ -2467,20 +2479,28 @@ class _TidePageState extends State<TidePage>
       if (code >= 51) return Icons.water_drop_rounded;
       if (code >= 45) return Icons.foggy;
       if (code >= 3) return Icons.cloud_rounded;
-      if (code >= 1) return Icons.wb_cloudy_rounded;
+      if (code >= 1) {
+        return slot.isDay == false
+            ? Icons.nights_stay_rounded
+            : Icons.wb_cloudy_rounded;
+      }
     }
     if ((slot.precipitationProbabilityPct ?? 0) >= 45) {
       return Icons.water_drop_rounded;
     }
     if ((slot.cloudCoverPct ?? 0) >= 65) return Icons.cloud_rounded;
-    final isNight = slot.time.hour < 6 || slot.time.hour >= 20;
+    final isNight = slot.isDay == null
+        ? slot.time.hour < 6 || slot.time.hour >= 20
+        : !slot.isDay!;
     return isNight ? Icons.nightlight_round : Icons.wb_sunny_rounded;
   }
 
   Color _weatherColor(tm.HourlyForecastSlot slot) {
     final icon = _weatherIcon(slot);
     if (icon == Icons.wb_sunny_rounded) return const Color(0xFFFFBF3F);
-    if (icon == Icons.nightlight_round) return const Color(0xFF91B7FF);
+    if (icon == Icons.nightlight_round || icon == Icons.nights_stay_rounded) {
+      return const Color(0xFF91B7FF);
+    }
     if (icon == Icons.water_drop_rounded ||
         icon == Icons.thunderstorm_rounded) {
       return const Color(0xFF43BFF0);
