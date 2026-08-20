@@ -61,6 +61,12 @@ from firebase_admin import credentials, firestore
 OPEN_METEO_API_KEY = (os.environ.get("OPEN_METEO_API_KEY") or "").strip() or None
 FORECAST_RUN_ID = (os.environ.get("FORECAST_RUN_ID") or "").strip() or None
 
+# Un document météo de dix jours pèse environ 90 Kio avec les trois modèles.
+# Firestore refuse tout Commit supérieur à 10 Mio. Une limite fixe de vingt
+# stations garde chaque requête très loin de ce plafond, y compris lorsque les
+# cinq résumés ``conditions`` sont présents dans le même lot.
+PUBLISH_BATCH_STATION_COUNT = 20
+
 FORECAST_BASE_URL = "https://customer-api.open-meteo.com/v1/forecast"
 MARINE_BASE_URL = "https://customer-marine-api.open-meteo.com/v1/marine"
 
@@ -1111,14 +1117,20 @@ def _validate_publications_before_commit(
         )
 
 
-def _write_forecast_batch(
+def _write_forecast_batches(
     db,
     publications,
     run_id,
     *,
     conditions_spot_ids=CONDITIONS_SPOT_IDS,
 ):
-    """Publie le run entier dans un unique WriteBatch Firestore atomique."""
+    """Publie des lots atomiques bornés après validation du run complet.
+
+    Les trois documents éventuels d'une station (météo, index et résumé de
+    conditions) restent toujours dans le même WriteBatch. Si un Commit échoue,
+    les stations déjà publiées restent cohérentes et les autres conservent leur
+    dernière version valide ; l'exception interrompt immédiatement le job.
+    """
     _validate_publications_before_commit(
         publications,
         run_id,
@@ -1126,49 +1138,65 @@ def _write_forecast_batch(
     )
 
     expected_write_count = len(publications) * 2 + len(conditions_spot_ids)
-    if expected_write_count > 500:
-        raise ValueError(
-            f"Lot Firestore trop grand : {expected_write_count} écritures (>500)."
-        )
-
-    batch = db.batch()
     write_count = 0
-    for publication in publications:
-        spot = publication["spot"]
-        spot_id = spot["id"]
-        weather_ref = db.collection("spots_meteo").document(spot_id)
-        index_ref = db.collection("spots_index").document(spot_id)
-        batch.set(weather_ref, publication["weather_doc"])
-        write_count += 1
-        batch.set(
-            index_ref,
-            {
-                "forecast_run_id": run_id,
-                "spot_id": spot_id,
-                "last_update": firestore.SERVER_TIMESTAMP,
-                "name": spot["name"],
-                "latitude": spot["lat"],
-                "longitude": spot["lon"],
-            },
-        )
-        write_count += 1
-
-        conditions_id = conditions_spot_ids.get(spot_id)
-        if conditions_id is not None:
-            conditions_ref = db.collection("conditions").document(conditions_id)
+    commit_count = 0
+    for start in range(0, len(publications), PUBLISH_BATCH_STATION_COUNT):
+        station_batch = publications[
+            start : start + PUBLISH_BATCH_STATION_COUNT
+        ]
+        batch = db.batch()
+        batch_write_count = 0
+        for publication in station_batch:
+            spot = publication["spot"]
+            spot_id = spot["id"]
+            weather_ref = db.collection("spots_meteo").document(spot_id)
+            index_ref = db.collection("spots_index").document(spot_id)
+            batch.set(weather_ref, publication["weather_doc"])
+            write_count += 1
+            batch_write_count += 1
             batch.set(
-                conditions_ref,
-                {"gfs": publication["conditions_summary"]},
-                merge=True,
+                index_ref,
+                {
+                    "forecast_run_id": run_id,
+                    "spot_id": spot_id,
+                    "last_update": firestore.SERVER_TIMESTAMP,
+                    "name": spot["name"],
+                    "latitude": spot["lat"],
+                    "longitude": spot["lon"],
+                },
             )
             write_count += 1
+            batch_write_count += 1
+
+            conditions_id = conditions_spot_ids.get(spot_id)
+            if conditions_id is not None:
+                conditions_ref = db.collection("conditions").document(
+                    conditions_id
+                )
+                batch.set(
+                    conditions_ref,
+                    {"gfs": publication["conditions_summary"]},
+                    merge=True,
+                )
+                write_count += 1
+                batch_write_count += 1
+
+        if batch_write_count > PUBLISH_BATCH_STATION_COUNT * 3:
+            raise RuntimeError(
+                f"Sous-lot Firestore inattendu : {batch_write_count} écritures."
+            )
+        batch.commit()
+        commit_count += 1
+        print(
+            f"  -> Lot Firestore {commit_count} publié : "
+            f"{len(station_batch)} station(s), {batch_write_count} écriture(s)."
+        )
 
     if write_count != expected_write_count:
         raise RuntimeError(
             f"Lot Firestore incomplet : {write_count}/{expected_write_count} écritures."
         )
-    batch.commit()
-    return write_count
+    return write_count, commit_count
 
 
 def _prepare_and_publish_forecasts(
@@ -1199,13 +1227,13 @@ def _prepare_and_publish_forecasts(
             f"{len(publications)}/{expected_spot_count} stations."
         )
 
-    write_count = _write_forecast_batch(
+    write_count, commit_count = _write_forecast_batches(
         db,
         publications,
         run_id,
         conditions_spot_ids=conditions_spot_ids,
     )
-    return publications, write_count
+    return publications, write_count, commit_count
 
 
 def _snapshot_data(snapshot, label):
@@ -1528,9 +1556,9 @@ def main():
     db = firestore.client()
 
     # Aucune écriture n'est créée tant que les 123 stations n'ont pas
-    # toutes passé les contrôles modèles/build/dates/créneaux. Les 251
-    # documents sont ensuite publiés par un seul commit atomique (<500).
-    publications, write_count = _prepare_and_publish_forecasts(
+    # toutes passé les contrôles modèles/build/dates/créneaux. Les documents
+    # sont ensuite publiés par lots atomiques bornés sous la limite de 10 Mio.
+    publications, write_count, commit_count = _prepare_and_publish_forecasts(
         db,
         _iter_station_results(SPOTS),
         FORECAST_RUN_ID,
@@ -1543,7 +1571,8 @@ def main():
     print(f"Termine en {elapsed:.0f}s.")
     print(f"Réussis: {success}")
     print(f"Total spots: {len(SPOTS)}")
-    print(f"Écritures Firestore atomiques: {write_count}")
+    print(f"Écritures Firestore: {write_count}")
+    print(f"Lots Firestore atomiques: {commit_count}")
     if success != len(SPOTS):
         raise RuntimeError(
             f"Récolte incomplète : {success}/{len(SPOTS)} stations écrites."

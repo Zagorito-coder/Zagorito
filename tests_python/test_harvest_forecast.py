@@ -96,7 +96,8 @@ class _FakeCollection:
 
 
 class _FakeBatch:
-    def __init__(self):
+    def __init__(self, database):
+        self.database = database
         self.operations = []
         self.commit_count = 0
 
@@ -105,12 +106,22 @@ class _FakeBatch:
 
     def commit(self):
         self.commit_count += 1
+        self.database.commit_attempt_count += 1
+        if (
+            self.database.fail_commit_number is not None
+            and self.database.commit_attempt_count
+            == self.database.fail_commit_number
+        ):
+            raise RuntimeError("échec commit Firestore simulé")
 
 
 class _FakeDatabase:
-    def __init__(self, documents=None):
+    def __init__(self, documents=None, *, fail_commit_number=None):
         self.documents = {} if documents is None else documents
+        self.fail_commit_number = fail_commit_number
+        self.commit_attempt_count = 0
         self.last_batch = None
+        self.batches = []
         self.batch_count = 0
 
     def collection(self, name):
@@ -118,7 +129,8 @@ class _FakeDatabase:
 
     def batch(self):
         self.batch_count += 1
-        self.last_batch = _FakeBatch()
+        self.last_batch = _FakeBatch(self)
+        self.batches.append(self.last_batch)
         return self.last_batch
 
 
@@ -469,7 +481,7 @@ class ProductionWriteAndVerificationTests(unittest.TestCase):
             len(publication["conditions_summary"]["hourly"]),
         )
 
-    def test_global_write_uses_one_atomic_batch_for_251_documents(self):
+    def test_global_write_uses_bounded_atomic_batches_for_251_documents(self):
         database = _FakeDatabase()
         spots = [
             {
@@ -506,21 +518,29 @@ class ProductionWriteAndVerificationTests(unittest.TestCase):
                 }
             )
 
-        write_count = harvest_forecast._write_forecast_batch(
+        write_count, commit_count = harvest_forecast._write_forecast_batches(
             database,
             publications,
             self.run_id,
             conditions_spot_ids=conditions_spot_ids,
         )
 
-        batch = database.last_batch
         self.assertEqual(251, write_count)
-        self.assertEqual(1, database.batch_count)
-        self.assertEqual(1, batch.commit_count)
-        self.assertEqual(251, len(batch.operations))
-        self.assertEqual(123, sum(op[0][0] == "spots_meteo" for op in batch.operations))
-        self.assertEqual(123, sum(op[0][0] == "spots_index" for op in batch.operations))
-        self.assertEqual(5, sum(op[0][0] == "conditions" for op in batch.operations))
+        self.assertEqual(7, commit_count)
+        self.assertEqual(7, database.batch_count)
+        self.assertTrue(all(batch.commit_count == 1 for batch in database.batches))
+        self.assertTrue(
+            all(len(batch.operations) <= 45 for batch in database.batches)
+        )
+        operations = [
+            operation
+            for batch in database.batches
+            for operation in batch.operations
+        ]
+        self.assertEqual(251, len(operations))
+        self.assertEqual(123, sum(op[0][0] == "spots_meteo" for op in operations))
+        self.assertEqual(123, sum(op[0][0] == "spots_index" for op in operations))
+        self.assertEqual(5, sum(op[0][0] == "conditions" for op in operations))
 
     def test_station_failure_before_publication_creates_no_batch_or_commit(self):
         database = _FakeDatabase()
@@ -541,6 +561,49 @@ class ProductionWriteAndVerificationTests(unittest.TestCase):
 
         self.assertEqual(0, database.batch_count)
         self.assertIsNone(database.last_batch)
+
+    def test_commit_failure_stops_before_creating_later_batches(self):
+        database = _FakeDatabase(fail_commit_number=2)
+        publications = []
+        for index in range(41):
+            spot = {
+                "id": f"spot_{index:03d}",
+                "name": f"Spot {index:03d}",
+                "lat": float(index) / 10,
+                "lon": -float(index) / 10,
+            }
+            publications.append(
+                {
+                    "spot": spot,
+                    "weather_doc": {
+                        "forecast_run_id": self.run_id,
+                        "spot_id": spot["id"],
+                        "location_name": spot["name"],
+                        "latitude": spot["lat"],
+                        "longitude": spot["lon"],
+                    },
+                    "conditions_summary": None,
+                }
+            )
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "échec commit Firestore simulé",
+        ):
+            harvest_forecast._write_forecast_batches(
+                database,
+                publications,
+                self.run_id,
+                conditions_spot_ids={},
+            )
+
+        self.assertEqual(2, database.commit_attempt_count)
+        self.assertEqual(2, database.batch_count)
+        self.assertEqual([1, 1], [batch.commit_count for batch in database.batches])
+        self.assertEqual(
+            [40, 40],
+            [len(batch.operations) for batch in database.batches],
+        )
 
     def test_late_station_build_failure_still_creates_no_batch_or_commit(self):
         database = _FakeDatabase()
