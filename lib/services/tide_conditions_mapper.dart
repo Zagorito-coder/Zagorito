@@ -331,6 +331,12 @@ class TideConditionsMapper {
         minimum: 0,
         maximum: 100,
       );
+      final isDayValue = _boundedNumber(
+        slot,
+        'isDay',
+        minimum: 0,
+        maximum: 1,
+      );
       parsed.add(
         HourlyForecastPoint(
           time: time,
@@ -353,6 +359,7 @@ class TideConditionsMapper {
             maximum: 360,
           ),
           weatherCode: weatherCode?.round(),
+          isDay: isDayValue == null ? null : isDayValue.round() == 1,
           temperatureC: _boundedNumber(
             slot,
             'temperatureC',

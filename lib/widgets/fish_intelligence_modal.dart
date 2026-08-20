@@ -37,7 +37,6 @@ class FishIntelligenceModal extends StatelessWidget {
   });
 
   static const Color _cyan = Color(0xFF48CAE4);
-  static const Color _green = Color(0xFF52B788);
   static const Color _orange = Color(0xFFF4A261);
 
   @override
@@ -582,7 +581,6 @@ class _TideBlockState extends State<_TideBlock> {
     }
 
     final activity = _getTideActivity(t);
-    final isGood = activity > 0.5;
     final point = _currentPoint(t);
     final gfsPoint = _gfsWeather?.nearestTo(point?.time ?? DateTime.now());
     final wind = point?.windSpeedKmh;
@@ -606,45 +604,6 @@ class _TideBlockState extends State<_TideBlock> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _BlockTitle(l10n.translate('fishIntelligence.tideBlock')),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    l10n.translate('fishIntelligence.fishActivity'),
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      color: palette.secondaryText,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                Text(
-                  '${(activity * 100).round()}%',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isGood
-                        ? FishIntelligenceModal._green
-                        : FishIntelligenceModal._orange,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 5),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(5),
-              child: LinearProgressIndicator(
-                value: activity,
-                minHeight: 5,
-                backgroundColor: palette.progressBackground,
-                valueColor: AlwaysStoppedAnimation(
-                  isGood
-                      ? FishIntelligenceModal._green
-                      : FishIntelligenceModal._orange,
-                ),
-              ),
-            ),
             const SizedBox(height: 8),
             LayoutBuilder(
               builder: (context, constraints) {

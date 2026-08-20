@@ -458,7 +458,7 @@ class _PrivateCatchesViewState extends State<PrivateCatchesView> {
 
   Future<void> _openCommunityTerms() async {
     final uri = Uri.parse(
-      'https://zagorito-coder.github.io/boosterfish/terms-of-service/',
+      'https://www.boosterfish.com/terms-of-service/',
     );
     try {
       final opened = await launchUrl(

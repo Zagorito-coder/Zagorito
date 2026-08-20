@@ -380,9 +380,7 @@ class TideCoefficientsView extends StatelessWidget {
                         labels: [
                           context.tr('tide.alKsourLatin'),
                           context.tr('tide.elMaSghirLatin'),
-                          context
-                              .tr('tide.alQamrayerLatin')
-                              .replaceFirst('Al ', ''),
+                          context.tr('tide.alQamrayerLatin'),
                           context.tr('tide.alHamzLatin'),
                           context.tr('tide.elMaLkbirLatin'),
                         ],
@@ -585,7 +583,7 @@ class TideCoefficientsView extends StatelessWidget {
         );
       case MoroccanTidePeriod.alQamrayer:
         return _TraditionalPeriodData(
-          arabicName: 'القمراير / العفران',
+          arabicName: 'القصاير / الحصران',
           description: context.tr('tide.alQamrayerDescription'),
         );
       case MoroccanTidePeriod.alHamz:

@@ -72,6 +72,9 @@ jobs:
       - name: Executer le script de recolte
         env:
           OPEN_METEO_API_KEY: ${{ secrets.OPEN_METEO_API_KEY }}
+          # Identifiant immuable et unique, recopié dans chaque document puis
+          # contrôlé par la relecture Production de fin de récolte.
+          FORECAST_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
         run: python -u harvest_forecast.py
 
       - name: Nettoyer la cle (securite)

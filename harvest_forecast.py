@@ -47,7 +47,7 @@ import random
 import threading
 import time
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
-from datetime import datetime
+from datetime import date, datetime, timedelta, timezone
 from collections import defaultdict
 
 import requests
@@ -59,6 +59,13 @@ from firebase_admin import credentials, firestore
 # ---------------------------------------------------------------------------
 # Clé commerciale injectée uniquement par le job serveur/GitHub Actions.
 OPEN_METEO_API_KEY = (os.environ.get("OPEN_METEO_API_KEY") or "").strip() or None
+FORECAST_RUN_ID = (os.environ.get("FORECAST_RUN_ID") or "").strip() or None
+
+# Un document météo de dix jours pèse environ 90 Kio avec les trois modèles.
+# Firestore refuse tout Commit supérieur à 10 Mio. Une limite fixe de vingt
+# stations garde chaque requête très loin de ce plafond, y compris lorsque les
+# cinq résumés ``conditions`` sont présents dans le même lot.
+PUBLISH_BATCH_STATION_COUNT = 20
 
 FORECAST_BASE_URL = "https://customer-api.open-meteo.com/v1/forecast"
 MARINE_BASE_URL = "https://customer-marine-api.open-meteo.com/v1/marine"
@@ -68,7 +75,10 @@ MARINE_BASE_URL = "https://customer-marine-api.open-meteo.com/v1/marine"
 # ---------------------------------------------------------------------------
 SPOTS = [
     # === Afrique du Nord (Maghreb) ===
-    {"id": "casablanca_maroc", "name": "Casablanca, Maroc", "lat": 33.57, "lon": -7.59},
+    # Point côtier Bourgogne Ouest utilisé par la référence de comparaison.
+    # Le centre-ville produisait une interpolation moins représentative du
+    # vent réellement rencontré sur le littoral casablancais.
+    {"id": "casablanca_maroc", "name": "Casablanca, Maroc", "lat": 33.5971, "lon": -7.6315},
     {"id": "agadir_maroc", "name": "Agadir, Maroc", "lat": 30.42, "lon": -9.60},
     {"id": "tanger_maroc", "name": "Tanger, Maroc", "lat": 35.77, "lon": -5.81},
     {"id": "rabat_maroc", "name": "Rabat, Maroc", "lat": 34.02, "lon": -6.84},
@@ -231,6 +241,8 @@ CONDITIONS_SPOT_IDS = {
     "essaouira_maroc": "essaouira",
 }
 CONDITIONS_GFS_DAYS = 10
+EXPECTED_SLOTS_PER_DAY = 24 // STEP_HOURS
+FRESHNESS_CLOCK_SKEW = timedelta(minutes=5)
 
 
 # ---------------------------------------------------------------------------
@@ -289,6 +301,18 @@ def _hourly_num(hourly, key, index, default=None):
     return _safe_num(values[index], default)
 
 
+def _is_native_gfs_step(local_timestamp, utc_offset_seconds):
+    """Indique si une heure locale correspond à un pas GFS UTC de 3 h.
+
+    Open-Meteo renvoie les horodatages dans le fuseau demandé. La grille GFS
+    reste toutefois calée sur 00/03/06 UTC. À Casablanca (UTC+1), les créneaux
+    comparables sont donc 01/04/07, et non 00/03/06.
+    """
+    local_time = datetime.fromisoformat(local_timestamp)
+    utc_time = local_time - timedelta(seconds=int(utc_offset_seconds or 0))
+    return utc_time.minute == 0 and utc_time.hour % STEP_HOURS == 0
+
+
 def _error_summary(error):
     """Résumé sûr pour les logs : ne jamais imprimer une URL avec apikey."""
     if isinstance(error, ValueError):
@@ -340,7 +364,7 @@ HOURLY_COMMON_WIND = (
 # les publie officiellement. Le flux ECMWF reste inchangé afin qu'une variable
 # optionnelle non prise en charge ne bloque jamais la récolte haute résolution.
 HOURLY_GFS_WIND = (
-    f"{HOURLY_COMMON_WIND},cloud_cover,precipitation,visibility,weather_code"
+    f"{HOURLY_COMMON_WIND},cloud_cover,precipitation,visibility,weather_code,is_day"
 )
 
 HOURLY_WAVE = (
@@ -445,7 +469,7 @@ def fetch_wave_model(lat, lon):
 
 
 def _fetch_station_models(spot, fetchers=None):
-    """Récupère les trois modèles d'un spot dans un thread de travail."""
+    """Récupère les trois modèles et s'arrête au premier échec."""
     if fetchers is None:
         fetchers = (
             ("wind", fetch_wind_model),
@@ -461,6 +485,10 @@ def _fetch_station_models(spot, fetchers=None):
         except Exception as error:
             results[model_name] = None
             errors[model_name] = error
+            # Inutile de consommer deux autres appels commerciaux lorsque la
+            # station ne pourra de toute façon pas être publiée. Le consommateur
+            # interrompt ensuite le run avant toute écriture Firestore.
+            break
     return {
         "spot": spot,
         "models": results,
@@ -502,14 +530,16 @@ def _iter_station_results(spots, max_workers=MAX_STATION_WORKERS):
                 try:
                     yield future.result()
                 except Exception as error:
-                    # Garde-fou : _fetch_station_models capture déjà les erreurs
-                    # modèle par modèle, mais un défaut inattendu ne doit pas
-                    # interrompre les autres stations.
-                    yield {
-                        "spot": spot,
-                        "models": {},
-                        "errors": {"station": error},
-                    }
+                    # Un défaut inattendu du worker invalide le run complet.
+                    # Les futures encore en attente ne déclenchent aucune
+                    # écriture : la publication globale intervient seulement
+                    # après consommation et validation de tous les résultats.
+                    for pending_future in pending:
+                        pending_future.cancel()
+                    raise RuntimeError(
+                        f"Récolte interrompue pour {spot['id']} : "
+                        "erreur inattendue du worker."
+                    ) from error
                 submit_next()
 
 
@@ -537,6 +567,7 @@ def _extract_wind_model_slot(wind_data, wind_by_time, t):
         "rel_humidity_pct": _safe_num(h["relative_humidity_2m"][i]),
         "visibility_m": _hourly_num(h, "visibility", i),
         "weather_code": _hourly_num(h, "weather_code", i),
+        "is_day": _hourly_num(h, "is_day", i),
     }
 
 
@@ -615,10 +646,12 @@ def build_days_payload(wind_json, hires_json, wave_json, daily_json):
 
     days = defaultdict(list)
     water_temp_values = []
+    utc_offset_seconds = int(
+        _safe_num(wind_json.get("utc_offset_seconds"), 0) or 0
+    )
 
     for i, t in enumerate(w_data["time"]):
-        dt = datetime.fromisoformat(t)
-        if dt.hour % STEP_HOURS != 0:
+        if not _is_native_gfs_step(t, utc_offset_seconds):
             continue
 
         # --- modele vent GFS (utilise comme champs racine pour compat arriere) ---
@@ -663,6 +696,7 @@ def build_days_payload(wind_json, hires_json, wave_json, daily_json):
             "cloud_pct": round(cloud_total),
             "precip_pct": precip,
             "weather_code": _hourly_num(w_data, "weather_code", i),
+            "is_day": _hourly_num(w_data, "is_day", i),
             "rating": compute_rating(wind_kt, wave_h, precip),
             # nouveau sous-objet additif
             "models": {
@@ -691,12 +725,105 @@ def build_days_payload(wind_json, hires_json, wave_json, daily_json):
 # ---------------------------------------------------------------------------
 # 5. Validation
 # ---------------------------------------------------------------------------
-def validate_payload(days_payload):
+def validate_payload(
+    days_payload,
+    utc_offset_seconds=0,
+    required_days=CONDITIONS_GFS_DAYS,
+):
+    """Valide la structure servie par l'application avant toute écriture.
+
+    Les échéances GFS natives sont espacées de trois heures en UTC. Les
+    réponses Open-Meteo de ce pipeline utilisent un décalage UTC unique pour
+    la fenêtre demandée ; chaque journée locale doit donc contenir exactement
+    huit échéances. Si cette hypothèse change un jour (transition DST exposée
+    par slot, par exemple), la récolte échouera explicitement au lieu de
+    publier silencieusement un tableau incomplet ou décalé.
+
+    La validation historique de couverture vent/vagues reste appliquée à
+    l'ensemble du payload après les contrôles structurels des dix premiers
+    jours.
     """
-    Verifie qu'au moins 50% des slots ont des valeurs non-null pour
-    wind_speed_kt et wave.height_m (dans le sous-objet models.wave).
-    Leve ValueError si ce n'est pas le cas.
-    """
+    if not isinstance(days_payload, list) or len(days_payload) < required_days:
+        raise ValueError(
+            f"Prévisions insuffisantes : {len(days_payload or [])} jour(s), "
+            f"{required_days} requis."
+        )
+
+    if any(not isinstance(day, dict) for day in days_payload):
+        raise ValueError("Chaque journée de prévision doit être un objet.")
+
+    raw_dates = [day.get("date") for day in days_payload]
+    if any(not isinstance(value, str) for value in raw_dates):
+        raise ValueError("Chaque journée doit posséder une date ISO valide.")
+    if len(set(raw_dates)) != len(raw_dates):
+        raise ValueError("Les dates de prévision doivent être uniques.")
+    if raw_dates != sorted(raw_dates):
+        raise ValueError("Les dates de prévision doivent être triées.")
+
+    try:
+        parsed_dates = [date.fromisoformat(value) for value in raw_dates]
+    except ValueError as error:
+        raise ValueError("Une date de prévision n'est pas au format ISO.") from error
+
+    first_dates = parsed_dates[:required_days]
+    for index, current_date in enumerate(first_dates):
+        expected_date = first_dates[0] + timedelta(days=index)
+        if current_date != expected_date:
+            raise ValueError(
+                f"Les {required_days} premières dates doivent être consécutives : "
+                f"{expected_date.isoformat()} attendu, "
+                f"{current_date.isoformat()} reçu."
+            )
+
+        slots = days_payload[index].get("slots")
+        if not isinstance(slots, list) or len(slots) != EXPECTED_SLOTS_PER_DAY:
+            raise ValueError(
+                f"{current_date.isoformat()} doit contenir exactement "
+                f"{EXPECTED_SLOTS_PER_DAY} créneaux GFS natifs."
+            )
+
+        if any(not isinstance(slot, dict) for slot in slots):
+            raise ValueError(
+                f"Chaque créneau du {current_date.isoformat()} doit être un objet."
+            )
+        raw_hours = [slot.get("hour") for slot in slots]
+        if any(not isinstance(value, str) for value in raw_hours):
+            raise ValueError(
+                f"Créneau horaire ISO manquant le {current_date.isoformat()}."
+            )
+        if len(set(raw_hours)) != len(raw_hours) or raw_hours != sorted(raw_hours):
+            raise ValueError(
+                f"Les créneaux du {current_date.isoformat()} doivent être "
+                "uniques et triés."
+            )
+
+        try:
+            parsed_hours = [datetime.fromisoformat(value) for value in raw_hours]
+        except ValueError as error:
+            raise ValueError(
+                f"Créneau horaire ISO invalide le {current_date.isoformat()}."
+            ) from error
+
+        for slot_time, raw_hour in zip(parsed_hours, raw_hours):
+            if slot_time.date() != current_date:
+                raise ValueError(
+                    f"Le créneau {raw_hour} n'appartient pas au jour "
+                    f"{current_date.isoformat()}."
+                )
+            if slot_time.second != 0 or slot_time.microsecond != 0:
+                raise ValueError(f"Le créneau {raw_hour} n'est pas une heure pleine.")
+            if not _is_native_gfs_step(raw_hour, utc_offset_seconds):
+                raise ValueError(
+                    f"Le créneau {raw_hour} n'est pas aligné sur un pas GFS UTC."
+                )
+
+        for previous, current in zip(parsed_hours, parsed_hours[1:]):
+            if current - previous != timedelta(hours=STEP_HOURS):
+                raise ValueError(
+                    f"Les créneaux du {current_date.isoformat()} ne sont pas "
+                    f"espacés de {STEP_HOURS} heures."
+                )
+
     total = 0
     ok_wind = 0
     ok_wave = 0
@@ -731,7 +858,14 @@ def validate_payload(days_payload):
           f"sur {total} slots.")
 
 
-def build_conditions_gfs_summary(days_payload, max_days=CONDITIONS_GFS_DAYS):
+def build_conditions_gfs_summary(
+    days_payload,
+    max_days=CONDITIONS_GFS_DAYS,
+    *,
+    forecast_run_id=None,
+    spot_id=None,
+    last_update=None,
+):
     """Construit le résumé horaire consommé par la page Marées.
 
     Les mesures restent dans le document ``conditions`` déjà lu par
@@ -771,6 +905,11 @@ def build_conditions_gfs_summary(days_payload, max_days=CONDITIONS_GFS_DAYS):
                     if slot.get("weather_code") is not None
                     else None
                 ),
+                "isDay": (
+                    round(slot["is_day"])
+                    if slot.get("is_day") is not None
+                    else None
+                ),
                 "temperatureC": slot.get("temp_c"),
                 "waveHeightM": slot.get("wave_height_m"),
                 "wavePeriodS": slot.get("wave_period_s"),
@@ -805,10 +944,476 @@ def build_conditions_gfs_summary(days_payload, max_days=CONDITIONS_GFS_DAYS):
             ):
                 hourly.append(values)
 
-    return {
+    summary = {
         "model": "GFS ~13km",
         "hourly": hourly,
     }
+    if forecast_run_id is not None:
+        summary["forecast_run_id"] = forecast_run_id
+    if spot_id is not None:
+        summary["spot_id"] = spot_id
+    if last_update is not None:
+        summary["last_update"] = last_update
+    return summary
+
+
+def _require_station_models(station_result):
+    """Retourne les trois modèles ou interrompt la récolte au premier manque."""
+    spot = station_result["spot"]
+    models = station_result.get("models") or {}
+    errors = station_result.get("errors") or {}
+    required = {}
+    for model_name in ("wind", "hires", "wave"):
+        model_json = models.get(model_name)
+        if model_json is None:
+            error = errors.get(model_name) or errors.get("station")
+            detail = _error_summary(error) if error is not None else "réponse absente"
+            raise RuntimeError(
+                f"Récolte interrompue pour {spot['id']} : "
+                f"modèle {model_name} indisponible ({detail})."
+            )
+        required[model_name] = model_json
+    return required["wind"], required["hires"], required["wave"]
+
+
+def _build_station_publication(
+    station_result,
+    run_id,
+    *,
+    conditions_spot_ids=CONDITIONS_SPOT_IDS,
+):
+    """Construit et valide une station sans effectuer d'écriture Firestore."""
+    spot = station_result["spot"]
+    models = station_result.get("models") or {}
+    wind_json, hires_json, wave_json = _require_station_models(station_result)
+
+    for model_name in ("wind", "hires", "wave"):
+        slot_count = len(models[model_name].get("hourly", {}).get("time", []))
+        print(f"  [{model_name}] OK ({slot_count} slots)")
+
+    daily_json = {}
+    if "daily" in wind_json:
+        daily = wind_json["daily"]
+        for index, day_value in enumerate(daily.get("time", [])):
+            daily_json[day_value] = {
+                "sunrise": (
+                    daily["sunrise"][index]
+                    if index < len(daily.get("sunrise", []))
+                    else None
+                ),
+                "sunset": (
+                    daily["sunset"][index]
+                    if index < len(daily.get("sunset", []))
+                    else None
+                ),
+            }
+
+    days_payload, water_temp_c = build_days_payload(
+        wind_json,
+        hires_json,
+        wave_json,
+        daily_json,
+    )
+    utc_offset_seconds = int(
+        _safe_num(wind_json.get("utc_offset_seconds"), 0) or 0
+    )
+    validate_payload(days_payload, utc_offset_seconds)
+
+    # L'interface publie explicitement dix jours. Limiter le document à cette
+    # fenêtre maintient aussi le Commit global de 251 écritures nettement sous
+    # la limite Firestore de 10 Mio, contrairement aux quinze jours bruts
+    # demandés à Open-Meteo (utiles comme marge de collecte/validation).
+    published_days = days_payload[:CONDITIONS_GFS_DAYS]
+
+    weather_doc = {
+        "forecast_run_id": run_id,
+        "spot_id": spot["id"],
+        "last_update": firestore.SERVER_TIMESTAMP,
+        "location_name": spot["name"],
+        "latitude": spot["lat"],
+        "longitude": spot["lon"],
+        "utc_offset_seconds": utc_offset_seconds,
+        "days": published_days,
+    }
+    if water_temp_c is not None:
+        weather_doc["water_temp_c"] = water_temp_c
+    first_day = published_days[0]
+    if "sunrise" in first_day:
+        weather_doc["sunrise"] = first_day["sunrise"]
+    if "sunset" in first_day:
+        weather_doc["sunset"] = first_day["sunset"]
+
+    conditions_summary = None
+    if spot["id"] in conditions_spot_ids:
+        conditions_summary = build_conditions_gfs_summary(
+            published_days,
+            forecast_run_id=run_id,
+            spot_id=spot["id"],
+            last_update=firestore.SERVER_TIMESTAMP,
+        )
+
+    return {
+        "spot": spot,
+        "weather_doc": weather_doc,
+        "conditions_summary": conditions_summary,
+    }
+
+
+def _validate_publications_before_commit(
+    publications,
+    run_id,
+    conditions_spot_ids,
+):
+    """Valide le lot complet avant même de créer le WriteBatch."""
+    seen_spot_ids = set()
+    condition_spot_ids = set(conditions_spot_ids)
+    for publication in publications:
+        spot = publication.get("spot") or {}
+        spot_id = spot.get("id")
+        if not spot_id or spot_id in seen_spot_ids:
+            raise ValueError(
+                f"Publication absente ou dupliquée pour le spot {spot_id!r}."
+            )
+        seen_spot_ids.add(spot_id)
+
+        weather_doc = publication.get("weather_doc")
+        if not isinstance(weather_doc, dict):
+            raise ValueError(f"Document météo manquant pour {spot_id}.")
+        if weather_doc.get("forecast_run_id") != run_id:
+            raise ValueError(f"Run id météo incohérent pour {spot_id}.")
+        if weather_doc.get("spot_id") != spot_id:
+            raise ValueError(f"Spot id météo incohérent pour {spot_id}.")
+        if weather_doc.get("location_name") != spot.get("name"):
+            raise ValueError(f"Nom météo incohérent pour {spot_id}.")
+        if weather_doc.get("latitude") != spot.get("lat") or weather_doc.get(
+            "longitude"
+        ) != spot.get("lon"):
+            raise ValueError(f"Coordonnées météo incohérentes pour {spot_id}.")
+
+        conditions_summary = publication.get("conditions_summary")
+        if spot_id in condition_spot_ids:
+            if not isinstance(conditions_summary, dict):
+                raise ValueError(
+                    f"Résumé conditions manquant pour le spot requis {spot_id}."
+                )
+            if conditions_summary.get("forecast_run_id") != run_id:
+                raise ValueError(
+                    f"Run id conditions incohérent pour le spot {spot_id}."
+                )
+            if conditions_summary.get("spot_id") != spot_id:
+                raise ValueError(
+                    f"Spot id conditions incohérent pour le spot {spot_id}."
+                )
+        elif conditions_summary is not None:
+            raise ValueError(
+                f"Résumé conditions inattendu pour le spot {spot_id}."
+            )
+
+    missing_conditions = condition_spot_ids - seen_spot_ids
+    if missing_conditions:
+        raise ValueError(
+            "Spot(s) requis pour conditions absent(s) du lot : "
+            + ", ".join(sorted(missing_conditions))
+        )
+
+
+def _write_forecast_batches(
+    db,
+    publications,
+    run_id,
+    *,
+    conditions_spot_ids=CONDITIONS_SPOT_IDS,
+):
+    """Publie des lots atomiques bornés après validation du run complet.
+
+    Les trois documents éventuels d'une station (météo, index et résumé de
+    conditions) restent toujours dans le même WriteBatch. Si un Commit échoue,
+    les stations déjà publiées restent cohérentes et les autres conservent leur
+    dernière version valide ; l'exception interrompt immédiatement le job.
+    """
+    _validate_publications_before_commit(
+        publications,
+        run_id,
+        conditions_spot_ids,
+    )
+
+    expected_write_count = len(publications) * 2 + len(conditions_spot_ids)
+    write_count = 0
+    commit_count = 0
+    for start in range(0, len(publications), PUBLISH_BATCH_STATION_COUNT):
+        station_batch = publications[
+            start : start + PUBLISH_BATCH_STATION_COUNT
+        ]
+        batch = db.batch()
+        batch_write_count = 0
+        for publication in station_batch:
+            spot = publication["spot"]
+            spot_id = spot["id"]
+            weather_ref = db.collection("spots_meteo").document(spot_id)
+            index_ref = db.collection("spots_index").document(spot_id)
+            batch.set(weather_ref, publication["weather_doc"])
+            write_count += 1
+            batch_write_count += 1
+            batch.set(
+                index_ref,
+                {
+                    "forecast_run_id": run_id,
+                    "spot_id": spot_id,
+                    "last_update": firestore.SERVER_TIMESTAMP,
+                    "name": spot["name"],
+                    "latitude": spot["lat"],
+                    "longitude": spot["lon"],
+                },
+            )
+            write_count += 1
+            batch_write_count += 1
+
+            conditions_id = conditions_spot_ids.get(spot_id)
+            if conditions_id is not None:
+                conditions_ref = db.collection("conditions").document(
+                    conditions_id
+                )
+                batch.set(
+                    conditions_ref,
+                    {"gfs": publication["conditions_summary"]},
+                    merge=True,
+                )
+                write_count += 1
+                batch_write_count += 1
+
+        if batch_write_count > PUBLISH_BATCH_STATION_COUNT * 3:
+            raise RuntimeError(
+                f"Sous-lot Firestore inattendu : {batch_write_count} écritures."
+            )
+        batch.commit()
+        commit_count += 1
+        print(
+            f"  -> Lot Firestore {commit_count} publié : "
+            f"{len(station_batch)} station(s), {batch_write_count} écriture(s)."
+        )
+
+    if write_count != expected_write_count:
+        raise RuntimeError(
+            f"Lot Firestore incomplet : {write_count}/{expected_write_count} écritures."
+        )
+    return write_count, commit_count
+
+
+def _prepare_and_publish_forecasts(
+    db,
+    station_results,
+    run_id,
+    *,
+    expected_spot_count,
+    conditions_spot_ids=CONDITIONS_SPOT_IDS,
+):
+    """Valide toutes les stations, puis seulement ensuite publie le lot."""
+    publications = []
+    for station_result in station_results:
+        spot = station_result["spot"]
+        print(f"Recolte pour {spot['name']}...")
+        publication = _build_station_publication(
+            station_result,
+            run_id,
+            conditions_spot_ids=conditions_spot_ids,
+        )
+        publications.append(publication)
+        day_count = len(publication["weather_doc"]["days"])
+        print(f"  -> {day_count} jours préparés et validés en mémoire.")
+
+    if len(publications) != expected_spot_count:
+        raise RuntimeError(
+            "Récolte incomplète avant publication : "
+            f"{len(publications)}/{expected_spot_count} stations."
+        )
+
+    write_count, commit_count = _write_forecast_batches(
+        db,
+        publications,
+        run_id,
+        conditions_spot_ids=conditions_spot_ids,
+    )
+    return publications, write_count, commit_count
+
+
+def _snapshot_data(snapshot, label):
+    if not getattr(snapshot, "exists", False):
+        raise RuntimeError(f"Vérification Production : {label} est absent.")
+    data = snapshot.to_dict()
+    if not isinstance(data, dict):
+        raise RuntimeError(
+            f"Vérification Production : {label} ne contient pas un objet valide."
+        )
+    return data
+
+
+def _utc_datetime(value, label):
+    if not isinstance(value, datetime):
+        raise RuntimeError(
+            f"Vérification Production : horodatage {label} absent ou invalide."
+        )
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _verify_freshness(data, label, run_started_at, now):
+    updated_at = _utc_datetime(data.get("last_update"), label)
+    if updated_at < run_started_at - FRESHNESS_CLOCK_SKEW:
+        raise RuntimeError(
+            f"Vérification Production : {label} est antérieur au run courant."
+        )
+    if updated_at > now + FRESHNESS_CLOCK_SKEW:
+        raise RuntimeError(
+            f"Vérification Production : {label} possède une date future invalide."
+        )
+
+
+def _verify_spot_identity(data, spot, run_id, name_field, label):
+    if data.get("forecast_run_id") != run_id:
+        raise RuntimeError(
+            f"Vérification Production : run id incorrect dans {label}."
+        )
+    if data.get("spot_id") != spot["id"]:
+        raise RuntimeError(
+            f"Vérification Production : spot id incorrect dans {label}."
+        )
+    if data.get(name_field) != spot["name"]:
+        raise RuntimeError(
+            f"Vérification Production : nom incorrect dans {label}."
+        )
+    for field, expected in (("latitude", spot["lat"]), ("longitude", spot["lon"])):
+        actual = data.get(field)
+        if (
+            isinstance(actual, bool)
+            or not isinstance(actual, (int, float))
+            or abs(float(actual) - float(expected)) > 1e-6
+        ):
+            raise RuntimeError(
+                f"Vérification Production : {field} incorrect dans {label}."
+            )
+
+
+def verify_production_state(
+    db,
+    spots,
+    run_id,
+    run_started_at,
+    *,
+    conditions_spot_ids=CONDITIONS_SPOT_IDS,
+    now=None,
+):
+    """Relit et valide chaque document publié par le run courant.
+
+    Firestore fournit des lectures fortement cohérentes : une différence de
+    run, d'identité, de fraîcheur ou de payload immédiatement après les commits
+    révèle donc une écriture manquante ou partielle et fait échouer le job.
+    """
+    run_started_at = _utc_datetime(run_started_at, "début du run")
+    now = _utc_datetime(now or datetime.now(timezone.utc), "fin du run")
+
+    catalog_ids = {spot["id"] for spot in spots}
+    missing_conditions = set(conditions_spot_ids) - catalog_ids
+    if missing_conditions:
+        raise RuntimeError(
+            "Vérification Production : spot(s) conditions absent(s) du catalogue : "
+            + ", ".join(sorted(missing_conditions))
+        )
+
+    verified_conditions = set()
+    for spot in spots:
+        weather_label = f"spots_meteo/{spot['id']}"
+        weather = _snapshot_data(
+            db.collection("spots_meteo").document(spot["id"]).get(),
+            weather_label,
+        )
+        _verify_spot_identity(
+            weather,
+            spot,
+            run_id,
+            "location_name",
+            weather_label,
+        )
+        _verify_freshness(weather, weather_label, run_started_at, now)
+        utc_offset_seconds = weather.get("utc_offset_seconds")
+        if isinstance(utc_offset_seconds, bool) or not isinstance(
+            utc_offset_seconds, (int, float)
+        ):
+            raise RuntimeError(
+                f"Vérification Production : décalage UTC invalide dans {weather_label}."
+            )
+        try:
+            validate_payload(
+                weather.get("days"),
+                int(utc_offset_seconds),
+                CONDITIONS_GFS_DAYS,
+            )
+        except (TypeError, ValueError) as error:
+            raise RuntimeError(
+                f"Vérification Production : payload invalide dans {weather_label} : "
+                f"{error}"
+            ) from error
+
+        index_label = f"spots_index/{spot['id']}"
+        index_data = _snapshot_data(
+            db.collection("spots_index").document(spot["id"]).get(),
+            index_label,
+        )
+        _verify_spot_identity(index_data, spot, run_id, "name", index_label)
+        _verify_freshness(index_data, index_label, run_started_at, now)
+
+        conditions_id = conditions_spot_ids.get(spot["id"])
+        if conditions_id is None:
+            continue
+        conditions_label = f"conditions/{conditions_id}.gfs"
+        conditions_doc = _snapshot_data(
+            db.collection("conditions").document(conditions_id).get(),
+            f"conditions/{conditions_id}",
+        )
+        gfs = conditions_doc.get("gfs")
+        if not isinstance(gfs, dict):
+            raise RuntimeError(
+                f"Vérification Production : {conditions_label} est absent ou invalide."
+            )
+        if gfs.get("forecast_run_id") != run_id or gfs.get("spot_id") != spot["id"]:
+            raise RuntimeError(
+                f"Vérification Production : métadonnées incorrectes dans "
+                f"{conditions_label}."
+            )
+        _verify_freshness(gfs, conditions_label, run_started_at, now)
+
+        expected_summary = build_conditions_gfs_summary(
+            weather["days"],
+            CONDITIONS_GFS_DAYS,
+        )
+        if gfs.get("model") != expected_summary["model"]:
+            raise RuntimeError(
+                f"Vérification Production : modèle incorrect dans {conditions_label}."
+            )
+        if gfs.get("hourly") != expected_summary["hourly"]:
+            raise RuntimeError(
+                f"Vérification Production : résumé horaire incohérent dans "
+                f"{conditions_label}."
+            )
+        if len(expected_summary["hourly"]) != (
+            CONDITIONS_GFS_DAYS * EXPECTED_SLOTS_PER_DAY
+        ):
+            raise RuntimeError(
+                f"Vérification Production : {conditions_label} ne contient pas "
+                "les 80 créneaux attendus."
+            )
+        verified_conditions.add(spot["id"])
+
+    if verified_conditions != set(conditions_spot_ids):
+        raise RuntimeError(
+            "Vérification Production : tous les résumés conditions n'ont pas été relus."
+        )
+
+    print(
+        "Vérification Production OK : "
+        f"{len(spots)} météo + {len(spots)} index + "
+        f"{len(verified_conditions)} conditions, run={run_id}."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -865,7 +1470,10 @@ def main_test_single_spot(spot_id, spots_list=None):
     days_payload, water_temp_c = build_days_payload(wind_json, hires_json, wave_json, daily_json)
 
     # Validation
-    validate_payload(days_payload)
+    validate_payload(
+        days_payload,
+        int(_safe_num(wind_json.get("utc_offset_seconds"), 0) or 0),
+    )
 
     # Construction du document
     doc = {
@@ -924,7 +1532,21 @@ def main():
             "OPEN_METEO_API_KEY est obligatoire pour l'usage commercial d'Open-Meteo. "
             "Ajoutez-le aux secrets GitHub Actions."
         )
+    if not FORECAST_RUN_ID:
+        raise SystemExit(
+            "FORECAST_RUN_ID est obligatoire pour tracer et vérifier chaque récolte."
+        )
+    if len(SPOTS) != 123:
+        raise SystemExit(
+            f"Catalogue de récolte inattendu : {len(SPOTS)} spots au lieu de 123."
+        )
+    if len(CONDITIONS_SPOT_IDS) != 5:
+        raise SystemExit(
+            "Configuration conditions inattendue : cinq résumés sont requis."
+        )
+
     start_time = time.time()
+    run_started_at = datetime.now(timezone.utc)
 
     cred = credentials.Certificate("firebase-key.json")
     try:
@@ -933,118 +1555,40 @@ def main():
         firebase_admin.initialize_app(cred)
     db = firestore.client()
 
-    success = 0
-    partial = 0
-    failed = 0
-
-    for station_result in _iter_station_results(SPOTS):
-        spot = station_result["spot"]
-        models = station_result["models"]
-        errors = station_result["errors"]
-        print(f"Recolte pour {spot['name']}...")
-
-        missing_models = []
-        for model_name in ("wind", "hires", "wave"):
-            model_json = models.get(model_name)
-            if model_json is None:
-                error = errors.get(model_name) or errors.get("station")
-                error_text = (
-                    _error_summary(error)
-                    if error is not None
-                    else "réponse absente"
-                )
-                print(f"  [{model_name}] ECHEC: {error_text}")
-                missing_models.append(model_name)
-                continue
-
-            slot_count = len(model_json.get("hourly", {}).get("time", []))
-            print(f"  [{model_name}] OK ({slot_count} slots)")
-
-        wind_json = models.get("wind")
-        hires_json = models.get("hires")
-        wave_json = models.get("wave")
-
-        # Si aucun modele vent (obligatoire), on skip ce spot
-        if wind_json is None:
-            print(f"  !! Aucun modele vent disponible pour {spot['name']}, spot ignore.")
-            failed += 1
-            continue
-
-        # Ne jamais remplacer un document valide par un document partiel.
-        # Les prévisions existantes restent ainsi servables pendant une panne
-        # transitoire d'un modèle ou de l'API commerciale.
-        if missing_models:
-            partial += 1
-            print(
-                f"  !! Récolte partielle ({', '.join(missing_models)}) pour "
-                f"{spot['name']}; aucune écriture Firestore."
-            )
-            continue
-
-        daily_json = {}
-        if "daily" in wind_json:
-            daily = wind_json["daily"]
-            for i, d in enumerate(daily.get("time", [])):
-                daily_json[d] = {
-                    "sunrise": daily["sunrise"][i] if i < len(daily.get("sunrise", [])) else None,
-                    "sunset": daily["sunset"][i] if i < len(daily.get("sunset", [])) else None,
-                }
-
-        try:
-            days_payload, water_temp_c = build_days_payload(wind_json, hires_json, wave_json, daily_json)
-            validate_payload(days_payload)
-
-            doc = {
-                "last_update": firestore.SERVER_TIMESTAMP,
-                "location_name": spot["name"],
-                "latitude": spot["lat"],
-                "longitude": spot["lon"],
-                "days": days_payload,
-            }
-            if water_temp_c is not None:
-                doc["water_temp_c"] = water_temp_c
-            first_day = days_payload[0] if days_payload else None
-            if first_day:
-                if "sunrise" in first_day:
-                    doc["sunrise"] = first_day["sunrise"]
-                if "sunset" in first_day:
-                    doc["sunset"] = first_day["sunset"]
-
-            db.collection("spots_meteo").document(spot["id"]).set(doc)
-            # Ecrit aussi l'index leger pour listAvailableSpots() sans OOM
-            db.collection("spots_index").document(spot["id"]).set({
-                "name": spot["name"],
-                "latitude": spot["lat"],
-                "longitude": spot["lon"],
-            })
-            conditions_spot_id = CONDITIONS_SPOT_IDS.get(spot["id"])
-            if conditions_spot_id is not None:
-                db.collection("conditions").document(conditions_spot_id).set(
-                    {"gfs": build_conditions_gfs_summary(days_payload)},
-                    merge=True,
-                )
-            print(f"  -> {len(days_payload)} jours envoyes sur Firestore.")
-
-            success += 1
-
-        except Exception as e:
-            print(f"  !! Erreur build/write pour {spot['name']}: {_error_summary(e)}")
-            failed += 1
+    # Aucune écriture n'est créée tant que les 123 stations n'ont pas
+    # toutes passé les contrôles modèles/build/dates/créneaux. Les documents
+    # sont ensuite publiés par lots atomiques bornés sous la limite de 10 Mio.
+    publications, write_count, commit_count = _prepare_and_publish_forecasts(
+        db,
+        _iter_station_results(SPOTS),
+        FORECAST_RUN_ID,
+        expected_spot_count=len(SPOTS),
+    )
+    success = len(publications)
 
     elapsed = time.time() - start_time
     print(f"\n{'='*60}")
     print(f"Termine en {elapsed:.0f}s.")
-    print(f"Reussis: {success}, Partiels: {partial}, Echoues: {failed}")
+    print(f"Réussis: {success}")
     print(f"Total spots: {len(SPOTS)}")
-
-    # Ne pas laisser GitHub Actions afficher un succès lorsque des spots
-    # n'ont pas été actualisés : l'application risquerait de servir des
-    # prévisions périmées sans alerte opérationnelle. Les documents écrits
-    # avec succès restent disponibles pour les utilisateurs.
-    if failed > 0 or partial > 0:
-        raise SystemExit(
-            f"Récolte incomplète : {failed} échec(s), {partial} résultat(s) partiel(s)."
+    print(f"Écritures Firestore: {write_count}")
+    print(f"Lots Firestore atomiques: {commit_count}")
+    if success != len(SPOTS):
+        raise RuntimeError(
+            f"Récolte incomplète : {success}/{len(SPOTS)} stations écrites."
         )
+    if write_count != len(SPOTS) * 2 + len(CONDITIONS_SPOT_IDS):
+        raise RuntimeError(
+            f"Publication incomplète : {write_count}/251 écritures Firestore."
+        )
+
+    # Le job n'est vert qu'après relecture de l'intégralité de l'état publié.
+    verify_production_state(
+        db,
+        SPOTS,
+        FORECAST_RUN_ID,
+        run_started_at,
+    )
 
 
 if __name__ == "__main__":

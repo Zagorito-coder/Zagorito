@@ -43,6 +43,7 @@ void main() {
     expect(result.hourlyForecast.first.windSpeedKmh, 18);
     expect(result.hourlyForecast.first.windDirectionDeg, 225);
     expect(result.hourlyForecast.first.weatherCode, 1);
+    expect(result.hourlyForecast.first.isDay, isFalse);
     expect(result.hourlyForecast.first.temperatureC, 24);
     expect(result.hourlyForecast.first.waveHeightM, 1.1);
     expect(result.hourlyForecast.first.wavePeriodS, 9);
@@ -220,6 +221,7 @@ Map<String, dynamic> _conditionsDocument({
           'windSpeedKmh': 18,
           'windDirectionDeg': 225,
           'weatherCode': 1,
+          'isDay': 0,
           'temperatureC': 24,
           'waveHeightM': 1.1,
           'wavePeriodS': 9,

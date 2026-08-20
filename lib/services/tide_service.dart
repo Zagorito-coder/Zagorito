@@ -6,7 +6,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 
 import '../models/tide_data.dart';
 import 'casablanca_tide_reference.dart';
@@ -16,6 +16,14 @@ class TideService {
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
   static const Duration _requestTimeout = Duration(seconds: 15);
   static const Duration _maximumForecastAge = Duration(hours: 36);
+  static const String unavailableLocationLabel =
+      'Données marines indisponibles';
+
+  /// Une station marégraphique publiée ne représente une position que dans un
+  /// rayon côtier de 100 km. Hors de ce rayon, le service doit utiliser son
+  /// repli explicite plutôt qu'une station marocaine éloignée.
+  static const double maximumTideStationDistanceKm = 100.0;
+
   static const List<_ForecastStation> _publishedStations = [
     _ForecastStation(
       id: 'casablanca',
@@ -57,10 +65,10 @@ class TideService {
   static Future<TideData> fetchTides({
     double latitude = 33.57,
     double longitude = -7.59,
-    String locationName = 'Casablanca Morocco',
+    String? locationName,
   }) async {
     if (!_validCoordinates(latitude, longitude)) {
-      return TideData.fallback(location: locationName);
+      return TideData.fallback(location: _fallbackLocation(locationName));
     }
 
     final station = _nearestStation(
@@ -69,7 +77,7 @@ class TideService {
       longitude,
     );
     if (station == null) {
-      return TideData.fallback(location: locationName);
+      return TideData.fallback(location: _fallbackLocation(locationName));
     }
 
     for (var attempt = 0; attempt < 2; attempt++) {
@@ -102,7 +110,14 @@ class TideService {
         }
       }
     }
-    return TideData.fallback(location: locationName);
+    return TideData.fallback(location: station.name);
+  }
+
+  static String _fallbackLocation(String? locationName) {
+    final normalized = locationName?.trim();
+    return normalized == null || normalized.isEmpty
+        ? unavailableLocationLabel
+        : normalized;
   }
 
   static bool _validCoordinates(double latitude, double longitude) =>
@@ -129,17 +144,73 @@ class TideService {
     List<_ForecastStation> stations,
     double latitude,
     double longitude,
-  ) {
-    _ForecastStation? nearest;
+  ) =>
+      _nearestWithinRadius<_ForecastStation>(
+        stations: stations,
+        latitude: latitude,
+        longitude: longitude,
+        latitudeOf: (station) => station.latitude,
+        longitudeOf: (station) => station.longitude,
+        maximumDistanceKm: maximumTideStationDistanceKm,
+      );
+
+  /// Sélection pure exposée pour vérifier la règle de rayon sans initialiser
+  /// Firebase. Les cartes invalides sont ignorées et aucun identifiant n'est
+  /// renvoyé si la station la plus proche se trouve au-delà du seuil.
+  @visibleForTesting
+  static String? nearestTideStationIdWithinRadius({
+    required Iterable<Map<String, dynamic>> stations,
+    required double latitude,
+    required double longitude,
+  }) {
+    final validStations = stations.where((station) {
+      final id = station['id'];
+      final stationLatitude = (station['latitude'] as num?)?.toDouble();
+      final stationLongitude = (station['longitude'] as num?)?.toDouble();
+      return id is String &&
+          id.trim().isNotEmpty &&
+          stationLatitude != null &&
+          stationLongitude != null &&
+          _validCoordinates(stationLatitude, stationLongitude);
+    });
+    final nearest = _nearestWithinRadius<Map<String, dynamic>>(
+      stations: validStations,
+      latitude: latitude,
+      longitude: longitude,
+      latitudeOf: (station) => (station['latitude'] as num).toDouble(),
+      longitudeOf: (station) => (station['longitude'] as num).toDouble(),
+      maximumDistanceKm: maximumTideStationDistanceKm,
+    );
+    return nearest?['id'] as String?;
+  }
+
+  static T? _nearestWithinRadius<T>({
+    required Iterable<T> stations,
+    required double latitude,
+    required double longitude,
+    required double Function(T station) latitudeOf,
+    required double Function(T station) longitudeOf,
+    required double maximumDistanceKm,
+  }) {
+    if (!_validCoordinates(latitude, longitude) ||
+        !maximumDistanceKm.isFinite ||
+        maximumDistanceKm < 0) {
+      return null;
+    }
+
+    T? nearest;
     var shortestDistance = double.infinity;
     for (final station in stations) {
+      final stationLatitude = latitudeOf(station);
+      final stationLongitude = longitudeOf(station);
+      if (!_validCoordinates(stationLatitude, stationLongitude)) continue;
       final distance = _haversineKm(
         latitude,
         longitude,
-        station.latitude,
-        station.longitude,
+        stationLatitude,
+        stationLongitude,
       );
-      if (distance < shortestDistance) {
+      if (distance <= maximumDistanceKm && distance < shortestDistance) {
         shortestDistance = distance;
         nearest = station;
       }
