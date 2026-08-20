@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:spots_app/services/offline_map_service.dart';
+import 'package:spots_app/services/satellite_fallback_tile_provider.dart';
+import 'package:spots_app/utils/map_zoom_limits.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:vector_map_tiles/vector_map_tiles.dart';
 import 'package:vector_map_tiles_pmtiles/vector_map_tiles_pmtiles.dart';
@@ -31,24 +33,32 @@ class _AppTileLayerState extends State<AppTileLayer> {
 
   TileProvider get _tileProvider {
     return _networkTileProvider ??= widget.networkTileProviderFactory?.call() ??
-        NetworkTileProvider(
-          headers: {
-            'User-Agent': 'BoosterFish Android '
-                '(+https://www.boosterfish.com/; '
-                'contact: support@boosterfish.com)',
-          },
-          // Une coupure réseau ne doit pas transformer l'échec isolé d'une
-          // image de tuile en erreur Flutter fatale. Le cache reste consulté
-          // en priorité ; sans tuile exploitable, flutter_map affiche sa tuile
-          // transparente et la carte continue de fonctionner.
-          silenceExceptions: true,
-          // Respecte les en-têtes HTTP des fournisseurs (obligatoire pour
-          // tile.openstreetmap.org), évite les téléchargements répétés et
-          // borne l'empreinte disque du cache partagé entre les fonds.
-          cachingProvider: BuiltInMapCachingProvider.getOrCreateInstance(
-            maxCacheSize: 256 * 1024 * 1024,
-          ),
-        );
+        (widget.style == MapStyle.satellite
+            ? SatelliteFallbackTileProvider(
+                headers: {
+                  'User-Agent': 'BoosterFish Android '
+                      '(+https://www.boosterfish.com/; '
+                      'contact: support@boosterfish.com)',
+                },
+              )
+            : NetworkTileProvider(
+                headers: {
+                  'User-Agent': 'BoosterFish Android '
+                      '(+https://www.boosterfish.com/; '
+                      'contact: support@boosterfish.com)',
+                },
+                // Une coupure réseau ne doit pas transformer l'échec isolé d'une
+                // image de tuile en erreur Flutter fatale. Le cache reste consulté
+                // en priorité ; sans tuile exploitable, flutter_map affiche sa tuile
+                // transparente et la carte continue de fonctionner.
+                silenceExceptions: true,
+                // Respecte les en-têtes HTTP des fournisseurs (obligatoire pour
+                // tile.openstreetmap.org), évite les téléchargements répétés et
+                // borne l'empreinte disque du cache partagé entre les fonds.
+                cachingProvider: BuiltInMapCachingProvider.getOrCreateInstance(
+                  maxCacheSize: 256 * 1024 * 1024,
+                ),
+              ));
   }
 
   @override
@@ -58,6 +68,13 @@ class _AppTileLayerState extends State<AppTileLayer> {
         widget.style == MapStyle.offline) {
       // TileLayer disposes its provider when the raster layer is removed.
       // Drop our reference so returning online creates a fresh HTTP client.
+      _networkTileProvider = null;
+    }
+    if (oldWidget.style != widget.style &&
+        oldWidget.style != MapStyle.offline &&
+        widget.style != MapStyle.offline) {
+      // Le satellite utilise un fournisseur spécialisé. Ne jamais réutiliser
+      // un fournisseur raster d'un autre style après le changement de couche.
       _networkTileProvider = null;
     }
   }
@@ -71,6 +88,12 @@ class _AppTileLayerState extends State<AppTileLayer> {
               'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
           userAgentPackageName: _userAgentPackageName,
           tileProvider: _tileProvider,
+          maxZoom: MapZoomLimits.manualMaximum,
+          // Priorité à la vraie photographie Z18. Si ArcGIS retourne sa tuile
+          // grise, le fournisseur extrait le bon quadrant de Z17 puis Z16.
+          // Aux zooms manuels 19–20, flutter_map agrandit ce meilleur résultat
+          // sans demander les niveaux natifs ArcGIS indisponibles.
+          maxNativeZoom: SatelliteFallbackTileProvider.preferredNativeZoom,
           keepBuffer: 1,
           panBuffer: 0,
           tileUpdateTransformer: _tileUpdateTransformer,
@@ -82,6 +105,10 @@ class _AppTileLayerState extends State<AppTileLayer> {
           subdomains: const ['a', 'b', 'c', 'd'],
           userAgentPackageName: _userAgentPackageName,
           tileProvider: _tileProvider,
+          maxZoom: MapZoomLimits.manualMaximum,
+          // CartoDB ne garantit pas partout des tuiles natives au-delà de 19.
+          // flutter_map sur-échantillonne donc proprement le dernier niveau.
+          maxNativeZoom: 19,
           keepBuffer: 1,
           panBuffer: 0,
           tileUpdateTransformer: _tileUpdateTransformer,
@@ -91,6 +118,9 @@ class _AppTileLayerState extends State<AppTileLayer> {
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
           userAgentPackageName: _userAgentPackageName,
           tileProvider: _tileProvider,
+          maxZoom: MapZoomLimits.manualMaximum,
+          // OpenStreetMap publie officiellement ses tuiles jusqu'au niveau 19.
+          maxNativeZoom: 19,
           keepBuffer: 1,
           panBuffer: 0,
           tileUpdateTransformer: _tileUpdateTransformer,

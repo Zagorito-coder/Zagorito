@@ -81,4 +81,20 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
     },
   );
+
+  testWidgets('respecte les limites natives propres a chaque fond de carte',
+      (tester) async {
+    await tester.pumpWidget(_mapWithStyle(MapStyle.satellite));
+    var layer = tester.widget<TileLayer>(find.byType(TileLayer));
+    expect(layer.maxZoom, 20);
+    expect(layer.maxNativeZoom, 18);
+
+    await tester.pumpWidget(_mapWithStyle(MapStyle.standard));
+    layer = tester.widget<TileLayer>(find.byType(TileLayer));
+    expect(layer.maxZoom, 20);
+    expect(layer.maxNativeZoom, 19);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 100));
+  });
 }

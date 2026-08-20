@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:latlong2/latlong.dart';
+import 'package:spots_app/utils/map_zoom_limits.dart';
 
 /// Plan de vol cinématique économe en tuiles.
 ///
@@ -35,9 +36,11 @@ final class MapFlightPlan {
     required double distanceKm,
   }) {
     final safeDistance = distanceKm.isFinite ? math.max(0.0, distanceKm) : 0.0;
-    final safeTargetZoom = targetZoom.clamp(3.0, 22.0).toDouble();
-    final safeStartZoom =
-        startZoom.clamp(3.0, math.max(3.0, safeTargetZoom)).toDouble();
+    final safeTargetZoom = MapZoomLimits.clampManual(targetZoom);
+    // Le zoom manuel peut être supérieur au zoom d'arrivée automatique.
+    // Conserver le niveau réel de départ évite un saut visuel de 20x à 16x
+    // dès la première frame lorsqu'un nouveau spot est sélectionné.
+    final safeStartZoom = MapZoomLimits.clampManual(startZoom);
     final suggestedCruiseZoom = switch (safeDistance) {
       < 0.75 => safeTargetZoom - 0.35,
       < 5 => 14.5,

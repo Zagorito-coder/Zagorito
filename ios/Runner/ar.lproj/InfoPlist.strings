@@ -1,0 +1,4 @@
+"CFBundleDisplayName" = "BoosterFish";
+"NSLocationWhenInUseUsageDescription" = "يستخدم BoosterFish موقعك لعرض مواقع الصيد القريبة والظروف البحرية.";
+"NSPhotoLibraryUsageDescription" = "يصل BoosterFish إلى الصورة التي تختارها لعرض موقع صيد أو صيدتك.";
+"NSCameraUsageDescription" = "يستخدم BoosterFish الكاميرا لتصوير موقع صيد أو صيدتك.";

@@ -41,8 +41,11 @@ class AdService {
   Future<void> get ready => initialize();
 
   Future<void> _initialize() async {
-    if (kIsWeb) {
+    if (kIsWeb || !AdConfig.supportsCurrentPlatform) {
       _adsAllowed = false;
+      debugPrint(
+        '[AdService] Publicités non configurées pour cette plateforme',
+      );
       return;
     }
 
