@@ -58,8 +58,8 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyBw1pC6Pe1sEr1Cq_j6SG2akCFtihzwyK8',
-    appId: '1:68722970471:ios:69befe61397a785b12e9c2',
+    apiKey: 'AIzaSyC0vGIvqygtd1BPCibu6IdKr9mqwXjcuwo',
+    appId: '1:68722970471:ios:089c1ebbb819e61c12e9c2',
     messagingSenderId: '68722970471',
     projectId: 'zagorito-9a0c4',
     storageBucket: 'zagorito-9a0c4.firebasestorage.app',

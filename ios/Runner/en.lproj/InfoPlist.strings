@@ -1,1 +1,4 @@
-"NSLocationWhenInUseUsageDescription" = "This app uses your location to show nearby fishing spots.";
+"CFBundleDisplayName" = "BoosterFish";
+"NSLocationWhenInUseUsageDescription" = "BoosterFish uses your location to show nearby fishing spots and marine conditions.";
+"NSPhotoLibraryUsageDescription" = "BoosterFish accesses the photo you select to illustrate a fishing spot or catch.";
+"NSCameraUsageDescription" = "BoosterFish uses the camera to photograph a fishing spot or catch.";

@@ -12,7 +12,7 @@ void main() {
 
       expect(provider.hasPremiumAccess, isTrue);
       expect(provider.isPremium, isTrue);
-      expect(provider.maxZoom, 16.0);
+      expect(provider.maxZoom, 20.0);
       expect(provider.isPaidSubscriber, isFalse);
       expect(provider.isOnTrial, isFalse);
     });

@@ -62,4 +62,19 @@ void main() {
     expect(plan.zoomAt(0.4), plan.cruiseZoom);
     expect(plan.zoomAt(0.6), plan.cruiseZoom);
   });
+
+  test('un choix de spot redescend progressivement du zoom manuel 20x à 16x',
+      () {
+    final plan = MapFlightPlan.adaptive(
+      start: const LatLng(31, -8),
+      target: const LatLng(31.2, -8.2),
+      startZoom: 20,
+      targetZoom: 16,
+      distanceKm: 30,
+    );
+
+    expect(plan.zoomAt(0), 20);
+    expect(plan.zoomAt(1), 16);
+    expect(plan.cruiseZoom, lessThan(16));
+  });
 }

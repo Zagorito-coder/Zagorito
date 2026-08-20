@@ -1,0 +1,4 @@
+"CFBundleDisplayName" = "BoosterFish";
+"NSLocationWhenInUseUsageDescription" = "BoosterFish utiliza tu ubicación para mostrar puntos de pesca cercanos y las condiciones marinas.";
+"NSPhotoLibraryUsageDescription" = "BoosterFish accede a la foto que selecciones para ilustrar un punto o una captura de pesca.";
+"NSCameraUsageDescription" = "BoosterFish utiliza la cámara para fotografiar un punto o una captura de pesca.";

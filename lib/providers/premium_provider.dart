@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart' show ChangeNotifier;
+import 'package:spots_app/utils/map_zoom_limits.dart';
 
 /// Compatibilité : l'app est 100% gratuite (AdMob). Cette classe ne fait rien.
 class PremiumProvider extends ChangeNotifier {
@@ -6,7 +7,7 @@ class PremiumProvider extends ChangeNotifier {
   bool get isPremium => true;
   bool get hasPremiumAccess => true;
   bool get isPaidSubscriber => false;
-  double get maxZoom => 16.0;
+  double get maxZoom => MapZoomLimits.manualMaximum;
   bool get isForcePremium => false;
   int get trialDaysRemaining => 0;
   bool get isOnTrial => false;

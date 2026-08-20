@@ -30,6 +30,7 @@ import 'package:spots_app/spots_canvas_layer.dart';
 import 'package:spots_app/theme.dart';
 import 'package:spots_app/theme_controller.dart';
 import 'package:spots_app/utils/map_flight_plan.dart';
+import 'package:spots_app/utils/map_zoom_limits.dart';
 import 'package:spots_app/widgets/app_tile_layer.dart';
 import 'package:spots_app/widgets/finite_map_controller.dart';
 import 'package:spots_app/widgets/finite_marker_layer.dart';
@@ -918,7 +919,6 @@ class _MapScreenState extends State<MapScreen>
   MapStyle _mapStyle = MapStyle.satellite;
   // Toutes les fonctions sont gratuites dans la version financée par AdMob.
   static const bool _isPremium = true;
-  static const double _maxZoom = 16.0;
 
   // Compass — désactivé par défaut
   bool _isCompassEnabled = false;
@@ -1231,10 +1231,7 @@ class _MapScreenState extends State<MapScreen>
     if (!zoom.isFinite) return;
     final center = _mapController.camera.center;
     if (!center.latitude.isFinite || !center.longitude.isFinite) return;
-    if (zoom > _maxZoom) {
-      zoom = _maxZoom;
-    }
-    final z = zoom.clamp(3.0, _maxZoom);
+    final z = MapZoomLimits.clampManual(zoom);
     _mapController.move(center, z);
     setState(() => _currentZoom = z);
   }
@@ -1259,9 +1256,9 @@ class _MapScreenState extends State<MapScreen>
     final startZoom = camera.zoom;
     if (!_isValidMapPoint(start) || !startZoom.isFinite) return;
 
-    final targetZoom = (startZoom < _maxZoom ? _maxZoom : startZoom)
-        .clamp(3.0, _maxZoom)
-        .toDouble();
+    // Toute sélection automatique s'arrête à 16x, même si l'utilisateur
+    // observait auparavant la carte au niveau manuel 20x.
+    const targetZoom = MapZoomLimits.automaticSpotSelection;
     final distanceKm = _distance.as(LengthUnit.Kilometer, start, target);
     final plan = MapFlightPlan.adaptive(
       start: start,
@@ -1366,7 +1363,7 @@ class _MapScreenState extends State<MapScreen>
                 math.cos(center.latitude * math.pi / 180) /
                 (256 * (20000 / 256))) /
             math.ln2)
-        .clamp(3.0, _maxZoom);
+        .clamp(MapZoomLimits.minimum, MapZoomLimits.manualMaximum);
     if (!zoom.isFinite) return;
 
     _zoomTo(zoom);
@@ -1606,8 +1603,8 @@ class _MapScreenState extends State<MapScreen>
         !nb.west.isFinite) {
       return;
     }
-    if (nz > _maxZoom) {
-      nz = _maxZoom;
+    if (nz > MapZoomLimits.manualMaximum) {
+      nz = MapZoomLimits.manualMaximum;
       _mapController.move(camera.center, nz);
     }
 
@@ -1656,8 +1653,8 @@ class _MapScreenState extends State<MapScreen>
             options: MapOptions(
               initialCenter: const LatLng(30.5, -9.7),
               initialZoom: 6,
-              maxZoom: _maxZoom,
-              minZoom: 3.0,
+              maxZoom: MapZoomLimits.manualMaximum,
+              minZoom: MapZoomLimits.minimum,
               interactionOptions: const InteractionOptions(
                 // Pinch zoom is essential. Pinch-move and rotation remain
                 // disabled so two fingers only change the finite, clamped zoom.
@@ -2346,7 +2343,7 @@ class _MapScreenState extends State<MapScreen>
             final pos =
                 LatLng(_currentPosition!.latitude, _currentPosition!.longitude);
             if (!pos.latitude.isFinite || !pos.longitude.isFinite) return;
-            final z = (_currentZoom + 2).clamp(3.0, _maxZoom);
+            final z = MapZoomLimits.clampManual(_currentZoom + 2);
             if (!z.isFinite) return;
             _cancelCameraFlight();
             _mapController.move(pos, z);
