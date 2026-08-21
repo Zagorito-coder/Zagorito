@@ -1685,8 +1685,8 @@ class _GoodFishingBanner extends StatelessWidget {
   }
 }
 
-/// Google impose un accès aux options de confidentialité uniquement lorsque
-/// UMP retourne le statut `required`.
+/// Google impose un accès aux choix AdMob/Analytics uniquement lorsque UMP
+/// retourne le statut `required`.
 class _AdvertisingPrivacyEntry extends StatefulWidget {
   const _AdvertisingPrivacyEntry();
 

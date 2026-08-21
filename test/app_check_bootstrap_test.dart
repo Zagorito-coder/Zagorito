@@ -12,6 +12,8 @@ void main() {
         source.indexOf('await Firebase.initializeApp');
     final appCheckActivation =
         source.indexOf('await _activateAppCheckSafely();');
+    final analyticsInitialization =
+        source.indexOf('await _initializeAnalyticsSafely();');
     final crashReportingInitialization =
         source.indexOf('await CrashReportingService.initialize();');
     final appShellNavigation =
@@ -21,10 +23,16 @@ void main() {
     expect(appCheckActivation, greaterThan(firebaseInitialization));
     expect(
       appCheckActivation,
+      lessThan(analyticsInitialization),
+      reason: 'App Check doit précéder les services Firebase optionnels.',
+    );
+    expect(
+      analyticsInitialization,
       lessThan(crashReportingInitialization),
       reason:
-          'App Check doit être actif avant que Crashlytics utilise Firebase.',
+          'Analytics doit être initialisé avant le démarrage différé d’UMP.',
     );
+    expect(source, contains('await AnalyticsService.initialize();'));
     expect(
       appCheckActivation,
       lessThan(appShellNavigation),

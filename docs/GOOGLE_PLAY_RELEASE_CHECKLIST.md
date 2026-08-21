@@ -1,7 +1,7 @@
 # BoosterFish — fiche de publication Google Play
 
-Version candidate en cours de validation : **1.0.6 (14)**
-Dernière mise à jour : **11 août 2026**
+Version candidate en cours de validation : **1.0.7 (15)**
+Dernière mise à jour : **21 août 2026**
 
 Cette fiche décrit l'état réel de l'application et les réponses à reporter dans
 Google Play Console. Toute modification future des SDK, de l'authentification,
@@ -45,9 +45,11 @@ leur contenu corresponde aux fichiers `docs/` de cette version.
 - **Création de compte : Oui, facultative**, via Google Sign-In et Firebase Auth.
 - **Suppression de compte : Oui**, dans Paramètres > Confidentialité, avec
   réauthentification Google ; demande externe possible depuis l'URL publique.
-- **Public visé :** sélectionner `16–17 ans` et `18 ans et plus`, conformément à
-  la politique actuelle. Ne pas déclarer l'application comme destinée aux
-  enfants.
+- **Public visé :** sélectionner uniquement `18 ans et plus`. Ne pas sélectionner
+  `16–17 ans` et ne pas déclarer l'application comme destinée aux enfants. Cette
+  décision doit rester identique dans la fiche Play Console tant qu'aucun flux
+  neutre de vérification de l'âge et de traitement publicitaire adapté aux
+  mineurs n'a été intégré et validé.
 
 ## Sécurité des données — réponses générales
 
@@ -70,15 +72,16 @@ leur contenu corresponde aux fichiers `docs/` de cette version.
 | Identifiants utilisateur | UID Firebase ; identifiant technique `ownerUid` inclus dans une publication communautaire pour reconnaître l'auteur, appliquer les blocages et modérer | Oui | Oui lors d'une publication volontaire ; non¹ pour les seuls services Firebase | Facultatif, seulement avec connexion/publication | Fonctionnalité de l'application ; gestion du compte ; sécurité/prévention des abus |
 | Photos et vidéos — photos | Photo de profil Google ; photo de prise publiée volontairement | Oui | Oui pour une publication volontaire | Facultatif | Fonctionnalité de l'application ; gestion du compte |
 | Localisation précise | Coordonnées d'un spot personnel synchronisé dans l'espace privé ; coordonnées des tuiles de la zone affichée lorsqu'une carte en ligne est centrée sur la position de l'appareil | Oui | Oui pour les fournisseurs de cartes en ligne ; non¹ pour Firestore | Facultatif, après autorisation ou action de l'utilisateur | Fonctionnalité de l'application |
-| Localisation approximative | Zone d'environ 5 km d'une prise publiée ; estimation par adresse IP de Google Mobile Ads, Firebase Auth et Cloud Functions | Oui | Oui pour Google Mobile Ads ; non¹ pour Firebase | Facultative pour la communauté ; requise lors de l'authentification, des appels serveur ou de la diffusion d'annonces | Fonctionnalité de l'application ; gestion du compte ; publicité ou marketing ; analyses ; prévention de la fraude, sécurité et conformité |
-| Activité dans l'application — interactions | Likes, blocages, signalements, lancements et interactions avec l'application ou les annonces | Oui | Oui pour les signaux publicitaires ; seul le total des likes est public | Facultatif pour la communauté ; requis lorsque les annonces sont diffusées | Fonctionnalité de l'application ; analyses ; sécurité/prévention des abus ; publicité ou marketing |
+| Localisation approximative | Zone d'environ 5 km d'une prise publiée ; estimation par adresse IP de Google Mobile Ads, Google Analytics, Firebase Auth et Cloud Functions | Oui | Oui pour Google Mobile Ads ; non¹ pour Firebase | Facultative pour la communauté ; requise lors de l'authentification, des appels serveur, de la mesure Analytics Release ou de la diffusion d'annonces | Fonctionnalité de l'application ; gestion du compte ; publicité ou marketing ; analyses ; prévention de la fraude, sécurité et conformité |
+| Activité dans l'application — interactions | Likes, blocages, signalements et interactions avec les annonces ; événements automatiques de session/engagement et noms statiques des cinq onglets dans Google Analytics | Oui | Oui pour les signaux publicitaires ; non¹ pour Google Analytics ; seul le total des likes est public | Facultatif pour la communauté ; requis pour la mesure Android Release et lorsque les annonces sont diffusées | Fonctionnalité de l'application ; analyses ; sécurité/prévention des abus ; publicité ou marketing |
 | Autres contenus générés par les utilisateurs | Espèce, poids, zone, montage, appât, notes et conseil associés à une prise publiée ; informations d'un spot personnel | Oui | Oui pour une publication volontaire | Facultatif | Fonctionnalité de l'application ; sécurité/prévention des abus |
 | Informations sur l'application et performances — journaux de plantage | Piles de crash et ANR Firebase Crashlytics, état technique pertinent de l'application | Oui | Non¹ | Requise dans la version Release | Analyses |
 | Informations sur l'application et performances — diagnostics | Métadonnées techniques Crashlytics ; temps de lancement, blocages, consommation d'énergie et diagnostics du SDK publicitaire | Oui | Oui pour les signaux publicitaires ; non¹ pour Crashlytics | Requise dans la version Release et lorsque les annonces sont diffusées | Analyses ; prévention de la fraude, sécurité et conformité ; publicité ou marketing |
-| Appareil ou autres identifiants | Identifiant publicitaire Android, App Set ID et identifiants de compte publicitaire ; identifiant d'installation Firebase ; UUID d'installation Crashlytics et jeton d'intégrité App Check/Play Integrity | Oui | Oui pour Google Mobile Ads ; non¹ pour Firebase | Requise lorsque les annonces, le diagnostic Release, l'attestation ou les appels serveur sont utilisés | Fonctionnalité de l'application ; publicité ou marketing ; analyses ; prévention de la fraude, sécurité et conformité |
+| Appareil ou autres identifiants | Identifiant publicitaire Android, App Set ID et identifiants de compte publicitaire utilisés par Google Mobile Ads ; identifiant d'instance d'application Google Analytics sans collecte de l'identifiant publicitaire par Analytics ; identifiant d'installation Firebase ; UUID d'installation Crashlytics et jeton d'intégrité App Check/Play Integrity | Oui | Oui pour Google Mobile Ads ; non¹ pour Firebase | Requise lorsque les annonces, la mesure ou le diagnostic Release, l'attestation ou les appels serveur sont utilisés | Fonctionnalité de l'application ; publicité ou marketing ; analyses ; prévention de la fraude, sécurité et conformité |
 
-¹ Firebase Auth, Google Sign-In et Firebase Crashlytics sont utilisés comme
-prestataires de service respectivement pour l'authentification et le diagnostic.
+¹ Firebase Auth, Google Sign-In, Google Analytics for Firebase et Firebase
+Crashlytics sont utilisés comme prestataires de service respectivement pour
+l'authentification, la mesure d'audience et le diagnostic.
 Cette transmission n'est pas déclarée comme un « partage » si l'exception
 fournisseur de services de Google Play s'applique à la configuration
 contractuelle du compte développeur. Si une donnée est réutilisée par un
@@ -103,9 +106,12 @@ destinataire pour ses propres finalités, la déclarer aussi comme partagée.
   fichier personnel ou historique d'achat n'est collecté par l'application.
 - Firebase Crashlytics collecte les crashs et ANR techniques uniquement dans la
   version Release. Aucun UID Firebase, nom, e-mail, emplacement, nom de spot,
-  note, photo, journal personnalisé ni événement Google Analytics n'est ajouté
-  aux rapports. Les identifiants et rapports Crashlytics sont conservés 90
-  jours selon la documentation Firebase.
+  note, photo, journal personnalisé ni donnée publicitaire n'est ajouté par
+  BoosterFish. Lorsque Google Analytics est actif, Crashlytics peut joindre des
+  fils d'Ariane techniques issus des événements Analytics automatiques et des
+  noms statiques d'onglets afin de reconstituer le parcours précédant un crash.
+  Les identifiants et rapports Crashlytics sont conservés 90 jours selon la
+  documentation Firebase.
 
 Les fournisseurs de cartes reçoivent néanmoins les coordonnées des tuiles de la
 zone affichée ainsi que des données techniques réseau. Cette information est
@@ -169,24 +175,45 @@ fournisseur ou un SDK de cartographie est ajouté.
   jusqu'à validation d'une installation distribuée par Google Play en Internal
   Testing, puis doit être activé progressivement sur Firestore, Storage et
   Functions.
-- **Crashlytics :** intégré uniquement pour la version Release, sans Analytics,
-  identifiant utilisateur, clé personnalisée ni journal applicatif. Dans la
-  console Firebase, désactiver le partage optionnel « Crash Insights » avant la
-  production si vous ne souhaitez pas contribuer les piles anonymisées aux
-  comparaisons globales.
+- **Google Analytics :** SDK `firebase_analytics` actif uniquement en Android
+  Release. Les builds Debug/Profile et les plateformes Apple restent désactivés.
+  Aucun UID Firebase, nom, e-mail, localisation, contenu utilisateur ni
+  identifiant publicitaire n'est fourni à Analytics par BoosterFish. Seuls les
+  événements automatiques du SDK et les noms statiques `home`, `tides`,
+  `my_spots`, `map` et `settings` sont autorisés. Le Consent Mode v2 est refusé
+  par défaut ; UMP applique les choix réglementaires. Hors zone où UMP retourne
+  `notRequired`, seul `analytics_storage` est accordé, tandis que `ad_storage`,
+  `ad_user_data` et `ad_personalization` restent refusés.
+  Contrôle des consoles effectué le 21 août 2026 : conservation des événements
+  et des données utilisateur limitée à 2 mois, prolongation lors d'une nouvelle
+  activité désactivée, Signaux Google désactivés, collecte précise de la ville
+  et de l'appareil désactivée dans toutes les régions, personnalisation
+  publicitaire Analytics refusée dans 307 régions sur 307, User-ID et données
+  fournies par l'utilisateur non activés, et données Firebase non marquées
+  automatiquement comme consenties. Dans AdMob, le Consent Mode UMP est activé
+  pour les finalités publicitaires et Analytics ; le message européen publié
+  propose Autoriser, Refuser et Gérer les options en français, anglais et
+  espagnol. La fonctionnalité spéciale 2 du TCF reste désactivée.
+- **Crashlytics :** intégré uniquement pour la version Release, sans identifiant
+  utilisateur, clé personnalisée ni journal applicatif ajouté par BoosterFish.
+  Les fils d'Ariane Analytics automatiques et les noms statiques d'onglets
+  peuvent accompagner un rapport. Dans la console Firebase, désactiver le
+  partage optionnel « Crash Insights » avant la production si vous ne souhaitez
+  pas contribuer les piles anonymisées aux comparaisons globales.
 
 ## Contrôles avant chaque envoi
 
 1. Vérifier que les deux URLs légales publiques répondent sans connexion et
-   affichent la même date, les mêmes SDK et la même adresse que les fichiers du
-   dépôt.
+   que chaque page affiche la date, les SDK et l'adresse de son fichier
+   correspondant dans le dépôt.
 2. Vérifier que le compte Google reviewer dédié fonctionne sans 2FA/OTP sur un
    appareil ou profil où il n'était pas déjà connecté, puis renseigner
    « Accès à l'application » en anglais.
-3. Vérifier que la fiche « Sécurité des données », la déclaration publicitaire
-   et le public cible correspondent exactement à cette fiche. Si Play Console
-   affiche la déclaration « Standards de sécurité des mineurs », renseigner
-   l'URL ancrée, le contact nominatif et les certifications décrites ci-dessus.
+3. Vérifier que la fiche « Sécurité des données », la déclaration publicitaire,
+   la mesure Google Analytics et le public cible correspondent exactement à
+   cette fiche. Si Play Console affiche la déclaration « Standards de sécurité
+   des mineurs », renseigner l'URL ancrée, le contact nominatif et les
+   certifications décrites ci-dessus.
 4. Télécharger l'AAB signé correspondant au `versionCode` attendu, puis vérifier
    dans l'App Bundle Explorer les autorisations et SDK détectés.
 5. Installer l'APK release sur un appareil propre, refuser puis accepter les
@@ -197,7 +224,10 @@ fournisseur ou un SDK de cartographie est ajouté.
    Cloudflare protégé par App Check, installer l'AAB depuis Google Play Internal
    Testing : un APK installé par câble n'est pas une preuve d'attestation Play
    valide.
-6. Consulter les rapports de pré-lancement, Android vitals, ANR et crashs avant
+6. Dans AdMob, vérifier que le Consent Mode UMP est activé. Dans Google
+   Analytics/Firebase, contrôler la conservation, les paramètres de partage et
+   l'absence de collecte publicitaire Analytics avant la publication.
+7. Consulter les rapports de pré-lancement, Android vitals, ANR et crashs avant
    de promouvoir la version vers une piste plus large.
 
 ## Sources officielles
@@ -220,5 +250,9 @@ fournisseur ou un SDK de cartographie est ajouté.
   <https://developers.google.com/admob/android/privacy/play-data-disclosure>
 - Firebase Android — divulgation des données :
   <https://firebase.google.com/docs/android/play-data-disclosure>
+- Firebase Analytics Flutter — démarrage :
+  <https://firebase.google.com/docs/analytics/flutter/get-started>
+- Google UMP — Consent Mode Flutter :
+  <https://developers.google.com/admob/flutter/privacy/consent-mode>
 - Google Play — exigences de niveau d'API cible :
   <https://support.google.com/googleplay/android-developer/answer/11926878>

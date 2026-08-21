@@ -14,14 +14,17 @@ void main() {
     expect(checklist, isNot(contains('jeton FCM')));
     expect(privacy, contains("identifiant d'installation Firebase"));
     expect(checklist, contains("identifiant d'installation Firebase"));
+    expect(pubspec, contains('firebase_analytics: 12.4.5'));
+    expect(privacy, contains('Google Analytics for Firebase'));
+    expect(checklist, contains('Google Analytics'));
+    expect(privacy, isNot(contains("Google Analytics n'est pas intégré")));
   });
 
-  test('les deux pages légales affichent la même date actuelle', () {
+  test('chaque page légale conserve sa date réelle de mise à jour', () {
     final privacy = File('docs/privacy_policy.html').readAsStringSync();
     final terms = File('docs/terms_of_service.html').readAsStringSync();
-    const currentDate = 'Dernière mise à jour : 11 août 2026';
 
-    expect(privacy, contains(currentDate));
-    expect(terms, contains(currentDate));
+    expect(privacy, contains('Dernière mise à jour : 21 août 2026'));
+    expect(terms, contains('Dernière mise à jour : 11 août 2026'));
   });
 }

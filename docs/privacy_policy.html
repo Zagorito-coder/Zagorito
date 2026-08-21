@@ -19,7 +19,7 @@
 <body>
 
 <h1>Politique de confidentialité — BoosterFish</h1>
-<p class="last-update">Dernière mise à jour : 11 août 2026</p>
+<p class="last-update">Dernière mise à jour : 21 août 2026</p>
 
 <p>
   La présente politique décrit les traitements de données réalisés par
@@ -45,7 +45,8 @@
   <li><strong>Zones cartographiques et lieux consultés :</strong> les fournisseurs de cartes reçoivent les coordonnées des tuiles nécessaires à la zone affichée. Lorsque vous choisissez de centrer une carte en ligne sur votre position, ces coordonnées de tuiles peuvent donc révéler au fournisseur la zone précise affichée. Les coordonnées publiques d'un spot peuvent être transmises à une application de navigation uniquement lorsque vous choisissez explicitement de l'ouvrir. Elles ne sont pas associées à votre compte par BoosterFish.</li>
   <li><strong>Publicité et consentement :</strong> Google Mobile Ads (AdMob) et la plateforme UMP peuvent traiter des identifiants d'appareil ou publicitaires, l'adresse IP, des informations techniques, les interactions avec les annonces et le choix de consentement, conformément aux paramètres UMP et aux règles de Google.</li>
   <li><strong>Protection de l'application :</strong> Firebase App Check utilise, en version Android Release, l'attestation Google Play Integrity et un jeton d'intégrité transmis à Firebase afin de vérifier que les requêtes proviennent de l'application authentique et de limiter les abus. Les appels Firebase Auth et Cloud Functions transmettent aussi l'adresse IP, des informations techniques sur l'application et l'appareil ainsi qu'un identifiant d'installation Firebase utilisé par les SDK concernés. Ces traitements servent au fonctionnement, à la sécurité et à la prévention de la fraude, et ne sont pas utilisés par BoosterFish pour la publicité ou la personnalisation.</li>
-  <li><strong>Diagnostic de stabilité :</strong> en version Android Release, Firebase Crashlytics reçoit automatiquement les rapports de crash et d'absence de réponse (ANR), notamment la pile d'exécution, l'état technique pertinent de l'Application, des métadonnées ponctuelles sur l'appareil et un identifiant d'installation Crashlytics. BoosterFish n'ajoute à ces rapports aucun UID Firebase, nom, e-mail, emplacement, nom de spot, note, photo, journal personnalisé ni donnée publicitaire. Crashlytics est désactivé dans les builds Debug et Profile et Google Analytics n'est pas intégré à ce diagnostic.</li>
+  <li><strong>Mesure d'audience :</strong> uniquement dans la version Android Release, Google Analytics for Firebase traite les événements automatiques du SDK (notamment première ouverture, session et engagement), les noms statiques des cinq onglets principaux (<em>Accueil</em>, <em>Marées</em>, <em>Mes spots</em>, <em>Carte</em> et <em>Paramètres</em>), un identifiant d'instance d'application et des informations techniques générales telles que la version de l'Application, la catégorie d'appareil, la version majeure du système, la langue et le pays ou la région approximative déduite du réseau. La collecte Analytics précise de la ville, du modèle et du nom de l'appareil, des versions mineures du système et de la résolution d'écran est désactivée pour toutes les régions. BoosterFish n'envoie à Analytics aucun UID Firebase, nom, e-mail, position GPS, nom de spot, texte, note ou photo et désactive la collecte de l'identifiant publicitaire par Analytics. La collecte Analytics est désactivée dans les builds Debug/Profile et sur les plateformes Apple actuellement différées.</li>
+  <li><strong>Diagnostic de stabilité :</strong> en version Android Release, Firebase Crashlytics reçoit automatiquement les rapports de crash et d'absence de réponse (ANR), notamment la pile d'exécution, l'état technique pertinent de l'Application, des métadonnées ponctuelles sur l'appareil et un identifiant d'installation Crashlytics. BoosterFish n'ajoute à ces rapports aucun UID Firebase, nom, e-mail, emplacement, nom de spot, note, photo, journal personnalisé ni donnée publicitaire. Lorsque Google Analytics est actif, Crashlytics peut joindre des fils d'Ariane techniques issus des événements Analytics automatiques et des noms statiques d'onglets afin de reconstituer le parcours précédant un crash. Crashlytics reste désactivé dans les builds Debug et Profile.</li>
   <li><strong>Données locales :</strong> langue, thème, caches de spots et magasins et, si nécessaire, un identifiant anonyme aléatoire stocké dans le stockage sécurisé ou les préférences de l'appareil.</li>
   <li><strong>Données techniques des fournisseurs :</strong> adresse IP, modèle d'appareil, journaux réseau ou requêtes de tuiles susceptibles d'être traités par les services tiers nécessaires au fonctionnement.</li>
 </ul>
@@ -56,6 +57,7 @@
   <li>enregistrer la galerie privée choisie par l'utilisateur et afficher les prises communautaires publiées volontairement ;</li>
   <li>faire respecter la limite d'une publication par 24 heures, calculer la meilleure prise hebdomadaire et traiter les likes, blocages et signalements ;</li>
   <li>mémoriser les préférences et assurer la sécurité du service ;</li>
+  <li>mesurer de façon agrégée l'utilisation des principaux onglets afin d'améliorer l'Application ;</li>
   <li>détecter, regrouper et corriger les crashs et ANR afin d'améliorer la stabilité ;</li>
   <li>afficher des annonces pour financer l'Application ;</li>
   <li>respecter les obligations légales et prévenir les abus.</li>
@@ -73,7 +75,8 @@
 <ul>
   <li><strong>Google Firebase Auth, Firestore et Cloud Functions :</strong> connexion Google, données privées de compte, spots personnels, publication communautaire, likes, blocages, signalements, classement hebdomadaire, modération et suppression des données. Aucun nouveau droit d'abonnement n'est créé par l'Application.</li>
   <li><strong>Firebase App Check et Google Play Integrity :</strong> attestation de l'application et de l'environnement Android pour protéger les ressources Firebase contre les requêtes frauduleuses ou non autorisées. Voir les informations de confidentialité de Google et Firebase.</li>
-  <li><strong>Firebase Crashlytics :</strong> diagnostic technique des crashs et ANR de la version Release, sans identifiant de compte ni contexte utilisateur ajouté par BoosterFish.</li>
+  <li><strong>Google Analytics for Firebase :</strong> mesure d'audience limitée à la version Android Release, sans identifiant de compte, contenu utilisateur, position GPS ni identifiant publicitaire fourni par BoosterFish.</li>
+  <li><strong>Firebase Crashlytics :</strong> diagnostic technique des crashs et ANR de la version Release, sans identifiant de compte ni contexte utilisateur ajouté par BoosterFish ; des fils d'Ariane Analytics techniques peuvent être associés au rapport.</li>
   <li><strong>Cloudflare Workers et R2 :</strong> distribution des cartes hors ligne et stockage des photos de spots ou de prises publiées. Les photos communautaires sont accessibles publiquement par une URL non devinable pendant leur période de publication ou de classement ; les écritures sont protégées par Firebase Auth et App Check.</li>
   <li><strong>Google AdMob et User Messaging Platform (UMP) :</strong> consentement et diffusion des annonces. Voir la <a href="https://policies.google.com/privacy">Politique de confidentialité de Google</a>.</li>
   <li><strong>Open-Meteo :</strong> données météo et marines obtenues exclusivement par les tâches serveur utilisant les endpoints commerciaux, puis publiées dans Firestore. L'Application mobile ne contacte pas directement Open-Meteo. Voir les <a href="https://open-meteo.com/en/terms">conditions et informations de confidentialité</a>.</li>
@@ -86,9 +89,15 @@
   données personnelles.
 </p>
 
-<h2>4. Publicité et choix de consentement</h2>
+<h2>4. Publicité, mesure d'audience et choix de consentement</h2>
 <p>
-  Au démarrage de l'interface principale, UMP vérifie si un consentement est requis. Aucune
+  Au démarrage de l'interface principale, UMP vérifie si un consentement est requis pour
+  AdMob et Google Analytics. Les quatre états du Consent Mode v2 (stockage Analytics,
+  stockage publicitaire, données publicitaires et personnalisation) sont refusés par défaut.
+  Lorsque la réglementation concernée s'applique, UMP traduit les choix affichés dans son
+  formulaire et permet leur modification ultérieure. Lorsque UMP confirme qu'aucun formulaire
+  n'est requis, seule la mesure Analytics est autorisée ; les trois usages publicitaires restent
+  refusés dans Analytics. Aucune
   annonce n'est demandée tant que le SDK n'indique pas qu'elle peut l'être. Si vous refusez la
   publicité personnalisée, Google peut encore diffuser des annonces limitées ou non personnalisées,
   selon les choix disponibles dans votre région. Si aucun statut UMP valide, actuel ou précédemment
@@ -96,7 +105,7 @@
   autres fonctions de l'Application.
 </p>
 <p>
-  Lorsque UMP l'exige, l'entrée <strong>Préférences publicitaires</strong> apparaît dans
+  Lorsque UMP l'exige, l'entrée <strong>Choix de confidentialité</strong> apparaît dans
   Paramètres afin de modifier ou retirer votre choix. Vous pouvez également gérer ou réinitialiser
   l'identifiant publicitaire dans les paramètres Android.
 </p>
@@ -110,6 +119,7 @@
   <li>Les photos et fiches de la galerie privée restent sur l'appareil jusqu'à leur suppression par l'utilisateur, la suppression du compte lorsqu'elle peut être exécutée, l'effacement des données de l'Application ou sa désinstallation.</li>
   <li>Les préférences et caches locaux restent sur l'appareil jusqu'à leur effacement, la suppression du compte lorsqu'ils sont concernés, ou la désinstallation.</li>
   <li>Les données publicitaires et journaux des prestataires sont conservés selon leurs propres politiques et votre choix de consentement.</li>
+  <li>Les données d'événement et les données utilisateur Google Analytics sont configurées pour une conservation de 2 mois, sans prolongation automatique lors d'une nouvelle activité, sous réserve des choix de consentement applicables et des rapports agrégés standards de Google. L'identifiant d'instance peut être réinitialisé en effaçant les données de l'Application ou en la désinstallant.</li>
   <li>Firebase Crashlytics conserve les piles de crash, données techniques associées et identifiants d'installation pendant 90 jours avant le début de leur suppression de ses systèmes actifs et de sauvegarde. Ces rapports ne sont volontairement pas liés au compte BoosterFish.</li>
 </ul>
 
@@ -155,7 +165,7 @@
 
 <h2>9. Enfants</h2>
 <p>
-  BoosterFish n'est pas destinée aux enfants de moins de 16 ans et ne cible pas les enfants avec
+  BoosterFish est destinée uniquement aux personnes de 18 ans et plus et ne cible pas les enfants avec
   ses publicités. Si vous pensez qu'un mineur nous a transmis des données, contactez-nous pour en
   demander la suppression.
 </p>

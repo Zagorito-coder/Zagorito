@@ -25,6 +25,7 @@ import 'package:spots_app/models.dart';
 import 'package:spots_app/models/spot_selection_request.dart';
 import 'package:spots_app/models/user_spot.dart';
 import 'package:spots_app/models/user_spot_selection_request.dart';
+import 'package:spots_app/services/analytics_service.dart';
 import 'package:spots_app/services/ad_service.dart';
 import 'package:spots_app/widgets/adaptive_banner_ad.dart';
 
@@ -51,6 +52,13 @@ class AppShell extends StatefulWidget {
 class AppShellState extends State<AppShell> {
   static const _personalSpotBadgePreferenceKey =
       'unread_personal_spot_badge_count';
+  static const Map<int, String> _analyticsScreenNames = {
+    0: 'home',
+    1: 'tides',
+    2: 'my_spots',
+    3: 'map',
+    4: 'settings',
+  };
 
   int _currentIndex = 3;
 
@@ -75,6 +83,9 @@ class AppShellState extends State<AppShell> {
     _userSpotSelectionRequests = ValueNotifier<UserSpotSelectionRequest?>(null);
     _pages = List<Widget?>.filled(5, null);
     _pages[_currentIndex] = _buildPage(_currentIndex);
+    unawaited(AnalyticsService.logScreenView(
+      screenName: _analyticsScreenNames[_currentIndex]!,
+    ));
     unawaited(_restorePersonalSpotBadge());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future<void>.delayed(const Duration(seconds: 1), () {
@@ -113,6 +124,7 @@ class AppShellState extends State<AppShell> {
   /// Navigue vers un onglet spécifique
   void navigateTo(int index) {
     if (index < 0 || index >= _pages.length) return;
+    final didChangeScreen = index != _currentIndex;
     final openedMySpots = index == 2;
     _mapIsActive.value = index == 3;
     setState(() {
@@ -126,6 +138,10 @@ class AppShellState extends State<AppShell> {
     if (openedMySpots) {
       unawaited(_persistPersonalSpotBadge(0));
     }
+    if (!didChangeScreen) return;
+    unawaited(AnalyticsService.logScreenView(
+      screenName: _analyticsScreenNames[index]!,
+    ));
   }
 
   Future<void> _restorePersonalSpotBadge() async {

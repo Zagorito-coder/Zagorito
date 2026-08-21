@@ -2,7 +2,7 @@ name: spots_app
 description: Application de spots de pêche côtière
 publish_to: 'none'
 
-version: 1.0.6+14
+version: 1.0.7+15
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -50,6 +50,7 @@ dependencies:
   path: ^1.9.1
   package_info_plus: ^10.2.1
   sqflite: ^2.4.3
+  firebase_analytics: 12.4.5
 
 
 dev_dependencies:

@@ -419,6 +419,8 @@ void main() {
       await _setViewport(tester, const Size(390, 844));
       await tester.pumpWidget(_testApp(tideData: _marineData()));
       await tester.pumpAndSettle();
+      await _precacheExpeditionImages(tester);
+      await tester.pumpAndSettle();
       await expectLater(
         find.byType(HomeDashboard),
         matchesGoldenFile('goldens/home_dashboard_light.png'),
@@ -454,6 +456,29 @@ const _expeditionKeys = <String>[
   'home-expedition-community',
   'home-expedition-shops',
 ];
+
+const _expeditionAssetStems = <String>[
+  'tides_portrait',
+  'advanced_tides_portrait',
+  'fish_species_portrait',
+  'techniques_portrait',
+  'community_portrait',
+  'shops_cart_portrait',
+];
+
+Future<void> _precacheExpeditionImages(WidgetTester tester) async {
+  final imageContext = tester.element(find.byType(HomeDashboard));
+  await tester.runAsync(() async {
+    for (final theme in const ['light', 'dark']) {
+      for (final stem in _expeditionAssetStems) {
+        await precacheImage(
+          AssetImage('assets/home_cards/${stem}_$theme.webp'),
+          imageContext,
+        );
+      }
+    }
+  });
+}
 
 Future<void> _setViewport(WidgetTester tester, Size size) async {
   await tester.binding.setSurfaceSize(size);
