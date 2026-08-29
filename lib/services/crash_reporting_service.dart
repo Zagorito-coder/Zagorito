@@ -38,15 +38,21 @@ class CrashReportingService {
       )) {
         return;
       }
-      crashlytics.recordFlutterFatalError(
-        FlutterErrorDetails(
-          exception: sanitizeError(details.exception),
-          stack: details.stack,
-          library: 'BoosterFish',
-          context: ErrorDescription('Uncaught Flutter framework error'),
-          silent: details.silent,
-        ),
+      final sanitizedDetails = FlutterErrorDetails(
+        exception: sanitizeError(details.exception),
+        stack: details.stack,
+        library: 'BoosterFish',
+        context: ErrorDescription('Uncaught Flutter framework error'),
+        silent: details.silent,
       );
+      if (shouldRecordFlutterErrorAsFatal(details)) {
+        unawaited(crashlytics.recordFlutterFatalError(sanitizedDetails));
+      } else {
+        // Flutter réserve `silent` aux erreurs environnementales récupérables,
+        // notamment les échecs HTTP d'images. Elles restent diagnostiquées,
+        // mais ne doivent pas dégrader artificiellement le taux sans crash.
+        unawaited(crashlytics.recordFlutterError(sanitizedDetails));
+      }
     };
     PlatformDispatcher.instance.onError = (error, stackTrace) {
       if (isRecoverableTileNetworkError(error, stackTrace)) return true;
@@ -97,6 +103,13 @@ class CrashReportingService {
     if (error is! ClientException || stackTrace == null) return false;
     return stackTrace.toString().contains('NetworkTileImageProvider');
   }
+
+  /// Les erreurs silencieuses sont déjà considérées comme récupérables par
+  /// Flutter. Elles peuvent provenir de conditions externes (image supprimée,
+  /// réponse HTTP temporaire) et doivent donc rester non fatales.
+  @visibleForTesting
+  static bool shouldRecordFlutterErrorAsFatal(FlutterErrorDetails details) =>
+      !details.silent;
 
   /// Retire le message d'exception, qui pourrait contenir une URL de tuile,
   /// une coordonnée ou un texte saisi par l'utilisateur. Le type et la pile

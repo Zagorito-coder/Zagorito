@@ -35,4 +35,33 @@ void main() {
     expect(source, contains('width: 32'));
     expect(source, contains('fontSize: 14.5'));
   });
+
+  test('la carte Communauté refuse les caméras non finies', () {
+    final source = File(
+      'lib/features/community/widgets/community_map_view.dart',
+    ).readAsStringSync().replaceAll('\r\n', '\n');
+
+    expect(source, contains('final _mapController = FiniteMapController();'));
+    expect(source, contains('if (!camera.zoom.isFinite) return;'));
+    expect(source, isNot(contains('final _mapController = MapController();')));
+  });
+
+  test('toutes les images Communauté possèdent un fallback local', () {
+    final source = File(
+      'lib/features/community/widgets/community_map_view.dart',
+    ).readAsStringSync().replaceAll('\r\n', '\n');
+
+    expect(source, isNot(contains('CachedNetworkImageProvider(')));
+    expect(source, contains('class _CommunityAvatar extends StatelessWidget'));
+    expect(
+      source,
+      contains('class _CommunityImageFallback extends StatelessWidget'),
+    );
+
+    final imageCount =
+        RegExp(r'CachedNetworkImage\(').allMatches(source).length;
+    final errorFallbackCount =
+        RegExp(r'errorWidget:').allMatches(source).length;
+    expect(errorFallbackCount, imageCount);
+  });
 }

@@ -12,6 +12,7 @@ import 'package:spots_app/features/community/services/community_repository.dart'
 import 'package:spots_app/l10n/app_localizations.dart';
 import 'package:spots_app/widgets/app_tile_layer.dart';
 import 'package:spots_app/widgets/boosterfish_page.dart';
+import 'package:spots_app/widgets/finite_map_controller.dart';
 import 'package:spots_app/widgets/finite_marker_layer.dart';
 import 'package:spots_app/widgets/location_access_feedback.dart';
 
@@ -26,7 +27,7 @@ class CommunityMapView extends StatefulWidget {
 
 class _CommunityMapViewState extends State<CommunityMapView> {
   final _repository = CommunityRepository.instance;
-  final _mapController = MapController();
+  final _mapController = FiniteMapController();
   late final Stream<List<CommunityCatch>> _catchesStream;
   late final Stream<WeeklyCommunityWinner?> _winnerStream;
   late Stream<Set<String>> _likesStream;
@@ -105,6 +106,7 @@ class _CommunityMapViewState extends State<CommunityMapView> {
                           ),
                           onTap: (_, __) => _clearSelection(),
                           onPositionChanged: (camera, _) {
+                            if (!camera.zoom.isFinite) return;
                             final next = camera.zoom.floor();
                             if (next != _zoomBand && mounted) {
                               setState(() => _zoomBand = next);
@@ -583,6 +585,16 @@ class _WeeklyWinnerBanner extends StatelessWidget {
                 child: CachedNetworkImage(
                   imageUrl: winner.photoUrl,
                   fit: BoxFit.cover,
+                  placeholder: (_, __) => _CommunityImageFallback(
+                    color: palette.oceanDeep,
+                    iconColor: palette.gold,
+                    icon: Icons.emoji_events_rounded,
+                  ),
+                  errorWidget: (_, __, ___) => _CommunityImageFallback(
+                    color: palette.oceanDeep,
+                    iconColor: palette.gold,
+                    icon: Icons.emoji_events_rounded,
+                  ),
                 ),
               ),
               const SizedBox(width: 9),
@@ -903,19 +915,12 @@ class _PublicCatchCard extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    CircleAvatar(
+                    _CommunityAvatar(
                       radius: 15,
+                      imageUrl: item.avatarUrl,
                       backgroundColor: palette.oceanDeep,
-                      foregroundImage: item.avatarUrl.isEmpty
-                          ? null
-                          : CachedNetworkImageProvider(item.avatarUrl),
-                      child: item.avatarUrl.isEmpty
-                          ? Icon(
-                              Icons.person_rounded,
-                              color: palette.accent,
-                              size: 17,
-                            )
-                          : null,
+                      iconColor: palette.accent,
+                      iconSize: 17,
                     ),
                     const SizedBox(width: 9),
                     Expanded(
@@ -1090,15 +1095,12 @@ class _CatchDetailsSheetState extends State<_CatchDetailsSheet> {
               const SizedBox(height: 13),
               Row(
                 children: [
-                  CircleAvatar(
+                  _CommunityAvatar(
                     radius: 21,
+                    imageUrl: item.avatarUrl,
                     backgroundColor: palette.oceanDeep,
-                    foregroundImage: item.avatarUrl.isEmpty
-                        ? null
-                        : CachedNetworkImageProvider(item.avatarUrl),
-                    child: item.avatarUrl.isEmpty
-                        ? Icon(Icons.person_rounded, color: palette.accent)
-                        : null,
+                    iconColor: palette.accent,
+                    iconSize: 24,
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -1399,6 +1401,71 @@ class _CatchDetailsSheetState extends State<_CatchDetailsSheet> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(context.tr(key))),
+    );
+  }
+}
+
+class _CommunityAvatar extends StatelessWidget {
+  const _CommunityAvatar({
+    required this.radius,
+    required this.imageUrl,
+    required this.backgroundColor,
+    required this.iconColor,
+    required this.iconSize,
+  });
+
+  final double radius;
+  final String imageUrl;
+  final Color backgroundColor;
+  final Color iconColor;
+  final double iconSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final fallback = _CommunityImageFallback(
+      color: backgroundColor,
+      iconColor: iconColor,
+      icon: Icons.person_rounded,
+      iconSize: iconSize,
+    );
+    final trimmedUrl = imageUrl.trim();
+
+    return ClipOval(
+      child: SizedBox.square(
+        dimension: radius * 2,
+        child: trimmedUrl.isEmpty
+            ? fallback
+            : CachedNetworkImage(
+                imageUrl: trimmedUrl,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => fallback,
+                errorWidget: (_, __, ___) => fallback,
+              ),
+      ),
+    );
+  }
+}
+
+class _CommunityImageFallback extends StatelessWidget {
+  const _CommunityImageFallback({
+    required this.color,
+    required this.iconColor,
+    required this.icon,
+    this.iconSize,
+  });
+
+  final Color color;
+  final Color iconColor;
+  final IconData icon;
+  final double? iconSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: color,
+      child: Center(
+        child: Icon(icon, color: iconColor, size: iconSize),
+      ),
     );
   }
 }

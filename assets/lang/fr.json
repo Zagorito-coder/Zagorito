@@ -624,6 +624,13 @@
     "serviceDisabledMessage": "Activez la localisation de l’appareil pour utiliser cette fonction.",
     "openLocationSettings": "Activer le GPS"
   },
+  "optionalUpdate": {
+    "title": "Mise à jour disponible",
+    "message": "Mettez BoosterFish à jour pour bénéficier des nouvelles fonctionnalités et des derniers correctifs.",
+    "update": "Mettre à jour",
+    "later": "Plus tard",
+    "storeError": "Impossible d’ouvrir Google Play pour le moment."
+  },
   "common": {
     "ok": "OK",
     "close": "Fermer",
@@ -644,6 +651,7 @@
     "next": "Suivant",
     "cancel": "Annuler",
     "confirm": "Confirmer",
+    "pressBackAgainToExit": "Appuyez encore une fois sur Retour pour quitter.",
     "ngf": "{height}m NGF"
   }
 }

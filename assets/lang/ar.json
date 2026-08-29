@@ -624,6 +624,13 @@
     "serviceDisabledMessage": "فعّل خدمة الموقع في الجهاز لاستخدام هذه الميزة.",
     "openLocationSettings": "تفعيل الموقع"
   },
+  "optionalUpdate": {
+    "title": "يتوفر تحديث",
+    "message": "حدّث BoosterFish للاستفادة من الميزات الجديدة وأحدث الإصلاحات.",
+    "update": "تحديث",
+    "later": "لاحقًا",
+    "storeError": "يتعذر فتح Google Play حاليًا."
+  },
   "common": {
     "ok": "موافق",
     "close": "إغلاق",
@@ -644,6 +651,7 @@
     "next": "التالي",
     "cancel": "إلغاء",
     "confirm": "تأكيد",
+    "pressBackAgainToExit": "اضغط على زر الرجوع مرة أخرى للخروج.",
     "ngf": "{height}m NGF"
   }
 }
