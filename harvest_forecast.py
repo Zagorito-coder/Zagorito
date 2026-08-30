@@ -66,6 +66,7 @@ FORECAST_RUN_ID = (os.environ.get("FORECAST_RUN_ID") or "").strip() or None
 # stations garde chaque requête très loin de ce plafond, y compris lorsque les
 # cinq résumés ``conditions`` sont présents dans le même lot.
 PUBLISH_BATCH_STATION_COUNT = 20
+EXPECTED_STATION_COUNT = 143
 
 FORECAST_BASE_URL = "https://customer-api.open-meteo.com/v1/forecast"
 MARINE_BASE_URL = "https://customer-marine-api.open-meteo.com/v1/marine"
@@ -94,6 +95,29 @@ SPOTS = [
     {"id": "nador_maroc", "name": "Nador, Maroc", "lat": 35.17, "lon": -2.93},
     {"id": "larache_maroc", "name": "Larache, Maroc", "lat": 35.19, "lon": -6.15},
     {"id": "mdiq_maroc", "name": "Mdiq, Maroc", "lat": 35.69, "lon": -5.32},
+    # Points météo côtiers régionaux au Maroc. Ces libellés décrivent une zone
+    # ou un corridor et ne présentent pas les noms locaux des spots comme des
+    # villes officielles. Les coordonnées de couverture restent inchangées.
+    {"id": "aousserd_extreme_sud_maroc", "name": "Littoral d'Aousserd — extrême sud, Maroc", "lat": 21.12819, "lon": -16.94092},
+    {"id": "tantan_elouatia_maroc", "name": "Littoral de Tan-Tan / El Ouatia, Maroc", "lat": 28.61326, "lon": -11.21374},
+    {"id": "boujdour_sud_maroc", "name": "Littoral de Boujdour — sud, Maroc", "lat": 25.52581, "lon": -14.70870},
+    {"id": "aousserd_nord_maroc", "name": "Littoral d'Aousserd — nord, Maroc", "lat": 22.44095, "lon": -16.45138},
+    {"id": "sidi_ifni_maroc", "name": "Sidi Ifni, Maroc", "lat": 29.36693, "lon": -10.18696},
+    {"id": "tarfaya_akhfennir_maroc", "name": "Corridor Tarfaya–Akhfennir, Maroc", "lat": 27.93843, "lon": -12.31627},
+    {"id": "dakhla_boujdour_maroc", "name": "Corridor Dakhla–Boujdour, Maroc", "lat": 24.51228, "lon": -15.11409},
+    {"id": "boujdour_nord_maroc", "name": "Littoral de Boujdour — nord, Maroc", "lat": 26.43321, "lon": -14.09085},
+    {"id": "aousserd_littoral_maroc", "name": "Littoral d'Aousserd, Maroc", "lat": 21.89563, "lon": -16.90179},
+    {"id": "dakhla_sud_maroc", "name": "Littoral de Dakhla — sud, Maroc", "lat": 23.08228, "lon": -16.20727},
+    {"id": "tarfaya_sud_maroc", "name": "Littoral de Tarfaya — sud, Maroc", "lat": 27.78174, "lon": -13.03329},
+    {"id": "kenitra_moulay_bousselham_maroc", "name": "Corridor Kénitra–Moulay Bousselham, Maroc", "lat": 34.59778, "lon": -6.44856},
+    {"id": "chefchaouen_jabha_maroc", "name": "Littoral de Chefchaouen — secteur Jabha, Maroc", "lat": 35.20981, "lon": -4.66566},
+    {"id": "akhfennir_chbika_maroc", "name": "Corridor Akhfennir–Chbika, Maroc", "lat": 28.23050, "lon": -11.73065},
+    {"id": "aglou_tiznit_maroc", "name": "Littoral d'Aglou–Tiznit, Maroc", "lat": 29.85254, "lon": -9.79749},
+    {"id": "saidia_maroc", "name": "Saïdia, Maroc", "lat": 35.09066, "lon": -2.23885},
+    {"id": "oualidia_maroc", "name": "Oualidia, Maroc", "lat": 32.80346, "lon": -8.95479},
+    {"id": "imsouane_nord_maroc", "name": "Littoral d'Imsouane — nord, Maroc", "lat": 30.95543, "lon": -9.82194},
+    {"id": "guelmim_tantan_maroc", "name": "Littoral de Guelmim–Tan-Tan, Maroc", "lat": 28.96584, "lon": -10.59871},
+    {"id": "laayoune_boujdour_maroc", "name": "Corridor Laâyoune–Boujdour, Maroc", "lat": 26.73018, "lon": -13.57505},
     {"id": "alger_algerie", "name": "Alger, Algérie", "lat": 36.75, "lon": 3.04},
     {"id": "oran_algerie", "name": "Oran, Algérie", "lat": 35.70, "lon": -0.64},
     {"id": "annaba_algerie", "name": "Annaba, Algérie", "lat": 36.90, "lon": 7.77},
@@ -1020,7 +1044,7 @@ def _build_station_publication(
     validate_payload(days_payload, utc_offset_seconds)
 
     # L'interface publie explicitement dix jours. Limiter le document à cette
-    # fenêtre maintient aussi le Commit global de 251 écritures nettement sous
+    # fenêtre maintient aussi la publication totale de 291 écritures nettement sous
     # la limite Firestore de 10 Mio, contrairement aux quinze jours bruts
     # demandés à Open-Meteo (utiles comme marge de collecte/validation).
     published_days = days_payload[:CONDITIONS_GFS_DAYS]
@@ -1536,9 +1560,10 @@ def main():
         raise SystemExit(
             "FORECAST_RUN_ID est obligatoire pour tracer et vérifier chaque récolte."
         )
-    if len(SPOTS) != 123:
+    if len(SPOTS) != EXPECTED_STATION_COUNT:
         raise SystemExit(
-            f"Catalogue de récolte inattendu : {len(SPOTS)} spots au lieu de 123."
+            "Catalogue de récolte inattendu : "
+            f"{len(SPOTS)} spots au lieu de {EXPECTED_STATION_COUNT}."
         )
     if len(CONDITIONS_SPOT_IDS) != 5:
         raise SystemExit(
@@ -1555,7 +1580,7 @@ def main():
         firebase_admin.initialize_app(cred)
     db = firestore.client()
 
-    # Aucune écriture n'est créée tant que les 123 stations n'ont pas
+    # Aucune écriture n'est créée tant que les 143 stations n'ont pas
     # toutes passé les contrôles modèles/build/dates/créneaux. Les documents
     # sont ensuite publiés par lots atomiques bornés sous la limite de 10 Mio.
     publications, write_count, commit_count = _prepare_and_publish_forecasts(
@@ -1577,9 +1602,11 @@ def main():
         raise RuntimeError(
             f"Récolte incomplète : {success}/{len(SPOTS)} stations écrites."
         )
-    if write_count != len(SPOTS) * 2 + len(CONDITIONS_SPOT_IDS):
+    expected_write_count = len(SPOTS) * 2 + len(CONDITIONS_SPOT_IDS)
+    if write_count != expected_write_count:
         raise RuntimeError(
-            f"Publication incomplète : {write_count}/251 écritures Firestore."
+            "Publication incomplète : "
+            f"{write_count}/{expected_write_count} écritures Firestore."
         )
 
     # Le job n'est vert qu'après relecture de l'intégralité de l'état publié.

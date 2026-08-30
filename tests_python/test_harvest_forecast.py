@@ -304,7 +304,7 @@ class SpotCatalogTests(unittest.TestCase):
     def test_spot_ids_are_unique_and_coordinates_are_valid(self):
         ids = [spot["id"] for spot in harvest_forecast.SPOTS]
 
-        self.assertEqual(123, len(ids))
+        self.assertEqual(143, len(ids))
         self.assertEqual(len(ids), len(set(ids)))
         for spot in harvest_forecast.SPOTS:
             self.assertGreaterEqual(spot["lat"], -90)
@@ -329,6 +329,37 @@ class SpotCatalogTests(unittest.TestCase):
                 coordinates,
                 (by_id[spot_id]["lat"], by_id[spot_id]["lon"]),
             )
+
+    def test_morocco_coastal_points_keep_validated_names_and_coordinates(self):
+        by_id = {spot["id"]: spot for spot in harvest_forecast.SPOTS}
+        expected = {
+            "aousserd_extreme_sud_maroc": ("Littoral d'Aousserd — extrême sud, Maroc", 21.12819, -16.94092),
+            "tantan_elouatia_maroc": ("Littoral de Tan-Tan / El Ouatia, Maroc", 28.61326, -11.21374),
+            "boujdour_sud_maroc": ("Littoral de Boujdour — sud, Maroc", 25.52581, -14.70870),
+            "aousserd_nord_maroc": ("Littoral d'Aousserd — nord, Maroc", 22.44095, -16.45138),
+            "sidi_ifni_maroc": ("Sidi Ifni, Maroc", 29.36693, -10.18696),
+            "tarfaya_akhfennir_maroc": ("Corridor Tarfaya–Akhfennir, Maroc", 27.93843, -12.31627),
+            "dakhla_boujdour_maroc": ("Corridor Dakhla–Boujdour, Maroc", 24.51228, -15.11409),
+            "boujdour_nord_maroc": ("Littoral de Boujdour — nord, Maroc", 26.43321, -14.09085),
+            "aousserd_littoral_maroc": ("Littoral d'Aousserd, Maroc", 21.89563, -16.90179),
+            "dakhla_sud_maroc": ("Littoral de Dakhla — sud, Maroc", 23.08228, -16.20727),
+            "tarfaya_sud_maroc": ("Littoral de Tarfaya — sud, Maroc", 27.78174, -13.03329),
+            "kenitra_moulay_bousselham_maroc": ("Corridor Kénitra–Moulay Bousselham, Maroc", 34.59778, -6.44856),
+            "chefchaouen_jabha_maroc": ("Littoral de Chefchaouen — secteur Jabha, Maroc", 35.20981, -4.66566),
+            "akhfennir_chbika_maroc": ("Corridor Akhfennir–Chbika, Maroc", 28.23050, -11.73065),
+            "aglou_tiznit_maroc": ("Littoral d'Aglou–Tiznit, Maroc", 29.85254, -9.79749),
+            "saidia_maroc": ("Saïdia, Maroc", 35.09066, -2.23885),
+            "oualidia_maroc": ("Oualidia, Maroc", 32.80346, -8.95479),
+            "imsouane_nord_maroc": ("Littoral d'Imsouane — nord, Maroc", 30.95543, -9.82194),
+            "guelmim_tantan_maroc": ("Littoral de Guelmim–Tan-Tan, Maroc", 28.96584, -10.59871),
+            "laayoune_boujdour_maroc": ("Corridor Laâyoune–Boujdour, Maroc", 26.73018, -13.57505),
+        }
+
+        self.assertEqual(20, len(expected))
+        for spot_id, (name, latitude, longitude) in expected.items():
+            self.assertIn(spot_id, by_id)
+            self.assertEqual(name, by_id[spot_id]["name"])
+            self.assertEqual((latitude, longitude), (by_id[spot_id]["lat"], by_id[spot_id]["lon"]))
 
 
 class NativeGfsStepTests(unittest.TestCase):
