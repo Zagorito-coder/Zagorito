@@ -338,7 +338,7 @@ class SpotCatalogTests(unittest.TestCase):
             "boujdour_sud_maroc": ("Littoral de Boujdour — sud, Maroc", 25.52581, -14.70870),
             "aousserd_nord_maroc": ("Littoral d'Aousserd — nord, Maroc", 22.44095, -16.45138),
             "sidi_ifni_maroc": ("Sidi Ifni, Maroc", 29.36693, -10.18696),
-            "tarfaya_akhfennir_maroc": ("Corridor Tarfaya–Akhfennir, Maroc", 27.93843, -12.31627),
+            "tarfaya_akhfennir_maroc": ("Corridor Tarfaya–Akhfennir, Maroc", 28.041664, -12.708328),
             "dakhla_boujdour_maroc": ("Corridor Dakhla–Boujdour, Maroc", 24.51228, -15.11409),
             "boujdour_nord_maroc": ("Littoral de Boujdour — nord, Maroc", 26.43321, -14.09085),
             "aousserd_littoral_maroc": ("Littoral d'Aousserd, Maroc", 21.89563, -16.90179),

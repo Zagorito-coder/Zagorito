@@ -103,7 +103,7 @@ SPOTS = [
     {"id": "boujdour_sud_maroc", "name": "Littoral de Boujdour — sud, Maroc", "lat": 25.52581, "lon": -14.70870},
     {"id": "aousserd_nord_maroc", "name": "Littoral d'Aousserd — nord, Maroc", "lat": 22.44095, "lon": -16.45138},
     {"id": "sidi_ifni_maroc", "name": "Sidi Ifni, Maroc", "lat": 29.36693, "lon": -10.18696},
-    {"id": "tarfaya_akhfennir_maroc", "name": "Corridor Tarfaya–Akhfennir, Maroc", "lat": 27.93843, "lon": -12.31627},
+    {"id": "tarfaya_akhfennir_maroc", "name": "Corridor Tarfaya–Akhfennir, Maroc", "lat": 28.041664, "lon": -12.708328},
     {"id": "dakhla_boujdour_maroc", "name": "Corridor Dakhla–Boujdour, Maroc", "lat": 24.51228, "lon": -15.11409},
     {"id": "boujdour_nord_maroc", "name": "Littoral de Boujdour — nord, Maroc", "lat": 26.43321, "lon": -14.09085},
     {"id": "aousserd_littoral_maroc", "name": "Littoral d'Aousserd, Maroc", "lat": 21.89563, "lon": -16.90179},
