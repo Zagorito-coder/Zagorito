@@ -15,6 +15,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:spots_app/data/coastal_cities.dart';
 import 'package:spots_app/models.dart';
 import 'package:spots_app/models/compass_readings.dart';
 import 'package:spots_app/models/offline_map_region.dart';
@@ -30,6 +31,7 @@ import 'package:spots_app/spots_canvas_layer.dart';
 import 'package:spots_app/theme.dart';
 import 'package:spots_app/theme_controller.dart';
 import 'package:spots_app/utils/map_flight_plan.dart';
+import 'package:spots_app/utils/city_spot_search.dart';
 import 'package:spots_app/utils/map_zoom_limits.dart';
 import 'package:spots_app/widgets/app_tile_layer.dart';
 import 'package:spots_app/widgets/finite_map_controller.dart';
@@ -269,20 +271,26 @@ class SpotLabel extends StatelessWidget {
 
 class _SearchBar extends StatelessWidget {
   final TextEditingController controller;
-  final List<Spot> results;
+  final List<CoastalCity> cityResults;
+  final List<Spot> spotResults;
+  final CoastalCity? selectedCity;
   final ValueChanged<String> onChanged;
   final VoidCallback onClear;
-  final void Function(Spot) onSelect;
+  final void Function(CoastalCity) onSelectCity;
+  final void Function(Spot) onSelectSpot;
   final String Function(Spot) distanceText;
   final String? measurementText;
   final VoidCallback onStopMeasurement;
   final VoidCallback? onTap;
   const _SearchBar(
       {required this.controller,
-      required this.results,
+      required this.cityResults,
+      required this.spotResults,
+      required this.selectedCity,
       required this.onChanged,
       required this.onClear,
-      required this.onSelect,
+      required this.onSelectCity,
+      required this.onSelectSpot,
       required this.distanceText,
       required this.onStopMeasurement,
       this.measurementText,
@@ -292,6 +300,7 @@ class _SearchBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context);
+    final entries = _buildEntries();
     return Column(mainAxisAlignment: MainAxisAlignment.end, children: [
       Stack(clipBehavior: Clip.none, children: [
         Padding(
@@ -347,7 +356,11 @@ class _SearchBar extends StatelessWidget {
                     textInputAction: TextInputAction.search,
                     onChanged: onChanged,
                     onSubmitted: (_) {
-                      if (results.isNotEmpty) onSelect(results.first);
+                      if (cityResults.isNotEmpty) {
+                        onSelectCity(cityResults.first);
+                      } else if (spotResults.isNotEmpty) {
+                        onSelectSpot(spotResults.first);
+                      }
                     }))),
         if (measurementText != null)
           Positioned(
@@ -422,7 +435,7 @@ class _SearchBar extends StatelessWidget {
                                 onPressed: onStopMeasurement))))
               ]))),
       ]),
-      if (controller.text.isNotEmpty && results.isNotEmpty)
+      if (controller.text.isNotEmpty && entries.isNotEmpty)
         Container(
             margin: const EdgeInsets.only(bottom: 8),
             constraints: const BoxConstraints(maxHeight: 240),
@@ -441,44 +454,188 @@ class _SearchBar extends StatelessWidget {
                 child: ListView.builder(
                     shrinkWrap: true,
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemCount: results.length,
+                    itemCount: entries.length,
                     itemBuilder: (context, index) {
-                      final spot = results[index];
-                      return Container(
-                          margin: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                              color: tc.surfaceLight.withValues(alpha: 0.8),
-                              borderRadius: BorderRadius.circular(10)),
-                          child: ListTile(
+                      final entry = entries[index];
+                      if (entry.sectionKey != null) {
+                        return Padding(
+                          key: ValueKey<String>(entry.sectionKey!),
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 5),
+                          child: Text(
+                            entry.sectionLabel!(l10n),
+                            style: TextStyle(
+                              color: tc.textMuted,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.6,
+                            ),
+                          ),
+                        );
+                      }
+
+                      final city = entry.city;
+                      if (city != null) {
+                        return Padding(
+                          key: ValueKey<String>(
+                            'city-search-result-${city.iso}-${CitySpotSearch.normalize(city.name)}',
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          child: Material(
+                            color: tc.surfaceLight.withValues(alpha: 0.8),
+                            borderRadius: BorderRadius.circular(10),
+                            clipBehavior: Clip.antiAlias,
+                            child: ListTile(
                               dense: true,
-                              leading: Container(
-                                  width: 10,
-                                  height: 10,
-                                  decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: spot.type.color,
-                                      boxShadow: [
-                                        BoxShadow(
-                                            color: spot.type.color
-                                                .withValues(alpha: 0.4),
-                                            blurRadius: 6,
-                                            spreadRadius: 1)
-                                      ])),
-                              title: Text(spot.name,
-                                  style: TextStyle(
-                                      color: tc.textPrimary,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600)),
-                              subtitle: Text(distanceText(spot),
-                                  style: TextStyle(
-                                      color: tc.textMuted, fontSize: 11)),
-                              trailing: Icon(Icons.chevron_right,
-                                  color: tc.textMuted, size: 16),
-                              onTap: () => onSelect(spot)));
+                              leading: Icon(
+                                Icons.location_city_rounded,
+                                color: tc.oceanMedium,
+                                size: 22,
+                              ),
+                              title: Text(
+                                city.name,
+                                style: TextStyle(
+                                  color: tc.textPrimary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              subtitle: Text(
+                                '${city.country} • ${city.iso}',
+                                style: TextStyle(
+                                  color: tc.textMuted,
+                                  fontSize: 11,
+                                ),
+                              ),
+                              trailing: Icon(
+                                Icons.chevron_right,
+                                color: tc.textMuted,
+                                size: 16,
+                              ),
+                              onTap: () => onSelectCity(city),
+                            ),
+                          ),
+                        );
+                      }
+
+                      final spot = entry.spot;
+                      if (spot == null) {
+                        return Padding(
+                          key: const ValueKey<String>('city-search-empty'),
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                          child: Text(
+                            l10n.translate('map.noSpotsAroundCity'),
+                            style: TextStyle(
+                              color: tc.textMuted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        );
+                      }
+                      return Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          child: Material(
+                              color: tc.surfaceLight.withValues(alpha: 0.8),
+                              borderRadius: BorderRadius.circular(10),
+                              clipBehavior: Clip.antiAlias,
+                              child: ListTile(
+                                  dense: true,
+                                  leading: Container(
+                                      width: 10,
+                                      height: 10,
+                                      decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: spot.type.color,
+                                          boxShadow: [
+                                            BoxShadow(
+                                                color: spot.type.color
+                                                    .withValues(alpha: 0.4),
+                                                blurRadius: 6,
+                                                spreadRadius: 1)
+                                          ])),
+                                  title: Text(spot.name,
+                                      style: TextStyle(
+                                          color: tc.textPrimary,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600)),
+                                  subtitle: Text(distanceText(spot),
+                                      style: TextStyle(
+                                          color: tc.textMuted, fontSize: 11)),
+                                  trailing: Icon(Icons.chevron_right,
+                                      color: tc.textMuted, size: 16),
+                                  onTap: () => onSelectSpot(spot))));
                     }))),
     ]);
   }
+
+  List<_MapSearchEntry> _buildEntries() {
+    final city = selectedCity;
+    if (city != null) {
+      return <_MapSearchEntry>[
+        _MapSearchEntry.section(
+          key: 'city-search-summary',
+          label: (l10n) => l10n.trArgs(
+            'map.spotsAroundCity',
+            args: {
+              'city': city.name,
+              'radius': CitySpotSearch.radiusKm.toStringAsFixed(0),
+              'count': spotResults.length.toString(),
+            },
+          ),
+        ),
+        if (spotResults.isEmpty)
+          const _MapSearchEntry.empty()
+        else
+          ...spotResults.map(_MapSearchEntry.spot),
+      ];
+    }
+
+    return <_MapSearchEntry>[
+      if (cityResults.isNotEmpty) ...[
+        _MapSearchEntry.section(
+          key: 'city-search-section',
+          label: (l10n) => l10n.translate('map.cities'),
+        ),
+        ...cityResults.map(_MapSearchEntry.city),
+      ],
+      if (spotResults.isNotEmpty) ...[
+        _MapSearchEntry.section(
+          key: 'spot-search-section',
+          label: (l10n) => l10n.translate('map.spots'),
+        ),
+        ...spotResults.map(_MapSearchEntry.spot),
+      ],
+    ];
+  }
+}
+
+class _MapSearchEntry {
+  final String? sectionKey;
+  final String Function(AppLocalizations)? sectionLabel;
+  final CoastalCity? city;
+  final Spot? spot;
+
+  const _MapSearchEntry._({
+    this.sectionKey,
+    this.sectionLabel,
+    this.city,
+    this.spot,
+  });
+
+  const _MapSearchEntry.city(CoastalCity city) : this._(city: city);
+
+  const _MapSearchEntry.spot(Spot spot) : this._(spot: spot);
+
+  const _MapSearchEntry.empty() : this._();
+
+  _MapSearchEntry.section({
+    required String key,
+    required String Function(AppLocalizations) label,
+  }) : this._(sectionKey: key, sectionLabel: label);
 }
 
 class ZoomButton extends StatelessWidget {
@@ -895,9 +1052,12 @@ class _MapScreenState extends State<MapScreen>
   double? _pendingZoom;
 
   List<Spot> _spots = [];
+  SpotSearchIndex _spotSearchIndex = SpotSearchIndex.empty();
   LatLngBounds? _lastBounds;
   List<Spot> _visibleSpots = [];
   String _searchQuery = '';
+  CoastalCity? _selectedSearchCity;
+  List<Spot> _citySearchSpots = const [];
   Position? _currentPosition;
   Spot? _selectedSpot;
   UserSpot? _selectedUserSpot;
@@ -928,12 +1088,13 @@ class _MapScreenState extends State<MapScreen>
   bool _positionStreamStartedForCompass = false;
   Position? _lastPosition;
 
-  List<Spot> get _searchResults {
-    final q = _searchQuery.trim().toLowerCase();
-    return q.isEmpty
-        ? []
-        : _spots.where((s) => s.name.toLowerCase().contains(q)).toList();
-  }
+  List<CoastalCity> get _citySearchResults => _selectedSearchCity == null
+      ? CitySpotSearch.matchingCities(_searchQuery)
+      : const [];
+
+  List<Spot> get _spotSearchResults => _selectedSearchCity == null
+      ? _spotSearchIndex.search(_searchQuery)
+      : _citySearchSpots;
 
   String _distanceText(Spot spot) {
     if (_currentPosition == null) return 'Distance inconnue';
@@ -942,6 +1103,13 @@ class _MapScreenState extends State<MapScreen>
         LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
         LatLng(spot.latitude, spot.longitude));
     return '${km.toStringAsFixed(1)} km';
+  }
+
+  String _searchDistanceText(Spot spot) {
+    final city = _selectedSearchCity;
+    if (city == null) return _distanceText(spot);
+    final km = CitySpotSearch.distanceFromCityKm(city, spot);
+    return km.isFinite ? '${km.toStringAsFixed(1)} km' : '';
   }
 
   String get _formattedMeasuredDistance =>
@@ -1184,9 +1352,16 @@ class _MapScreenState extends State<MapScreen>
   Future<void> _loadSpots() async {
     try {
       if (widget.initialSpots != null && widget.initialSpots!.isNotEmpty) {
+        final initialSpots = widget.initialSpots!;
+        final searchIndex = SpotSearchIndex(initialSpots);
         if (!mounted) return;
         setState(() {
-          _spots = widget.initialSpots!;
+          _spots = initialSpots;
+          _spotSearchIndex = searchIndex;
+          final city = _selectedSearchCity;
+          if (city != null) {
+            _citySearchSpots = CitySpotSearch.spotsAroundCity(city, _spots);
+          }
           _isLoadingSpots = false;
         });
         WidgetsBinding.instance
@@ -1194,9 +1369,15 @@ class _MapScreenState extends State<MapScreen>
         return;
       }
       final spots = await SpotService.loadSpots();
+      final searchIndex = SpotSearchIndex(spots);
       if (!mounted) return;
       setState(() {
         _spots = spots;
+        _spotSearchIndex = searchIndex;
+        final city = _selectedSearchCity;
+        if (city != null) {
+          _citySearchSpots = CitySpotSearch.spotsAroundCity(city, _spots);
+        }
         _isLoadingSpots = false;
       });
       WidgetsBinding.instance
@@ -1240,7 +1421,10 @@ class _MapScreenState extends State<MapScreen>
     await _animateToPoint(LatLng(spot.latitude, spot.longitude));
   }
 
-  Future<void> _animateToPoint(LatLng target) async {
+  Future<void> _animateToPoint(
+    LatLng target, {
+    double targetZoom = MapZoomLimits.automaticSpotSelection,
+  }) async {
     if (!_isValidMapPoint(target)) return;
     final flightSerial = ++_cameraFlightSerial;
     _cameraFlightController.stop();
@@ -1258,7 +1442,6 @@ class _MapScreenState extends State<MapScreen>
 
     // Toute sélection automatique s'arrête à 16x, même si l'utilisateur
     // observait auparavant la carte au niveau manuel 20x.
-    const targetZoom = MapZoomLimits.automaticSpotSelection;
     final distanceKm = _distance.as(LengthUnit.Kilometer, start, target);
     final plan = MapFlightPlan.adaptive(
       start: start,
@@ -1312,6 +1495,44 @@ class _MapScreenState extends State<MapScreen>
     _cameraFlightPlan = null;
   }
 
+  void _resetCitySearch() {
+    _selectedSearchCity = null;
+    _citySearchSpots = const [];
+  }
+
+  Future<void> _selectCity(CoastalCity city) async {
+    if (!city.lat.isFinite ||
+        !city.lon.isFinite ||
+        city.lat < -90 ||
+        city.lat > 90 ||
+        city.lon < -180 ||
+        city.lon > 180) {
+      return;
+    }
+
+    final nearbySpots = CitySpotSearch.spotsAroundCity(city, _spots);
+    setState(() {
+      _selectedSearchCity = city;
+      _citySearchSpots = nearbySpots;
+      _searchQuery = city.name;
+      _selectedSpot = null;
+      _selectedUserSpot = null;
+      _pendingPersonalSpot = null;
+      _isFishBarVisible = false;
+      _showToolsPanel = false;
+    });
+    _searchController.value = TextEditingValue(
+      text: city.name,
+      selection: TextSelection.collapsed(offset: city.name.length),
+    );
+    FocusScope.of(context).unfocus();
+
+    await _animateToPoint(
+      LatLng(city.lat, city.lon),
+      targetZoom: MapZoomLimits.automaticCitySearch,
+    );
+  }
+
   Future<void> _selectSpot(Spot spot) async {
     setState(() {
       _selectedSpot = spot;
@@ -1320,6 +1541,7 @@ class _MapScreenState extends State<MapScreen>
       _searchQuery = '';
       _isFishBarVisible = false;
       _showToolsPanel = false;
+      _resetCitySearch();
     });
     _searchController.clear();
     FocusScope.of(context).unfocus();
@@ -1339,6 +1561,7 @@ class _MapScreenState extends State<MapScreen>
       _selectedSpot = null;
       _pendingPersonalSpot = null;
       _searchQuery = '';
+      _resetCitySearch();
       _isFishBarVisible = false;
       _showToolsPanel = false;
     });
@@ -1385,6 +1608,7 @@ class _MapScreenState extends State<MapScreen>
       _measurePoints.clear();
       _measuredDistanceKm = 0;
       _searchQuery = '';
+      _resetCitySearch();
     });
     _searchController.clear();
     FocusScope.of(context).unfocus();
@@ -1404,6 +1628,7 @@ class _MapScreenState extends State<MapScreen>
       _showToolsPanel = false;
       _isFishBarVisible = false;
       _searchQuery = '';
+      _resetCitySearch();
     });
     _searchController.clear();
     FocusScope.of(context).unfocus();
@@ -1538,6 +1763,7 @@ class _MapScreenState extends State<MapScreen>
         _isFishBarVisible = false;
         _showToolsPanel = false;
         _searchQuery = '';
+        _resetCitySearch();
       });
       _searchController.clear();
       FocusScope.of(context).unfocus();
@@ -1635,10 +1861,12 @@ class _MapScreenState extends State<MapScreen>
       builder: (context, _) {
         final tc = ThemeColors.of(context);
         final hasSel = _selectedSpot != null;
-        final media = MediaQuery.of(context);
-        final isLandscape = media.orientation == Orientation.landscape;
+        final mediaPadding = MediaQuery.paddingOf(context);
+        final isLandscape =
+            MediaQuery.orientationOf(context) == Orientation.landscape;
 
         return Scaffold(
+            resizeToAvoidBottomInset: false,
             body: Stack(children: [
           if (_isLoadingSpots)
             Center(
@@ -1648,9 +1876,11 @@ class _MapScreenState extends State<MapScreen>
               Text('Chargement des spots...',
                   style: TextStyle(color: tc.textSecondary)),
             ])),
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
+          RepaintBoundary(
+            key: const ValueKey<String>('map-render-boundary'),
+            child: FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
               initialCenter: const LatLng(30.5, -9.7),
               initialZoom: 6,
               maxZoom: MapZoomLimits.manualMaximum,
@@ -1672,8 +1902,8 @@ class _MapScreenState extends State<MapScreen>
                   _showOfflineRegion(region);
                 }
               },
-            ),
-            children: [
+              ),
+              children: [
               AppTileLayer(style: _mapStyle),
               AppMapAttribution(style: _mapStyle),
               if (_currentPosition != null)
@@ -1791,7 +2021,8 @@ class _MapScreenState extends State<MapScreen>
                                     border: Border.all(
                                         color: Colors.redAccent, width: 2)))))
                         .toList()),
-            ],
+              ],
+            ),
           ),
           if (_showToolsPanel) _buildToolsPanel(),
           if (_isAddingSpot) _buildAddSpotModeBanner(),
@@ -1838,42 +2069,53 @@ class _MapScreenState extends State<MapScreen>
             ListenableBuilder(
                 listenable: LanguageController.instance,
                 builder: (ctx, _) {
+                  final keyboardInset = MediaQuery.viewInsetsOf(ctx).bottom;
                   return Positioned(
-                      bottom: 16,
+                      bottom: 16 + keyboardInset,
                       left: 16,
                       right: 16,
                       child: Center(
                           child: SizedBox(
-                              width: MediaQuery.of(ctx).size.width * 0.45,
-                              child: _SearchBar(
-                                  controller: _searchController,
-                                  results: _searchResults,
-                                  onTap: () {
-                                    if (_isFishBarVisible) {
-                                      setState(() => _isFishBarVisible = false);
-                                    }
-                                  },
-                                  onChanged: (q) => setState(() {
-                                        _searchQuery = q.trim().toLowerCase();
+                              width: MediaQuery.sizeOf(ctx).width * 0.45,
+                              child: RepaintBoundary(
+                                child: _SearchBar(
+                                    controller: _searchController,
+                                    cityResults: _citySearchResults,
+                                    spotResults: _spotSearchResults,
+                                    selectedCity: _selectedSearchCity,
+                                    onTap: () {
+                                      if (_isFishBarVisible) {
+                                        setState(
+                                            () => _isFishBarVisible = false);
+                                      }
+                                    },
+                                    onChanged: (q) => setState(() {
+                                          _searchQuery = q;
+                                          _resetCitySearch();
+                                          _selectedSpot = null;
+                                          _selectedUserSpot = null;
+                                          _isFishBarVisible = false;
+                                        }),
+                                    onClear: () {
+                                      _searchController.clear();
+                                      setState(() {
+                                        _searchQuery = '';
+                                        _resetCitySearch();
                                         _selectedSpot = null;
                                         _selectedUserSpot = null;
-                                        _isFishBarVisible = false;
-                                      }),
-                                  onClear: () {
-                                    _searchController.clear();
-                                    setState(() {
-                                      _searchQuery = '';
-                                      _selectedSpot = null;
-                                      _selectedUserSpot = null;
-                                    });
-                                    FocusScope.of(context).unfocus();
-                                  },
-                                  onSelect: _selectSpot,
-                                  distanceText: _distanceText,
-                                  measurementText: _isMeasuring
-                                      ? _formattedMeasuredDistance
-                                      : null,
-                                  onStopMeasurement: _stopMeasuring))));
+                                      });
+                                      FocusScope.of(context).unfocus();
+                                    },
+                                    onSelectCity: (city) =>
+                                        unawaited(_selectCity(city)),
+                                    onSelectSpot: (spot) =>
+                                        unawaited(_selectSpot(spot)),
+                                    distanceText: _searchDistanceText,
+                                    measurementText: _isMeasuring
+                                        ? _formattedMeasuredDistance
+                                        : null,
+                                    onStopMeasurement: _stopMeasuring),
+                              ))));
                 }),
           if (_isCompassEnabled)
             Positioned(
@@ -1884,8 +2126,8 @@ class _MapScreenState extends State<MapScreen>
                     magneticHeading: _magneticHeading,
                     gpsCourseOverGround: _gpsCourseOverGround)),
           Positioned(
-            top: media.padding.top + (isLandscape ? 12 : 80),
-            right: 16 + media.padding.right,
+            top: mediaPadding.top + (isLandscape ? 12 : 80),
+            right: 16 + mediaPadding.right,
             bottom: isLandscape ? null : 100,
             child: SingleChildScrollView(
               scrollDirection: isLandscape ? Axis.horizontal : Axis.vertical,
@@ -2277,6 +2519,7 @@ class _MapScreenState extends State<MapScreen>
           onTap: () => setState(() {
                 _isFishBarVisible = !_isFishBarVisible;
                 _searchQuery = '';
+                _resetCitySearch();
               }),
           child: SizedBox(
               width: _mapBottomControlHeight,

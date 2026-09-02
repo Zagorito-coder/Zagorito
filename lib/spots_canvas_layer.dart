@@ -4,6 +4,84 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:spots_app/models.dart';
 
+@visibleForTesting
+const double spotNameMinimumZoom = 14.0;
+
+@visibleForTesting
+const int maximumVisibleSpotNames = 60;
+
+@visibleForTesting
+bool shouldPaintSpotNames(
+  double zoom, {
+  bool hasSelectedSpot = false,
+}) =>
+    zoom >= spotNameMinimumZoom && !hasSelectedSpot;
+
+@visibleForTesting
+Rect? findSpotNameLabelRect({
+  required Offset markerPosition,
+  required double markerRadius,
+  required Size labelSize,
+  required Rect viewport,
+  required List<Rect> occupiedLabels,
+  required List<Offset> markerPositions,
+  required int markerIndex,
+}) {
+  const markerGap = 5.0;
+  const collisionGap = 2.0;
+  const markerClearance = 8.0;
+  final horizontalOffset = markerRadius + markerGap;
+  final verticalOffset = markerRadius + markerGap;
+  final candidates = <Rect>[
+    Rect.fromLTWH(
+      markerPosition.dx + horizontalOffset,
+      markerPosition.dy - labelSize.height / 2,
+      labelSize.width,
+      labelSize.height,
+    ),
+    Rect.fromLTWH(
+      markerPosition.dx - horizontalOffset - labelSize.width,
+      markerPosition.dy - labelSize.height / 2,
+      labelSize.width,
+      labelSize.height,
+    ),
+    Rect.fromLTWH(
+      markerPosition.dx - labelSize.width / 2,
+      markerPosition.dy - verticalOffset - labelSize.height,
+      labelSize.width,
+      labelSize.height,
+    ),
+    Rect.fromLTWH(
+      markerPosition.dx - labelSize.width / 2,
+      markerPosition.dy + verticalOffset,
+      labelSize.width,
+      labelSize.height,
+    ),
+  ];
+
+  for (final candidate in candidates) {
+    if (!viewport.contains(candidate.topLeft) ||
+        !viewport.contains(candidate.bottomRight)) {
+      continue;
+    }
+
+    final collisionRect = candidate.inflate(collisionGap);
+    if (occupiedLabels.any(collisionRect.overlaps)) continue;
+
+    var overlapsAnotherMarker = false;
+    for (var i = 0; i < markerPositions.length; i++) {
+      if (i == markerIndex) continue;
+      if (collisionRect.inflate(markerClearance).contains(markerPositions[i])) {
+        overlapsAnotherMarker = true;
+        break;
+      }
+    }
+    if (!overlapsAnotherMarker) return candidate;
+  }
+
+  return null;
+}
+
 class _MapRepaintNotifier extends ChangeNotifier {
   void repaint() => notifyListeners();
 }
@@ -137,9 +215,14 @@ class _SpotsCanvasLayerState extends State<SpotsCanvasLayer> {
 }
 
 class _SpotsPainter extends CustomPainter {
+  static const double _labelHorizontalPadding = 6.0;
+  static const double _labelVerticalPadding = 3.0;
+  static const double _maximumTextWidth = 144.0;
+
   final List<Spot> visibleSpots;
   final MapController mapController;
   final Spot? selectedSpot;
+  final Map<String, TextPainter> _labelPainters = <String, TextPainter>{};
 
   _SpotsPainter({
     required this.visibleSpots,
@@ -167,6 +250,7 @@ class _SpotsPainter extends CustomPainter {
     final highlightPaint = Paint()..style = PaintingStyle.fill;
     final borderColor = Colors.white.withValues(alpha: 0.92);
     final highlightColor = Colors.white.withValues(alpha: 0.55);
+    final paintedMarkers = <_PaintedSpot>[];
 
     for (final spot in visibleSpots) {
       // visibleSpots is deliberately refreshed only after an 80 ms debounce.
@@ -182,6 +266,14 @@ class _SpotsPainter extends CustomPainter {
       final isSelected = spot == selectedSpot;
       final radius = isSelected ? 11.0 : 6.0;
       final baseColor = spot.type.color;
+      paintedMarkers.add(
+        _PaintedSpot(
+          spot: spot,
+          position: pos,
+          radius: radius,
+          isSelected: isSelected,
+        ),
+      );
 
       // Ombre portée douce (neumorphique)
       // A blurred shadow for every marker is disproportionately expensive on
@@ -215,6 +307,131 @@ class _SpotsPainter extends CustomPainter {
         );
       }
     }
+
+    if (!shouldPaintSpotNames(
+          camera.zoom,
+          hasSelectedSpot: selectedSpot != null,
+        ) ||
+        paintedMarkers.isEmpty) {
+      return;
+    }
+
+    _paintSpotNames(canvas, size, paintedMarkers);
+  }
+
+  void _paintSpotNames(
+    Canvas canvas,
+    Size size,
+    List<_PaintedSpot> paintedMarkers,
+  ) {
+    // Keep labels out of the permanent right-side controls and the lower
+    // search/ad/navigation area. The proportional fallback preserves enough
+    // map space on small landscape displays.
+    final proportionalRightInset = size.width * 0.20;
+    final rightInset =
+        proportionalRightInset < 64.0 ? proportionalRightInset : 64.0;
+    final proportionalBottomInset = size.height * 0.30;
+    final bottomInset =
+        proportionalBottomInset < 210.0 ? proportionalBottomInset : 210.0;
+    final viewport = Rect.fromLTRB(
+      4,
+      4,
+      size.width - rightInset,
+      size.height - bottomInset,
+    );
+    if (viewport.isEmpty) return;
+
+    final viewportCenter = viewport.center;
+    final markerPositions = paintedMarkers
+        .map((paintedSpot) => paintedSpot.position)
+        .toList(growable: false);
+    final priorityOrder = List<int>.generate(
+      paintedMarkers.length,
+      (index) => index,
+      growable: false,
+    )..sort((a, b) {
+        final first = paintedMarkers[a];
+        final second = paintedMarkers[b];
+        if (first.isSelected != second.isSelected) {
+          return first.isSelected ? -1 : 1;
+        }
+        final firstDistance = (first.position - viewportCenter).distanceSquared;
+        final secondDistance =
+            (second.position - viewportCenter).distanceSquared;
+        return firstDistance.compareTo(secondDistance);
+      });
+
+    final occupiedLabels = <Rect>[];
+    final labelFillPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = const Color(0xE61A2036);
+    final labelBorderPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+
+    for (final markerIndex in priorityOrder) {
+      if (occupiedLabels.length >= maximumVisibleSpotNames) break;
+
+      final paintedSpot = paintedMarkers[markerIndex];
+      final label = _normalizedSpotName(paintedSpot.spot.name);
+      if (label.isEmpty) continue;
+
+      final textPainter = _labelPainter(label);
+      final labelSize = Size(
+        textPainter.width + _labelHorizontalPadding * 2,
+        textPainter.height + _labelVerticalPadding * 2,
+      );
+      final labelRect = findSpotNameLabelRect(
+        markerPosition: paintedSpot.position,
+        markerRadius: paintedSpot.radius,
+        labelSize: labelSize,
+        viewport: viewport,
+        occupiedLabels: occupiedLabels,
+        markerPositions: markerPositions,
+        markerIndex: markerIndex,
+      );
+      if (labelRect == null) continue;
+
+      final background = RRect.fromRectAndRadius(
+        labelRect,
+        const Radius.circular(6),
+      );
+      canvas.drawRRect(background, labelFillPaint);
+      labelBorderPaint.color =
+          paintedSpot.spot.type.color.withValues(alpha: 0.9);
+      canvas.drawRRect(background, labelBorderPaint);
+      textPainter.paint(
+        canvas,
+        labelRect.topLeft +
+            const Offset(_labelHorizontalPadding, _labelVerticalPadding),
+      );
+      occupiedLabels.add(labelRect);
+    }
+  }
+
+  String _normalizedSpotName(String name) {
+    return name.replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
+
+  TextPainter _labelPainter(String label) {
+    return _labelPainters.putIfAbsent(label, () {
+      final painter = TextPainter(
+        text: TextSpan(
+          text: label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 11.5,
+            fontWeight: FontWeight.w600,
+            height: 1.0,
+          ),
+        ),
+        maxLines: 1,
+        ellipsis: '\u2026',
+        textDirection: TextDirection.ltr,
+      );
+      painter.layout(maxWidth: _maximumTextWidth);
+      return painter;
+    });
   }
 
   @override
@@ -223,4 +440,18 @@ class _SpotsPainter extends CustomPainter {
         oldDelegate.selectedSpot != selectedSpot ||
         oldDelegate.mapController != mapController;
   }
+}
+
+class _PaintedSpot {
+  final Spot spot;
+  final Offset position;
+  final double radius;
+  final bool isSelected;
+
+  const _PaintedSpot({
+    required this.spot,
+    required this.position,
+    required this.radius,
+    required this.isSelected,
+  });
 }

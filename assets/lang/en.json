@@ -5,8 +5,12 @@
     "version": "Abyssal Fishing v1.0"
   },
   "map": {
-    "searchHint": "Search for a spot...",
+    "searchHint": "Search for a city, coastal area or spot...",
     "clearSearch": "Clear search",
+    "cities": "Cities and coastal areas",
+    "spots": "Spots",
+    "spotsAroundCity": "{count} spots around {city} • {radius} km radius",
+    "noSpotsAroundCity": "No spots found within this area.",
     "tools": "Map tools",
     "measureDistance": "Measure distance",
     "stopMeasure": "Stop measuring",

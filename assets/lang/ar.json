@@ -5,8 +5,12 @@
     "version": "Abyssal Fishing v1.0"
   },
   "map": {
-    "searchHint": "ابحث عن موقع صيد...",
+    "searchHint": "ابحث عن مدينة أو منطقة ساحلية أو موقع صيد...",
     "clearSearch": "مسح البحث",
+    "cities": "المدن والمناطق الساحلية",
+    "spots": "مواقع الصيد",
+    "spotsAroundCity": "{count} موقع صيد حول {city} • ضمن {radius} كم",
+    "noSpotsAroundCity": "لم يتم العثور على مواقع صيد داخل هذا النطاق.",
     "tools": "أدوات الخريطة",
     "measureDistance": "قياس المسافة",
     "stopMeasure": "إيقاف القياس",

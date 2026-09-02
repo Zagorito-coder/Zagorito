@@ -5,6 +5,9 @@
 /// plus détaillé est réservé à une action explicite de l'utilisateur.
 abstract final class MapZoomLimits {
   static const double minimum = 3.0;
+  // Un rayon de 30 km reste visible sur un téléphone sans charger les tuiles
+  // détaillées utilisées pour la fiche d'un spot individuel.
+  static const double automaticCitySearch = 9.5;
   static const double automaticSpotSelection = 16.0;
   // La source satellite gratuite actuelle fournit, sur les zones côtières
   // contrôlées, ses derniers vrais détails au niveau 18. Le zoom manuel peut
