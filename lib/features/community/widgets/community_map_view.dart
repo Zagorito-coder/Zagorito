@@ -8,6 +8,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:spots_app/features/community/models/community_catch.dart';
+import 'package:spots_app/features/community/models/profile_avatar.dart';
 import 'package:spots_app/features/community/services/community_repository.dart';
 import 'package:spots_app/l10n/app_localizations.dart';
 import 'package:spots_app/widgets/app_tile_layer.dart';
@@ -918,6 +919,7 @@ class _PublicCatchCard extends StatelessWidget {
                     _CommunityAvatar(
                       radius: 15,
                       imageUrl: item.avatarUrl,
+                      avatarId: item.avatarId,
                       backgroundColor: palette.oceanDeep,
                       iconColor: palette.accent,
                       iconSize: 17,
@@ -1098,6 +1100,7 @@ class _CatchDetailsSheetState extends State<_CatchDetailsSheet> {
                   _CommunityAvatar(
                     radius: 21,
                     imageUrl: item.avatarUrl,
+                    avatarId: item.avatarId,
                     backgroundColor: palette.oceanDeep,
                     iconColor: palette.accent,
                     iconSize: 24,
@@ -1409,6 +1412,7 @@ class _CommunityAvatar extends StatelessWidget {
   const _CommunityAvatar({
     required this.radius,
     required this.imageUrl,
+    this.avatarId = '',
     required this.backgroundColor,
     required this.iconColor,
     required this.iconSize,
@@ -1416,6 +1420,7 @@ class _CommunityAvatar extends StatelessWidget {
 
   final double radius;
   final String imageUrl;
+  final String avatarId;
   final Color backgroundColor;
   final Color iconColor;
   final double iconSize;
@@ -1429,18 +1434,25 @@ class _CommunityAvatar extends StatelessWidget {
       iconSize: iconSize,
     );
     final trimmedUrl = imageUrl.trim();
+    final assetPath = profileAvatarAssetPath(avatarId);
 
     return ClipOval(
       child: SizedBox.square(
         dimension: radius * 2,
-        child: trimmedUrl.isEmpty
-            ? fallback
-            : CachedNetworkImage(
-                imageUrl: trimmedUrl,
+        child: assetPath != null
+            ? Image.asset(
+                assetPath,
                 fit: BoxFit.cover,
-                placeholder: (_, __) => fallback,
-                errorWidget: (_, __, ___) => fallback,
-              ),
+                errorBuilder: (_, __, ___) => fallback,
+              )
+            : trimmedUrl.isEmpty
+                ? fallback
+                : CachedNetworkImage(
+                    imageUrl: trimmedUrl,
+                    fit: BoxFit.cover,
+                    placeholder: (_, __) => fallback,
+                    errorWidget: (_, __, ___) => fallback,
+                  ),
       ),
     );
   }

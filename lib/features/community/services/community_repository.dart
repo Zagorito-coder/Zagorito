@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:spots_app/features/community/models/community_catch.dart';
 import 'package:spots_app/features/community/models/private_catch.dart';
+import 'package:spots_app/features/community/models/profile_avatar.dart';
 import 'package:spots_app/features/community/services/community_photo_service.dart';
 import 'package:spots_app/features/community/services/community_privacy.dart';
 import 'package:spots_app/features/community/services/private_catch_repository.dart';
@@ -17,11 +18,13 @@ class CommunityPublicProfile {
     required this.publicDisplayName,
     required this.publishAnonymously,
     required this.hasSavedPreference,
+    required this.avatarChoice,
   });
 
   final String publicDisplayName;
   final bool publishAnonymously;
   final bool hasSavedPreference;
+  final ProfileAvatarChoice avatarChoice;
 }
 
 /// Entrée privée visible uniquement par le pêcheur qui a effectué le blocage.
@@ -77,6 +80,7 @@ class CommunityRepository {
   final PrivateCatchRepository _privateRepository;
   CommunityPublicProfile? _publicProfileCache;
   String? _publicProfileCacheUid;
+  final ValueNotifier<int> publicProfileRevision = ValueNotifier<int>(0);
 
   CollectionReference<Map<String, dynamic>> get _catches =>
       _firestore.collection('community_catches');
@@ -88,6 +92,7 @@ class CommunityRepository {
         publicDisplayName: '',
         publishAnonymously: true,
         hasSavedPreference: false,
+        avatarChoice: ProfileAvatarChoice.google(),
       );
     }
     if (_publicProfileCacheUid == user.uid && _publicProfileCache != null) {
@@ -98,6 +103,7 @@ class CommunityRepository {
       publicDisplayName: _fallbackPublicName(user),
       publishAnonymously: false,
       hasSavedPreference: false,
+      avatarChoice: const ProfileAvatarChoice.google(),
     );
     final snapshot = await _firestore
         .collection(publicProfileCollection)
@@ -111,6 +117,11 @@ class CommunityRepository {
           : fallback.publicDisplayName,
       publishAnonymously: data?['publishAnonymously'] == true,
       hasSavedPreference: snapshot.exists,
+      avatarChoice: ProfileAvatarChoice.fromStored(
+        source: data?['avatarSource'],
+        presetId: data?['avatarId'],
+        customUrl: data?['avatarUrl'],
+      ),
     );
     _publicProfileCacheUid = user.uid;
     _publicProfileCache = profile;
@@ -120,6 +131,7 @@ class CommunityRepository {
   Future<void> savePublicProfile({
     required bool publishAnonymously,
     required String publicDisplayName,
+    required ProfileAvatarChoice avatarChoice,
   }) async {
     final user = _requireUser();
     final cleanName = publicDisplayName.trim();
@@ -133,16 +145,21 @@ class CommunityRepository {
       publicDisplayName: publishAnonymously ? '' : cleanName,
       publishAnonymously: publishAnonymously,
       hasSavedPreference: true,
+      avatarChoice: avatarChoice,
     );
     await _firestore.collection(publicProfileCollection).doc(user.uid).set({
-      'schemaVersion': 1,
+      'schemaVersion': 2,
       'ownerUid': user.uid,
       'publicDisplayName': profile.publicDisplayName,
       'publishAnonymously': profile.publishAnonymously,
+      'avatarSource': profile.avatarChoice.storedSource,
+      'avatarId': profile.avatarChoice.presetId,
+      'avatarUrl': profile.avatarChoice.customUrl,
       'updatedAt': FieldValue.serverTimestamp(),
     });
     _publicProfileCacheUid = user.uid;
     _publicProfileCache = profile;
+    publicProfileRevision.value += 1;
   }
 
   Stream<List<CommunityCatch>> watchActiveCatches() {
@@ -248,7 +265,10 @@ class CommunityRepository {
       final expiresAt = Timestamp.fromDate(
         DateTime.now().add(CommunityCatch.publicationLifetime),
       );
-      final publicName = await _publicName(user);
+      final publicProfile = await _loadPublicProfileOrNull();
+      final publicName = _publicName(user, publicProfile);
+      final avatarUrl = _publicAvatarUrl(user, publicProfile);
+      final avatarId = _publicAvatarId(publicProfile);
       await _firestore.runTransaction((transaction) async {
         final stateSnapshot = await transaction.get(state);
         final lastPublishedAt = stateSnapshot.data()?['lastPublishedAt'];
@@ -266,7 +286,8 @@ class CommunityRepository {
           'schemaVersion': 1,
           'ownerUid': user.uid,
           'anglerName': publicName,
-          'avatarUrl': _safeAvatarUrl(user.photoURL),
+          'avatarUrl': avatarUrl,
+          'avatarId': avatarId,
           'photoUrl': uploaded!.url,
           'photoObjectKey': uploaded.objectKey,
           'species': privateCatch.species.trim(),
@@ -462,6 +483,9 @@ class CommunityRepository {
     try {
       await _functions.httpsCallable('deleteCommunityAccountData').call<void>();
       await _privateRepository.clearAll();
+      _publicProfileCache = null;
+      _publicProfileCacheUid = null;
+      publicProfileRevision.value += 1;
     } on FirebaseFunctionsException catch (error, stackTrace) {
       debugPrint(
         '[CommunityRepository] Account cleanup failed: '
@@ -501,25 +525,53 @@ class CommunityRepository {
     }
   }
 
-  Future<String> _publicName(User user) async {
+  Future<CommunityPublicProfile?> _loadPublicProfileOrNull() async {
     try {
-      final profile = await loadPublicProfile();
-      if (profile.publishAnonymously) return anonymousDisplayName;
-      if (profile.publicDisplayName.isNotEmpty) {
-        return profile.publicDisplayName;
-      }
+      return await loadPublicProfile();
     } catch (error, stackTrace) {
       // L’identité publique est optionnelle : une panne de son document ne
       // doit jamais empêcher une publication déjà valide.
       debugPrint(
         '[CommunityRepository] Public profile unavailable: $error\n$stackTrace',
       );
+      return null;
+    }
+  }
+
+  static String _publicName(
+    User user,
+    CommunityPublicProfile? profile,
+  ) {
+    if (profile?.publishAnonymously == true) return anonymousDisplayName;
+    if (profile?.publicDisplayName.isNotEmpty == true) {
+      return profile!.publicDisplayName;
     }
     final displayName = user.displayName?.trim() ?? '';
     if (displayName.isEmpty) return 'Pêcheur BoosterFish';
     return displayName.length <= 80
         ? displayName
         : displayName.substring(0, 80);
+  }
+
+  static String _publicAvatarUrl(
+    User user,
+    CommunityPublicProfile? profile,
+  ) {
+    if (profile?.publishAnonymously == true) return '';
+    return switch (profile?.avatarChoice.source) {
+      ProfileAvatarSource.custom =>
+        _safeAvatarUrl(profile!.avatarChoice.customUrl),
+      ProfileAvatarSource.preset => '',
+      ProfileAvatarSource.google || null => _safeAvatarUrl(user.photoURL),
+    };
+  }
+
+  static String _publicAvatarId(CommunityPublicProfile? profile) {
+    if (profile == null || profile.publishAnonymously) return '';
+    return profile.avatarChoice.source == ProfileAvatarSource.preset &&
+            profileAvatarAssetPath(profile.avatarChoice.presetId) != null
+        ? profile.avatarChoice.presetId
+        : '';
   }
 
   static String _fallbackPublicName(User user) {

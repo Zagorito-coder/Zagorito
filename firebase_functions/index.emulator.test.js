@@ -130,9 +130,12 @@ test('account deletion removes the owner data without touching other users',
   ]);
 
   const deletedPhotos = [];
+  const deletedProfileAvatars = [];
   await deleteCommunityAccountDataForUid(uid, {
     firestore,
     deletePhoto: async (objectKey) => deletedPhotos.push(objectKey),
+    deleteProfileAvatar: async (ownerUid) =>
+      deletedProfileAvatars.push(ownerUid),
   });
 
   const [
@@ -184,6 +187,7 @@ test('account deletion removes the owner data without touching other users',
   assert.equal(publishStateAfter.exists, false);
   assert.equal(cleanupTasksAfter.empty, true);
   assert.deepEqual(deletedPhotos, ['owner_abcdefghijklmnopqrstuvwx']);
+  assert.deepEqual(deletedProfileAvatars, [uid]);
 });
 
 test('report creation is idempotent under duplicate event delivery',

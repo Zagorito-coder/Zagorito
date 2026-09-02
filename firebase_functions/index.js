@@ -8,6 +8,7 @@ const {
   FieldValue,
   Timestamp,
 } = require('firebase-admin/firestore');
+const {getStorage} = require('firebase-admin/storage');
 const {defineSecret} = require('firebase-functions/params');
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {
@@ -19,6 +20,7 @@ const {onSchedule} = require('firebase-functions/v2/scheduler');
 initializeApp();
 
 const db = getFirestore();
+const storage = getStorage();
 const region = 'europe-west1';
 const runtimeServiceAccount =
   'boosterfish-community-runtime@zagorito-9a0c4.iam.gserviceaccount.com';
@@ -63,7 +65,6 @@ function safeAvatarUrl(value) {
     const url = new URL(value);
     if (
       url.protocol !== 'https:'
-      || url.hostname !== 'lh3.googleusercontent.com'
       || url.port !== ''
       || url.username !== ''
       || url.password !== ''
@@ -72,10 +73,47 @@ function safeAvatarUrl(value) {
     ) {
       return '';
     }
+    if (url.hostname === 'lh3.googleusercontent.com') {
+      return /^https:\/\/lh3\.googleusercontent\.com\/[A-Za-z0-9_./%=-]+(\?[A-Za-z0-9_&.=%-]+)?$/
+        .test(value) ? value : '';
+    }
+    if (url.hostname !== 'firebasestorage.googleapis.com') return '';
+    const match = /^\/v0\/b\/zagorito-9a0c4\.firebasestorage\.app\/o\//
+      .exec(url.pathname);
+    if (match == null) return '';
+    const objectName = decodeURIComponent(url.pathname.slice(match[0].length));
+    if (!/^profile_avatars\/[A-Za-z0-9_-]{1,128}\/avatar\.jpg$/
+      .test(objectName)) {
+      return '';
+    }
+    const altValues = url.searchParams.getAll('alt');
+    const tokenValues = url.searchParams.getAll('token');
+    const versionValues = url.searchParams.getAll('v');
+    if (
+      altValues.length !== 1
+      || altValues[0] !== 'media'
+      || tokenValues.length !== 1
+      || !/^[A-Za-z0-9_-]{20,128}$/.test(tokenValues[0])
+      || (versionValues.length !== 0 && (
+        versionValues.length !== 1
+        || !/^[0-9]{10,16}$/.test(versionValues[0])
+      ))
+      || [...url.searchParams.keys()].some(
+        (key) => key !== 'alt' && key !== 'token' && key !== 'v',
+      )
+    ) {
+      return '';
+    }
     return url.toString();
   } catch (_) {
     return '';
   }
+}
+
+function safeAvatarId(value) {
+  return typeof value === 'string' && /^fisher_(0[1-9]|10)$/.test(value)
+    ? value
+    : '';
 }
 
 function candidateFromDocument(document) {
@@ -106,6 +144,7 @@ function candidateFromDocument(document) {
     ownerUid: data.ownerUid,
     anglerName: data.anglerName,
     avatarUrl: safeAvatarUrl(data.avatarUrl),
+    avatarId: safeAvatarId(data.avatarId),
     photoUrl: data.photoUrl,
     photoObjectKey: data.photoObjectKey,
     species: data.species,
@@ -123,6 +162,7 @@ function publicWinner(candidate, weekId) {
     catchId: candidate.catchId,
     anglerName: candidate.anglerName,
     avatarUrl: safeAvatarUrl(candidate.avatarUrl),
+    avatarId: safeAvatarId(candidate.avatarId),
     photoUrl: candidate.photoUrl,
     species: candidate.species,
     weightKg: candidate.weightKg,
@@ -708,6 +748,7 @@ async function deleteCommunityAccountDataForUid(
   {
     firestore = db,
     deletePhoto = deleteR2Photo,
+    deleteProfileAvatar = deleteFirebaseProfileAvatar,
   } = {},
 ) {
   const owned = await firestore
@@ -775,11 +816,25 @@ async function deleteCommunityAccountDataForUid(
   for (const postId of affectedPostIds) {
     await recalculateCommunityReportCount(postId, {firestore});
   }
+  await deleteProfileAvatar(uid);
   await Promise.all([
     firestore.collection('community_profiles').doc(uid).delete(),
     firestore.collection('community_public_profiles').doc(uid).delete(),
     firestore.collection('community_publish_state').doc(uid).delete(),
   ]);
+}
+
+async function deleteFirebaseProfileAvatar(
+  uid,
+  storageInstance = storage,
+) {
+  if (typeof uid !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(uid)) {
+    throw new Error('Invalid profile avatar owner');
+  }
+  await storageInstance
+    .bucket()
+    .file(`profile_avatars/${uid}/avatar.jpg`)
+    .delete({ignoreNotFound: true});
 }
 
 exports.deleteCommunityAccountData = onCall(
@@ -815,6 +870,7 @@ exports.deleteCommunityAccountData = onCall(
 exports.__test = {
   cleanupRetryDate,
   deleteCommunityAccountDataForUid,
+  deleteFirebaseProfileAvatar,
   deleteR2Photo,
   handleCommunityReportCreated,
   isValidR2ObjectKey,
@@ -825,5 +881,6 @@ exports.__test = {
   retryCommunityCleanupTasksPage,
   replaceLeaderboardState,
   safeAvatarUrl,
+  safeAvatarId,
   previousUtcWeek,
 };

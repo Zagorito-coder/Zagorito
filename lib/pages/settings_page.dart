@@ -4,8 +4,13 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
+import 'package:spots_app/features/community/models/profile_avatar.dart';
+import 'package:spots_app/features/community/services/profile_avatar_processor.dart';
+import 'package:spots_app/features/community/services/profile_avatar_storage_service.dart';
+import 'package:spots_app/features/community/widgets/profile_avatar_view.dart';
 import 'package:spots_app/l10n/app_localizations.dart';
 import 'package:spots_app/widgets/app_back_button.dart';
 import 'package:spots_app/widgets/boosterfish_page.dart';
@@ -263,14 +268,10 @@ class SettingsPage extends StatelessWidget {
           return _CommandAccountCard(
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundImage: auth.photoUrl != null
-                      ? NetworkImage(auth.photoUrl!)
-                      : null,
-                  child: auth.photoUrl == null
-                      ? const Icon(Icons.person, size: 32)
-                      : null,
+                _CurrentProfileAvatar(
+                  googlePhotoUrl: auth.photoUrl,
+                  backgroundColor: tc.oceanDeep,
+                  iconColor: tc.accent,
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -973,9 +974,16 @@ class _PublicProfileSheet extends StatefulWidget {
 
 class _PublicProfileSheetState extends State<_PublicProfileSheet> {
   final _nicknameController = TextEditingController();
+  final _avatarPicker = ImagePicker();
+  final _avatarProcessor = const ProfileAvatarProcessor();
+  final _avatarStorage = ProfileAvatarStorageService();
   bool _anonymous = false;
   bool _loading = true;
   bool _saving = false;
+  bool _processingAvatar = false;
+  ProfileAvatarChoice _avatarChoice = const ProfileAvatarChoice.google();
+  ProfileAvatarChoice _loadedAvatarChoice = const ProfileAvatarChoice.google();
+  Uint8List? _pendingAvatarBytes;
   String? _error;
 
   @override
@@ -995,6 +1003,8 @@ class _PublicProfileSheetState extends State<_PublicProfileSheet> {
           : fallback;
       setState(() {
         _anonymous = profile.publishAnonymously;
+        _avatarChoice = profile.avatarChoice;
+        _loadedAvatarChoice = profile.avatarChoice;
         _loading = false;
       });
     } catch (_) {
@@ -1020,10 +1030,30 @@ class _PublicProfileSheetState extends State<_PublicProfileSheet> {
       _error = null;
     });
     try {
+      var nextAvatarChoice = _avatarChoice;
+      if (nextAvatarChoice.source == ProfileAvatarSource.custom &&
+          _pendingAvatarBytes != null) {
+        final avatarUrl = await _avatarStorage.upload(_pendingAvatarBytes!);
+        nextAvatarChoice = ProfileAvatarChoice.custom(avatarUrl);
+      }
+      if (nextAvatarChoice.source == ProfileAvatarSource.custom &&
+          nextAvatarChoice.customUrl.isEmpty) {
+        throw const FormatException('Invalid custom profile photo');
+      }
       await CommunityRepository.instance.savePublicProfile(
         publishAnonymously: _anonymous,
         publicDisplayName: nickname,
+        avatarChoice: nextAvatarChoice,
       );
+      if (_loadedAvatarChoice.source == ProfileAvatarSource.custom &&
+          nextAvatarChoice.source != ProfileAvatarSource.custom) {
+        try {
+          await _avatarStorage.delete();
+        } catch (_) {
+          // Le profil est déjà enregistré sans la photo. Un échec réseau de
+          // nettoyage ne doit pas annuler le choix visible de l'utilisateur.
+        }
+      }
       if (mounted) Navigator.of(context).pop(true);
     } on FormatException catch (error) {
       if (mounted) setState(() => _error = error.message);
@@ -1036,6 +1066,48 @@ class _PublicProfileSheetState extends State<_PublicProfileSheet> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Future<void> _pickCustomAvatar(ImageSource source) async {
+    if (_saving || _processingAvatar) return;
+    setState(() {
+      _processingAvatar = true;
+      _error = null;
+    });
+    try {
+      final selected = await _avatarPicker.pickImage(
+        source: source,
+        maxWidth: 2048,
+        maxHeight: 2048,
+        imageQuality: 95,
+      );
+      if (selected == null) return;
+      final processed = await _avatarProcessor.process(
+        await selected.readAsBytes(),
+      );
+      if (!mounted) return;
+      setState(() {
+        _pendingAvatarBytes = processed.bytes;
+        _avatarChoice = const ProfileAvatarChoice.pendingCustom();
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _error = context.tr('settings.profilePhotoInvalid');
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _processingAvatar = false);
+    }
+  }
+
+  void _selectAvatar(ProfileAvatarChoice choice) {
+    if (_saving || _processingAvatar) return;
+    setState(() {
+      _avatarChoice = choice;
+      _pendingAvatarBytes = null;
+      _error = null;
+    });
   }
 
   @override
@@ -1168,6 +1240,10 @@ class _PublicProfileSheetState extends State<_PublicProfileSheet> {
                               key: const ValueKey('anonymous-preview'),
                               name: CommunityRepository.anonymousDisplayName,
                               tc: tc,
+                              avatarChoice: _avatarChoice,
+                              googlePhotoUrl:
+                                  context.read<AuthService>().photoUrl,
+                              anonymous: true,
                             )
                           : TextField(
                               key: const ValueKey('nickname-field'),
@@ -1201,7 +1277,21 @@ class _PublicProfileSheetState extends State<_PublicProfileSheet> {
                               ? context.tr('settings.userFallback')
                               : value.text.trim(),
                           tc: tc,
+                          avatarChoice: _avatarChoice,
+                          googlePhotoUrl: context.read<AuthService>().photoUrl,
+                          memoryBytes: _pendingAvatarBytes,
                         ),
+                      ),
+                      const SizedBox(height: 14),
+                      _ProfileAvatarEditor(
+                        choice: _avatarChoice,
+                        savedChoice: _loadedAvatarChoice,
+                        googlePhotoUrl: context.read<AuthService>().photoUrl,
+                        memoryBytes: _pendingAvatarBytes,
+                        busy: _saving || _processingAvatar,
+                        onSelect: _selectAvatar,
+                        onGallery: () => _pickCustomAvatar(ImageSource.gallery),
+                        onCamera: () => _pickCustomAvatar(ImageSource.camera),
                       ),
                     ],
                     if (_error != null) ...[
@@ -1310,10 +1400,22 @@ class _IdentityChoice extends StatelessWidget {
 }
 
 class _PublicPreview extends StatelessWidget {
-  const _PublicPreview({super.key, required this.name, required this.tc});
+  const _PublicPreview({
+    super.key,
+    required this.name,
+    required this.tc,
+    required this.avatarChoice,
+    required this.googlePhotoUrl,
+    this.memoryBytes,
+    this.anonymous = false,
+  });
 
   final String name;
   final BoosterFishPagePalette tc;
+  final ProfileAvatarChoice avatarChoice;
+  final String? googlePhotoUrl;
+  final Uint8List? memoryBytes;
+  final bool anonymous;
 
   @override
   Widget build(BuildContext context) {
@@ -1326,7 +1428,15 @@ class _PublicPreview extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.preview_rounded, color: tc.accent, size: 18),
+          ProfileAvatarView(
+            choice: avatarChoice,
+            googlePhotoUrl: googlePhotoUrl,
+            memoryBytes: memoryBytes,
+            anonymous: anonymous,
+            size: 36,
+            backgroundColor: tc.oceanDeep,
+            iconColor: tc.accent,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -1337,6 +1447,294 @@ class _PublicPreview extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ProfileAvatarEditor extends StatelessWidget {
+  const _ProfileAvatarEditor({
+    required this.choice,
+    required this.savedChoice,
+    required this.googlePhotoUrl,
+    required this.memoryBytes,
+    required this.busy,
+    required this.onSelect,
+    required this.onGallery,
+    required this.onCamera,
+  });
+
+  final ProfileAvatarChoice choice;
+  final ProfileAvatarChoice savedChoice;
+  final String? googlePhotoUrl;
+  final Uint8List? memoryBytes;
+  final bool busy;
+  final ValueChanged<ProfileAvatarChoice> onSelect;
+  final VoidCallback onGallery;
+  final VoidCallback onCamera;
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = BoosterFishPagePalette.of(context);
+    final hasGooglePhoto = safeProfileAvatarUrl(googlePhotoUrl).isNotEmpty;
+    final hasSavedCustom = savedChoice.source == ProfileAvatarSource.custom &&
+        savedChoice.customUrl.isNotEmpty;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: tc.surfaceElevated.withValues(alpha: 0.66),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: tc.borderStrong),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            context.tr('settings.profilePhotoTitle'),
+            style: TextStyle(
+              color: tc.textPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            context.tr('settings.profilePhotoSubtitle'),
+            style: TextStyle(
+              color: tc.textSecondary,
+              fontSize: 10.5,
+              height: 1.25,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 7,
+            runSpacing: 7,
+            children: [
+              if (hasGooglePhoto)
+                _AvatarActionChip(
+                  icon: Icons.account_circle_rounded,
+                  label: context.tr('settings.profilePhotoGoogle'),
+                  selected: choice.source == ProfileAvatarSource.google,
+                  onTap: busy
+                      ? null
+                      : () => onSelect(const ProfileAvatarChoice.google()),
+                ),
+              if (hasSavedCustom)
+                _AvatarActionChip(
+                  icon: Icons.person_pin_rounded,
+                  label: context.tr('settings.profilePhotoCurrent'),
+                  selected: choice.source == ProfileAvatarSource.custom &&
+                      memoryBytes == null &&
+                      choice.customUrl == savedChoice.customUrl,
+                  onTap: busy ? null : () => onSelect(savedChoice),
+                ),
+              _AvatarActionChip(
+                icon: Icons.photo_library_outlined,
+                label: context.tr('settings.profilePhotoGallery'),
+                selected: choice.source == ProfileAvatarSource.custom &&
+                    memoryBytes != null,
+                onTap: busy ? null : onGallery,
+              ),
+              _AvatarActionChip(
+                icon: Icons.photo_camera_outlined,
+                label: context.tr('settings.profilePhotoCamera'),
+                selected: false,
+                onTap: busy ? null : onCamera,
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            context.tr('settings.profilePhotoAvatars'),
+            style: TextStyle(
+              color: tc.textSecondary,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final avatarSize = (constraints.maxWidth - 32) / 5;
+              return Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (var index = 0; index < profileAvatarIds.length; index++)
+                    _PresetAvatarChoice(
+                      avatarId: profileAvatarIds[index],
+                      number: index + 1,
+                      size: avatarSize,
+                      selected: choice.source == ProfileAvatarSource.preset &&
+                          choice.presetId == profileAvatarIds[index],
+                      enabled: !busy,
+                      onTap: () => onSelect(
+                        ProfileAvatarChoice.preset(profileAvatarIds[index]),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+          if (busy) ...[
+            const SizedBox(height: 10),
+            const LinearProgressIndicator(minHeight: 2),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AvatarActionChip extends StatelessWidget {
+  const _AvatarActionChip({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = BoosterFishPagePalette.of(context);
+    return Material(
+      color: selected
+          ? tc.accent.withValues(alpha: 0.14)
+          : tc.surface.withValues(alpha: 0.7),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected ? tc.accent : tc.borderStrong,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 17, color: selected ? tc.accent : tc.textMuted),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  color: tc.textPrimary,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PresetAvatarChoice extends StatelessWidget {
+  const _PresetAvatarChoice({
+    required this.avatarId,
+    required this.number,
+    required this.size,
+    required this.selected,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final String avatarId;
+  final int number;
+  final double size;
+  final bool selected;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = BoosterFishPagePalette.of(context);
+    final label = context.trArgs(
+      'settings.profilePhotoAvatarNumber',
+      args: {'number': '$number'},
+    );
+    return Semantics(
+      button: true,
+      selected: selected,
+      enabled: enabled,
+      label: label,
+      child: Tooltip(
+        message: label,
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          customBorder: const CircleBorder(),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            width: size,
+            height: size,
+            padding: EdgeInsets.all(selected ? 2.5 : 1),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: selected ? tc.accent : tc.borderStrong,
+                width: selected ? 2.5 : 1,
+              ),
+              boxShadow: selected
+                  ? [
+                      BoxShadow(
+                        color: tc.accent.withValues(alpha: 0.22),
+                        blurRadius: 9,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: ProfileAvatarView(
+              choice: ProfileAvatarChoice.preset(avatarId),
+              googlePhotoUrl: null,
+              size: size - (selected ? 5 : 2),
+              backgroundColor: tc.oceanDeep,
+              iconColor: tc.accent,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CurrentProfileAvatar extends StatelessWidget {
+  const _CurrentProfileAvatar({
+    required this.googlePhotoUrl,
+    required this.backgroundColor,
+    required this.iconColor,
+  });
+
+  final String? googlePhotoUrl;
+  final Color backgroundColor;
+  final Color iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final repository = CommunityRepository.instance;
+    return ValueListenableBuilder<int>(
+      valueListenable: repository.publicProfileRevision,
+      builder: (context, _, __) => FutureBuilder<CommunityPublicProfile>(
+        future: repository.loadPublicProfile(),
+        builder: (context, snapshot) => ProfileAvatarView(
+          choice:
+              snapshot.data?.avatarChoice ?? const ProfileAvatarChoice.google(),
+          googlePhotoUrl: googlePhotoUrl,
+          size: 48,
+          backgroundColor: backgroundColor,
+          iconColor: iconColor,
+        ),
       ),
     );
   }

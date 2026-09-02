@@ -191,7 +191,8 @@ test('publication requires consent and the atomic 24-hour state write',
   await assertFails(publish(ownerDb, ownerUid, 'second-publication'));
 });
 
-test('publication only accepts the strict Google avatar host', async () => {
+test('publication accepts only trusted Google, Storage or local avatars',
+    async () => {
   const allowedUid = 'avatar-allowed';
   await seedAcceptedProfile(allowedUid);
   await assertSucceeds(publish(
@@ -204,6 +205,59 @@ test('publication only accepts the strict Google avatar host', async () => {
         'https://lh3.googleusercontent.com/a/avatar_ABC-123=s96-c?sz=96',
     },
   ));
+
+  const presetUid = 'avatar-preset';
+  await seedAcceptedProfile(presetUid);
+  await assertSucceeds(publish(
+    environment.authenticatedContext(presetUid).firestore(),
+    presetUid,
+    'allowed-preset-avatar',
+    presetUid,
+    {avatarId: 'fisher_10'},
+  ));
+
+  const customUid = 'avatar-custom';
+  await seedAcceptedProfile(customUid);
+  const customAvatarUrl =
+    'https://firebasestorage.googleapis.com/v0/b/'
+    + 'zagorito-9a0c4.firebasestorage.app/o/'
+    + `profile_avatars%2F${customUid}%2Favatar.jpg`
+    + '?alt=media&token=abcdefghijklmnopqrst-1234567890&v=1788312345678';
+  await assertSucceeds(publish(
+    environment.authenticatedContext(customUid).firestore(),
+    customUid,
+    'allowed-custom-avatar',
+    customUid,
+    {avatarUrl: customAvatarUrl, avatarId: ''},
+  ));
+
+  for (const [uid, overrides] of [
+    ['avatar-invalid-preset', {avatarId: 'fisher_11'}],
+    [
+      'avatar-foreign-custom',
+      {
+        avatarUrl: customAvatarUrl,
+        avatarId: '',
+      },
+    ],
+    [
+      'avatar-double-choice',
+      {
+        avatarUrl:
+          'https://lh3.googleusercontent.com/a/avatar_ABC-123=s96-c?sz=96',
+        avatarId: 'fisher_01',
+      },
+    ],
+  ]) {
+    await seedAcceptedProfile(uid);
+    await assertFails(publish(
+      environment.authenticatedContext(uid).firestore(),
+      uid,
+      `${uid}-post`,
+      uid,
+      overrides,
+    ));
+  }
 
   for (const [uid, avatarUrl] of [
     ['avatar-tracker', 'https://tracker.example/avatar.png'],
@@ -226,6 +280,52 @@ test('publication only accepts the strict Google avatar host', async () => {
       {avatarUrl},
     ));
   }
+});
+
+test('public profile v2 validates each avatar source and remains owner-only',
+    async () => {
+  const uid = 'profile-owner';
+  const ownerDb = environment.authenticatedContext(uid).firestore();
+  const reference = doc(ownerDb, 'community_public_profiles', uid);
+  const base = {
+    schemaVersion: 2,
+    ownerUid: uid,
+    publicDisplayName: 'NadirFish',
+    publishAnonymously: false,
+    avatarSource: 'preset',
+    avatarId: 'fisher_09',
+    avatarUrl: '',
+    updatedAt: serverTimestamp(),
+  };
+
+  await assertSucceeds(setDoc(reference, base));
+  await assertSucceeds(setDoc(reference, {
+    ...base,
+    avatarSource: 'custom',
+    avatarId: '',
+    avatarUrl:
+      'https://firebasestorage.googleapis.com/v0/b/'
+      + 'zagorito-9a0c4.firebasestorage.app/o/'
+      + `profile_avatars%2F${uid}%2Favatar.jpg`
+      + '?alt=media&token=abcdefghijklmnopqrst-1234567890&v=1788312345678',
+  }));
+  await assertFails(setDoc(reference, {...base, avatarId: 'fisher_11'}));
+  await assertFails(setDoc(reference, {
+    ...base,
+    avatarSource: 'custom',
+    avatarId: '',
+    avatarUrl:
+      'https://firebasestorage.googleapis.com/v0/b/'
+      + 'zagorito-9a0c4.firebasestorage.app/o/'
+      + 'profile_avatars%2Fother-user%2Favatar.jpg'
+      + '?alt=media&token=abcdefghijklmnopqrst-1234567890',
+  }));
+
+  const attackerDb = environment.authenticatedContext('other-user').firestore();
+  await assertFails(setDoc(
+    doc(attackerDb, 'community_public_profiles', uid),
+    base,
+  ));
 });
 
 test('active feed query is public while unbounded feed queries are denied',

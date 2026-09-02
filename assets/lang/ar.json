@@ -357,7 +357,7 @@
     "name": "الاسم",
     "profileSignInRequired": "سجّل الدخول لإدارة هويتك العامة.",
     "publicIdentityTitle": "الهوية العامة",
-    "publicIdentitySubtitle": "اختر الاسم الذي سيظهر في منشوراتك المجتمعية القادمة.",
+    "publicIdentitySubtitle": "اختر الاسم والصورة اللذين سيظهران في منشوراتك المجتمعية القادمة.",
     "publicIdentityAnonymous": "البقاء مجهولًا",
     "publicIdentityNickname": "إظهار لقبي",
     "publicIdentityNicknameHint": "مثال: NadirFish",
@@ -366,7 +366,16 @@
     "publicIdentitySaved": "تم تحديث هويتك العامة.",
     "publicIdentityLoadError": "تعذر تحميل الملف العام. يمكنك المحاولة مرة أخرى.",
     "publicIdentitySaveError": "تعذر حفظ اختيارك. تحقق من الاتصال.",
-    "publicIdentityNicknameError": "يجب أن يتكون اللقب من حرفين إلى 40 حرفًا."
+    "publicIdentityNicknameError": "يجب أن يتكون اللقب من حرفين إلى 40 حرفًا.",
+    "profilePhotoTitle": "الصورة الشخصية",
+    "profilePhotoSubtitle": "احتفظ بصورة Google أو استورد صورة شخصية أو اختر صورة رمزية من Booster Fish.",
+    "profilePhotoGoogle": "صورة Google",
+    "profilePhotoCurrent": "الصورة المحفوظة",
+    "profilePhotoGallery": "المعرض",
+    "profilePhotoCamera": "الكاميرا",
+    "profilePhotoAvatars": "صور Booster Fish الرمزية",
+    "profilePhotoAvatarNumber": "الصورة الرمزية {number}",
+    "profilePhotoInvalid": "لا يمكن استخدام هذه الصورة. اختر صورة صالحة بصيغة JPEG أو PNG أو WebP."
   },
   "language": {
     "title": "اللغة",

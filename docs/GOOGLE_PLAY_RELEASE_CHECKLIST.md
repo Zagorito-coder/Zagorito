@@ -70,7 +70,7 @@ leur contenu corresponde aux fichiers `docs/` de cette version.
 | Informations personnelles — nom | Nom d'affichage Google, affiché avec une prise publiée | Oui | Oui pour une publication volontaire | Facultatif, seulement avec connexion/publication | Fonctionnalité de l'application ; gestion du compte |
 | Informations personnelles — adresse e-mail | Adresse du compte Google | Oui | Non¹ | Facultatif, seulement avec connexion | Fonctionnalité de l'application ; gestion du compte |
 | Identifiants utilisateur | UID Firebase ; identifiant technique `ownerUid` inclus dans une publication communautaire pour reconnaître l'auteur, appliquer les blocages et modérer | Oui | Oui lors d'une publication volontaire ; non¹ pour les seuls services Firebase | Facultatif, seulement avec connexion/publication | Fonctionnalité de l'application ; gestion du compte ; sécurité/prévention des abus |
-| Photos et vidéos — photos | Photo de profil Google ; photo de prise publiée volontairement | Oui | Oui pour une publication volontaire | Facultatif | Fonctionnalité de l'application ; gestion du compte |
+| Photos et vidéos — photos | Photo de profil Google ou personnelle choisie par l'utilisateur ; photo de prise publiée volontairement | Oui | Oui pour une publication volontaire non anonyme | Facultatif | Fonctionnalité de l'application ; gestion du compte |
 | Localisation précise | Coordonnées d'un spot personnel synchronisé dans l'espace privé ; coordonnées des tuiles de la zone affichée lorsqu'une carte en ligne est centrée sur la position de l'appareil | Oui | Oui pour les fournisseurs de cartes en ligne ; non¹ pour Firestore | Facultatif, après autorisation ou action de l'utilisateur | Fonctionnalité de l'application |
 | Localisation approximative | Zone d'environ 5 km d'une prise publiée ; estimation par adresse IP de Google Mobile Ads, Google Analytics, Firebase Auth et Cloud Functions | Oui | Oui pour Google Mobile Ads ; non¹ pour Firebase | Facultative pour la communauté ; requise lors de l'authentification, des appels serveur, de la mesure Analytics Release ou de la diffusion d'annonces | Fonctionnalité de l'application ; gestion du compte ; publicité ou marketing ; analyses ; prévention de la fraude, sécurité et conformité |
 | Activité dans l'application — interactions | Likes, blocages, signalements et interactions avec les annonces ; événements automatiques de session/engagement et noms statiques des cinq onglets dans Google Analytics | Oui | Oui pour les signaux publicitaires ; non¹ pour Google Analytics ; seul le total des likes est public | Facultatif pour la communauté ; requis pour la mesure Android Release et lorsque les annonces sont diffusées | Fonctionnalité de l'application ; analyses ; sécurité/prévention des abus ; publicité ou marketing |
@@ -218,7 +218,8 @@ fournisseur ou un SDK de cartographie est ajouté.
    dans l'App Bundle Explorer les autorisations et SDK détectés.
 5. Installer l'APK release sur un appareil propre, refuser puis accepter les
    choix UMP, tester la localisation refusée/acceptée, la connexion et la
-   suppression du compte. Tester aussi l'import privé, la publication avec une
+   suppression du compte. Tester aussi les dix avatars locaux, l'import et le
+   remplacement d'une photo de profil, l'anonymat, l'import privé, la publication avec une
    photo de moins de 2 Mo, le like depuis un second compte, le signalement, le
    blocage et le retrait par l'auteur. Pour valider Play Integrity et l'envoi
    Cloudflare protégé par App Check, installer l'AAB depuis Google Play Internal

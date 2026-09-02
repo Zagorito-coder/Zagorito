@@ -10,6 +10,7 @@ const {
   isValidR2ObjectKey,
   photoCleanupTaskId,
   safeAvatarUrl,
+  safeAvatarId,
   previousUtcWeek,
 } = communityFunctions.__test;
 
@@ -26,10 +27,16 @@ test('previousUtcWeek is stable when called on a Monday', () => {
   assert.equal(result.end.toISOString(), '2026-07-27T00:00:00.000Z');
 });
 
-test('safeAvatarUrl only retains the exact trusted Google host', () => {
+test('safeAvatarUrl only retains trusted Google and owned Storage paths', () => {
   const allowed =
     'https://lh3.googleusercontent.com/a/avatar_ABC-123=s96-c?sz=96';
   assert.equal(safeAvatarUrl(allowed), allowed);
+  const storageAvatar =
+    'https://firebasestorage.googleapis.com/v0/b/'
+    + 'zagorito-9a0c4.firebasestorage.app/o/'
+    + 'profile_avatars%2Fowner-1%2Favatar.jpg'
+    + '?alt=media&token=abcdefghijklmnopqrst-1234567890&v=1788312345678';
+  assert.equal(safeAvatarUrl(storageAvatar), storageAvatar);
   assert.equal(safeAvatarUrl('https://tracker.example/avatar.png'), '');
   assert.equal(
     safeAvatarUrl(
@@ -47,6 +54,15 @@ test('safeAvatarUrl only retains the exact trusted Google host', () => {
     safeAvatarUrl('https://lh3.googleusercontent.com:444/avatar.png'),
     '',
   );
+  assert.equal(
+    safeAvatarUrl(storageAvatar.replace('owner-1', '..%2Fother')),
+    '',
+  );
+  assert.equal(safeAvatarUrl(storageAvatar.replace('v=1788312345678', 'v=x')), '');
+  assert.equal(safeAvatarUrl(`${storageAvatar}&v=1788312345679`), '');
+  assert.equal(safeAvatarId('fisher_01'), 'fisher_01');
+  assert.equal(safeAvatarId('fisher_10'), 'fisher_10');
+  assert.equal(safeAvatarId('fisher_11'), '');
 });
 
 test('R2 object keys and cleanup task IDs are deterministic and constrained',

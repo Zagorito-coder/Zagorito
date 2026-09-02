@@ -83,6 +83,9 @@ void main() {
     expect(rules, contains('match /community_public_profiles/{userId}'));
     expect(rules, contains("'publicDisplayName'"));
     expect(rules, contains("'publishAnonymously'"));
+    expect(rules, contains("'avatarSource'"));
+    expect(rules, contains("'avatarId'"));
+    expect(rules, contains('hasValidProfileAvatarUrl'));
     expect(repository, contains('savePublicProfile'));
     expect(repository, contains('loadPublicProfile'));
     expect(repository, contains('hasSavedPreference: snapshot.exists'));
@@ -92,8 +95,11 @@ void main() {
     expect(settings, contains('_showUpdateHint = !profile.hasSavedPreference'));
     expect(settings, contains('_showUpdateHint = false'));
     expect(settings, contains('publicIdentityAnonymous'));
+    expect(settings, contains('profilePhotoAvatars'));
+    expect(settings, contains('ProfileAvatarProcessor'));
     expect(
         functions, contains("community_public_profiles').doc(uid).delete()"));
+    expect(functions, contains('deleteFirebaseProfileAvatar'));
   });
 
   test('les CGU publient des standards explicites de sécurité des mineurs', () {

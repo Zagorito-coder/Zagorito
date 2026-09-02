@@ -1,15 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-
-final RegExp _trustedCommunityAvatarPattern = RegExp(
-  r'^https://lh3\.googleusercontent\.com/[A-Za-z0-9_./%=-]+'
-  r'(\?[A-Za-z0-9_&.=%-]+)?$',
-);
+import 'package:spots_app/features/community/models/profile_avatar.dart';
 
 String safeCommunityAvatarUrl(Object? value) {
-  if (value is! String) return '';
-  final trimmed = value.trim();
-  if (trimmed.isEmpty || trimmed.length > 1024) return '';
-  return _trustedCommunityAvatarPattern.hasMatch(trimmed) ? trimmed : '';
+  return safeProfileAvatarUrl(value);
 }
 
 class CommunityCatch {
@@ -18,6 +11,7 @@ class CommunityCatch {
     required this.ownerUid,
     required this.anglerName,
     required this.avatarUrl,
+    this.avatarId = '',
     required this.photoUrl,
     required this.photoObjectKey,
     required this.species,
@@ -42,6 +36,7 @@ class CommunityCatch {
   final String ownerUid;
   final String anglerName;
   final String avatarUrl;
+  final String avatarId;
   final String photoUrl;
   final String photoObjectKey;
   final String species;
@@ -102,6 +97,9 @@ class CommunityCatch {
       ownerUid: ownerUid,
       anglerName: anglerName,
       avatarUrl: safeCommunityAvatarUrl(data['avatarUrl']),
+      avatarId: profileAvatarAssetPath(data['avatarId']) == null
+          ? ''
+          : data['avatarId'] as String,
       photoUrl: photoUrl,
       photoObjectKey: photoObjectKey,
       species: species,
@@ -145,6 +143,7 @@ class WeeklyCommunityWinner {
     required this.catchId,
     required this.anglerName,
     required this.avatarUrl,
+    this.avatarId = '',
     required this.photoUrl,
     required this.species,
     required this.weightKg,
@@ -156,6 +155,7 @@ class WeeklyCommunityWinner {
   final String catchId;
   final String anglerName;
   final String avatarUrl;
+  final String avatarId;
   final String photoUrl;
   final String species;
   final double weightKg;
@@ -197,6 +197,9 @@ class WeeklyCommunityWinner {
       catchId: catchId,
       anglerName: anglerName,
       avatarUrl: safeCommunityAvatarUrl(data['avatarUrl']),
+      avatarId: profileAvatarAssetPath(data['avatarId']) == null
+          ? ''
+          : data['avatarId'] as String,
       photoUrl: photoUrl,
       species: species,
       weightKg: weightKg.toDouble(),

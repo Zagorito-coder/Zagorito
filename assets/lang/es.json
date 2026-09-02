@@ -357,7 +357,7 @@
     "name": "Nombre",
     "profileSignInRequired": "Inicia sesión para gestionar tu identidad pública.",
     "publicIdentityTitle": "Identidad pública",
-    "publicIdentitySubtitle": "Elige el nombre que aparecerá en tus próximas publicaciones comunitarias.",
+    "publicIdentitySubtitle": "Elige el nombre y la foto que aparecerán en tus próximas publicaciones comunitarias.",
     "publicIdentityAnonymous": "Permanecer anónimo",
     "publicIdentityNickname": "Mostrar mi apodo",
     "publicIdentityNicknameHint": "p. ej. NadirFish",
@@ -366,7 +366,16 @@
     "publicIdentitySaved": "Tu identidad pública se ha actualizado.",
     "publicIdentityLoadError": "No se pudo cargar el perfil público. Puedes intentarlo de nuevo.",
     "publicIdentitySaveError": "No se pudo guardar tu elección. Comprueba tu conexión.",
-    "publicIdentityNicknameError": "El apodo debe tener entre 2 y 40 caracteres."
+    "publicIdentityNicknameError": "El apodo debe tener entre 2 y 40 caracteres.",
+    "profilePhotoTitle": "Foto de perfil",
+    "profilePhotoSubtitle": "Conserva tu foto de Google, importa una foto personal o elige un avatar de Booster Fish.",
+    "profilePhotoGoogle": "Foto de Google",
+    "profilePhotoCurrent": "Foto guardada",
+    "profilePhotoGallery": "Galería",
+    "profilePhotoCamera": "Cámara",
+    "profilePhotoAvatars": "Avatares de Booster Fish",
+    "profilePhotoAvatarNumber": "Avatar {number}",
+    "profilePhotoInvalid": "No se puede utilizar esta foto. Elige una imagen JPEG, PNG o WebP válida."
   },
   "language": {
     "title": "Idioma",

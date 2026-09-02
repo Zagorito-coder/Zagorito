@@ -160,13 +160,43 @@ service cloud.firestore {
         );
     }
 
-    function hasValidCommunityAvatar() {
+    function hasValidProfileAvatarUrl(userId, value) {
+      return value is string
+        && value.size() <= 1024
+        && value.matches(
+          '^https://firebasestorage\\.googleapis\\.com/v0/b/zagorito-9a0c4\\.firebasestorage\\.app/o/profile_avatars%2F'
+          + userId
+          + '%2Favatar\\.jpg\\?alt=media&token=[A-Za-z0-9_-]{20,128}(&v=[0-9]{10,16})?$'
+        );
+    }
+
+    function hasValidCommunityAvatar(userId) {
       return request.resource.data.avatarUrl is string
         && request.resource.data.avatarUrl.size() <= 1024
         && (
           request.resource.data.avatarUrl == ''
           || request.resource.data.avatarUrl.matches(
             '^https://lh3\\.googleusercontent\\.com/[A-Za-z0-9_./%=-]+(\\?[A-Za-z0-9_&.=%-]+)?$'
+          )
+          || hasValidProfileAvatarUrl(
+            userId,
+            request.resource.data.avatarUrl
+          )
+        )
+        && (
+          !request.resource.data.keys().hasAny(['avatarId'])
+          || (
+            request.resource.data.avatarId is string
+            && (
+              request.resource.data.avatarId == ''
+              || request.resource.data.avatarId.matches(
+                '^fisher_(0[1-9]|10)$'
+              )
+            )
+            && (
+              request.resource.data.avatarId == ''
+              || request.resource.data.avatarUrl == ''
+            )
           )
         );
     }
@@ -177,6 +207,7 @@ service cloud.firestore {
           'ownerUid',
           'anglerName',
           'avatarUrl',
+          'avatarId',
           'photoUrl',
           'photoObjectKey',
           'species',
@@ -199,7 +230,7 @@ service cloud.firestore {
         && request.resource.data.anglerName is string
         && request.resource.data.anglerName.size() > 0
         && request.resource.data.anglerName.size() <= 80
-        && hasValidCommunityAvatar()
+        && hasValidCommunityAvatar(userId)
         && hasValidCommunityPhoto(userId)
         && request.resource.data.species is string
         && request.resource.data.species.size() > 0
@@ -467,13 +498,63 @@ service cloud.firestore {
           'ownerUid',
           'publicDisplayName',
           'publishAnonymously',
+          'avatarSource',
+          'avatarId',
+          'avatarUrl',
           'updatedAt'
         ])
-        && request.resource.data.schemaVersion == 1
+        && request.resource.data.schemaVersion in [1, 2]
         && request.resource.data.ownerUid == userId
         && request.resource.data.publicDisplayName is string
         && request.resource.data.publicDisplayName.size() <= 40
         && request.resource.data.publishAnonymously is bool
+        && (
+          (
+            request.resource.data.schemaVersion == 1
+            && !request.resource.data.keys().hasAny([
+              'avatarSource',
+              'avatarId',
+              'avatarUrl'
+            ])
+          )
+          || (
+            request.resource.data.schemaVersion == 2
+            && request.resource.data.keys().hasAll([
+              'avatarSource',
+              'avatarId',
+              'avatarUrl'
+            ])
+            && request.resource.data.avatarSource in [
+              'google',
+              'preset',
+              'custom'
+            ]
+            && request.resource.data.avatarId is string
+            && request.resource.data.avatarUrl is string
+            && (
+              (
+                request.resource.data.avatarSource == 'google'
+                && request.resource.data.avatarId == ''
+                && request.resource.data.avatarUrl == ''
+              )
+              || (
+                request.resource.data.avatarSource == 'preset'
+                && request.resource.data.avatarId.matches(
+                  '^fisher_(0[1-9]|10)$'
+                )
+                && request.resource.data.avatarUrl == ''
+              )
+              || (
+                request.resource.data.avatarSource == 'custom'
+                && request.resource.data.avatarId == ''
+                && hasValidProfileAvatarUrl(
+                  userId,
+                  request.resource.data.avatarUrl
+                )
+              )
+            )
+          )
+        )
         && request.resource.data.updatedAt == request.time;
     }
 

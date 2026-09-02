@@ -52,6 +52,7 @@ dependencies:
   sqflite: ^2.4.3
   firebase_analytics: 12.4.5
   firebase_remote_config: ^6.5.6
+  firebase_storage: ^13.4.6
 
 
 dev_dependencies:
@@ -88,6 +89,7 @@ flutter:
     - assets/fish_selector_thumbnails/
     - assets/animations/
     - assets/flags/
+    - assets/profile_avatars/
     - assets/launcher_icon.png
     - assets/lang/fr.json
     - assets/lang/en.json

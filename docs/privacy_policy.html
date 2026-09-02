@@ -37,6 +37,7 @@
 <h2>1. Données traitées</h2>
 <ul>
   <li><strong>Compte Google facultatif :</strong> adresse e-mail, nom d'affichage, photo de profil et identifiant Firebase (UID), lorsque vous choisissez Google Sign-In.</li>
+  <li><strong>Photo de profil BoosterFish facultative :</strong> vous pouvez conserver votre photo Google, choisir l'un des dix avatars inclus localement dans l'Application ou importer une photo personnelle. Une photo personnelle est recadrée, réduite à 512 × 512 pixels, réencodée en JPEG sans métadonnées EXIF puis stockée dans Firebase Storage. Elle devient publiquement visible uniquement avec les publications communautaires non anonymes que vous choisissez d'effectuer.</li>
   <li><strong>Localisation de l'appareil :</strong> position approximative ou précise après autorisation Android, utilisée pour centrer la carte, calculer des distances, sélectionner localement la station de prévisions publiée la plus proche et, uniquement à votre demande, renseigner l'emplacement d'une prise privée. BoosterFish ne transmet pas cette position à Open-Meteo.</li>
   <li><strong>Spots personnels :</strong> nom, notes, photo facultative et coordonnées du point que vous choisissez sur la carte. Ces éléments sont synchronisés dans l'espace Firestore privé de votre compte afin de les retrouver sur vos appareils et d'alimenter une file privée de vérification. Ils ne sont pas rendus publics automatiquement.</li>
   <li><strong>Galerie privée « Mes prises » :</strong> photo, espèce, poids, zone, montage, appât, notes, conseil, date et, si vous la renseignez, position exacte. Ces données restent dans le stockage privé de l'Application sur votre appareil, séparé par compte, dans la limite de 20 prises. Elles ne sont jamais publiées automatiquement.</li>
@@ -73,7 +74,7 @@
 <h2>3. Services et destinataires</h2>
 <p>BoosterFish utilise les prestataires suivants, qui appliquent leurs propres politiques :</p>
 <ul>
-  <li><strong>Google Firebase Auth, Firestore et Cloud Functions :</strong> connexion Google, données privées de compte, spots personnels, publication communautaire, likes, blocages, signalements, classement hebdomadaire, modération et suppression des données. Aucun nouveau droit d'abonnement n'est créé par l'Application.</li>
+  <li><strong>Google Firebase Auth, Firestore, Storage et Cloud Functions :</strong> connexion Google, données privées de compte, photo de profil personnelle facultative, spots personnels, publication communautaire, likes, blocages, signalements, classement hebdomadaire, modération et suppression des données. Aucun nouveau droit d'abonnement n'est créé par l'Application.</li>
   <li><strong>Firebase App Check et Google Play Integrity :</strong> attestation de l'application et de l'environnement Android pour protéger les ressources Firebase contre les requêtes frauduleuses ou non autorisées. Voir les informations de confidentialité de Google et Firebase.</li>
   <li><strong>Google Analytics for Firebase :</strong> mesure d'audience limitée à la version Android Release, sans identifiant de compte, contenu utilisateur, position GPS ni identifiant publicitaire fourni par BoosterFish.</li>
   <li><strong>Firebase Crashlytics :</strong> diagnostic technique des crashs et ANR de la version Release, sans identifiant de compte ni contexte utilisateur ajouté par BoosterFish ; des fils d'Ariane Analytics techniques peuvent être associés au rapport.</li>
@@ -113,6 +114,7 @@
 <h2>5. Conservation</h2>
 <ul>
   <li>Les données du compte Firebase sont conservées jusqu'à la suppression du compte ou selon les délais nécessaires à la sécurité et aux obligations légales.</li>
+  <li>Une photo de profil personnelle reste dans Firebase Storage jusqu'à son remplacement, le choix d'une photo Google ou d'un avatar local, ou la suppression du compte. Les dix avatars BoosterFish restent uniquement dans les fichiers locaux de l'Application.</li>
   <li>Les coordonnées exactes d'une prise de la galerie privée restent sur l'appareil. Les coordonnées d'un spot personnel choisi sur la carte sont conservées dans l'espace privé du compte jusqu'à sa suppression.</li>
   <li>Une prise communautaire ordinaire reste active au maximum 7 jours. Les éléments nécessaires à l'annonce de la meilleure prise et à ses remplaçantes limitées peuvent être conservés jusqu'au classement hebdomadaire suivant. Une publication retirée par son auteur, supprimée par modération ou liée à un compte supprimé est effacée avec sa photo publique.</li>
   <li>Les likes, signalements et éléments de modération associés sont supprimés avec la publication ou le compte concerné, sous réserve d'une conservation plus longue strictement nécessaire à une obligation légale ou à la prévention d'un abus grave.</li>
@@ -140,7 +142,7 @@
   <li>appuyez sur <strong>Supprimer mon compte</strong> et confirmez la réauthentification Google.</li>
 </ol>
 <p>
-  Cette opération supprime les publications communautaires et leurs photos, likes, signalements,
+  Cette opération supprime la photo de profil personnelle, les publications communautaires et leurs photos, likes, signalements,
   blocages, consentement communautaire, spots personnels, galerie privée locale, ancien
   enregistrement d'abonnement éventuellement associé au UID, puis le compte Firebase Auth.
   Une publication peut aussi être retirée séparément depuis sa fiche dans la Communauté.
@@ -157,8 +159,10 @@
   Les échanges réseau utilisent HTTPS/TLS, l'authentification repose sur Google OAuth et Firebase,
   les règles Firestore isolent les données privées, valident les publications et bloquent les
   écritures du client sur les prévisions et les anciens droits d'abonnement. Les photos sont
-  limitées à 2 Mo, réencodées sans métadonnées EXIF avant stockage et protégées à l'écriture par
-  Firebase Auth et App Check. Les données applicatives privées sont exclues d'Android Auto Backup
+  limitées à 2 Mo pour les contenus communautaires et à 350 Ko pour la photo de profil, réencodées
+  sans métadonnées EXIF avant stockage et protégées à l'écriture par Firebase Auth et des règles
+  de stockage limitées au propriétaire ; les envois communautaires Cloudflare exigent en plus App Check.
+  Les données applicatives privées sont exclues d'Android Auto Backup
   et du transfert appareil-à-appareil. Aucun mot de passe Google n'est reçu ou stocké par BoosterFish.
   Aucun système n'étant infaillible, contactez-nous si vous soupçonnez un incident.
 </p>

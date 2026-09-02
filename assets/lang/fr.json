@@ -357,7 +357,7 @@
   "name": "Nom",
   "profileSignInRequired": "Connectez-vous pour gérer votre identité publique.",
   "publicIdentityTitle": "Identité publique",
-  "publicIdentitySubtitle": "Choisissez le nom visible sur vos prochaines publications communautaires.",
+  "publicIdentitySubtitle": "Choisissez le nom et la photo visibles sur vos prochaines publications communautaires.",
   "publicIdentityAnonymous": "Rester anonyme",
   "publicIdentityNickname": "Afficher mon surnom",
   "publicIdentityNicknameHint": "Ex. NadirFish",
@@ -366,7 +366,16 @@
   "publicIdentitySaved": "Votre identité publique a été mise à jour.",
   "publicIdentityLoadError": "Le profil public n’a pas pu être chargé. Vous pouvez réessayer.",
   "publicIdentitySaveError": "Impossible d’enregistrer votre choix. Vérifiez votre connexion.",
-  "publicIdentityNicknameError": "Le surnom doit contenir entre 2 et 40 caractères."
+  "publicIdentityNicknameError": "Le surnom doit contenir entre 2 et 40 caractères.",
+  "profilePhotoTitle": "Photo de profil",
+  "profilePhotoSubtitle": "Conservez votre photo Google, importez une photo personnelle ou choisissez un avatar Booster Fish.",
+  "profilePhotoGoogle": "Photo Google",
+  "profilePhotoCurrent": "Photo enregistrée",
+  "profilePhotoGallery": "Galerie",
+  "profilePhotoCamera": "Appareil photo",
+  "profilePhotoAvatars": "Avatars Booster Fish",
+  "profilePhotoAvatarNumber": "Avatar {number}",
+  "profilePhotoInvalid": "Cette photo ne peut pas être utilisée. Choisissez une image JPEG, PNG ou WebP valide."
   },
   "language": {
     "title": "Langue",
