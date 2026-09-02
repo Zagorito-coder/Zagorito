@@ -385,6 +385,13 @@ class _PrivateCatchesViewState extends State<PrivateCatchesView> {
       _showMessage('community.signInRequired');
       return;
     }
+    if (item.hasActivePublicationAt(
+      DateTime.now(),
+      publicationLifetime: CommunityCatch.publicationLifetime,
+    )) {
+      _showMessage('community.alreadyPublished');
+      return;
+    }
     if (item.latitude == null || item.longitude == null) {
       _showMessage('community.locationRequiredToPublish');
       return;
@@ -495,6 +502,7 @@ class _PrivateCatchesViewState extends State<PrivateCatchesView> {
     return switch (error.failure) {
       CommunityFailure.authenticationRequired => 'community.signInRequired',
       CommunityFailure.termsRequired => 'community.communityRules',
+      CommunityFailure.alreadyPublished => 'community.alreadyPublished',
       CommunityFailure.publicationCooldown => 'community.publicationCooldown',
       CommunityFailure.invalidData => 'community.invalidData',
       CommunityFailure.invalidPhoto => 'community.invalidPhoto',
@@ -533,6 +541,10 @@ class _PrivateCatchCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = BoosterFishPagePalette.of(context);
+    final hasActivePublication = item.hasActivePublicationAt(
+      DateTime.now(),
+      publicationLifetime: CommunityCatch.publicationLifetime,
+    );
     return DecoratedBox(
       decoration: BoxDecoration(
         color: palette.surface,
@@ -645,11 +657,15 @@ class _PrivateCatchCard extends StatelessWidget {
                   ),
                   const Spacer(),
                   IconButton.filledTonal(
-                    tooltip: context.tr('community.publish'),
+                    tooltip: context.tr(
+                      hasActivePublication
+                          ? 'community.alreadyPublished'
+                          : 'community.publish',
+                    ),
                     visualDensity: VisualDensity.compact,
                     onPressed: busy ? null : onPublish,
                     icon: Icon(
-                      item.isPublished
+                      hasActivePublication
                           ? Icons.public_rounded
                           : Icons.upload_rounded,
                       size: 20,

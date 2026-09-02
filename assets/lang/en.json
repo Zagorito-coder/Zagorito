@@ -243,6 +243,7 @@
     "publishBestCatch": "Publish my best catch",
     "publishPrivacyConfirm": "This catch will be visible for 7 days. Your public name, photo, weight in kg and an approximate area will be shown. The exact location is never published.",
     "catchPublished": "Your catch is published for 7 days.",
+    "alreadyPublished": "This catch is already published. You can publish it again after it expires or remove it from the community.",
     "publicationCooldown": "Only one publication is allowed every 24 hours.",
     "locationRequiredToPublish": "Add a private location before publishing; only an approximate area will be public.",
     "communityRules": "Community rules",

@@ -243,6 +243,7 @@
     "publishBestCatch": "Publicar mi mejor captura",
     "publishPrivacyConfirm": "Esta captura será visible durante 7 días. Se mostrarán tu nombre público, la foto, el peso en kg y una zona aproximada. La ubicación exacta nunca se publica.",
     "catchPublished": "Tu captura está publicada durante 7 días.",
+    "alreadyPublished": "Esta captura ya está publicada. Podrás volver a publicarla cuando caduque o retirarla desde la comunidad.",
     "publicationCooldown": "Solo se permite una publicación cada 24 horas.",
     "locationRequiredToPublish": "Añade una ubicación privada antes de publicar; solo una zona aproximada será pública.",
     "communityRules": "Normas de la comunidad",

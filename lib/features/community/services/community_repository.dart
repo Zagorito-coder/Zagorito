@@ -241,6 +241,12 @@ class CommunityRepository {
 
   Future<String> publish(PrivateCatch privateCatch) async {
     final user = _requireUser();
+    if (privateCatch.hasActivePublicationAt(
+      DateTime.now(),
+      publicationLifetime: CommunityCatch.publicationLifetime,
+    )) {
+      throw const CommunityException(CommunityFailure.alreadyPublished);
+    }
     if (!await hasAcceptedTerms()) {
       throw const CommunityException(CommunityFailure.termsRequired);
     }

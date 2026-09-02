@@ -213,6 +213,7 @@ class WeeklyCommunityWinner {
 enum CommunityFailure {
   authenticationRequired,
   termsRequired,
+  alreadyPublished,
   publicationCooldown,
   invalidData,
   invalidPhoto,

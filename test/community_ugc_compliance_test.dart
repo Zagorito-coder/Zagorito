@@ -20,6 +20,22 @@ void main() {
     expect(source, contains('community.acceptAndContinue'));
   });
 
+  test('une prise publique active ne peut pas être publiée deux fois', () {
+    final view = File(
+      'lib/features/community/widgets/private_catches_view.dart',
+    ).readAsStringSync();
+    final repository = File(
+      'lib/features/community/services/community_repository.dart',
+    ).readAsStringSync();
+
+    expect(view, contains("community.alreadyPublished"));
+    expect(repository, contains('CommunityFailure.alreadyPublished'));
+    expect(
+      repository.indexOf('hasActivePublicationAt'),
+      lessThan(repository.indexOf('await _photoService.upload')),
+    );
+  });
+
   test('le détail propose séparément signalement et blocage', () {
     final source = File(
       'lib/features/community/widgets/community_map_view.dart',
