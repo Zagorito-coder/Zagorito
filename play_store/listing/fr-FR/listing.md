@@ -37,9 +37,11 @@ fonctions présentes dans la candidate Release installée sur appareil physique.
 >
 > Un compte Google est facultatif. Il est nécessaire pour synchroniser vos
 > spots personnels, gérer vos prises privées et publier volontairement une
-> prise dans la communauté. Les publications peuvent être aimées, signalées ou
-> masquées en bloquant leur auteur. Vous pouvez retirer vos publications et
-> supprimer votre compte depuis l'application.
+> prise dans la communauté. Personnalisez votre profil avec votre photo Google,
+> une photo personnelle ou l'un des 10 avatars BoosterFish inclus, et choisissez
+> de publier sous votre nom public ou anonymement. Les publications peuvent être
+> aimées, signalées ou masquées en bloquant leur auteur. Vous pouvez retirer vos
+> publications et supprimer votre compte depuis l'application.
 >
 > BoosterFish est gratuite et contient des annonces.
 >
@@ -50,10 +52,10 @@ fonctions présentes dans la candidate Release installée sur appareil physique.
 
 ## Notes de version proposées
 
-> Amélioration de la lisibilité de la courbe des marées et de ses extrema.
-> Harmonisation des hauteurs locales de Casablanca entre l'accueil et la page
-> Marées. Mise à jour du logo et améliorations visuelles en modes clair et
-> sombre. Corrections de stabilité et de performance.
+> Personnalisation du profil avec 10 avatars BoosterFish ou une photo
+> personnelle, avec possibilité de publier anonymement. Amélioration de la
+> recherche des spots et de l'affichage de la carte. Corrections de stabilité
+> et de performance.
 
 ## Accès pour l'équipe de validation
 

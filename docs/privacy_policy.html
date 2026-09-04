@@ -5,7 +5,34 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="Politique de confidentialité de l'application BoosterFish.">
 <meta name="robots" content="index, follow">
+<meta name="theme-color" content="#f5f9fc">
+<meta name="application-name" content="BoosterFish">
+<meta name="apple-mobile-web-app-title" content="BoosterFish">
 <link rel="canonical" href="https://www.boosterfish.com/privacy-policy/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="BoosterFish">
+<meta property="og:title" content="Politique de confidentialité — BoosterFish">
+<meta property="og:description" content="Politique de confidentialité de l'application BoosterFish.">
+<meta property="og:url" content="https://www.boosterfish.com/privacy-policy/">
+<meta property="og:locale" content="fr_FR">
+<meta property="og:image" content="https://www.boosterfish.com/og-boosterfish-2026.png">
+<meta property="og:image:secure_url" content="https://www.boosterfish.com/og-boosterfish-2026.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="BoosterFish — Comprenez la mer, choisissez votre moment">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Politique de confidentialité — BoosterFish">
+<meta name="twitter:description" content="Politique de confidentialité de l'application BoosterFish.">
+<meta name="twitter:image" content="https://www.boosterfish.com/og-boosterfish-2026.png">
+<meta name="twitter:image:alt" content="BoosterFish — Comprenez la mer, choisissez votre moment">
+<link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="16x16 32x32 48x48">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="mask-icon" href="/safari-pinned-tab.svg" color="#079fd3">
+<link rel="manifest" href="/site.webmanifest">
 <title>Politique de confidentialité — BoosterFish</title>
 <style>
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; line-height: 1.7; color: #333; }
@@ -19,7 +46,7 @@
 <body>
 
 <h1>Politique de confidentialité — BoosterFish</h1>
-<p class="last-update">Dernière mise à jour : 21 août 2026</p>
+<p class="last-update">Dernière mise à jour : 4 septembre 2026</p>
 
 <p>
   La présente politique décrit les traitements de données réalisés par
@@ -37,7 +64,7 @@
 <h2>1. Données traitées</h2>
 <ul>
   <li><strong>Compte Google facultatif :</strong> adresse e-mail, nom d'affichage, photo de profil et identifiant Firebase (UID), lorsque vous choisissez Google Sign-In.</li>
-  <li><strong>Photo de profil BoosterFish facultative :</strong> vous pouvez conserver votre photo Google, choisir l'un des dix avatars inclus localement dans l'Application ou importer une photo personnelle. Une photo personnelle est recadrée, réduite à 512 × 512 pixels, réencodée en JPEG sans métadonnées EXIF puis stockée dans Firebase Storage. Elle devient publiquement visible uniquement avec les publications communautaires non anonymes que vous choisissez d'effectuer.</li>
+  <li><strong>Photo de profil BoosterFish facultative :</strong> vous pouvez conserver votre photo Google, choisir l'un des dix avatars inclus localement dans l'Application ou importer une photo personnelle. Le type de photo choisi et, pour un avatar inclus, son identifiant sont enregistrés dans le profil Firestore de votre compte afin de synchroniser ce choix. Une photo personnelle est recadrée, réduite à 512 × 512 pixels, réencodée en JPEG sans métadonnées EXIF puis stockée dans Firebase Storage. Votre photo ou votre avatar devient publiquement visible uniquement avec les publications communautaires non anonymes que vous choisissez d'effectuer.</li>
   <li><strong>Localisation de l'appareil :</strong> position approximative ou précise après autorisation Android, utilisée pour centrer la carte, calculer des distances, sélectionner localement la station de prévisions publiée la plus proche et, uniquement à votre demande, renseigner l'emplacement d'une prise privée. BoosterFish ne transmet pas cette position à Open-Meteo.</li>
   <li><strong>Spots personnels :</strong> nom, notes, photo facultative et coordonnées du point que vous choisissez sur la carte. Ces éléments sont synchronisés dans l'espace Firestore privé de votre compte afin de les retrouver sur vos appareils et d'alimenter une file privée de vérification. Ils ne sont pas rendus publics automatiquement.</li>
   <li><strong>Galerie privée « Mes prises » :</strong> photo, espèce, poids, zone, montage, appât, notes, conseil, date et, si vous la renseignez, position exacte. Ces données restent dans le stockage privé de l'Application sur votre appareil, séparé par compte, dans la limite de 20 prises. Elles ne sont jamais publiées automatiquement.</li>
@@ -114,7 +141,7 @@
 <h2>5. Conservation</h2>
 <ul>
   <li>Les données du compte Firebase sont conservées jusqu'à la suppression du compte ou selon les délais nécessaires à la sécurité et aux obligations légales.</li>
-  <li>Une photo de profil personnelle reste dans Firebase Storage jusqu'à son remplacement, le choix d'une photo Google ou d'un avatar local, ou la suppression du compte. Les dix avatars BoosterFish restent uniquement dans les fichiers locaux de l'Application.</li>
+  <li>Une photo de profil personnelle reste dans Firebase Storage jusqu'à son remplacement, le choix d'une photo Google ou d'un avatar local, ou la suppression du compte. Le type de photo choisi et l'éventuel identifiant d'avatar restent dans le profil Firestore jusqu'à leur remplacement ou la suppression du compte. Les dix fichiers d'avatars BoosterFish restent intégrés localement à l'Application et ne sont pas envoyés depuis l'appareil.</li>
   <li>Les coordonnées exactes d'une prise de la galerie privée restent sur l'appareil. Les coordonnées d'un spot personnel choisi sur la carte sont conservées dans l'espace privé du compte jusqu'à sa suppression.</li>
   <li>Une prise communautaire ordinaire reste active au maximum 7 jours. Les éléments nécessaires à l'annonce de la meilleure prise et à ses remplaçantes limitées peuvent être conservés jusqu'au classement hebdomadaire suivant. Une publication retirée par son auteur, supprimée par modération ou liée à un compte supprimé est effacée avec sa photo publique.</li>
   <li>Les likes, signalements et éléments de modération associés sont supprimés avec la publication ou le compte concerné, sous réserve d'une conservation plus longue strictement nécessaire à une obligation légale ou à la prévention d'un abus grave.</li>

@@ -1,7 +1,7 @@
 # BoosterFish — fiche de publication Google Play
 
-Version candidate en cours de validation : **1.0.7 (16)**
-Dernière mise à jour : **22 août 2026**
+Version candidate en cours de validation : **1.0.7 (19)**
+Dernière mise à jour : **4 septembre 2026**
 
 Cette fiche décrit l'état réel de l'application et les réponses à reporter dans
 Google Play Console. Toute modification future des SDK, de l'authentification,
@@ -89,6 +89,12 @@ destinataire pour ses propres finalités, la déclarer aussi comme partagée.
 
 ### Données locales ou non transmises
 
+- Les dix fichiers d'avatars BoosterFish sont intégrés à l'Application et ne
+  sont pas transmis depuis l'appareil. Seuls le type de photo choisi et
+  l'identifiant technique de l'avatar sélectionné sont synchronisés dans le
+  profil Firestore. Ce choix ne constitue pas une information sur l'origine
+  ethnique réelle de l'utilisateur : ne pas déclarer « Race et origine
+  ethnique » pour cette fonctionnalité.
 - La position exacte associée à une prise de la galerie privée reste sur
   l'appareil. Lors d'une publication, seule une cellule d'environ 5 km est
   envoyée. La galerie privée de 20 prises n'est jamais synchronisée ni publiée
