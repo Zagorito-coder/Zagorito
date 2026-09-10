@@ -33,7 +33,22 @@ class _CachedForecast {
   const _CachedForecast({required this.forecast, required this.timestamp});
 }
 
+typedef AvailableWeatherSpotsLoader = Future<List<Map<String, dynamic>>>
+    Function();
+typedef SpotForecastLoader = Future<SpotForecast?> Function(String spotId);
+
 class WindAnimationProvider extends ChangeNotifier {
+  WindAnimationProvider({
+    AvailableWeatherSpotsLoader? availableSpotsLoader,
+    SpotForecastLoader? spotForecastLoader,
+  })  : _availableSpotsLoader =
+            availableSpotsLoader ?? ForecastFirestoreService.listAvailableSpots,
+        _spotForecastLoader =
+            spotForecastLoader ?? ForecastFirestoreService.fetchSpot;
+
+  final AvailableWeatherSpotsLoader _availableSpotsLoader;
+  final SpotForecastLoader _spotForecastLoader;
+
   bool _isEnabled = false;
   String? _spotId;
   SpotForecast? _forecast;
@@ -43,6 +58,8 @@ class WindAnimationProvider extends ChangeNotifier {
   WindVector? _currentVector;
   bool _isLoading = false;
   String? _error;
+  String? _panelRequestKey;
+  int _requestGeneration = 0;
 
   final Map<String, _CachedForecast> _cache = {};
   static const int _maxCacheEntries = 50;
@@ -74,8 +91,9 @@ class WindAnimationProvider extends ChangeNotifier {
     _isEnabled = true;
     _isLoading = true;
     _error = null;
+    final requestGeneration = ++_requestGeneration;
     notifyListeners();
-    _fetchNearest(lat, lon);
+    _fetchNearest(lat, lon, requestGeneration: requestGeneration);
   }
 
   /// Desactive l'animation de vent (conserve les donnees en cache).
@@ -86,14 +104,43 @@ class WindAnimationProvider extends ChangeNotifier {
   }
 
   /// Charge les donnees vent pour le panel (sans activer l'animation)
-  Future<void> fetchForPanel(double lat, double lon) async {
-    if (_currentVector != null) return; // deja charge
-    await _fetchNearest(lat, lon);
+  Future<void> fetchForPanel(
+    double lat,
+    double lon, {
+    bool force = false,
+  }) async {
+    final requestKey = _coordinatesKey(lat, lon);
+    final isSameRequest = requestKey == _panelRequestKey;
+    if (!force &&
+        isSameRequest &&
+        (_isLoading || _currentVector != null || _error != null)) {
+      return;
+    }
+
+    _panelRequestKey = requestKey;
+    _spotId = null;
+    _forecast = null;
+    _currentVector = null;
+    _selectedHourIndex = 0;
+    _userSelectedHour = false;
+    _isLoading = true;
+    _error = null;
+    final requestGeneration = ++_requestGeneration;
+    notifyListeners();
+    await _fetchNearest(lat, lon, requestGeneration: requestGeneration);
   }
 
-  Future<void> _fetchNearest(double lat, double lon) async {
+  Future<void> retryForPanel(double lat, double lon) =>
+      fetchForPanel(lat, lon, force: true);
+
+  Future<void> _fetchNearest(
+    double lat,
+    double lon, {
+    required int requestGeneration,
+  }) async {
     try {
-      final spots = await ForecastFirestoreService.listAvailableSpots();
+      final spots = await _availableSpotsLoader();
+      if (!_isCurrentRequest(requestGeneration)) return;
       if (spots.isEmpty) {
         _error = 'Aucun spot meteo disponible';
         _isEnabled = false;
@@ -117,8 +164,12 @@ class WindAnimationProvider extends ChangeNotifier {
         return;
       }
 
-      await _loadSpotData(nearestId);
+      await _loadSpotData(
+        nearestId,
+        requestGeneration: requestGeneration,
+      );
     } catch (e) {
+      if (!_isCurrentRequest(requestGeneration)) return;
       debugPrint('[WindAnimationProvider] Erreur fetchNearest: $e');
       _error = e.toString();
       _isEnabled = false;
@@ -127,7 +178,11 @@ class WindAnimationProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _loadSpotData(String spotId) async {
+  Future<void> _loadSpotData(
+    String spotId, {
+    required int requestGeneration,
+  }) async {
+    if (!_isCurrentRequest(requestGeneration)) return;
     _spotId = spotId;
 
     // Capture si l'entree etait deja en cache avant de potentiellement la supprimer
@@ -135,6 +190,7 @@ class WindAnimationProvider extends ChangeNotifier {
     if (wasCached) {
       final cached = _cache[spotId]!;
       if (DateTime.now().difference(cached.timestamp) < _cacheTtl) {
+        if (!_isCurrentRequest(requestGeneration)) return;
         _forecast = cached.forecast;
         _selectedHourIndex = _findClosestHourIndex(_forecast!);
         _computeVector();
@@ -147,7 +203,8 @@ class WindAnimationProvider extends ChangeNotifier {
     }
 
     try {
-      final forecast = await ForecastFirestoreService.fetchSpot(spotId);
+      final forecast = await _spotForecastLoader(spotId);
+      if (!_isCurrentRequest(requestGeneration)) return;
       if (forecast == null || forecast.slots.isEmpty) {
         _error = 'Aucune donnee meteo pour ce spot';
         _isEnabled = false;
@@ -171,6 +228,7 @@ class WindAnimationProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     } catch (e) {
+      if (!_isCurrentRequest(requestGeneration)) return;
       debugPrint('[WindAnimationProvider] Erreur loadSpotData: $e');
       _error = e.toString();
       _isEnabled = false;
@@ -178,6 +236,12 @@ class WindAnimationProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  bool _isCurrentRequest(int requestGeneration) =>
+      requestGeneration == _requestGeneration;
+
+  static String _coordinatesKey(double lat, double lon) =>
+      '${lat.toStringAsFixed(6)},${lon.toStringAsFixed(6)}';
 
   void _evictCacheIfNeeded() {
     while (_cache.length >= _maxCacheEntries) {

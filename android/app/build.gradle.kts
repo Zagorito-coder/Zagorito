@@ -92,9 +92,31 @@ val validateOfficialSpotCatalog by tasks.registering {
             ?.substringAfter('=')
             .orEmpty()
 
+        val cartoBasemapApiKey = encodedDefines
+            .split(',')
+            .asSequence()
+            .filter { it.isNotBlank() }
+            .mapNotNull { encoded ->
+                try {
+                    String(Base64.getDecoder().decode(encoded), Charsets.UTF_8)
+                } catch (_: IllegalArgumentException) {
+                    null
+                }
+            }
+            .firstOrNull { it.startsWith("CARTO_BASEMAP_API_KEY=") }
+            ?.substringAfter('=')
+            .orEmpty()
+
         if (encryptionKey.isBlank()) {
             throw GradleException(
                 "Build Android refuse : CSV_ENCRYPTION_KEY est absente. " +
+                    "Utilisez tools/run_app.sh ou tools/build_release.sh."
+            )
+        }
+
+        if (cartoBasemapApiKey.isBlank()) {
+            throw GradleException(
+                "Build Android refuse : CARTO_BASEMAP_API_KEY est absente. " +
                     "Utilisez tools/run_app.sh ou tools/build_release.sh."
             )
         }

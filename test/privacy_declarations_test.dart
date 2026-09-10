@@ -24,7 +24,7 @@ void main() {
     final privacy = File('docs/privacy_policy.html').readAsStringSync();
     final terms = File('docs/terms_of_service.html').readAsStringSync();
 
-    expect(privacy, contains('Dernière mise à jour : 21 août 2026'));
-    expect(terms, contains('Dernière mise à jour : 11 août 2026'));
+    expect(privacy, contains('Dernière mise à jour : 4 septembre 2026'));
+    expect(terms, contains('Dernière mise à jour : 4 septembre 2026'));
   });
 }

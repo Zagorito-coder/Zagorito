@@ -121,21 +121,16 @@ class ForecastFirestoreService {
   /// Utilise la collection legere `spots_index` creee par harvest_forecast.py
   /// pour eviter de charger les donnees de forecast completes (OOM).
   static Future<List<Map<String, dynamic>>> listAvailableSpots() async {
-    try {
-      final snap = await _db.collection('spots_index').get();
-      return snap.docs.map((doc) {
-        final d = doc.data();
-        return {
-          'id': doc.id,
-          'name': d['name'] ?? doc.id,
-          'latitude': (d['latitude'] as num?)?.toDouble() ?? 0.0,
-          'longitude': (d['longitude'] as num?)?.toDouble() ?? 0.0,
-        };
-      }).toList();
-    } on FirebaseException catch (e) {
-      if (e.code == 'permission-denied') return [];
-      rethrow;
-    }
+    final snap = await _db.collection('spots_index').get();
+    return snap.docs.map((doc) {
+      final d = doc.data();
+      return {
+        'id': doc.id,
+        'name': d['name'] ?? doc.id,
+        'latitude': (d['latitude'] as num?)?.toDouble() ?? 0.0,
+        'longitude': (d['longitude'] as num?)?.toDouble() ?? 0.0,
+      };
+    }).toList();
   }
 
   /// Lit le même bloc `models.wind` que le tableau « Vent GFS » sans créer la
@@ -439,16 +434,11 @@ class ForecastFirestoreService {
 
   /// Recupere une seule fois les previsions d'un spot.
   static Future<SpotForecast?> fetchSpot(String spotId) async {
-    try {
-      final doc = await _db.collection('spots_meteo').doc(spotId).get();
-      if (!doc.exists) {
-        throw Exception('Spot "$spotId" introuvable dans Firestore.');
-      }
-      return _parseDoc(doc.data()!);
-    } on FirebaseException catch (e) {
-      if (e.code == 'permission-denied') return null;
-      rethrow;
+    final doc = await _db.collection('spots_meteo').doc(spotId).get();
+    if (!doc.exists) {
+      throw Exception('Spot "$spotId" introuvable dans Firestore.');
     }
+    return _parseDoc(doc.data()!);
   }
 
   /// Version "temps reel" : stream.

@@ -59,6 +59,24 @@ void main() {
     );
   });
 
+  test('le fond sombre utilise le service raster CARTO authentifie', () {
+    final source = File('lib/widgets/app_tile_layer.dart').readAsStringSync();
+
+    expect(
+      source,
+      contains("String.fromEnvironment(\n    'CARTO_BASEMAP_API_KEY',"),
+    );
+    expect(
+      source,
+      contains('https://basemaps.cartocdn.com/rastertiles/'),
+    );
+    expect(source, contains('dark_all/{z}/{x}/{y}.png?key='));
+    expect(
+      source,
+      isNot(contains('{s}.basemaps.cartocdn.com/dark_all')),
+    );
+  });
+
   testWidgets(
     'recree le fournisseur reseau apres le mode hors ligne',
     (tester) async {
