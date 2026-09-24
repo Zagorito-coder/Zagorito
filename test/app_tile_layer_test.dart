@@ -14,13 +14,24 @@ class _TransparentTileProvider extends TileProvider {
     'EQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
   );
 
+  bool disposed = false;
+
   @override
   ImageProvider getImage(TileCoordinates coordinates, TileLayer options) {
     return MemoryImage(_tile);
   }
+
+  @override
+  void dispose() {
+    disposed = true;
+    super.dispose();
+  }
 }
 
-Widget _mapWithStyle(MapStyle style) {
+Widget _mapWithStyle(
+  MapStyle style, {
+  TileProvider Function()? tileProviderFactory,
+}) {
   return MaterialApp(
     home: SizedBox.shrink(
       child: FlutterMap(
@@ -31,7 +42,8 @@ Widget _mapWithStyle(MapStyle style) {
         children: [
           AppTileLayer(
             style: style,
-            networkTileProviderFactory: _TransparentTileProvider.new,
+            networkTileProviderFactory:
+                tileProviderFactory ?? _TransparentTileProvider.new,
           ),
         ],
       ),
@@ -97,6 +109,47 @@ void main() {
       // le binding de test vérifie l'absence de timers résiduels.
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump(const Duration(milliseconds: 100));
+    },
+  );
+
+  testWidgets(
+    'libere chaque fournisseur remplace lors des changements de fond',
+    (tester) async {
+      final providers = <_TransparentTileProvider>[];
+
+      _TransparentTileProvider createProvider() {
+        final provider = _TransparentTileProvider();
+        providers.add(provider);
+        return provider;
+      }
+
+      await tester.pumpWidget(
+        _mapWithStyle(
+          MapStyle.satellite,
+          tileProviderFactory: createProvider,
+        ),
+      );
+      await tester.pumpWidget(
+        _mapWithStyle(
+          MapStyle.standard,
+          tileProviderFactory: createProvider,
+        ),
+      );
+      await tester.pumpWidget(
+        _mapWithStyle(
+          MapStyle.dark,
+          tileProviderFactory: createProvider,
+        ),
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(providers, hasLength(3));
+      expect(
+        providers.every((provider) => provider.disposed),
+        isTrue,
+        reason: 'Chaque changement doit fermer le client HTTP précédent.',
+      );
     },
   );
 

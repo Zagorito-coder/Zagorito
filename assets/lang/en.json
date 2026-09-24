@@ -358,7 +358,7 @@
     "name": "Name",
     "profileSignInRequired": "Sign in to manage your public identity.",
     "publicIdentityTitle": "Public identity",
-    "publicIdentitySubtitle": "Choose the name and photo shown on your next community posts.",
+    "publicIdentitySubtitle": "Your nickname, custom photo or preset avatar also updates on your existing non-anonymous posts. Your Google photo and anonymity choice apply to future posts.",
     "publicIdentityAnonymous": "Stay anonymous",
     "publicIdentityNickname": "Show my nickname",
     "publicIdentityNicknameHint": "e.g. NadirFish",

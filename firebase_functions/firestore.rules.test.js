@@ -13,6 +13,7 @@ const {
   collectionGroup,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   runTransaction,
   serverTimestamp,
@@ -326,6 +327,58 @@ test('public profile v2 validates each avatar source and remains owner-only',
     doc(attackerDb, 'community_public_profiles', uid),
     base,
   ));
+});
+
+test('posts accept explicit anonymity and legacy clients without exposing anonymous avatars',
+    async () => {
+  for (const [uid, overrides, allowed] of [
+    ['legacy', {}, true],
+    ['named', {publishAnonymously: false, avatarId: 'fisher_03'}, true],
+    ['anonymous', {
+      publishAnonymously: true, anglerName: 'Pêcheur anonyme', avatarId: '',
+    }, true],
+    ['invalid-flag', {publishAnonymously: 'false'}, false],
+    ['anonymous-name', {publishAnonymously: true}, false],
+    ['anonymous-preset', {
+      publishAnonymously: true, anglerName: 'Pêcheur anonyme',
+      avatarId: 'fisher_01',
+    }, false],
+    ['anonymous-photo', {
+      publishAnonymously: true, anglerName: 'Pêcheur anonyme',
+      avatarUrl: 'https://lh3.googleusercontent.com/a/test=s96-c',
+    }, false],
+  ]) {
+    await seedAcceptedProfile(uid);
+    const request = publish(environment.authenticatedContext(uid).firestore(),
+      uid, `${uid}-post`, uid, overrides);
+    await (allowed ? assertSucceeds(request) : assertFails(request));
+  }
+});
+
+test('clients cannot rewrite existing post identity; profiles stay owner-only',
+    async () => {
+  const uid = 'avatar-owner';
+  const ownerDb = environment.authenticatedContext(uid).firestore();
+  await seedAcceptedProfile(uid);
+  await publish(ownerDb, uid, 'post', uid, {
+    publishAnonymously: false, avatarId: 'fisher_01',
+  });
+  const reference = doc(ownerDb, 'community_catches', 'post');
+  await assertFails(setDoc(reference, {avatarId: 'fisher_02'}, {merge: true}));
+  await assertFails(setDoc(reference, {publishAnonymously: true}, {merge: true}));
+  const attacker = environment.authenticatedContext('other').firestore();
+  await assertFails(setDoc(doc(attacker, 'community_catches', 'post'), {
+    avatarId: 'fisher_03',
+  }, {merge: true}));
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'community_public_profiles', uid), {
+      ownerUid: uid, avatarSource: 'preset', avatarId: 'fisher_01',
+    });
+  });
+  await assertSucceeds(getDoc(doc(ownerDb, 'community_public_profiles', uid)));
+  await assertFails(getDoc(doc(attacker, 'community_public_profiles', uid)));
+  await assertFails(getDoc(doc(environment.unauthenticatedContext().firestore(),
+    'community_public_profiles', uid)));
 });
 
 test('active feed query is public while unbounded feed queries are denied',

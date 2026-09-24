@@ -15,6 +15,10 @@ const {
   reconcileCommunityReportCountsPage,
   retryCommunityCleanupTasksPage,
   replaceLeaderboardState,
+  synchronizeProfileIdentity,
+  synchronizeProfileDocuments,
+  handlePublicProfileWritten,
+  handleCommunityCatchCreated,
 } = require('./index.js').__test;
 
 const projectId = 'demo-boosterfish';
@@ -378,4 +382,321 @@ test('cleanup lease prevents concurrent duplicate R2 deletion', async () => {
   assert.equal(calls, 1);
   assert.equal(results.filter((result) => result.processed).length, 1);
   assert.equal((await taskReference.get()).exists, false);
+});
+
+function avatarUrl(version = '1789812345678') {
+  return 'https://firebasestorage.googleapis.com/v0/b/'
+    + 'zagorito-9a0c4.firebasestorage.app/o/'
+    + 'profile_avatars%2Fowner-1%2Favatar.jpg'
+    + `?alt=media&token=abcdefghijklmnopqrst-1234567890&v=${version}`;
+}
+
+async function saveAvatarProfile(overrides = {}) {
+  const ref = firestore.collection('community_public_profiles').doc('owner-1');
+  await ref.set({
+    schemaVersion: 2,
+    ownerUid: 'owner-1',
+    publicDisplayName: 'Pêcheur Test',
+    publishAnonymously: false,
+    avatarSource: 'custom',
+    avatarId: '',
+    avatarUrl: avatarUrl(),
+    ...overrides,
+  });
+  return ref.get();
+}
+
+test('profile sync updates existing avatars, never other content or anonymity',
+    async () => {
+  await saveAvatarProfile();
+  const originals = new Map();
+  for (const [id, extra] of [
+    ['legacy-public', {avatarId: 'fisher_01'}],
+    ['explicit-public', {publishAnonymously: false, avatarId: 'fisher_02'}],
+    ['legacy-anonymous', {anglerName: 'Pêcheur anonyme'}],
+    ['explicit-anonymous', {publishAnonymously: true}],
+    ['other-owner', {ownerUid: 'owner-2', avatarId: 'fisher_03'}],
+    ['archived', {status: 'archived', avatarId: 'fisher_04'}],
+  ]) {
+    const data = catchData({...extra, likeCount: 7, reportCount: 2});
+    originals.set(id, data);
+    await firestore.collection('community_catches').doc(id).set(data);
+  }
+  const options = {firestore};
+  assert.equal(await synchronizeProfileIdentity('owner-1', options), 3);
+  assert.equal(await synchronizeProfileIdentity('owner-1', options), 0);
+  for (const [id, original] of originals) {
+    const after = (await firestore.collection('community_catches').doc(id).get())
+      .data();
+    const changed = ['legacy-public', 'explicit-public', 'archived'].includes(id);
+    assert.deepEqual(after, changed
+      ? {...original, avatarId: '', avatarUrl: avatarUrl()} : original);
+  }
+  // Selecting anonymity for future posts must not reveal old anonymous posts
+  // or rename/retroactively anonymize the already public ones.
+  await saveAvatarProfile({
+    publishAnonymously: true, avatarSource: 'preset', avatarId: 'fisher_08',
+    avatarUrl: '',
+  });
+  assert.equal(await synchronizeProfileIdentity('owner-1', options), 3);
+  assert.equal((await firestore.collection('community_catches')
+    .doc('legacy-anonymous').get()).data().avatarUrl, '');
+});
+
+test('nickname sync updates only owned public posts and weekly copies',
+    async () => {
+  await saveAvatarProfile({
+    publicDisplayName: 'Nouveau surnom', avatarSource: 'google',
+    avatarId: '', avatarUrl: '',
+  });
+  const old = catchData({
+    avatarUrl: 'https://lh3.googleusercontent.com/a/original=s96-c',
+    likeCount: 7, reportCount: 2,
+  });
+  const anonymous = catchData({
+    anglerName: 'Pêcheur anonyme', publishAnonymously: true,
+  });
+  const other = catchData({ownerUid: 'owner-2'});
+  const posts = firestore.collection('community_catches');
+  await Promise.all([
+    posts.doc('public').set(old),
+    posts.doc('archived').set({...old, status: 'archived'}),
+    posts.doc('anonymous').set(anonymous),
+    posts.doc('other').set(other),
+  ]);
+  const candidate = {...old, catchId: 'public'};
+  const leaderboard = firestore.collection('community_internal')
+    .doc('weekly_leaderboard');
+  const winner = firestore.collection('community_state').doc('weekly_winner');
+  const initialWinner = {
+    catchId: 'public', anglerName: old.anglerName,
+    avatarUrl: old.avatarUrl, weekId: 'week', announcedAt: Timestamp.now(),
+  };
+  await leaderboard.set({weekId: 'week', candidates: [candidate]});
+  await winner.set(initialWinner);
+
+  assert.equal(await synchronizeProfileIdentity('owner-1', {firestore}), 2);
+  assert.equal(await synchronizeProfileIdentity('owner-1', {firestore}), 0);
+  for (const id of ['public', 'archived']) {
+    assert.deepEqual((await posts.doc(id).get()).data(), {
+      ...old, ...(id === 'archived' ? {status: 'archived'} : {}),
+      anglerName: 'Nouveau surnom',
+    });
+  }
+  assert.deepEqual((await posts.doc('anonymous').get()).data(), anonymous);
+  assert.deepEqual((await posts.doc('other').get()).data(), other);
+  assert.deepEqual((await leaderboard.get()).data().candidates, [
+    {...candidate, anglerName: 'Nouveau surnom'},
+  ]);
+  assert.deepEqual((await winner.get()).data(), {
+    ...initialWinner, anglerName: 'Nouveau surnom',
+  });
+});
+
+test('anonymous profile choice does not retroactively rename public posts',
+    async () => {
+  await saveAvatarProfile({
+    publishAnonymously: true, publicDisplayName: '',
+    avatarSource: 'google', avatarId: '', avatarUrl: '',
+  });
+  const post = firestore.collection('community_catches').doc('public');
+  await post.set(catchData());
+  assert.equal(await synchronizeProfileIdentity('owner-1', {firestore}), 0);
+  assert.equal((await post.get()).data().anglerName, 'Pêcheur Test');
+  await saveAvatarProfile({
+    publicDisplayName: 'Nouveau surnom', avatarSource: 'google',
+    avatarId: '', avatarUrl: '',
+  });
+  assert.equal(await synchronizeProfileIdentity('owner-1', {firestore}), 1);
+  assert.equal((await post.get()).data().anglerName, 'Nouveau surnom');
+});
+
+test('late and duplicate profile events cannot restore an older photo',
+    async () => {
+  const oldProfile = await saveAvatarProfile();
+  const post = firestore.collection('community_catches').doc('post-1');
+  await post.set(catchData({avatarId: 'fisher_01'}));
+  const latestUrl = avatarUrl('1789812345679');
+  await saveAvatarProfile({avatarUrl: latestUrl});
+  const oldEvent = {params: {userId: 'owner-1'}, data: {after: oldProfile}};
+  await Promise.all([
+    handlePublicProfileWritten(oldEvent, {firestore}),
+    handlePublicProfileWritten(oldEvent, {firestore}),
+  ]);
+  assert.equal((await post.get()).data().avatarUrl, latestUrl);
+  await firestore.collection('community_public_profiles').doc('owner-1').delete();
+  await handlePublicProfileWritten(oldEvent, {firestore});
+  assert.equal((await post.get()).data().avatarUrl, latestUrl);
+});
+
+test('late nickname events use the latest profile, not the event snapshot',
+    async () => {
+  const olderProfile = await saveAvatarProfile({
+    publicDisplayName: 'Ancien surnom', avatarSource: 'google',
+    avatarId: '', avatarUrl: '',
+  });
+  const post = firestore.collection('community_catches').doc('post-1');
+  await post.set(catchData());
+  await saveAvatarProfile({
+    publicDisplayName: 'Dernier surnom', avatarSource: 'google',
+    avatarId: '', avatarUrl: '',
+  });
+  const event = {params: {userId: 'owner-1'}, data: {after: olderProfile}};
+  await Promise.all([
+    handlePublicProfileWritten(event, {firestore}),
+    handlePublicProfileWritten(event, {firestore}),
+  ]);
+  assert.equal((await post.get()).data().anglerName, 'Dernier surnom');
+});
+
+test('a post created from a stale device profile is reconciled on creation',
+    async () => {
+  await saveAvatarProfile();
+  const post = firestore.collection('community_catches').doc('new-post');
+  await post.set(catchData({avatarId: 'fisher_01'}));
+  const event = {data: await post.get()};
+  await handleCommunityCatchCreated(event, {firestore});
+  assert.equal((await post.get()).data().avatarUrl, avatarUrl());
+  await post.delete();
+  await handleCommunityCatchCreated(event, {firestore});
+  assert.equal((await post.get()).exists, false);
+});
+
+test('a new post from a stale device receives the current nickname',
+    async () => {
+  await saveAvatarProfile({
+    publicDisplayName: 'Nouveau surnom', avatarSource: 'google',
+    avatarId: '', avatarUrl: '',
+  });
+  const post = firestore.collection('community_catches').doc('new-post');
+  const original = catchData({
+    avatarUrl: 'https://lh3.googleusercontent.com/a/original=s96-c',
+  });
+  await post.set(original);
+  await handleCommunityCatchCreated({data: await post.get()}, {firestore});
+  assert.deepEqual((await post.get()).data(), {
+    ...original, anglerName: 'Nouveau surnom',
+  });
+});
+
+test('profile synchronization paginates beyond one transaction page', async () => {
+  await saveAvatarProfile({avatarSource: 'preset', avatarId: 'fisher_06'});
+  const batch = firestore.batch();
+  for (let index = 0; index < 103; index += 1) {
+    batch.set(firestore.collection('community_catches').doc(`page-${index}`),
+      catchData({avatarId: 'fisher_01'}));
+  }
+  await batch.commit();
+  assert.equal(await synchronizeProfileIdentity('owner-1', {firestore}), 103);
+  assert.equal(await synchronizeProfileIdentity('owner-1', {firestore}), 0);
+});
+
+test('custom and preset transitions clear the previous avatar kind',
+    async () => {
+  const post = firestore.collection('community_catches').doc('post-1');
+  await post.set(catchData({avatarId: 'fisher_01'}));
+  const options = {firestore};
+  for (const [profile, expected] of [
+    [{}, {avatarId: '', avatarUrl: avatarUrl()}],
+    [{avatarUrl: avatarUrl('1789812345679')},
+      {avatarId: '', avatarUrl: avatarUrl('1789812345679')}],
+    [{avatarSource: 'preset', avatarId: 'fisher_07', avatarUrl: ''},
+      {avatarId: 'fisher_07', avatarUrl: ''}],
+  ]) {
+    await saveAvatarProfile(profile);
+    await synchronizeProfileIdentity('owner-1', options);
+    const data = (await post.get()).data();
+    assert.equal(data.avatarId, expected.avatarId);
+    assert.equal(data.avatarUrl, expected.avatarUrl);
+  }
+});
+
+test('Google choice leaves unchanged names and avatars untouched on late events',
+    async () => {
+  const previousProfile = await saveAvatarProfile();
+  await saveAvatarProfile({avatarSource: 'google', avatarId: '', avatarUrl: ''});
+  const post = firestore.collection('community_catches').doc('google-post');
+  const original = catchData({
+    avatarId: '', avatarUrl: 'https://lh3.googleusercontent.com/a/original=s96-c',
+  });
+  await post.set(original);
+  const olderPost = firestore.collection('community_catches').doc('preset-post');
+  const older = catchData({avatarId: 'fisher_03'});
+  await olderPost.set(older);
+  const leaderboard = firestore.collection('community_internal')
+    .doc('weekly_leaderboard');
+  const winner = firestore.collection('community_state').doc('weekly_winner');
+  const candidate = {...original, catchId: post.id};
+  await leaderboard.set({candidates: [candidate], weekId: 'week'});
+  await winner.set(candidate);
+  const options = {firestore};
+  assert.equal(await synchronizeProfileIdentity('owner-1', options), 0);
+  await handleCommunityCatchCreated({data: await post.get()}, options);
+  await handlePublicProfileWritten({
+    params: {userId: 'owner-1'}, data: {after: previousProfile},
+  }, options);
+  assert.deepEqual((await post.get()).data(), original);
+  assert.deepEqual((await olderPost.get()).data(), older);
+  assert.deepEqual((await winner.get()).data(), candidate);
+  assert.deepEqual((await leaderboard.get()).data(), {
+    candidates: [candidate], weekId: 'week',
+  });
+  // Opting back into a gallery photo enables sync again, without Auth lookup.
+  await saveAvatarProfile();
+  assert.equal(await synchronizeProfileIdentity('owner-1', options), 2);
+  assert.equal((await post.get()).data().avatarUrl, avatarUrl());
+});
+
+test('missing profiles and invalid avatar URLs leave current posts untouched',
+    async () => {
+  const post = firestore.collection('community_catches').doc('post-1');
+  const original = catchData({avatarId: 'fisher_01'});
+  await post.set(original);
+  await synchronizeProfileIdentity('owner-1', {firestore});
+  await saveAvatarProfile({avatarUrl: avatarUrl().replace('owner-1', 'other')});
+  await synchronizeProfileIdentity('owner-1', {firestore});
+  assert.deepEqual((await post.get()).data(), original);
+  await saveAvatarProfile();
+  await post.delete();
+  assert.equal(await synchronizeProfileDocuments('owner-1', [post], {firestore}), 0);
+  assert.equal((await post.get()).exists, false);
+});
+
+test('weekly copies stay in sync without changing rank, names or announcement',
+    async () => {
+  await saveAvatarProfile();
+  const candidate = {
+    ...catchData({avatarId: 'fisher_01'}), catchId: 'winner',
+  };
+  const other = {...candidate, ownerUid: 'other', catchId: 'other'};
+  const leaderboard = firestore.collection('community_internal')
+    .doc('weekly_leaderboard');
+  const winner = firestore.collection('community_state').doc('weekly_winner');
+  await leaderboard.set({candidates: [candidate, other], weekId: 'week'});
+  const initialWinner = {
+    catchId: 'winner', anglerName: 'Pêcheur Test', avatarId: 'fisher_01',
+    avatarUrl: '', weekId: 'week', announcedAt: Timestamp.now(), likeCount: 9,
+  };
+  await winner.set(initialWinner);
+  await synchronizeProfileIdentity('owner-1', {firestore});
+  assert.deepEqual((await winner.get()).data(), {
+    ...initialWinner, avatarId: '', avatarUrl: avatarUrl(),
+  });
+  assert.deepEqual((await leaderboard.get()).data().candidates, [
+    {...candidate, avatarId: '', avatarUrl: avatarUrl()}, other,
+  ]);
+});
+
+test('weekly selection re-reads identity data instead of restoring stale snapshots',
+    async () => {
+  const old = {...catchData({avatarId: 'fisher_01'}), catchId: 'winner'};
+  await firestore.collection('community_catches').doc('winner').set({
+    ...old, anglerName: 'Nouveau surnom', avatarId: '', avatarUrl: avatarUrl(),
+  });
+  await replaceLeaderboardState([old], 'week', firestore);
+  const winner = await firestore.collection('community_state')
+    .doc('weekly_winner').get();
+  assert.equal(winner.data().avatarUrl, avatarUrl());
+  assert.equal(winner.data().avatarId, '');
+  assert.equal(winner.data().anglerName, 'Nouveau surnom');
 });

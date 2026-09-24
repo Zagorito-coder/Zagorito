@@ -292,6 +292,7 @@ class CommunityRepository {
           'schemaVersion': 1,
           'ownerUid': user.uid,
           'anglerName': publicName,
+          'publishAnonymously': publicProfile?.publishAnonymously == true,
           'avatarUrl': avatarUrl,
           'avatarId': avatarId,
           'photoUrl': uploaded!.url,

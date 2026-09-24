@@ -358,7 +358,7 @@
     "name": "Nombre",
     "profileSignInRequired": "Inicia sesión para gestionar tu identidad pública.",
     "publicIdentityTitle": "Identidad pública",
-    "publicIdentitySubtitle": "Elige el nombre y la foto que aparecerán en tus próximas publicaciones comunitarias.",
+    "publicIdentitySubtitle": "Tu apodo, foto personal o avatar predeterminado también se actualizan en tus publicaciones existentes no anónimas. La foto de Google y la opción de anonimato se aplican a las próximas publicaciones.",
     "publicIdentityAnonymous": "Permanecer anónimo",
     "publicIdentityNickname": "Mostrar mi apodo",
     "publicIdentityNicknameHint": "p. ej. NadirFish",

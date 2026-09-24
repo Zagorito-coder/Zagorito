@@ -358,7 +358,7 @@
   "name": "Nom",
   "profileSignInRequired": "Connectez-vous pour gérer votre identité publique.",
   "publicIdentityTitle": "Identité publique",
-  "publicIdentitySubtitle": "Choisissez le nom et la photo visibles sur vos prochaines publications communautaires.",
+  "publicIdentitySubtitle": "Votre surnom, votre photo personnelle ou votre avatar prédéfini sont aussi actualisés sur vos publications existantes non anonymes. La photo Google et le choix d’anonymat s’appliquent aux prochaines publications.",
   "publicIdentityAnonymous": "Rester anonyme",
   "publicIdentityNickname": "Afficher mon surnom",
   "publicIdentityNicknameHint": "Ex. NadirFish",

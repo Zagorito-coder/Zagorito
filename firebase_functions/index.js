@@ -14,6 +14,7 @@ const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {
   onDocumentCreated,
   onDocumentDeleted,
+  onDocumentWritten,
 } = require('firebase-functions/v2/firestore');
 const {onSchedule} = require('firebase-functions/v2/scheduler');
 
@@ -116,6 +117,173 @@ function safeAvatarId(value) {
     : '';
 }
 
+// Older releases did not store the anonymity flag. Their anonymous posts
+// always use this literal name. Missing/invalid identities remain anonymous.
+function hasPublicAvatarIdentity(data) {
+  if (typeof data?.anglerName !== 'string'
+      || data.anglerName.trim() === ''
+      || data.anglerName.trim() === 'Pêcheur anonyme') return false;
+  if (Object.hasOwn(data, 'publishAnonymously')) {
+    return data.publishAnonymously === false;
+  }
+  return true;
+}
+
+function currentProfileAvatar(profile, uid) {
+  if (profile?.ownerUid !== uid || profile.schemaVersion !== 2) return null;
+  switch (profile.avatarSource) {
+    case 'preset': {
+      const avatarId = safeAvatarId(profile.avatarId);
+      return avatarId ? {avatarId, avatarUrl: ''} : null;
+    }
+    case 'custom': {
+      const avatarUrl = safeAvatarUrl(profile.avatarUrl);
+      if (!avatarUrl) return null;
+      const url = new URL(avatarUrl);
+      if (url.hostname !== 'firebasestorage.googleapis.com'
+          || decodeURIComponent(url.pathname.split('/o/')[1] ?? '')
+            !== `profile_avatars/${uid}/avatar.jpg`) return null;
+      return {avatarId: '', avatarUrl};
+    }
+    // Google photos retain the existing client-side publication behavior.
+    // Do not look up Auth users or rewrite existing posts for this choice.
+    case 'google':
+      return null;
+    default:
+      return null;
+  }
+}
+
+function currentProfileName(profile, uid) {
+  if (profile?.ownerUid !== uid
+      || ![1, 2].includes(profile.schemaVersion)
+      || profile.publishAnonymously !== false
+      || typeof profile.publicDisplayName !== 'string') return null;
+  const name = profile.publicDisplayName.trim();
+  if (name.length < 2 || name.length > 40 || name === 'Pêcheur anonyme') {
+    return null;
+  }
+  return name;
+}
+
+function avatarPatch(data, avatar) {
+  if (!hasPublicAvatarIdentity(data) || avatar == null) return null;
+  if (data.avatarUrl === avatar.avatarUrl
+      && (data.avatarId ?? '') === avatar.avatarId) return null;
+  return avatar;
+}
+
+function profileIdentityPatch(data, avatar, name) {
+  if (!hasPublicAvatarIdentity(data)) return null;
+  const patch = {...(avatarPatch(data, avatar) ?? {})};
+  if (name != null && data.anglerName !== name) patch.anglerName = name;
+  return Object.keys(patch).length === 0 ? null : patch;
+}
+
+async function synchronizeProfileDocuments(
+  uid,
+  references,
+  {firestore = db} = {},
+) {
+  if (references.length === 0) return 0;
+  return firestore.runTransaction(async (transaction) => {
+    const profile = await transaction.get(
+      firestore.collection('community_public_profiles').doc(uid),
+    );
+    if (!profile.exists) return 0;
+    const avatar = currentProfileAvatar(profile.data(), uid);
+    const name = currentProfileName(profile.data(), uid);
+    if (avatar == null && name == null) return 0;
+    const snapshots = await transaction.getAll(...references);
+    const eligible = snapshots.filter((snapshot) => snapshot.exists
+      && snapshot.data().ownerUid === uid
+      && hasPublicAvatarIdentity(snapshot.data()));
+    if (eligible.length === 0) return 0;
+    let updated = 0;
+    for (const snapshot of eligible) {
+      const patch = profileIdentityPatch(snapshot.data(), avatar, name);
+      if (patch == null) continue;
+      // Do not touch anonymity, catch photo, likes, status or timestamps.
+      transaction.update(snapshot.ref, patch);
+      updated += 1;
+    }
+    return updated;
+  });
+}
+
+async function synchronizeLeaderboardIdentity(
+  uid,
+  {firestore = db} = {},
+) {
+  const {internalLeaderboard, publicState} = communityRefs(firestore);
+  return firestore.runTransaction(async (transaction) => {
+    const [profile, leaderboard, winner] = await transaction.getAll(
+      firestore.collection('community_public_profiles').doc(uid),
+      internalLeaderboard,
+      publicState,
+    );
+    if (!profile.exists || !leaderboard.exists) return;
+    const avatar = currentProfileAvatar(profile.data(), uid);
+    const name = currentProfileName(profile.data(), uid);
+    if (avatar == null && name == null) return;
+    const previous = leaderboard.data().candidates;
+    if (!Array.isArray(previous) || !previous.some((candidate) =>
+      candidate.ownerUid === uid && hasPublicAvatarIdentity(candidate))) return;
+    let changed = false;
+    const candidates = previous.map((candidate) => {
+      if (candidate.ownerUid !== uid) return candidate;
+      const patch = profileIdentityPatch(candidate, avatar, name);
+      if (patch == null) return candidate;
+      changed = true;
+      return {...candidate, ...patch};
+    });
+    if (changed) transaction.update(internalLeaderboard, {candidates});
+    const first = candidates[0];
+    if (first?.ownerUid === uid && winner.exists
+        && winner.data().catchId === first.catchId
+        && hasPublicAvatarIdentity(first)) {
+      const patch = profileIdentityPatch(winner.data(), avatar, name);
+      if (patch != null) transaction.update(publicState, patch);
+    }
+  });
+}
+
+async function synchronizeProfileIdentity(uid, options = {}) {
+  if (typeof uid !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(uid)) return 0;
+  const firestore = options.firestore ?? db;
+  let cursor;
+  let updated = 0;
+  // Bounded transactions; retries always re-read the current profile rather
+  // than replay an event's obsolete image. Duplicate delivery is a no-op.
+  for (;;) {
+    let query = firestore.collection('community_catches')
+      .where('ownerUid', '==', uid).orderBy(FieldPath.documentId()).limit(100);
+    if (cursor != null) query = query.startAfter(cursor);
+    const page = await query.get();
+    if (page.empty) break;
+    updated += await synchronizeProfileDocuments(
+      uid, page.docs.map((document) => document.ref), options,
+    );
+    cursor = page.docs.at(-1);
+    if (page.size < 100) break;
+  }
+  await synchronizeLeaderboardIdentity(uid, options);
+  return updated;
+}
+
+async function handlePublicProfileWritten(event, options = {}) {
+  if (!event.data?.after?.exists) return;
+  await synchronizeProfileIdentity(event.params.userId, options);
+}
+
+async function handleCommunityCatchCreated(event, options = {}) {
+  if (!event.data?.exists) return;
+  const uid = event.data.data().ownerUid;
+  if (typeof uid !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(uid)) return;
+  // Covers publication from another device with an older cached profile.
+  await synchronizeProfileDocuments(uid, [event.data.ref], options);
+}
+
 function candidateFromDocument(document) {
   const data = document.data();
   const requiredStrings = [
@@ -143,6 +311,7 @@ function candidateFromDocument(document) {
     catchId: document.id,
     ownerUid: data.ownerUid,
     anglerName: data.anglerName,
+    publishAnonymously: !hasPublicAvatarIdentity(data),
     avatarUrl: safeAvatarUrl(data.avatarUrl),
     avatarId: safeAvatarId(data.avatarId),
     photoUrl: data.photoUrl,
@@ -476,6 +645,30 @@ async function replaceLeaderboardState(
   const {internalLeaderboard, publicState} = communityRefs(firestore);
   return firestore.runTransaction(async (transaction) => {
     const oldSnapshot = await transaction.get(internalLeaderboard);
+    // Selection queried the candidates before this transaction. Re-read their
+    // identity fields so a concurrent profile sync cannot be overwritten by
+    // an obsolete weekly snapshot.
+    const currentPosts = candidates.length === 0 ? [] : await transaction.getAll(
+      ...candidates.map((candidate) =>
+        firestore.collection('community_catches').doc(candidate.catchId)),
+    );
+    const currentCandidates = candidates.map((candidate, index) => {
+      const current = currentPosts[index];
+      if (!current.exists || current.data().ownerUid !== candidate.ownerUid) {
+        return candidate;
+      }
+      const data = current.data();
+      return {
+        ...candidate,
+        anglerName: typeof data.anglerName === 'string'
+          && data.anglerName.trim().length > 0
+          && data.anglerName.length <= 80
+          ? data.anglerName : candidate.anglerName,
+        avatarUrl: safeAvatarUrl(data.avatarUrl),
+        avatarId: safeAvatarId(data.avatarId),
+        publishAnonymously: !hasPublicAvatarIdentity(data),
+      };
+    });
     const oldCandidates = oldSnapshot.exists
       && Array.isArray(oldSnapshot.data().candidates)
       ? oldSnapshot.data().candidates
@@ -515,10 +708,10 @@ async function replaceLeaderboardState(
       transaction.set(internalLeaderboard, {
         schemaVersion: 1,
         weekId,
-        candidates,
+        candidates: currentCandidates,
         updatedAt: FieldValue.serverTimestamp(),
       });
-      transaction.set(publicState, publicWinner(candidates[0], weekId));
+      transaction.set(publicState, publicWinner(currentCandidates[0], weekId));
     }
     return retired;
   });
@@ -718,6 +911,27 @@ exports.onCommunityReportCreated = onDocumentCreated(
   async (event) => handleCommunityReportCreated(event),
 );
 
+exports.onCommunityPublicProfileWritten = onDocumentWritten(
+  {
+    document: 'community_public_profiles/{userId}',
+    region,
+    serviceAccount: runtimeServiceAccount,
+    retry: true,
+    timeoutSeconds: 300,
+  },
+  async (event) => handlePublicProfileWritten(event),
+);
+
+exports.onCommunityCatchCreated = onDocumentCreated(
+  {
+    document: 'community_catches/{postId}',
+    region,
+    serviceAccount: runtimeServiceAccount,
+    retry: true,
+  },
+  async (event) => handleCommunityCatchCreated(event),
+);
+
 exports.onCommunityCatchDeleted = onDocumentDeleted(
   {
     document: 'community_catches/{postId}',
@@ -868,6 +1082,15 @@ exports.deleteCommunityAccountData = onCall(
 );
 
 exports.__test = {
+  avatarPatch,
+  currentProfileAvatar,
+  currentProfileName,
+  handlePublicProfileWritten,
+  handleCommunityCatchCreated,
+  hasPublicAvatarIdentity,
+  profileIdentityPatch,
+  synchronizeProfileIdentity,
+  synchronizeProfileDocuments,
   cleanupRetryDate,
   deleteCommunityAccountDataForUid,
   deleteFirebaseProfileAvatar,

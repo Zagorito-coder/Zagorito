@@ -206,6 +206,7 @@ service cloud.firestore {
           'schemaVersion',
           'ownerUid',
           'anglerName',
+          'publishAnonymously',
           'avatarUrl',
           'avatarId',
           'photoUrl',
@@ -231,6 +232,23 @@ service cloud.firestore {
         && request.resource.data.anglerName.size() > 0
         && request.resource.data.anglerName.size() <= 80
         && hasValidCommunityAvatar(userId)
+        && (
+          !request.resource.data.keys().hasAny(['publishAnonymously'])
+          || (
+            request.resource.data.publishAnonymously is bool
+            && (
+              request.resource.data.publishAnonymously == false
+              || (
+                request.resource.data.anglerName == 'Pêcheur anonyme'
+                && request.resource.data.avatarUrl == ''
+                && (
+                  !request.resource.data.keys().hasAny(['avatarId'])
+                  || request.resource.data.avatarId == ''
+                )
+              )
+            )
+          )
+        )
         && hasValidCommunityPhoto(userId)
         && request.resource.data.species is string
         && request.resource.data.species.size() > 0

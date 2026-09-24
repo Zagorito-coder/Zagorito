@@ -10,6 +10,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:spots_app/features/community/models/community_catch.dart';
 import 'package:spots_app/features/community/models/profile_avatar.dart';
 import 'package:spots_app/features/community/services/community_repository.dart';
+import 'package:spots_app/features/community/widgets/live_community_catch_builder.dart';
 import 'package:spots_app/l10n/app_localizations.dart';
 import 'package:spots_app/widgets/app_tile_layer.dart';
 import 'package:spots_app/widgets/boosterfish_page.dart';
@@ -336,10 +337,21 @@ class _CommunityMapViewState extends State<CommunityMapView> {
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _CatchDetailsSheet(
-        item: item,
-        initiallyLiked: liked,
-        repository: _repository,
+      builder: (_) => LiveCommunityCatchBuilder(
+        initialItem: item,
+        stream: _catchesStream,
+        builder: (context, current) => current == null
+            ? Material(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(context.tr('community.unavailable')),
+                ),
+              )
+            : _CatchDetailsSheet(
+                item: current,
+                initiallyLiked: liked,
+                repository: _repository,
+              ),
       ),
     );
     if (!mounted || blockedUid == null) return;

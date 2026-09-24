@@ -87,6 +87,7 @@ class _AppTileLayerState extends State<AppTileLayer> {
     switch (widget.style) {
       case MapStyle.satellite:
         return TileLayer(
+          key: ValueKey(widget.style),
           urlTemplate:
               'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
           userAgentPackageName: _userAgentPackageName,
@@ -103,6 +104,7 @@ class _AppTileLayerState extends State<AppTileLayer> {
         );
       case MapStyle.dark:
         return TileLayer(
+          key: ValueKey(widget.style),
           urlTemplate: 'https://basemaps.cartocdn.com/rastertiles/'
               'dark_all/{z}/{x}/{y}.png?key='
               '${Uri.encodeQueryComponent(_cartoBasemapApiKey)}',
@@ -118,6 +120,7 @@ class _AppTileLayerState extends State<AppTileLayer> {
         );
       case MapStyle.standard:
         return TileLayer(
+          key: ValueKey(widget.style),
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
           userAgentPackageName: _userAgentPackageName,
           tileProvider: _tileProvider,

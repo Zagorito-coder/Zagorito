@@ -1181,12 +1181,30 @@ class _MapScreenState extends State<MapScreen>
   void _handleMapActivityChanged() {
     if (widget.isActive?.value ?? true) return;
 
+    final compassSubscription = _compassSubscription;
+    final positionSubscription = _positionSubscription;
+    _compassSubscription = null;
+    _positionSubscription = null;
+    _positionStreamStartedForCompass = false;
+    if (compassSubscription != null) {
+      unawaited(compassSubscription.cancel());
+    }
+    if (positionSubscription != null) {
+      unawaited(positionSubscription.cancel());
+    }
+
     final fishProvider = FishProvider.instance;
     if (fishProvider.isFishModalVisible) {
       fishProvider.closeFishModal();
     }
-    if (!mounted || !_isFishBarVisible) return;
-    setState(() => _isFishBarVisible = false);
+    if (!mounted) return;
+    setState(() {
+      _isFishBarVisible = false;
+      _isCompassEnabled = false;
+      _magneticHeading = null;
+      _gpsCourseOverGround = null;
+      _lastPosition = null;
+    });
   }
 
   void _handleSpotSelectionRequest() {
@@ -1273,6 +1291,7 @@ class _MapScreenState extends State<MapScreen>
   }
 
   void _initPositionStream({bool startedForCompass = false}) {
+    if (!mounted || !(widget.isActive?.value ?? true)) return;
     if (_positionSubscription != null) {
       if (!startedForCompass) _positionStreamStartedForCompass = false;
       return;

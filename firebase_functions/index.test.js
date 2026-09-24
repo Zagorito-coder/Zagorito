@@ -12,6 +12,11 @@ const {
   safeAvatarUrl,
   safeAvatarId,
   previousUtcWeek,
+  avatarPatch,
+  currentProfileAvatar,
+  currentProfileName,
+  hasPublicAvatarIdentity,
+  profileIdentityPatch,
 } = communityFunctions.__test;
 
 test('previousUtcWeek returns the complete previous Monday-to-Monday window', () => {
@@ -149,11 +154,130 @@ test('all community functions use the dedicated least-privilege identity',
     communityFunctions.reconcileCommunityReportCounts,
     communityFunctions.onCommunityReportCreated,
     communityFunctions.onCommunityCatchDeleted,
+    communityFunctions.onCommunityPublicProfileWritten,
+    communityFunctions.onCommunityCatchCreated,
     communityFunctions.deleteCommunityAccountData,
   ];
   for (const fn of functions) {
     assert.equal(fn.__endpoint.serviceAccountEmail, expected);
   }
+});
+
+test('avatar sync triggers are retried and use the expected documents', () => {
+  for (const [fn, document] of [
+    [communityFunctions.onCommunityPublicProfileWritten,
+      'community_public_profiles/{userId}'],
+    [communityFunctions.onCommunityCatchCreated, 'community_catches/{postId}'],
+  ]) {
+    assert.equal(fn.__endpoint.eventTrigger.retry, true);
+    assert.equal(fn.__endpoint.eventTrigger.eventFilterPathPatterns.document,
+      document);
+  }
+});
+
+test('avatar synchronization preserves explicit and legacy anonymity', () => {
+  assert.equal(hasPublicAvatarIdentity({anglerName: 'Nadir'}), true);
+  assert.equal(hasPublicAvatarIdentity({
+    anglerName: 'Nadir', publishAnonymously: false,
+  }), true);
+  for (const data of [
+    {},
+    {anglerName: ''},
+    {anglerName: 'Pêcheur anonyme'},
+    {anglerName: ' Pêcheur anonyme '},
+    {anglerName: 'Pêcheur anonyme', publishAnonymously: false},
+    {anglerName: 'Nadir', publishAnonymously: true},
+    {anglerName: 'Nadir', publishAnonymously: 'false'},
+  ]) {
+    assert.equal(hasPublicAvatarIdentity(data), false);
+    assert.equal(avatarPatch(data, {avatarId: 'fisher_02', avatarUrl: ''}), null);
+  }
+});
+
+test('current avatar resolves only presets and owned custom photos', () => {
+  const base = {schemaVersion: 2, ownerUid: 'owner-1'};
+  const googlePhoto = 'https://lh3.googleusercontent.com/a/test=s96-c';
+  assert.deepEqual(currentProfileAvatar({
+    ...base, avatarSource: 'preset', avatarId: 'fisher_10',
+  }, 'owner-1'), {avatarId: 'fisher_10', avatarUrl: ''});
+  const photo = 'https://firebasestorage.googleapis.com/v0/b/'
+    + 'zagorito-9a0c4.firebasestorage.app/o/'
+    + 'profile_avatars%2Fowner-1%2Favatar.jpg'
+    + '?alt=media&token=abcdefghijklmnopqrst-1234567890&v=1788312345678';
+  assert.deepEqual(currentProfileAvatar({
+    ...base, avatarSource: 'custom', avatarUrl: photo,
+  }, 'owner-1'), {avatarId: '', avatarUrl: photo});
+  for (const profile of [
+    null,
+    {...base, schemaVersion: 1, avatarSource: 'google'},
+    {...base, ownerUid: 'other', avatarSource: 'google'},
+    {...base, avatarSource: 'preset', avatarId: 'fisher_99'},
+    {...base, avatarSource: 'custom', avatarUrl: googlePhoto},
+    {...base, avatarSource: 'custom', avatarUrl: photo.replace('owner-1', 'other')},
+    {...base, avatarSource: 'custom', avatarUrl: 'https://evil.invalid/x'},
+    {...base, avatarSource: 'unknown'},
+  ]) {
+    assert.equal(currentProfileAvatar(profile, 'owner-1'), null);
+  }
+});
+
+test('Google profile choices never produce a synchronization patch', () => {
+  for (const avatarUrl of ['', 'https://lh3.googleusercontent.com/a/current']) {
+    const avatar = currentProfileAvatar({
+      schemaVersion: 2, ownerUid: 'owner-1', avatarSource: 'google', avatarUrl,
+    }, 'owner-1');
+    assert.equal(avatar, null);
+    assert.equal(avatarPatch({anglerName: 'Nadir', avatarId: 'fisher_01'}, avatar),
+      null);
+  }
+});
+
+test('avatar patches are limited to avatar fields and duplicates are no-ops', () => {
+  const avatar = {avatarId: '', avatarUrl: 'https://lh3.googleusercontent.com/a/x'};
+  assert.equal(avatarPatch({anglerName: 'Nadir', ...avatar}, avatar), null);
+  assert.deepEqual(avatarPatch({
+    anglerName: 'Nadir', avatarId: 'fisher_01', avatarUrl: '', likeCount: 17,
+  }, avatar), avatar);
+  assert.equal(avatarPatch({anglerName: 'Nadir'}, null), null);
+});
+
+test('public names require the owned non-anonymous profile', () => {
+  const profile = {
+    schemaVersion: 2, ownerUid: 'owner-1', publishAnonymously: false,
+    avatarSource: 'google', publicDisplayName: '  Nouveau surnom  ',
+  };
+  assert.equal(currentProfileName(profile, 'owner-1'), 'Nouveau surnom');
+  assert.equal(currentProfileName({...profile, schemaVersion: 1}, 'owner-1'),
+    'Nouveau surnom');
+  for (const invalid of [
+    null,
+    {...profile, ownerUid: 'owner-2'},
+    {...profile, schemaVersion: 3},
+    {...profile, publishAnonymously: true},
+    {...profile, publicDisplayName: ' '},
+    {...profile, publicDisplayName: 'x'},
+    {...profile, publicDisplayName: 'x'.repeat(41)},
+    {...profile, publicDisplayName: 'Pêcheur anonyme'},
+  ]) {
+    assert.equal(currentProfileName(invalid, 'owner-1'), null);
+  }
+});
+
+test('nickname patch changes only public names and never anonymous posts', () => {
+  const post = {anglerName: 'Ancien', avatarId: 'fisher_01', likeCount: 17};
+  assert.deepEqual(profileIdentityPatch(post, null, 'Nouveau'),
+    {anglerName: 'Nouveau'});
+  const avatar = {avatarId: 'fisher_02', avatarUrl: ''};
+  assert.deepEqual(profileIdentityPatch(post, avatar, 'Nouveau'), {
+    avatarId: 'fisher_02', avatarUrl: '', anglerName: 'Nouveau',
+  });
+  assert.deepEqual(avatar, {avatarId: 'fisher_02', avatarUrl: ''});
+  assert.equal(profileIdentityPatch({...post, anglerName: 'Nouveau'}, null,
+    'Nouveau'), null);
+  assert.equal(profileIdentityPatch({...post, publishAnonymously: true}, null,
+    'Nouveau'), null);
+  assert.equal(profileIdentityPatch({...post, anglerName: 'Pêcheur anonyme'},
+    null, 'Nouveau'), null);
 });
 
 test('community maintenance stays within the three free scheduler jobs',
