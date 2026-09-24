@@ -83,6 +83,7 @@ flutter:
     - assets/fish_data.json
     - assets/images/
     - assets/images/techniques/
+    - assets/images/techniques_v2/
     - assets/Shopsimages/
     - assets/Shopsimages/mini tiles marqueurs/
     - assets/fish_images/

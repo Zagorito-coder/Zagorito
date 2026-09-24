@@ -376,15 +376,6 @@ class _TechniqueGridCard extends StatelessWidget {
                 child: _TechniqueImage(
                   url: technique.photoUrl,
                   fit: BoxFit.contain,
-                  loadingBuilder: (context, child, progress) {
-                    if (progress == null) return child;
-                    return Center(
-                      child: CircularProgressIndicator(
-                        color: tc.oceanLight,
-                        strokeWidth: 2,
-                      ),
-                    );
-                  },
                   errorBuilder: (_, __, ___) => Center(
                     child: Icon(
                       Icons.image_not_supported,
@@ -457,7 +448,7 @@ class _TechniqueGridCard extends StatelessWidget {
 }
 
 // ============================================================
-//  PAGE DE DÉTAIL — 3 ONGLETS
+//  PAGE DE DÉTAIL — tutoriel lisible et zoomable
 // ============================================================
 class TechniqueDetailPage extends StatefulWidget {
   final Technique technique;
@@ -475,7 +466,7 @@ class _TechniqueDetailPageState extends State<TechniqueDetailPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -493,7 +484,7 @@ class _TechniqueDetailPageState extends State<TechniqueDetailPage>
       child: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           SliverAppBar(
-            expandedHeight: 320,
+            expandedHeight: 470,
             pinned: true,
             backgroundColor: tc.surface,
             foregroundColor: tc.textPrimary,
@@ -502,21 +493,11 @@ class _TechniqueDetailPageState extends State<TechniqueDetailPage>
               background: Container(
                 color: tc.surface,
                 padding: const EdgeInsets.only(
-                    top: 80, left: 16, right: 16, bottom: 94),
-                child: Center(
-                  child: _TechniqueImage(
-                    url: t.photoUrl,
-                    fit: BoxFit.contain,
-                    loadingBuilder: (context, child, progress) {
-                      if (progress == null) return child;
-                      return Container(color: tc.surfaceElevated);
-                    },
-                    errorBuilder: (_, __, ___) => Icon(
-                      Icons.image_not_supported,
-                      color: tc.textMuted,
-                      size: 48,
-                    ),
-                  ),
+                    top: 72, left: 12, right: 12, bottom: 98),
+                child: _TutorialPreview(
+                  technique: t,
+                  tc: tc,
+                  onTap: () => _openFullscreenTutorial(context, t),
                 ),
               ),
             ),
@@ -567,6 +548,7 @@ class _TechniqueDetailPageState extends State<TechniqueDetailPage>
                             fontSize: 13, fontWeight: FontWeight.w600),
                         unselectedLabelStyle: const TextStyle(fontSize: 13),
                         tabs: [
+                          Tab(text: context.tr('techniques.tabSteps')),
                           Tab(text: context.tr('techniques.tabInfos')),
                           Tab(text: context.tr('techniques.tabMateriel')),
                           Tab(text: context.tr('techniques.tabConseils')),
@@ -582,6 +564,7 @@ class _TechniqueDetailPageState extends State<TechniqueDetailPage>
         body: TabBarView(
           controller: _tabController,
           children: [
+            _StepsTab(t: t, tc: tc),
             _InfosTab(t: t, tc: tc),
             _MaterielTab(t: t, tc: tc),
             _ConseilsTab(t: t, tc: tc),
@@ -590,10 +573,250 @@ class _TechniqueDetailPageState extends State<TechniqueDetailPage>
       ),
     );
   }
+
+  void _openFullscreenTutorial(BuildContext context, Technique technique) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => _FullscreenTechniqueTutorial(technique: technique),
+      ),
+    );
+  }
+}
+
+class _TutorialPreview extends StatelessWidget {
+  const _TutorialPreview({
+    required this.technique,
+    required this.tc,
+    required this.onTap,
+  });
+
+  final Technique technique;
+  final BoosterFishPagePalette tc;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: '${context.tr('techniques.zoomHint')} ${technique.name}',
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: _TechniqueImage(
+                  url: technique.photoUrl,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Icon(
+                    Icons.image_not_supported_outlined,
+                    color: tc.textMuted,
+                    size: 48,
+                  ),
+                ),
+              ),
+              PositionedDirectional(
+                end: 10,
+                bottom: 10,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: const Color(0xE60A2744),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.zoom_in, color: Colors.white, size: 18),
+                      const SizedBox(width: 6),
+                      Text(
+                        context.tr('techniques.zoomHint'),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FullscreenTechniqueTutorial extends StatelessWidget {
+  const _FullscreenTechniqueTutorial({required this.technique});
+
+  final Technique technique;
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = BoosterFishPagePalette.of(context);
+    return Scaffold(
+      backgroundColor: const Color(0xFF071522),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF071522),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              technique.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            Text(
+              context.tr('techniques.pinchHint'),
+              style: const TextStyle(fontSize: 11, color: Colors.white70),
+            ),
+          ],
+        ),
+      ),
+      body: SafeArea(
+        top: false,
+        child: InteractiveViewer(
+          minScale: 0.8,
+          maxScale: 6,
+          boundaryMargin: const EdgeInsets.all(80),
+          child: Center(
+            child: Container(
+              margin: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Image.asset(
+                technique.photoUrl,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => Icon(
+                  Icons.image_not_supported_outlined,
+                  color: tc.textMuted,
+                  size: 56,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
-//  ONGLET 1 — INFOS
+//  ONGLET 1 — ÉTAPES GUIDÉES
+// ═══════════════════════════════════════════════════════════
+class _StepsTab extends StatelessWidget {
+  final Technique t;
+  final BoosterFishPagePalette tc;
+
+  const _StepsTab({required this.t, required this.tc});
+
+  @override
+  Widget build(BuildContext context) {
+    if (t.steps.isEmpty) {
+      return _EmptyTab(message: context.tr('techniques.noSteps'), tc: tc);
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      itemCount: t.steps.length + 1,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _SectionTitle(
+                  title: context.tr('techniques.guidedSteps'),
+                  tc: tc,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  context.tr('techniques.followNumbersHint'),
+                  style: TextStyle(
+                    color: tc.textSecondary,
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final stepIndex = index - 1;
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: tc.surfaceElevated,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: tc.oceanLight.withValues(alpha: 0.18),
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: tc.oceanLight,
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  '${stepIndex + 1}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  t.steps[stepIndex],
+                  style: TextStyle(
+                    color: tc.textPrimary,
+                    fontSize: 14,
+                    height: 1.45,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  ONGLET 2 — INFOS
 // ═══════════════════════════════════════════════════════════
 class _InfosTab extends StatelessWidget {
   final Technique t;
@@ -694,7 +917,7 @@ class _InfosTab extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  ONGLET 2 — MATÉRIEL
+//  ONGLET 3 — MATÉRIEL
 // ═══════════════════════════════════════════════════════════
 class _MaterielTab extends StatelessWidget {
   final Technique t;
@@ -724,7 +947,7 @@ class _MaterielTab extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  ONGLET 3 — CONSEILS
+//  ONGLET 4 — CONSEILS
 // ═══════════════════════════════════════════════════════════
 class _ConseilsTab extends StatelessWidget {
   final Technique t;
@@ -920,13 +1143,11 @@ class _TextCard extends StatelessWidget {
 class _TechniqueImage extends StatelessWidget {
   final String url;
   final BoxFit fit;
-  final Widget Function(BuildContext, Widget, ImageChunkEvent?) loadingBuilder;
   final Widget Function(BuildContext, Object, StackTrace?) errorBuilder;
 
   const _TechniqueImage({
     required this.url,
     required this.fit,
-    required this.loadingBuilder,
     required this.errorBuilder,
   });
 
