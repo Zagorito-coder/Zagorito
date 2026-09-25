@@ -396,31 +396,31 @@ class _PrivateCatchesViewState extends State<PrivateCatchesView> {
       _showMessage('community.locationRequiredToPublish');
       return;
     }
-    if (!await _community.hasAcceptedTerms()) {
-      if (!mounted || !await _showTermsDialog()) return;
-      await _community.acceptTerms();
-    }
-    if (!mounted) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(context.tr('community.publishBestCatch')),
-        content: Text(context.tr('community.publishPrivacyConfirm')),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
-          ),
-          FilledButton.icon(
-            onPressed: () => Navigator.pop(context, true),
-            icon: const Icon(Icons.public_rounded),
-            label: Text(context.tr('community.publish')),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
     await _run(() async {
+      if (!await _community.hasAcceptedTerms()) {
+        if (!mounted || !await _showTermsDialog()) return;
+        await _community.acceptTerms();
+      }
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(context.tr('community.publishBestCatch')),
+          content: Text(context.tr('community.publishPrivacyConfirm')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(context, true),
+              icon: const Icon(Icons.public_rounded),
+              label: Text(context.tr('community.publish')),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
       await _community.publish(item);
       _showMessage('community.catchPublished');
     });

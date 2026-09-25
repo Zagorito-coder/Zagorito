@@ -326,9 +326,24 @@ class _CommunityMapViewState extends State<CommunityMapView> {
         LatLng(position.latitude, position.longitude),
         10.5,
       );
+    } on TimeoutException {
+      _showLocationUnavailable();
+    } on LocationServiceDisabledException {
+      _showLocationUnavailable();
+    } on PermissionDeniedException {
+      _showLocationUnavailable();
+    } on PositionUpdateException {
+      _showLocationUnavailable();
     } finally {
       if (mounted) setState(() => _locating = false);
     }
+  }
+
+  void _showLocationUnavailable() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(context.tr('community.locationUnavailable'))),
+    );
   }
 
   Future<void> _openDetails(CommunityCatch item, bool liked) async {

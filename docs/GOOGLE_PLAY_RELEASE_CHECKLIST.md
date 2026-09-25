@@ -1,6 +1,6 @@
 # BoosterFish — fiche de publication Google Play
 
-Version candidate en cours de validation : **1.0.9 (23)**
+Version candidate en cours de validation : **1.0.9 (24)**
 Dernière mise à jour : **25 septembre 2026**
 
 Cette fiche décrit l'état réel de l'application et les réponses à reporter dans

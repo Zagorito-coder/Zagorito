@@ -208,35 +208,47 @@ class CommunityRepository {
   Future<bool> hasAcceptedTerms() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return false;
-    final profile =
-        await _firestore.collection('community_profiles').doc(uid).get();
-    final data = profile.data();
-    return data?['termsVersion'] == termsVersion &&
-        data?['termsAcceptedAt'] is Timestamp;
+    try {
+      final profile =
+          await _firestore.collection('community_profiles').doc(uid).get();
+      final data = profile.data();
+      return data?['termsVersion'] == termsVersion &&
+          data?['termsAcceptedAt'] is Timestamp;
+    } on FirebaseException catch (error) {
+      throw CommunityException(_mapFirebaseFailure(error));
+    }
   }
 
   Future<void> acceptTerms() async {
     final user = _requireUser();
-    await _firestore.collection('community_profiles').doc(user.uid).set(
-      {
-        'schemaVersion': 1,
-        'ownerUid': user.uid,
-        'termsVersion': termsVersion,
-        'termsAcceptedAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      },
-      SetOptions(merge: true),
-    );
+    try {
+      await _firestore.collection('community_profiles').doc(user.uid).set(
+        {
+          'schemaVersion': 1,
+          'ownerUid': user.uid,
+          'termsVersion': termsVersion,
+          'termsAcceptedAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+    } on FirebaseException catch (error) {
+      throw CommunityException(_mapFirebaseFailure(error));
+    }
   }
 
   Future<DateTime?> nextPublicationAt() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return null;
-    final state =
-        await _firestore.collection('community_publish_state').doc(uid).get();
-    final lastPublishedAt = state.data()?['lastPublishedAt'];
-    if (lastPublishedAt is! Timestamp) return null;
-    return lastPublishedAt.toDate().add(CommunityCatch.publicationCooldown);
+    try {
+      final state =
+          await _firestore.collection('community_publish_state').doc(uid).get();
+      final lastPublishedAt = state.data()?['lastPublishedAt'];
+      if (lastPublishedAt is! Timestamp) return null;
+      return lastPublishedAt.toDate().add(CommunityCatch.publicationCooldown);
+    } on FirebaseException catch (error) {
+      throw CommunityException(_mapFirebaseFailure(error));
+    }
   }
 
   Future<String> publish(PrivateCatch privateCatch) async {
