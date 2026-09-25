@@ -14,6 +14,10 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+dependencies {
+    implementation("androidx.core:core-ktx:1.17.0")
+}
+
 val keystorePropertiesFile = rootProject.file("key.properties")
 val keystoreProperties = Properties()
 if (keystorePropertiesFile.exists()) {
@@ -200,8 +204,10 @@ tasks.named("preBuild") {
 
 configurations.all {
     resolutionStrategy {
-        force("androidx.core:core:1.13.1")
-        force("androidx.core:core-ktx:1.13.1")
+        // WindowCompat.enableEdgeToEdge remplace les API de couleurs système
+        // obsolètes sur Android 15. L'application exige déjà minSdk 24.
+        force("androidx.core:core:1.17.0")
+        force("androidx.core:core-ktx:1.17.0")
         force("androidx.browser:browser:1.7.0")
         // Google Mobile Ads 25.3.0 référence encore WorkManager 2.7.0.
         // Cette ancienne version échoue à instancier sa WorkDatabase après

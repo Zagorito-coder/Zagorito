@@ -327,11 +327,13 @@ class AppTheme {
         centerTitle: true,
         backgroundColor: tc.background.withValues(alpha: 0.9),
         foregroundColor: tc.textPrimary,
-        systemOverlayStyle: isDark
-            ? SystemUiOverlayStyle.light
-                .copyWith(statusBarColor: Colors.transparent)
-            : SystemUiOverlayStyle.dark
-                .copyWith(statusBarColor: Colors.transparent),
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+          statusBarIconBrightness:
+              isDark ? Brightness.light : Brightness.dark,
+          systemNavigationBarIconBrightness:
+              isDark ? Brightness.light : Brightness.dark,
+        ),
         titleTextStyle: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.w600,

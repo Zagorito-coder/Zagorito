@@ -9,7 +9,7 @@ import 'dart:ui' as ui;
 import 'package:executor_lib/executor_lib.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'
-    show SystemChrome, SystemUiMode, SystemUiOverlayStyle;
+    show SystemChrome, SystemUiOverlayStyle;
 import 'package:flutter/foundation.dart' show ValueListenable, kDebugMode;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -77,9 +77,7 @@ void _bootstrap() {
     debugPrint = (String? message, {int? wrapWidth}) {};
   }
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.dark,
-    systemNavigationBarColor: Colors.transparent,
     systemNavigationBarIconBrightness: Brightness.dark,
   ));
   runApp(const SpotsApp());
@@ -96,10 +94,8 @@ class SpotsApp extends StatelessWidget {
         final isDark = ThemeController.instance.isDark;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-            statusBarColor: Colors.transparent,
             statusBarIconBrightness:
                 isDark ? Brightness.light : Brightness.dark,
-            systemNavigationBarColor: ThemeColors.of(context).background,
             systemNavigationBarIconBrightness:
                 isDark ? Brightness.light : Brightness.dark,
           ));
@@ -1130,7 +1126,6 @@ class _MapScreenState extends State<MapScreen>
         widget.userSpotSelectionRequests?.value?.serial ?? 0;
     widget.userSpotSelectionRequests
         ?.addListener(_handleUserSpotSelectionRequest);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _loadSpots();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -1327,7 +1322,6 @@ class _MapScreenState extends State<MapScreen>
 
   @override
   void dispose() {
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _cancelCameraFlight();
     _cameraFlightController.dispose();
     _mapController.dispose();

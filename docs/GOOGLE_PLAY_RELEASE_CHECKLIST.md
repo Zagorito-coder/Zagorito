@@ -1,7 +1,7 @@
 # BoosterFish — fiche de publication Google Play
 
-Version candidate en cours de validation : **1.0.9 (22)**
-Dernière mise à jour : **24 septembre 2026**
+Version candidate en cours de validation : **1.0.9 (23)**
+Dernière mise à jour : **25 septembre 2026**
 
 Cette fiche décrit l'état réel de l'application et les réponses à reporter dans
 Google Play Console. Toute modification future des SDK, de l'authentification,
@@ -126,6 +126,11 @@ fournisseur ou un SDK de cartographie est ajouté.
 
 ## Autorisations et déclarations
 
+- **Affichage bord à bord Android 15+ :** activé une seule fois dans l'activité
+  native avec `WindowCompat.enableEdgeToEdge(window)`. Le code Flutter ne fixe
+  plus les couleurs des barres système avec les API Android devenues obsolètes ;
+  il conserve uniquement le contraste clair/sombre des icônes. Contrôler ce
+  rendu dans le rapport de pré-lancement sur un appareil Android 15 ou ultérieur.
 - `INTERNET` : cartes, Firestore, authentification et publicité.
 - `ACCESS_COARSE_LOCATION` et `ACCESS_FINE_LOCATION` : uniquement lorsque
   l'utilisateur demande le centrage, une fonction de proximité ou

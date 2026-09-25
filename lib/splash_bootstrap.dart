@@ -13,7 +13,6 @@ import 'package:flutter/foundation.dart'
         TargetPlatform,
         visibleForTesting;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show SystemChrome, SystemUiMode;
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
@@ -43,7 +42,6 @@ class _SplashBootstrapState extends State<SplashBootstrap> {
   @override
   void initState() {
     super.initState();
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _bootstrap();
   }
 

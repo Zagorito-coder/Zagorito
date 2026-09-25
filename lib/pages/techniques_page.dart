@@ -3,6 +3,7 @@
 // ============================================================
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:spots_app/models/technique.dart';
 import 'package:spots_app/services/technique_service.dart';
 import 'package:spots_app/theme_controller.dart';
@@ -668,6 +669,11 @@ class _FullscreenTechniqueTutorial extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: const Color(0xFF071522),
         foregroundColor: Colors.white,
+        systemOverlayStyle: const SystemUiOverlayStyle(
+          statusBarBrightness: Brightness.dark,
+          statusBarIconBrightness: Brightness.light,
+          systemNavigationBarIconBrightness: Brightness.light,
+        ),
         elevation: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
