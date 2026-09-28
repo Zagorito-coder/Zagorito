@@ -1,0 +1,15 @@
+1
+00:00:00,000 --> 00:00:03,000
+Une prise, une histoire
+
+2
+00:00:03,000 --> 00:00:06,000
+Ajoutez votre photo
+
+3
+00:00:06,000 --> 00:00:09,000
+Partagez l'expérience avec la communauté
+
+4
+00:00:09,000 --> 00:00:12,000
+Votre spot privé reste protégé

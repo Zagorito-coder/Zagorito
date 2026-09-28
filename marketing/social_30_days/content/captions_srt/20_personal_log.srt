@@ -1,0 +1,15 @@
+1
+00:00:00,000 --> 00:00:03,000
+Ne perdez plus le fil de vos sorties
+
+2
+00:00:03,000 --> 00:00:06,000
+Enregistrez vos spots personnels
+
+3
+00:00:06,000 --> 00:00:09,000
+Ajoutez vos propres repères
+
+4
+00:00:09,000 --> 00:00:12,000
+Construisez votre mémoire de pêche
