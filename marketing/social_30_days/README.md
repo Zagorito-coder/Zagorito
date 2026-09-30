@@ -1,5 +1,7 @@
 # BoosterFish — campagne sociale de 30 jours
 
+Le pack complémentaire de **20 publications image 4:5** est disponible dans [`static_posts/`](static_posts/README.md).
+
 Livrable prêt pour Facebook Reels et Instagram Reels, construit à partir des fonctions réellement présentes dans BoosterFish et de son identité bleu marine/cyan.
 
 ## Contenu livré
