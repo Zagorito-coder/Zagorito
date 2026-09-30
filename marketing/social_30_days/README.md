@@ -2,6 +2,8 @@
 
 Le pack complémentaire de **20 publications image 4:5** est disponible dans [`static_posts/`](static_posts/README.md).
 
+La série enrichie demandée ensuite, avec écrans de l’application et explication détaillée de chaque fonction, est disponible dans [`feature_posters/`](feature_posters/README.md). Cette série est la version recommandée pour publication.
+
 Livrable prêt pour Facebook Reels et Instagram Reels, construit à partir des fonctions réellement présentes dans BoosterFish et de son identité bleu marine/cyan.
 
 ## Contenu livré
