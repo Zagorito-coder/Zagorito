@@ -100,5 +100,31 @@ void main() {
         isNull,
       );
     });
+
+    test('le repli Casablanca reste utilisable sans réseau', () {
+      final now = DateTime(2026, 9, 30, 14, 25);
+      final result = TideService.casablancaOfflineFallback(now: now);
+
+      expect(result.location, 'Casablanca, Maroc');
+      expect(result.generatedAt, isNull);
+      expect(result.hourlyPoints, hasLength(49));
+      expect(result.hourlyPoints.first.time, DateTime(2026, 9, 30));
+      expect(result.hourlyPoints.last.time, DateTime(2026, 10, 2));
+      expect(result.low, lessThan(result.high));
+      expect(result.next, isNonZero);
+      expect(result.waveHeight, 0);
+      expect(
+        now.isAfter(
+          result.hourlyPoints.first.time.subtract(const Duration(minutes: 90)),
+        ),
+        isTrue,
+      );
+      expect(
+        now.isBefore(
+          result.hourlyPoints.last.time.add(const Duration(minutes: 90)),
+        ),
+        isTrue,
+      );
+    });
   });
 }

@@ -9,6 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 
 import '../models/tide_data.dart';
+import 'astronomy_service.dart';
 import 'casablanca_tide_reference.dart';
 import 'tide_conditions_mapper.dart';
 
@@ -89,7 +90,7 @@ class TideService {
             .timeout(_requestTimeout);
         final data = snapshot.data();
         if (!snapshot.exists || data == null || !_isFresh(data['timestamp'])) {
-          return TideData.fallback(location: station.name);
+          return _fallbackForStation(station);
         }
 
         final mapped = TideConditionsMapper.fromDocument(
@@ -110,8 +111,52 @@ class TideService {
         }
       }
     }
-    return TideData.fallback(location: station.name);
+    return _fallbackForStation(station);
   }
+
+  /// Repli hors ligne déterministe pour la station de Casablanca.
+  ///
+  /// Les hauteurs proviennent des constituants harmoniques locaux embarqués,
+  /// sans appel réseau. Les champs météo et houle restent volontairement
+  /// indisponibles au lieu d'afficher des valeurs inventées.
+  @visibleForTesting
+  static TideData casablancaOfflineFallback({DateTime? now}) {
+    final referenceTime = (now ?? DateTime.now()).toLocal();
+    final start = DateTime(
+      referenceTime.year,
+      referenceTime.month,
+      referenceTime.day,
+    );
+    final points = List<TidePoint>.generate(49, (index) {
+      final time = start.add(Duration(hours: index));
+      return TidePoint(
+        time: time,
+        height: CasablancaTideReference.heightAtUtc(time.toUtc()),
+      );
+    }, growable: false);
+    final low = points.map((point) => point.height).reduce(math.min);
+    final high = points.map((point) => point.height).reduce(math.max);
+    final next = points
+            .where((point) => point.time.isAfter(referenceTime))
+            .firstOrNull ??
+        points.last;
+
+    return TideData(
+      hourlyPoints: points,
+      low: low,
+      high: high,
+      next: next.height,
+      waveHeight: 0,
+      location: 'Casablanca, Maroc',
+      generatedAt: null,
+      astro: AstronomyService.calculate(referenceTime, low, high),
+    );
+  }
+
+  static TideData _fallbackForStation(_ForecastStation station) =>
+      station.id == 'casablanca'
+          ? casablancaOfflineFallback()
+          : TideData.fallback(location: station.name);
 
   static String _fallbackLocation(String? locationName) {
     final normalized = locationName?.trim();
