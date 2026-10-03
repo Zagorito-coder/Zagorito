@@ -2037,13 +2037,12 @@ class _MapScreenState extends State<MapScreen>
               ],
             ),
           ),
-          if (_showToolsPanel) _buildToolsPanel(),
           if (_isAddingSpot) _buildAddSpotModeBanner(),
           if (_isLoadingSpots) const SizedBox.shrink(),
           Positioned(
-              bottom: 96 + 16 + 8,
-              left: 0,
-              right: 0,
+              bottom: 96 + 16 + 8 + mediaPadding.bottom,
+              left: mediaPadding.left,
+              right: mediaPadding.right,
               child: Align(
                   alignment: Alignment.centerLeft,
                   child: Consumer<FishProvider>(builder: (ctx, fp, _) {
@@ -2071,8 +2070,8 @@ class _MapScreenState extends State<MapScreen>
                         onFishDeselected: fp.deselectFish);
                   }))),
           Positioned(
-              bottom: 16,
-              left: 16,
+              bottom: 16 + mediaPadding.bottom,
+              left: 16 + mediaPadding.left,
               width: _mapBottomControlHeight,
               height: _mapBottomControlHeight,
               child: Directionality(
@@ -2084,9 +2083,9 @@ class _MapScreenState extends State<MapScreen>
                 builder: (ctx, _) {
                   final keyboardInset = MediaQuery.viewInsetsOf(ctx).bottom;
                   return Positioned(
-                      bottom: 16 + keyboardInset,
-                      left: 16,
-                      right: 16,
+                      bottom: 16 + keyboardInset + mediaPadding.bottom,
+                      left: 16 + mediaPadding.left,
+                      right: 16 + mediaPadding.right,
                       child: Center(
                           child: SizedBox(
                               width: MediaQuery.sizeOf(ctx).width * 0.45,
@@ -2130,6 +2129,7 @@ class _MapScreenState extends State<MapScreen>
                                     onStopMeasurement: _stopMeasuring),
                               ))));
                 }),
+          if (_showToolsPanel) _buildToolsPanel(),
           if (_isCompassEnabled)
             Positioned(
                 top: 0,
@@ -2227,131 +2227,142 @@ class _MapScreenState extends State<MapScreen>
 
   Widget _buildToolsPanel() {
     final tc = ThemeColors.of(context);
+    final padding = MediaQuery.paddingOf(context);
+    final isLandscape =
+        MediaQuery.orientationOf(context) == Orientation.landscape;
     return Positioned(
-        bottom: 170,
-        right: 80,
-        child: Container(
-            width: 180,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-                color: tc.surface.withValues(alpha: 0.95),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: tc.glassBorder, width: 1.2),
-                boxShadow: [
-                  BoxShadow(
-                      color: tc.shadowColor,
-                      blurRadius: 12,
-                      offset: const Offset(0, 4))
-                ]),
-            child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(context.tr('map.tools'),
-                      style: TextStyle(
+        top: padding.top + (isLandscape ? 72 : 12),
+        bottom: padding.bottom + (isLandscape ? 12 : 170),
+        right: padding.right + 80,
+        child: Align(
+          alignment: Alignment.bottomRight,
+          child: SingleChildScrollView(
+            key: const ValueKey<String>('map-tools-scroll'),
+            child: Container(
+                width: 180,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                    color: tc.surface.withValues(alpha: 0.95),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: tc.glassBorder, width: 1.2),
+                    boxShadow: [
+                      BoxShadow(
+                          color: tc.shadowColor,
+                          blurRadius: 12,
+                          offset: const Offset(0, 4))
+                    ]),
+                child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(context.tr('map.tools'),
+                          style: TextStyle(
+                              color: tc.textPrimary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14)),
+                      const Divider(height: 16),
+                      _toolItem(
+                        icon: Icons.add_location_alt_rounded,
+                        label: context.tr('mySpots.addTitle'),
+                        color: tc.oceanMedium,
+                        onTap: _startAddingSpot,
+                      ),
+                      const SizedBox(height: 10),
+                      _toolItem(
+                          key: const ValueKey<String>('map-measurement-toggle'),
+                          icon: _isMeasuring ? Icons.stop : Icons.straighten,
+                          label: _isMeasuring
+                              ? context.tr('map.stopMeasure')
+                              : context.tr('map.measureDistance'),
+                          color: _isMeasuring ? AppColors.gold : tc.textPrimary,
+                          onTap: () {
+                            if (_isMeasuring) {
+                              _stopMeasuring();
+                            } else {
+                              setState(() {
+                                _isMeasuring = true;
+                                _showToolsPanel = false;
+                              });
+                            }
+                          }),
+                      if (_isMeasuring && _measurePoints.isNotEmpty)
+                        Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(_formattedMeasuredDistance,
+                                style: const TextStyle(
+                                    color: AppColors.gold,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold))),
+                      const SizedBox(height: 10),
+                      Text('Fond de carte',
+                          style: TextStyle(
+                              color: tc.textMuted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 6),
+                      _toolItem(
+                          icon: Icons.map,
+                          label: 'Standard',
+                          color: _mapStyle == MapStyle.standard
+                              ? tc.oceanMedium
+                              : tc.textPrimary,
+                          onTap: () =>
+                              setState(() => _mapStyle = MapStyle.standard)),
+                      const SizedBox(height: 6),
+                      _toolItem(
+                          icon: Icons.satellite,
+                          label: 'Satellite',
+                          color: _mapStyle == MapStyle.satellite
+                              ? tc.oceanMedium
+                              : tc.textPrimary,
+                          onTap: () =>
+                              setState(() => _mapStyle = MapStyle.satellite)),
+                      const SizedBox(height: 6),
+                      _toolItem(
+                          icon: Icons.dark_mode,
+                          label: 'Sombre',
+                          color: _mapStyle == MapStyle.dark
+                              ? tc.oceanMedium
+                              : tc.textPrimary,
+                          onTap: () =>
+                              setState(() => _mapStyle = MapStyle.dark)),
+                      const SizedBox(height: 6),
+                      _toolItem(
+                          icon: Icons.map_outlined,
+                          label: context.tr('offlineMaps.offlineStyle'),
+                          color: _mapStyle == MapStyle.offline
+                              ? tc.oceanMedium
+                              : tc.textPrimary,
+                          onTap: () {
+                            final service = OfflineMapService.instance;
+                            if (service.hasActiveMap) {
+                              final region = service.activeRegion;
+                              if (region == null) {
+                                setState(() => _mapStyle = MapStyle.offline);
+                              } else {
+                                _showOfflineRegion(region);
+                              }
+                            } else {
+                              unawaited(_openOfflineMaps());
+                            }
+                          }),
+                      const SizedBox(height: 6),
+                      _toolItem(
+                          icon: Icons.download_for_offline,
+                          label: context.tr('offlineMaps.manage'),
                           color: tc.textPrimary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14)),
-                  const Divider(height: 16),
-                  _toolItem(
-                    icon: Icons.add_location_alt_rounded,
-                    label: context.tr('mySpots.addTitle'),
-                    color: tc.oceanMedium,
-                    onTap: _startAddingSpot,
-                  ),
-                  const SizedBox(height: 10),
-                  _toolItem(
-                      key: const ValueKey<String>('map-measurement-toggle'),
-                      icon: _isMeasuring ? Icons.stop : Icons.straighten,
-                      label: _isMeasuring
-                          ? context.tr('map.stopMeasure')
-                          : context.tr('map.measureDistance'),
-                      color: _isMeasuring ? AppColors.gold : tc.textPrimary,
-                      onTap: () {
-                        if (_isMeasuring) {
-                          _stopMeasuring();
-                        } else {
-                          setState(() {
-                            _isMeasuring = true;
-                            _showToolsPanel = false;
-                          });
-                        }
-                      }),
-                  if (_isMeasuring && _measurePoints.isNotEmpty)
-                    Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(_formattedMeasuredDistance,
-                            style: const TextStyle(
-                                color: AppColors.gold,
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold))),
-                  const SizedBox(height: 10),
-                  Text('Fond de carte',
-                      style: TextStyle(
-                          color: tc.textMuted,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 6),
-                  _toolItem(
-                      icon: Icons.map,
-                      label: 'Standard',
-                      color: _mapStyle == MapStyle.standard
-                          ? tc.oceanMedium
-                          : tc.textPrimary,
-                      onTap: () =>
-                          setState(() => _mapStyle = MapStyle.standard)),
-                  const SizedBox(height: 6),
-                  _toolItem(
-                      icon: Icons.satellite,
-                      label: 'Satellite',
-                      color: _mapStyle == MapStyle.satellite
-                          ? tc.oceanMedium
-                          : tc.textPrimary,
-                      onTap: () =>
-                          setState(() => _mapStyle = MapStyle.satellite)),
-                  const SizedBox(height: 6),
-                  _toolItem(
-                      icon: Icons.dark_mode,
-                      label: 'Sombre',
-                      color: _mapStyle == MapStyle.dark
-                          ? tc.oceanMedium
-                          : tc.textPrimary,
-                      onTap: () => setState(() => _mapStyle = MapStyle.dark)),
-                  const SizedBox(height: 6),
-                  _toolItem(
-                      icon: Icons.map_outlined,
-                      label: context.tr('offlineMaps.offlineStyle'),
-                      color: _mapStyle == MapStyle.offline
-                          ? tc.oceanMedium
-                          : tc.textPrimary,
-                      onTap: () {
-                        final service = OfflineMapService.instance;
-                        if (service.hasActiveMap) {
-                          final region = service.activeRegion;
-                          if (region == null) {
-                            setState(() => _mapStyle = MapStyle.offline);
-                          } else {
-                            _showOfflineRegion(region);
-                          }
-                        } else {
-                          unawaited(_openOfflineMaps());
-                        }
-                      }),
-                  const SizedBox(height: 6),
-                  _toolItem(
-                      icon: Icons.download_for_offline,
-                      label: context.tr('offlineMaps.manage'),
-                      color: tc.textPrimary,
-                      onTap: () => unawaited(_openOfflineMaps())),
-                ])));
+                          onTap: () => unawaited(_openOfflineMaps())),
+                    ])),
+          ),
+        ));
   }
 
   Widget _buildAddSpotModeBanner() {
     final tc = ThemeColors.of(context);
     return Positioned(
       top: MediaQuery.paddingOf(context).top + (_isCompassEnabled ? 92 : 12),
-      left: 14,
-      right: 76,
+      left: 14 + MediaQuery.paddingOf(context).left,
+      right: 76 + MediaQuery.paddingOf(context).right,
       child: Material(
         color: tc.surface.withValues(alpha: 0.96),
         borderRadius: BorderRadius.circular(8),
