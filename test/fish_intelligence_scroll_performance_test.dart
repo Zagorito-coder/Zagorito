@@ -29,9 +29,10 @@ void main() {
     expect(
       source,
       contains(
-        'if (fp.isFishModalVisible) {\n'
-        '                      return const SizedBox.shrink();\n'
-        '                    }',
+        RegExp(
+          r'if \(fp\.isFishModalVisible\) \{\s*'
+          r'return const SizedBox\.shrink\(\);\s*\}',
+        ),
       ),
     );
   });

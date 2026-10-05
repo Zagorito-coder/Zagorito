@@ -113,7 +113,8 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && !widget.disablePostLaunchTasksForTesting) {
+    if (state == AppLifecycleState.resumed &&
+        !widget.disablePostLaunchTasksForTesting) {
       unawaited(MarineLocationController.instance.refresh());
     }
   }

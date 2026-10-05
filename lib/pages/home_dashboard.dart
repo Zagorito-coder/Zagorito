@@ -394,8 +394,10 @@ class _ConditionsHero extends StatelessWidget {
     final current = _currentPoint;
     final activity =
         _hasData ? tideData.astro.fishActivity.clamp(0.0, 1.0) : 0.0;
-    final activityValue = _hasData && tideData.location.toLowerCase().contains('casablanca')
-        ? '${(activity * 100).round()}%' : '--';
+    final activityValue =
+        _hasData && tideData.location.toLowerCase().contains('casablanca')
+            ? '${(activity * 100).round()}%'
+            : '--';
     final tideValue = _hasData ? '${tideData.next.toStringAsFixed(1)} m' : '--';
     final windValue = current?.windSpeedKmh == null
         ? '--'

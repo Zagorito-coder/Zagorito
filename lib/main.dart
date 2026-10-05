@@ -8,8 +8,7 @@ import 'dart:ui' as ui;
 
 import 'package:executor_lib/executor_lib.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'
-    show SystemChrome, SystemUiOverlayStyle;
+import 'package:flutter/services.dart' show SystemChrome, SystemUiOverlayStyle;
 import 'package:flutter/foundation.dart' show ValueListenable, kDebugMode;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -1881,346 +1880,354 @@ class _MapScreenState extends State<MapScreen>
         return Scaffold(
             resizeToAvoidBottomInset: false,
             body: Stack(children: [
-          if (_isLoadingSpots)
-            Center(
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-              CircularProgressIndicator(color: tc.oceanLight),
-              const SizedBox(height: 12),
-              Text('Chargement des spots...',
-                  style: TextStyle(color: tc.textSecondary)),
-            ])),
-          RepaintBoundary(
-            key: const ValueKey<String>('map-render-boundary'),
-            child: FlutterMap(
-              mapController: _mapController,
-              options: MapOptions(
-              initialCenter: const LatLng(30.5, -9.7),
-              initialZoom: 6,
-              maxZoom: MapZoomLimits.manualMaximum,
-              minZoom: MapZoomLimits.minimum,
-              interactionOptions: const InteractionOptions(
-                // Pinch zoom is essential. Pinch-move and rotation remain
-                // disabled so two fingers only change the finite, clamped zoom.
-                flags: InteractiveFlag.drag |
-                    InteractiveFlag.flingAnimation |
-                    InteractiveFlag.pinchZoom |
-                    InteractiveFlag.doubleTapZoom |
-                    InteractiveFlag.doubleTapDragZoom,
-              ),
-              onPositionChanged: _onPositionChanged,
-              onLongPress: _onMapLongPress,
-              onMapReady: () {
-                final region = OfflineMapService.instance.activeRegion;
-                if (_mapStyle == MapStyle.offline && region != null) {
-                  _showOfflineRegion(region);
-                }
-              },
-              ),
-              children: [
-              AppTileLayer(style: _mapStyle),
-              AppMapAttribution(style: _mapStyle),
-              if (_currentPosition != null)
-                FiniteMarkerLayer(markers: [
-                  Marker(
-                      width: 20,
-                      height: 20,
-                      point: LatLng(_currentPosition!.latitude,
-                          _currentPosition!.longitude),
-                      child: Container(
-                          decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.blue.withValues(alpha: 0.9),
-                              border:
-                                  Border.all(color: Colors.white, width: 2.5),
-                              boxShadow: [
-                            BoxShadow(
-                                color: Colors.blue.withValues(alpha: 0.45),
-                                blurRadius: 10)
-                          ])))
-                ]),
-              SpotsCanvasLayer(
-                visibleSpots: _visibleSpots,
-                mapController: _mapController,
-                selectedSpot: _selectedSpot,
-                onSpotTap: _onCanvasSpotTap,
-                onMapTap: (ll) =>
-                    _onMapTap(const TapPosition(Offset.zero, Offset.zero), ll),
-              ),
-              PersonalSpotsMapLayer(
-                selectedSpotId: _selectedUserSpot?.id,
-                onSpotTap: (spot) => unawaited(_selectUserSpot(spot)),
-              ),
-              if (_selectedUserSpot != null)
-                FiniteMarkerLayer(
-                  markers: [
-                    Marker(
-                      width: 172,
-                      height: 86,
-                      point: LatLng(
-                        _selectedUserSpot!.latitude,
-                        _selectedUserSpot!.longitude,
-                      ),
-                      alignment: Alignment.topCenter,
-                      child: PersonalSpotMapMarker(
-                        spot: _selectedUserSpot!,
-                        selected: true,
-                        onTap: () {},
-                      ),
+              if (_isLoadingSpots)
+                Center(
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  CircularProgressIndicator(color: tc.oceanLight),
+                  const SizedBox(height: 12),
+                  Text('Chargement des spots...',
+                      style: TextStyle(color: tc.textSecondary)),
+                ])),
+              RepaintBoundary(
+                key: const ValueKey<String>('map-render-boundary'),
+                child: FlutterMap(
+                  mapController: _mapController,
+                  options: MapOptions(
+                    initialCenter: const LatLng(30.5, -9.7),
+                    initialZoom: 6,
+                    maxZoom: MapZoomLimits.manualMaximum,
+                    minZoom: MapZoomLimits.minimum,
+                    interactionOptions: const InteractionOptions(
+                      // Pinch zoom is essential. Pinch-move and rotation remain
+                      // disabled so two fingers only change the finite, clamped zoom.
+                      flags: InteractiveFlag.drag |
+                          InteractiveFlag.flingAnimation |
+                          InteractiveFlag.pinchZoom |
+                          InteractiveFlag.doubleTapZoom |
+                          InteractiveFlag.doubleTapDragZoom,
                     ),
-                  ],
-                ),
-              // 🌬️ Couche de particules de vent animees (30fps)
-              // IgnorePointer pour ne pas bloquer les taps sur la carte
-              ListenableBuilder(
-                listenable: FishProvider.instance,
-                child: IgnorePointer(
-                  child: Consumer<WindAnimationProvider>(
-                    builder: (ctx, wind, _) => WindParticleLayer(
-                      provider: wind,
-                      mapController: _mapController,
-                    ),
+                    onPositionChanged: _onPositionChanged,
+                    onLongPress: _onMapLongPress,
+                    onMapReady: () {
+                      final region = OfflineMapService.instance.activeRegion;
+                      if (_mapStyle == MapStyle.offline && region != null) {
+                        _showOfflineRegion(region);
+                      }
+                    },
                   ),
-                ),
-                builder: (context, child) => TickerMode(
-                  enabled: !FishProvider.instance.isFishModalVisible,
-                  child: child!,
-                ),
-              ),
-              if (_selectedSpot != null)
-                FiniteMarkerLayer(markers: [
-                  Marker(
-                      width: 52,
-                      height: 56,
-                      point: LatLng(
-                          _selectedSpot!.latitude, _selectedSpot!.longitude),
-                      child: _markerCacheManager.getOrCreateMarker(
-                          _selectedSpot!, true, _isPremium))
-                ]),
-              if (_pendingPersonalSpot != null)
-                FiniteMarkerLayer(
-                  markers: [
-                    Marker(
-                      width: 210,
-                      height: 96,
-                      point: _pendingPersonalSpot!,
-                      // In flutter_map, topCenter places the whole marker
-                      // above its geographic point. The pin tip at the bottom
-                      // therefore lands exactly on the long-pressed location.
-                      alignment: Alignment.topCenter,
-                      child: _buildPendingPersonalSpotMarker(
-                        _pendingPersonalSpot!,
-                      ),
-                    ),
-                  ],
-                ),
-              if (_isMeasuring && _measurePoints.isNotEmpty)
-                PolylineLayer(polylines: [
-                  Polyline(
-                      points: _measurePoints,
-                      color: Colors.redAccent,
-                      strokeWidth: 4.0)
-                ]),
-              if (_isMeasuring && _measurePoints.isNotEmpty)
-                FiniteMarkerLayer(
-                    markers: _measurePoints
-                        .map((p) => Marker(
-                            width: 14,
-                            height: 14,
-                            point: p,
+                  children: [
+                    AppTileLayer(style: _mapStyle),
+                    AppMapAttribution(style: _mapStyle),
+                    if (_currentPosition != null)
+                      FiniteMarkerLayer(markers: [
+                        Marker(
+                            width: 20,
+                            height: 20,
+                            point: LatLng(_currentPosition!.latitude,
+                                _currentPosition!.longitude),
                             child: Container(
                                 decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: Colors.white,
+                                    color: Colors.blue.withValues(alpha: 0.9),
                                     border: Border.all(
-                                        color: Colors.redAccent, width: 2)))))
-                        .toList()),
-              ],
-            ),
-          ),
-          if (_isAddingSpot) _buildAddSpotModeBanner(),
-          if (_isLoadingSpots) const SizedBox.shrink(),
-          Positioned(
-              bottom: 96 + 16 + 8 + mediaPadding.bottom,
-              left: mediaPadding.left,
-              right: mediaPadding.right,
-              child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Consumer<FishProvider>(builder: (ctx, fp, _) {
-                    if (fp.isFishModalVisible) {
-                      return const SizedBox.shrink();
-                    }
-                    if (!_isFishBarVisible) {
-                      return const SizedBox.shrink();
-                    }
-                    final df = fp.allFish;
-                    if (df.isEmpty) return const SizedBox.shrink();
-                    return _FishVerticalMenu(
-                        fishes: df,
-                        selectedFish: fp.selectedFish,
-                        onFishSelected: (f) {
-                          if (_isFishBarVisible) {
-                            setState(() => _isFishBarVisible = false);
-                          }
-                          unawaited(fp.selectFish(
-                            f,
-                            _spots,
-                            _currentPosition,
-                          ));
-                        },
-                        onFishDeselected: fp.deselectFish);
-                  }))),
-          Positioned(
-              bottom: 16 + mediaPadding.bottom,
-              left: 16 + mediaPadding.left,
-              width: _mapBottomControlHeight,
-              height: _mapBottomControlHeight,
-              child: Directionality(
-                  textDirection: TextDirection.ltr,
-                  child: _buildFishFilterButton())),
-          if (!hasSel && _selectedUserSpot == null)
-            ListenableBuilder(
-                listenable: LanguageController.instance,
-                builder: (ctx, _) {
-                  final keyboardInset = MediaQuery.viewInsetsOf(ctx).bottom;
-                  return Positioned(
-                      bottom: 16 + keyboardInset + mediaPadding.bottom,
-                      left: 16 + mediaPadding.left,
-                      right: 16 + mediaPadding.right,
-                      child: Center(
-                          child: SizedBox(
-                              width: MediaQuery.sizeOf(ctx).width * 0.45,
-                              child: RepaintBoundary(
-                                child: _SearchBar(
-                                    controller: _searchController,
-                                    cityResults: _citySearchResults,
-                                    spotResults: _spotSearchResults,
-                                    selectedCity: _selectedSearchCity,
-                                    onTap: () {
-                                      if (_isFishBarVisible) {
-                                        setState(
-                                            () => _isFishBarVisible = false);
-                                      }
-                                    },
-                                    onChanged: (q) => setState(() {
-                                          _searchQuery = q;
-                                          _resetCitySearch();
-                                          _selectedSpot = null;
-                                          _selectedUserSpot = null;
-                                          _isFishBarVisible = false;
-                                        }),
-                                    onClear: () {
-                                      _searchController.clear();
-                                      setState(() {
-                                        _searchQuery = '';
-                                        _resetCitySearch();
-                                        _selectedSpot = null;
-                                        _selectedUserSpot = null;
-                                      });
-                                      FocusScope.of(context).unfocus();
-                                    },
-                                    onSelectCity: (city) =>
-                                        unawaited(_selectCity(city)),
-                                    onSelectSpot: (spot) =>
-                                        unawaited(_selectSpot(spot)),
-                                    distanceText: _searchDistanceText,
-                                    measurementText: _isMeasuring
-                                        ? _formattedMeasuredDistance
-                                        : null,
-                                    onStopMeasurement: _stopMeasuring),
-                              ))));
-                }),
-          if (_showToolsPanel) _buildToolsPanel(),
-          if (_isCompassEnabled)
-            Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: _CompassRibbon(
-                    magneticHeading: _magneticHeading,
-                    gpsCourseOverGround: _gpsCourseOverGround)),
-          Positioned(
-            top: mediaPadding.top + (isLandscape ? 12 : 80),
-            right: 16 + mediaPadding.right,
-            bottom: isLandscape ? null : 100,
-            child: SingleChildScrollView(
-              scrollDirection: isLandscape ? Axis.horizontal : Axis.vertical,
-              child: _buildPrimaryMapControls(
-                isLandscape ? Axis.horizontal : Axis.vertical,
+                                        color: Colors.white, width: 2.5),
+                                    boxShadow: [
+                                  BoxShadow(
+                                      color:
+                                          Colors.blue.withValues(alpha: 0.45),
+                                      blurRadius: 10)
+                                ])))
+                      ]),
+                    SpotsCanvasLayer(
+                      visibleSpots: _visibleSpots,
+                      mapController: _mapController,
+                      selectedSpot: _selectedSpot,
+                      onSpotTap: _onCanvasSpotTap,
+                      onMapTap: (ll) => _onMapTap(
+                          const TapPosition(Offset.zero, Offset.zero), ll),
+                    ),
+                    PersonalSpotsMapLayer(
+                      selectedSpotId: _selectedUserSpot?.id,
+                      onSpotTap: (spot) => unawaited(_selectUserSpot(spot)),
+                    ),
+                    if (_selectedUserSpot != null)
+                      FiniteMarkerLayer(
+                        markers: [
+                          Marker(
+                            width: 172,
+                            height: 86,
+                            point: LatLng(
+                              _selectedUserSpot!.latitude,
+                              _selectedUserSpot!.longitude,
+                            ),
+                            alignment: Alignment.topCenter,
+                            child: PersonalSpotMapMarker(
+                              spot: _selectedUserSpot!,
+                              selected: true,
+                              onTap: () {},
+                            ),
+                          ),
+                        ],
+                      ),
+                    // 🌬️ Couche de particules de vent animees (30fps)
+                    // IgnorePointer pour ne pas bloquer les taps sur la carte
+                    ListenableBuilder(
+                      listenable: FishProvider.instance,
+                      child: IgnorePointer(
+                        child: Consumer<WindAnimationProvider>(
+                          builder: (ctx, wind, _) => WindParticleLayer(
+                            provider: wind,
+                            mapController: _mapController,
+                          ),
+                        ),
+                      ),
+                      builder: (context, child) => TickerMode(
+                        enabled: !FishProvider.instance.isFishModalVisible,
+                        child: child!,
+                      ),
+                    ),
+                    if (_selectedSpot != null)
+                      FiniteMarkerLayer(markers: [
+                        Marker(
+                            width: 52,
+                            height: 56,
+                            point: LatLng(_selectedSpot!.latitude,
+                                _selectedSpot!.longitude),
+                            child: _markerCacheManager.getOrCreateMarker(
+                                _selectedSpot!, true, _isPremium))
+                      ]),
+                    if (_pendingPersonalSpot != null)
+                      FiniteMarkerLayer(
+                        markers: [
+                          Marker(
+                            width: 210,
+                            height: 96,
+                            point: _pendingPersonalSpot!,
+                            // In flutter_map, topCenter places the whole marker
+                            // above its geographic point. The pin tip at the bottom
+                            // therefore lands exactly on the long-pressed location.
+                            alignment: Alignment.topCenter,
+                            child: _buildPendingPersonalSpotMarker(
+                              _pendingPersonalSpot!,
+                            ),
+                          ),
+                        ],
+                      ),
+                    if (_isMeasuring && _measurePoints.isNotEmpty)
+                      PolylineLayer(polylines: [
+                        Polyline(
+                            points: _measurePoints,
+                            color: Colors.redAccent,
+                            strokeWidth: 4.0)
+                      ]),
+                    if (_isMeasuring && _measurePoints.isNotEmpty)
+                      FiniteMarkerLayer(
+                          markers: _measurePoints
+                              .map((p) => Marker(
+                                  width: 14,
+                                  height: 14,
+                                  point: p,
+                                  child: Container(
+                                      decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: Colors.white,
+                                          border: Border.all(
+                                              color: Colors.redAccent,
+                                              width: 2)))))
+                              .toList()),
+                  ],
+                ),
               ),
-            ),
-          ),
-          if (hasSel)
-            ListenableBuilder(
-                listenable: LanguageController.instance,
-                builder: (ctx, _) {
-                  final media = MediaQuery.of(ctx);
-                  final isPortrait = media.orientation == Orientation.portrait;
-                  final panelHeight =
-                      (media.size.height * (isPortrait ? 0.28 : 0.49))
-                          .clamp(
-                            isPortrait ? 210.0 : 190.0,
-                            isPortrait ? 240.0 : 220.0,
-                          )
-                          .toDouble();
-                  return Align(
-                      alignment: Alignment.bottomCenter,
-                      child: SizedBox(
-                          width: MediaQuery.of(ctx).size.width * 0.92,
-                          height: panelHeight,
-                          child: SpotDetailsPanel(
-                              spot: _selectedSpot!,
-                              distanceText: _distanceText(_selectedSpot!),
-                              isPremium: _isPremium,
-                              onClose: _clearSelection,
-                              onPremiumTap: () {},
-                              currentPosition: _currentPosition != null
-                                  ? LatLng(_currentPosition!.latitude,
-                                      _currentPosition!.longitude)
-                                  : null,
-                              allSpots: _spots,
-                              onSpotSelected: _selectSpot)));
-                }),
-          ListenableBuilder(
-              listenable: LanguageController.instance,
-              builder: (ctx, _) {
-                return Consumer<FishProvider>(builder: (ctx, fp, __) {
-                  if (!fp.isFishModalVisible || fp.selectedFish == null) {
-                    return const SizedBox.shrink();
-                  }
-                  return Positioned.fill(
-                      child: GestureDetector(
-                          onTap: fp.closeFishModal,
-                          child: Container(
-                              color: Colors.black.withValues(alpha: 0.45),
-                              child: Center(
-                                  child: TweenAnimationBuilder<double>(
-                                      duration:
-                                          const Duration(milliseconds: 350),
-                                      curve: Curves.easeOutBack,
-                                      tween: Tween(begin: 0.0, end: 1.0),
-                                      builder: (ctx, v, c) => Opacity(
-                                          opacity: v.clamp(0.0, 1.0),
-                                          child: Transform.scale(
-                                              scale: 0.8 + 0.2 * v, child: c)),
-                                      child: GestureDetector(
-                                          onTap: () {},
-                                          child: RepaintBoundary(
-                                              child: FishIntelligenceModal(
-                                                  fish: fp.selectedFish!,
-                                                  nearbySpots: fp.nearbySpots,
-                                                  isLoadingNearby:
-                                                      fp.isLoadingNearby,
-                                                  distanceText: _distanceText,
-                                                  onSpotSelected: (s) {
-                                                    fp.closeFishModal();
-                                                    _selectSpot(s);
-                                                  },
-                                                  onClose: fp.closeFishModal,
-                                                  currentPosition:
-                                                      _currentPosition))))))));
-                });
-              }),
-        ]));
+              if (_isAddingSpot) _buildAddSpotModeBanner(),
+              if (_isLoadingSpots) const SizedBox.shrink(),
+              Positioned(
+                  bottom: 96 + 16 + 8 + mediaPadding.bottom,
+                  left: mediaPadding.left,
+                  right: mediaPadding.right,
+                  child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Consumer<FishProvider>(builder: (ctx, fp, _) {
+                        if (fp.isFishModalVisible) {
+                          return const SizedBox.shrink();
+                        }
+                        if (!_isFishBarVisible) {
+                          return const SizedBox.shrink();
+                        }
+                        final df = fp.allFish;
+                        if (df.isEmpty) return const SizedBox.shrink();
+                        return _FishVerticalMenu(
+                            fishes: df,
+                            selectedFish: fp.selectedFish,
+                            onFishSelected: (f) {
+                              if (_isFishBarVisible) {
+                                setState(() => _isFishBarVisible = false);
+                              }
+                              unawaited(fp.selectFish(
+                                f,
+                                _spots,
+                                _currentPosition,
+                              ));
+                            },
+                            onFishDeselected: fp.deselectFish);
+                      }))),
+              Positioned(
+                  bottom: 16 + mediaPadding.bottom,
+                  left: 16 + mediaPadding.left,
+                  width: _mapBottomControlHeight,
+                  height: _mapBottomControlHeight,
+                  child: Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: _buildFishFilterButton())),
+              if (!hasSel && _selectedUserSpot == null)
+                ListenableBuilder(
+                    listenable: LanguageController.instance,
+                    builder: (ctx, _) {
+                      final keyboardInset = MediaQuery.viewInsetsOf(ctx).bottom;
+                      return Positioned(
+                          bottom: 16 + keyboardInset + mediaPadding.bottom,
+                          left: 16 + mediaPadding.left,
+                          right: 16 + mediaPadding.right,
+                          child: Center(
+                              child: SizedBox(
+                                  width: MediaQuery.sizeOf(ctx).width * 0.45,
+                                  child: RepaintBoundary(
+                                    child: _SearchBar(
+                                        controller: _searchController,
+                                        cityResults: _citySearchResults,
+                                        spotResults: _spotSearchResults,
+                                        selectedCity: _selectedSearchCity,
+                                        onTap: () {
+                                          if (_isFishBarVisible) {
+                                            setState(() =>
+                                                _isFishBarVisible = false);
+                                          }
+                                        },
+                                        onChanged: (q) => setState(() {
+                                              _searchQuery = q;
+                                              _resetCitySearch();
+                                              _selectedSpot = null;
+                                              _selectedUserSpot = null;
+                                              _isFishBarVisible = false;
+                                            }),
+                                        onClear: () {
+                                          _searchController.clear();
+                                          setState(() {
+                                            _searchQuery = '';
+                                            _resetCitySearch();
+                                            _selectedSpot = null;
+                                            _selectedUserSpot = null;
+                                          });
+                                          FocusScope.of(context).unfocus();
+                                        },
+                                        onSelectCity: (city) =>
+                                            unawaited(_selectCity(city)),
+                                        onSelectSpot: (spot) =>
+                                            unawaited(_selectSpot(spot)),
+                                        distanceText: _searchDistanceText,
+                                        measurementText: _isMeasuring
+                                            ? _formattedMeasuredDistance
+                                            : null,
+                                        onStopMeasurement: _stopMeasuring),
+                                  ))));
+                    }),
+              if (_showToolsPanel) _buildToolsPanel(),
+              if (_isCompassEnabled)
+                Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: _CompassRibbon(
+                        magneticHeading: _magneticHeading,
+                        gpsCourseOverGround: _gpsCourseOverGround)),
+              Positioned(
+                top: mediaPadding.top + (isLandscape ? 12 : 80),
+                right: 16 + mediaPadding.right,
+                bottom: isLandscape ? null : 100,
+                child: SingleChildScrollView(
+                  scrollDirection:
+                      isLandscape ? Axis.horizontal : Axis.vertical,
+                  child: _buildPrimaryMapControls(
+                    isLandscape ? Axis.horizontal : Axis.vertical,
+                  ),
+                ),
+              ),
+              if (hasSel)
+                ListenableBuilder(
+                    listenable: LanguageController.instance,
+                    builder: (ctx, _) {
+                      final media = MediaQuery.of(ctx);
+                      final isPortrait =
+                          media.orientation == Orientation.portrait;
+                      final panelHeight =
+                          (media.size.height * (isPortrait ? 0.28 : 0.49))
+                              .clamp(
+                                isPortrait ? 210.0 : 190.0,
+                                isPortrait ? 240.0 : 220.0,
+                              )
+                              .toDouble();
+                      return Align(
+                          alignment: Alignment.bottomCenter,
+                          child: SizedBox(
+                              width: MediaQuery.of(ctx).size.width * 0.92,
+                              height: panelHeight,
+                              child: SpotDetailsPanel(
+                                  spot: _selectedSpot!,
+                                  distanceText: _distanceText(_selectedSpot!),
+                                  isPremium: _isPremium,
+                                  onClose: _clearSelection,
+                                  onPremiumTap: () {},
+                                  currentPosition: _currentPosition != null
+                                      ? LatLng(_currentPosition!.latitude,
+                                          _currentPosition!.longitude)
+                                      : null,
+                                  allSpots: _spots,
+                                  onSpotSelected: _selectSpot)));
+                    }),
+              ListenableBuilder(
+                  listenable: LanguageController.instance,
+                  builder: (ctx, _) {
+                    return Consumer<FishProvider>(builder: (ctx, fp, __) {
+                      if (!fp.isFishModalVisible || fp.selectedFish == null) {
+                        return const SizedBox.shrink();
+                      }
+                      return Positioned.fill(
+                          child: GestureDetector(
+                              onTap: fp.closeFishModal,
+                              child: Container(
+                                  color: Colors.black.withValues(alpha: 0.45),
+                                  child: Center(
+                                      child: TweenAnimationBuilder<double>(
+                                          duration:
+                                              const Duration(milliseconds: 350),
+                                          curve: Curves.easeOutBack,
+                                          tween: Tween(begin: 0.0, end: 1.0),
+                                          builder: (ctx, v, c) => Opacity(
+                                              opacity: v.clamp(0.0, 1.0),
+                                              child: Transform.scale(
+                                                  scale: 0.8 + 0.2 * v,
+                                                  child: c)),
+                                          child: GestureDetector(
+                                              onTap: () {},
+                                              child: RepaintBoundary(
+                                                  child: FishIntelligenceModal(
+                                                      fish: fp.selectedFish!,
+                                                      nearbySpots:
+                                                          fp.nearbySpots,
+                                                      isLoadingNearby:
+                                                          fp.isLoadingNearby,
+                                                      distanceText:
+                                                          _distanceText,
+                                                      onSpotSelected: (s) {
+                                                        fp.closeFishModal();
+                                                        _selectSpot(s);
+                                                      },
+                                                      onClose:
+                                                          fp.closeFishModal,
+                                                      currentPosition:
+                                                          _currentPosition))))))));
+                    });
+                  }),
+            ]));
       },
     );
   }
