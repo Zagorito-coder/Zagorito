@@ -11,6 +11,8 @@ import 'astronomy_service.dart';
 class TideConditionsMapper {
   const TideConditionsMapper._();
 
+  static const int _maximumDetailedForecastDays = 8;
+
   static TideData fromDocument(
     Map<String, dynamic> data, {
     required String fallbackLocation,
@@ -579,7 +581,10 @@ class TideConditionsMapper {
     final result = <HourlyForecastPoint>[];
     for (final point in parsed) {
       final key = '${point.time.year}-${point.time.month}-${point.time.day}';
-      if (!acceptedDays.contains(key) && acceptedDays.length >= 10) break;
+      if (!acceptedDays.contains(key) &&
+          acceptedDays.length >= _maximumDetailedForecastDays) {
+        break;
+      }
       acceptedDays.add(key);
       result.add(point);
     }

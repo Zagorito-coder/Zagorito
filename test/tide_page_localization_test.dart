@@ -121,7 +121,7 @@ void main() {
     );
   });
 
-  test('le modèle 10 jours reste vertical et ne construit que le jour ouvert',
+  test('le modèle 8 jours reste vertical et ne construit que le jour ouvert',
       () {
     final tideSource = File('lib/pages/tide_page.dart').readAsStringSync();
     final sectionStart =

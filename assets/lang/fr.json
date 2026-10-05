@@ -411,7 +411,7 @@
     "lowTideLabel": "Basse Mer",
     "hourlyActivity": "Activité par heure",
     "swipeToExplore": "Glissez pour explorer",
-    "tenDayForecast": "Prévisions 10 jours",
+    "tenDayForecast": "Prévisions 8 jours",
     "viewSelector": "Choisir la vue des marées",
     "todayTides": "Marées aujourd’hui",
     "forecasts": "Prévisions",
@@ -461,7 +461,7 @@
       "december": "Décembre"
     },
     "availableDayForecast": "Prévisions {count} jours",
-    "hourlyForecastUnavailable": "Les prévisions détaillées sur 10 jours seront disponibles après la prochaine synchronisation.",
+    "hourlyForecastUnavailable": "Les prévisions marines détaillées sur 8 jours seront disponibles après la prochaine synchronisation.",
     "forecastDaySemantics": "Afficher les prévisions du {day}",
     "activityScoreCompact": "Activité {score}%",
     "maxWindCompact": "max {speed}",

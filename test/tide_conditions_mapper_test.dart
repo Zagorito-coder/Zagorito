@@ -157,7 +157,7 @@ void main() {
     expect(result.hourlyPoints.first.oceanCurrentDirectionDeg, isNull);
   });
 
-  test('limite la prévision détaillée aux dix premiers jours', () {
+  test('limite la prévision détaillée aux huit jours marins disponibles', () {
     final document = _conditionsDocument(
       tideHeights: const [0.1, 0.4, 0.2],
       waveHeights: const [1.1, 1.2, 1.3],
@@ -179,9 +179,9 @@ void main() {
       now: DateTime(2026, 7, 26, 1),
     );
 
-    expect(result.hourlyForecast, hasLength(10));
+    expect(result.hourlyForecast, hasLength(8));
     expect(result.hourlyForecast.first.time.day, 26);
-    expect(result.hourlyForecast.last.time, DateTime(2026, 8, 4));
+    expect(result.hourlyForecast.last.time, DateTime(2026, 8, 2));
   });
 }
 

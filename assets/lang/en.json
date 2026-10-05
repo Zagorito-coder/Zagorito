@@ -411,7 +411,7 @@
     "lowTideLabel": "Low Tide",
     "hourlyActivity": "Hourly Activity",
     "swipeToExplore": "Swipe to explore",
-    "tenDayForecast": "10-day forecast",
+    "tenDayForecast": "8-day forecast",
     "viewSelector": "Choose the tide view",
     "todayTides": "Today’s tides",
     "forecasts": "Forecasts",
@@ -461,7 +461,7 @@
       "december": "December"
     },
     "availableDayForecast": "{count}-day forecast",
-    "hourlyForecastUnavailable": "Detailed 10-day forecasts will appear after the next synchronization.",
+    "hourlyForecastUnavailable": "Detailed 8-day marine forecasts will appear after the next synchronization.",
     "forecastDaySemantics": "Show forecasts for {day}",
     "activityScoreCompact": "Activity {score}%",
     "maxWindCompact": "max {speed}",

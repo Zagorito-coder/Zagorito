@@ -411,7 +411,7 @@
     "lowTideLabel": "Bajamar",
     "hourlyActivity": "Actividad por hora",
     "swipeToExplore": "Deslice para explorar",
-    "tenDayForecast": "Previsión de 10 días",
+    "tenDayForecast": "Previsión de 8 días",
     "viewSelector": "Elegir la vista de mareas",
     "todayTides": "Mareas de hoy",
     "forecasts": "Previsiones",
@@ -461,7 +461,7 @@
       "december": "Diciembre"
     },
     "availableDayForecast": "Previsión de {count} días",
-    "hourlyForecastUnavailable": "Las previsiones detalladas de 10 días aparecerán tras la próxima sincronización.",
+    "hourlyForecastUnavailable": "Las previsiones marinas detalladas de 8 días aparecerán tras la próxima sincronización.",
     "forecastDaySemantics": "Mostrar previsiones del {day}",
     "activityScoreCompact": "Actividad {score}%",
     "maxWindCompact": "máx. {speed}",

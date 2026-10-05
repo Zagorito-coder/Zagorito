@@ -384,7 +384,7 @@ List<tm.HourlyForecastDay> _groupHourlyForecast(
   }
 
   // Rétrocompatibilité pendant le premier cycle de publication du résumé
-  // 10 jours : les données du jour déjà chargées restent toujours visibles.
+  // marin : les données du jour déjà chargées restent toujours visibles.
   if (!grouped.containsKey(todayDate) && todayCards.isNotEmpty) {
     grouped[todayDate] = todayCards
         .where((card) => card.hour % 3 == 0)
@@ -411,7 +411,9 @@ List<tm.HourlyForecastDay> _groupHourlyForecast(
   }
 
   final days = grouped.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
-  return days.take(10).map((entry) {
+  // L'API Marine garantit au maximum huit jours. La page n'affiche que cette
+  // fenêtre complète afin de ne laisser aucun jour avec une marée manquante.
+  return days.take(8).map((entry) {
     final slots = entry.value..sort((a, b) => a.time.compareTo(b.time));
     return tm.HourlyForecastDay(
       date: entry.key,

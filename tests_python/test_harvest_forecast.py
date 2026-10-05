@@ -577,7 +577,7 @@ class ProductionWriteAndVerificationTests(unittest.TestCase):
             self.spot,
             wind,
             wave,
-            days,
+            days[:harvest_forecast.CONDITIONS_FORECAST_DAYS],
             forecast_run_id=self.run_id,
             last_update=self.updated,
         )
@@ -588,7 +588,7 @@ class ProductionWriteAndVerificationTests(unittest.TestCase):
             ("conditions", "test_condition"): conditions,
         }
 
-    def test_station_publication_keeps_exactly_ten_validated_days(self):
+    def test_station_publication_keeps_ten_weather_and_eight_tide_days(self):
         wind, wave = _complete_hourly_api_payloads(self.spot)
         station_result = {
             "spot": self.spot,
@@ -612,11 +612,11 @@ class ProductionWriteAndVerificationTests(unittest.TestCase):
 
         self.assertEqual(10, len(publication["weather_doc"]["days"]))
         self.assertEqual(
-            240,
+            192,
             len(publication["conditions_doc"]["tide"]["hourly"]),
         )
         self.assertEqual(
-            240,
+            192,
             len(publication["conditions_doc"]["weather"]["hourly"]),
         )
 
@@ -946,7 +946,7 @@ class ConditionsGfsSummaryTests(unittest.TestCase):
         self.assertEqual("run-1", result["forecast_run_id"])
         self.assertEqual("casablanca_maroc", result["spot_id"])
         self.assertEqual(update_time, result["last_update"])
-        self.assertEqual(10, len(result["hourly"]))
+        self.assertEqual(8, len(result["hourly"]))
         first = result["hourly"][0]
         self.assertEqual("2026-08-01T00:00", first["time"])
         self.assertEqual(23.2, first["windSpeedKmh"])

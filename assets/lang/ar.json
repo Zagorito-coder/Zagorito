@@ -411,7 +411,7 @@
     "lowTideLabel": "جزر منخفض",
     "hourlyActivity": "النشاط حسب الساعة",
     "swipeToExplore": "اسحب للاستكشاف",
-    "tenDayForecast": "توقعات 10 أيام",
+    "tenDayForecast": "توقعات 8 أيام",
     "viewSelector": "اختر عرض المد والجزر",
     "todayTides": "مد وجزر اليوم",
     "forecasts": "التوقعات",
@@ -461,7 +461,7 @@
       "december": "ديسمبر"
     },
     "availableDayForecast": "توقعات {count} أيام",
-    "hourlyForecastUnavailable": "ستظهر توقعات الأيام العشرة المفصلة بعد المزامنة التالية.",
+    "hourlyForecastUnavailable": "ستظهر التوقعات البحرية المفصلة لثمانية أيام بعد المزامنة التالية.",
     "forecastDaySemantics": "عرض توقعات {day}",
     "activityScoreCompact": "النشاط {score}%",
     "maxWindCompact": "الأقصى {speed}",

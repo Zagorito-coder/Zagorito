@@ -270,7 +270,11 @@ LEGACY_CONDITIONS_ALIASES = {
     "tanger_maroc": "tanger",
     "essaouira_maroc": "essaouira",
 }
-CONDITIONS_GFS_DAYS = 10
+# La météo générale reste publiée sur dix jours. L'API Marine documente en
+# revanche un maximum de huit jours : la page Marées se limite donc à cette
+# fenêtre complète au lieu de fabriquer ou d'afficher des niveaux manquants.
+PUBLISHED_FORECAST_DAYS = 10
+CONDITIONS_FORECAST_DAYS = 8
 EXPECTED_SLOTS_PER_DAY = 24 // STEP_HOURS
 FRESHNESS_CLOCK_SKEW = timedelta(minutes=5)
 
@@ -775,7 +779,7 @@ def build_days_payload(wind_json, hires_json, wave_json, daily_json):
 def validate_payload(
     days_payload,
     utc_offset_seconds=0,
-    required_days=CONDITIONS_GFS_DAYS,
+    required_days=PUBLISHED_FORECAST_DAYS,
 ):
     """Valide la structure servie par l'application avant toute écriture.
 
@@ -907,7 +911,7 @@ def validate_payload(
 
 def build_conditions_gfs_summary(
     days_payload,
-    max_days=CONDITIONS_GFS_DAYS,
+    max_days=CONDITIONS_FORECAST_DAYS,
     *,
     forecast_run_id=None,
     spot_id=None,
@@ -1071,10 +1075,15 @@ def _validated_number(hourly, api_key, index, minimum, maximum, label):
     return value
 
 
-def _validate_hourly_continuity(slots, label):
-    if len(slots) < 24 * 9:
+def _validate_hourly_continuity(
+    slots,
+    label,
+    expected_hours=CONDITIONS_FORECAST_DAYS * 24,
+):
+    if len(slots) != expected_hours:
         raise ValueError(
-            f"{label} : couverture insuffisante ({len(slots)} créneaux)."
+            f"{label} : couverture incorrecte ({len(slots)}/{expected_hours} "
+            "créneaux)."
         )
     parsed = []
     for slot in slots:
@@ -1106,6 +1115,11 @@ def build_conditions_document(
     absente fait échouer le run avant écriture, ce qui conserve dans Firestore
     le dernier document complet au lieu de publier un faux zéro.
     """
+    if len(published_days) != CONDITIONS_FORECAST_DAYS:
+        raise ValueError(
+            f"conditions/{spot['id']} : {len(published_days)} jour(s), "
+            f"{CONDITIONS_FORECAST_DAYS} requis."
+        )
     published_dates = {day["date"] for day in published_days}
     wave_hourly = wave_json.get("hourly") or {}
     wind_hourly = wind_json.get("hourly") or {}
@@ -1277,11 +1291,10 @@ def _build_station_publication(
     )
     validate_payload(days_payload, utc_offset_seconds)
 
-    # L'interface publie explicitement dix jours. Limiter le document à cette
-    # fenêtre maintient aussi la publication totale de 434 écritures nettement sous
-    # la limite Firestore de 10 Mio, contrairement aux quinze jours bruts
-    # demandés à Open-Meteo (utiles comme marge de collecte/validation).
-    published_days = days_payload[:CONDITIONS_GFS_DAYS]
+    # La météo générale conserve dix jours. Les conditions de la page Marées
+    # utilisent les huit jours entièrement couverts par l'API Marine.
+    published_days = days_payload[:PUBLISHED_FORECAST_DAYS]
+    conditions_days = published_days[:CONDITIONS_FORECAST_DAYS]
 
     weather_doc = {
         "forecast_run_id": run_id,
@@ -1307,7 +1320,7 @@ def _build_station_publication(
             spot,
             wind_json,
             wave_json,
-            published_days,
+            conditions_days,
             forecast_run_id=run_id,
             last_update=firestore.SERVER_TIMESTAMP,
         )
@@ -1743,7 +1756,7 @@ def verify_production_state(
             validate_payload(
                 weather.get("days"),
                 int(utc_offset_seconds),
-                CONDITIONS_GFS_DAYS,
+                PUBLISHED_FORECAST_DAYS,
             )
         except (TypeError, ValueError) as error:
             raise RuntimeError(
@@ -1769,7 +1782,7 @@ def verify_production_state(
 
         expected_summary = build_conditions_gfs_summary(
             weather["days"],
-            CONDITIONS_GFS_DAYS,
+            CONDITIONS_FORECAST_DAYS,
         )
         for conditions_id in condition_document_ids:
             conditions_label = f"conditions/{conditions_id}"
@@ -1816,11 +1829,12 @@ def verify_production_state(
                     f"{conditions_label}.gfs."
                 )
             if len(expected_summary["hourly"]) != (
-                CONDITIONS_GFS_DAYS * EXPECTED_SLOTS_PER_DAY
+                CONDITIONS_FORECAST_DAYS * EXPECTED_SLOTS_PER_DAY
             ):
                 raise RuntimeError(
                     f"Vérification Production : {conditions_label} ne contient pas "
-                    "les 80 créneaux attendus."
+                    f"les {CONDITIONS_FORECAST_DAYS * EXPECTED_SLOTS_PER_DAY} "
+                    "créneaux attendus."
                 )
             verified_condition_documents.add(conditions_id)
         verified_conditions.add(spot["id"])
