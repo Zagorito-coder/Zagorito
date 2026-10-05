@@ -64,8 +64,8 @@ FORECAST_RUN_ID = (os.environ.get("FORECAST_RUN_ID") or "").strip() or None
 
 # Les documents météo et conditions contiennent dix jours de données. Firestore
 # refuse tout Commit supérieur à 10 Mio. Une limite fixe de vingt stations garde
-# chaque requête loin de ce plafond même lorsque les trois documents de chacune
-# des 143 stations sont écrits ensemble.
+# chaque requête loin de ce plafond même lorsque les documents des 143 stations
+# et les cinq alias de transition sont écrits ensemble.
 PUBLISH_BATCH_STATION_COUNT = 20
 EXPECTED_STATION_COUNT = 143
 
@@ -259,9 +259,31 @@ _HTTP_LOCAL = threading.local()
 # client Flutter : aucune ville ne peut ainsi recevoir silencieusement les
 # données d'une autre station.
 CONDITIONS_SPOT_IDS = {spot["id"]: spot["id"] for spot in SPOTS}
+# Compatibilité temporaire avec BoosterFish 1.0.9 (24), qui lit encore ces
+# cinq identifiants courts. Ces alias reçoivent exactement le même document que
+# leur station canonique, sans nouvel appel Open-Meteo. Ils pourront être
+# retirés seulement après la fin du test fermé et l'adoption de la version 25.
+LEGACY_CONDITIONS_ALIASES = {
+    "casablanca_maroc": "casablanca",
+    "rabat_maroc": "rabat",
+    "agadir_maroc": "agadir",
+    "tanger_maroc": "tanger",
+    "essaouira_maroc": "essaouira",
+}
 CONDITIONS_GFS_DAYS = 10
 EXPECTED_SLOTS_PER_DAY = 24 // STEP_HOURS
 FRESHNESS_CLOCK_SKEW = timedelta(minutes=5)
+
+
+def _effective_conditions_aliases(conditions_spot_ids, aliases):
+    """N'active les alias historiques que pour la configuration Production."""
+    if aliases is not None:
+        return aliases
+    return (
+        LEGACY_CONDITIONS_ALIASES
+        if conditions_spot_ids is CONDITIONS_SPOT_IDS
+        else {}
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1256,7 +1278,7 @@ def _build_station_publication(
     validate_payload(days_payload, utc_offset_seconds)
 
     # L'interface publie explicitement dix jours. Limiter le document à cette
-    # fenêtre maintient aussi la publication totale de 429 écritures nettement sous
+    # fenêtre maintient aussi la publication totale de 434 écritures nettement sous
     # la limite Firestore de 10 Mio, contrairement aux quinze jours bruts
     # demandés à Open-Meteo (utiles comme marge de collecte/validation).
     published_days = days_payload[:CONDITIONS_GFS_DAYS]
@@ -1363,11 +1385,12 @@ def _write_forecast_batches(
     run_id,
     *,
     conditions_spot_ids=CONDITIONS_SPOT_IDS,
+    conditions_aliases=None,
 ):
     """Publie des lots atomiques bornés après validation du run complet.
 
-    Les trois documents d'une station (météo, index et conditions) restent
-    toujours dans le même WriteBatch. Si un Commit échoue,
+    Les documents d'une station (météo, index, conditions canonique et éventuel
+    alias historique) restent toujours dans le même WriteBatch. Si un Commit échoue,
     les stations déjà publiées restent cohérentes et les autres conservent leur
     dernière version valide ; l'exception interrompt immédiatement le job.
     """
@@ -1377,7 +1400,27 @@ def _write_forecast_batches(
         conditions_spot_ids,
     )
 
-    expected_write_count = len(publications) * 2 + len(conditions_spot_ids)
+    conditions_aliases = _effective_conditions_aliases(
+        conditions_spot_ids,
+        conditions_aliases,
+    )
+    unknown_alias_sources = set(conditions_aliases) - set(conditions_spot_ids)
+    if unknown_alias_sources:
+        raise ValueError(
+            "Alias conditions sans station canonique : "
+            + ", ".join(sorted(unknown_alias_sources))
+        )
+    document_ids = list(conditions_spot_ids.values()) + list(
+        conditions_aliases.values()
+    )
+    if len(document_ids) != len(set(document_ids)):
+        raise ValueError("Identifiants de documents conditions dupliqués.")
+
+    expected_write_count = (
+        len(publications) * 2
+        + len(conditions_spot_ids)
+        + len(conditions_aliases)
+    )
     write_count = 0
     commit_count = 0
     for start in range(0, len(publications), PUBLISH_BATCH_STATION_COUNT):
@@ -1419,7 +1462,18 @@ def _write_forecast_batches(
                 write_count += 1
                 batch_write_count += 1
 
-        if batch_write_count > PUBLISH_BATCH_STATION_COUNT * 3:
+                alias_id = conditions_aliases.get(spot_id)
+                if alias_id is not None:
+                    alias_ref = db.collection("conditions").document(alias_id)
+                    batch.set(alias_ref, publication["conditions_doc"])
+                    write_count += 1
+                    batch_write_count += 1
+
+        maximum_batch_writes = (
+            PUBLISH_BATCH_STATION_COUNT * 3
+            + len(conditions_aliases)
+        )
+        if batch_write_count > maximum_batch_writes:
             raise RuntimeError(
                 f"Sous-lot Firestore inattendu : {batch_write_count} écritures."
             )
@@ -1444,6 +1498,7 @@ def _prepare_and_publish_forecasts(
     *,
     expected_spot_count,
     conditions_spot_ids=CONDITIONS_SPOT_IDS,
+    conditions_aliases=None,
 ):
     """Valide toutes les stations, puis seulement ensuite publie le lot."""
     publications = []
@@ -1470,6 +1525,7 @@ def _prepare_and_publish_forecasts(
         publications,
         run_id,
         conditions_spot_ids=conditions_spot_ids,
+        conditions_aliases=conditions_aliases,
     )
     return publications, write_count, commit_count
 
@@ -1620,6 +1676,7 @@ def verify_production_state(
     run_started_at,
     *,
     conditions_spot_ids=CONDITIONS_SPOT_IDS,
+    conditions_aliases=None,
     now=None,
 ):
     """Relit et valide chaque document publié par le run courant.
@@ -1631,6 +1688,10 @@ def verify_production_state(
     run_started_at = _utc_datetime(run_started_at, "début du run")
     now = _utc_datetime(now or datetime.now(timezone.utc), "fin du run")
 
+    conditions_aliases = _effective_conditions_aliases(
+        conditions_spot_ids,
+        conditions_aliases,
+    )
     catalog_ids = {spot["id"] for spot in spots}
     missing_conditions = set(conditions_spot_ids) - catalog_ids
     if missing_conditions:
@@ -1638,8 +1699,25 @@ def verify_production_state(
             "Vérification Production : spot(s) conditions absent(s) du catalogue : "
             + ", ".join(sorted(missing_conditions))
         )
+    missing_alias_sources = set(conditions_aliases) - set(conditions_spot_ids)
+    if missing_alias_sources:
+        raise RuntimeError(
+            "Vérification Production : alias sans document canonique : "
+            + ", ".join(sorted(missing_alias_sources))
+        )
+
+    expected_condition_document_ids = set(conditions_spot_ids.values()) | set(
+        conditions_aliases.values()
+    )
+    if len(expected_condition_document_ids) != (
+        len(conditions_spot_ids) + len(conditions_aliases)
+    ):
+        raise RuntimeError(
+            "Vérification Production : identifiants conditions dupliqués."
+        )
 
     verified_conditions = set()
+    verified_condition_documents = set()
     for spot in spots:
         weather_label = f"spots_meteo/{spot['id']}"
         weather = _snapshot_data(
@@ -1681,65 +1759,86 @@ def verify_production_state(
         _verify_spot_identity(index_data, spot, run_id, "name", index_label)
         _verify_freshness(index_data, index_label, run_started_at, now)
 
-        conditions_id = conditions_spot_ids.get(spot["id"])
-        if conditions_id is None:
+        canonical_conditions_id = conditions_spot_ids.get(spot["id"])
+        if canonical_conditions_id is None:
             continue
-        conditions_label = f"conditions/{conditions_id}"
-        conditions_doc = _snapshot_data(
-            db.collection("conditions").document(conditions_id).get(),
-            conditions_label,
-        )
-        _verify_conditions_payload(
-            conditions_doc,
-            spot,
-            run_id,
-            conditions_label,
-            run_started_at,
-            now,
-        )
-        gfs = conditions_doc.get("gfs")
-        if not isinstance(gfs, dict):
-            raise RuntimeError(
-                f"Vérification Production : {conditions_label}.gfs est absent ou invalide."
-            )
-        if gfs.get("forecast_run_id") != run_id or gfs.get("spot_id") != spot["id"]:
-            raise RuntimeError(
-                f"Vérification Production : métadonnées incorrectes dans "
-                f"{conditions_label}.gfs."
-            )
-        _verify_freshness(gfs, f"{conditions_label}.gfs", run_started_at, now)
+        condition_document_ids = [canonical_conditions_id]
+        alias_id = conditions_aliases.get(spot["id"])
+        if alias_id is not None:
+            condition_document_ids.append(alias_id)
 
         expected_summary = build_conditions_gfs_summary(
             weather["days"],
             CONDITIONS_GFS_DAYS,
         )
-        if gfs.get("model") != expected_summary["model"]:
-            raise RuntimeError(
-                f"Vérification Production : modèle incorrect dans {conditions_label}."
+        for conditions_id in condition_document_ids:
+            conditions_label = f"conditions/{conditions_id}"
+            conditions_doc = _snapshot_data(
+                db.collection("conditions").document(conditions_id).get(),
+                conditions_label,
             )
-        if gfs.get("hourly") != expected_summary["hourly"]:
-            raise RuntimeError(
-                f"Vérification Production : résumé horaire incohérent dans "
-                f"{conditions_label}.gfs."
+            _verify_conditions_payload(
+                conditions_doc,
+                spot,
+                run_id,
+                conditions_label,
+                run_started_at,
+                now,
             )
-        if len(expected_summary["hourly"]) != (
-            CONDITIONS_GFS_DAYS * EXPECTED_SLOTS_PER_DAY
-        ):
-            raise RuntimeError(
-                f"Vérification Production : {conditions_label} ne contient pas "
-                "les 80 créneaux attendus."
+            gfs = conditions_doc.get("gfs")
+            if not isinstance(gfs, dict):
+                raise RuntimeError(
+                    f"Vérification Production : {conditions_label}.gfs est absent "
+                    "ou invalide."
+                )
+            if (
+                gfs.get("forecast_run_id") != run_id
+                or gfs.get("spot_id") != spot["id"]
+            ):
+                raise RuntimeError(
+                    f"Vérification Production : métadonnées incorrectes dans "
+                    f"{conditions_label}.gfs."
+                )
+            _verify_freshness(
+                gfs,
+                f"{conditions_label}.gfs",
+                run_started_at,
+                now,
             )
+            if gfs.get("model") != expected_summary["model"]:
+                raise RuntimeError(
+                    f"Vérification Production : modèle incorrect dans "
+                    f"{conditions_label}."
+                )
+            if gfs.get("hourly") != expected_summary["hourly"]:
+                raise RuntimeError(
+                    f"Vérification Production : résumé horaire incohérent dans "
+                    f"{conditions_label}.gfs."
+                )
+            if len(expected_summary["hourly"]) != (
+                CONDITIONS_GFS_DAYS * EXPECTED_SLOTS_PER_DAY
+            ):
+                raise RuntimeError(
+                    f"Vérification Production : {conditions_label} ne contient pas "
+                    "les 80 créneaux attendus."
+                )
+            verified_condition_documents.add(conditions_id)
         verified_conditions.add(spot["id"])
 
     if verified_conditions != set(conditions_spot_ids):
         raise RuntimeError(
             "Vérification Production : tous les résumés conditions n'ont pas été relus."
         )
+    if verified_condition_documents != expected_condition_document_ids:
+        raise RuntimeError(
+            "Vérification Production : tous les documents conditions et leurs "
+            "alias n'ont pas été relus."
+        )
 
     print(
         "Vérification Production OK : "
         f"{len(spots)} météo + {len(spots)} index + "
-        f"{len(verified_conditions)} conditions, run={run_id}."
+        f"{len(verified_condition_documents)} conditions, run={run_id}."
     )
 
 
@@ -1871,10 +1970,29 @@ def main():
     if (
         len(CONDITIONS_SPOT_IDS) != EXPECTED_STATION_COUNT
         or set(CONDITIONS_SPOT_IDS) != {spot["id"] for spot in SPOTS}
+        or any(
+            source_id != document_id
+            for source_id, document_id in CONDITIONS_SPOT_IDS.items()
+        )
     ):
         raise SystemExit(
             "Configuration conditions inattendue : chaque station du catalogue "
             "doit posséder son propre document."
+        )
+    if (
+        set(LEGACY_CONDITIONS_ALIASES)
+        != {
+            "casablanca_maroc",
+            "rabat_maroc",
+            "agadir_maroc",
+            "tanger_maroc",
+            "essaouira_maroc",
+        }
+        or set(LEGACY_CONDITIONS_ALIASES.values())
+        & set(CONDITIONS_SPOT_IDS.values())
+    ):
+        raise SystemExit(
+            "Configuration des alias historiques conditions inattendue."
         )
 
     start_time = time.time()
@@ -1909,7 +2027,11 @@ def main():
         raise RuntimeError(
             f"Récolte incomplète : {success}/{len(SPOTS)} stations écrites."
         )
-    expected_write_count = len(SPOTS) * 2 + len(CONDITIONS_SPOT_IDS)
+    expected_write_count = (
+        len(SPOTS) * 2
+        + len(CONDITIONS_SPOT_IDS)
+        + len(LEGACY_CONDITIONS_ALIASES)
+    )
     if write_count != expected_write_count:
         raise RuntimeError(
             "Publication incomplète : "

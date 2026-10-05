@@ -385,6 +385,26 @@ class SpotCatalogTests(unittest.TestCase):
             )
         )
 
+    def test_legacy_conditions_aliases_keep_release_24_compatible(self):
+        self.assertEqual(
+            {
+                "casablanca_maroc": "casablanca",
+                "rabat_maroc": "rabat",
+                "agadir_maroc": "agadir",
+                "tanger_maroc": "tanger",
+                "essaouira_maroc": "essaouira",
+            },
+            harvest_forecast.LEGACY_CONDITIONS_ALIASES,
+        )
+        self.assertTrue(
+            set(harvest_forecast.LEGACY_CONDITIONS_ALIASES)
+            <= set(harvest_forecast.CONDITIONS_SPOT_IDS)
+        )
+        self.assertFalse(
+            set(harvest_forecast.LEGACY_CONDITIONS_ALIASES.values())
+            & set(harvest_forecast.CONDITIONS_SPOT_IDS.values())
+        )
+
     def test_known_inland_cells_keep_their_validated_coastal_coordinates(self):
         by_id = {spot["id"]: spot for spot in harvest_forecast.SPOTS}
         expected = {
@@ -662,6 +682,48 @@ class ProductionWriteAndVerificationTests(unittest.TestCase):
         self.assertEqual(123, sum(op[0][0] == "spots_index" for op in operations))
         self.assertEqual(5, sum(op[0][0] == "conditions" for op in operations))
 
+    def test_global_write_duplicates_legacy_condition_without_new_api_data(self):
+        database = _FakeDatabase()
+        conditions_doc = {
+            "forecast_run_id": self.run_id,
+            "spot_id": self.spot["id"],
+            "name": self.spot["name"],
+        }
+        publication = {
+            "spot": self.spot,
+            "weather_doc": {
+                "forecast_run_id": self.run_id,
+                "spot_id": self.spot["id"],
+                "location_name": self.spot["name"],
+                "latitude": self.spot["lat"],
+                "longitude": self.spot["lon"],
+            },
+            "conditions_doc": conditions_doc,
+        }
+
+        write_count, commit_count = harvest_forecast._write_forecast_batches(
+            database,
+            [publication],
+            self.run_id,
+            conditions_spot_ids={self.spot["id"]: "test_condition"},
+            conditions_aliases={self.spot["id"]: "legacy_condition"},
+        )
+
+        self.assertEqual(4, write_count)
+        self.assertEqual(1, commit_count)
+        condition_operations = [
+            operation
+            for operation in database.batches[0].operations
+            if operation[0][0] == "conditions"
+        ]
+        self.assertEqual(
+            {"test_condition", "legacy_condition"},
+            {operation[0][1] for operation in condition_operations},
+        )
+        self.assertTrue(
+            all(operation[1] is conditions_doc for operation in condition_operations)
+        )
+
     def test_station_failure_before_publication_creates_no_batch_or_commit(self):
         database = _FakeDatabase()
         failed_result = {
@@ -760,6 +822,23 @@ class ProductionWriteAndVerificationTests(unittest.TestCase):
             self.run_id,
             self.started,
             conditions_spot_ids={self.spot["id"]: "test_condition"},
+            now=self.updated + timedelta(minutes=1),
+        )
+
+    def test_post_write_verification_checks_legacy_alias_document(self):
+        documents = self._documents()
+        documents[("conditions", "legacy_condition")] = documents[
+            ("conditions", "test_condition")
+        ]
+        database = _FakeDatabase(documents)
+
+        harvest_forecast.verify_production_state(
+            database,
+            [self.spot],
+            self.run_id,
+            self.started,
+            conditions_spot_ids={self.spot["id"]: "test_condition"},
+            conditions_aliases={self.spot["id"]: "legacy_condition"},
             now=self.updated + timedelta(minutes=1),
         )
 
