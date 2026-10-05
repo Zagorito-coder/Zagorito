@@ -27,6 +27,7 @@ import 'package:spots_app/models/spot_selection_request.dart';
 import 'package:spots_app/models/user_spot.dart';
 import 'package:spots_app/models/user_spot_selection_request.dart';
 import 'package:spots_app/services/analytics_service.dart';
+import 'package:spots_app/services/marine_location_controller.dart';
 import 'package:spots_app/services/ad_service.dart';
 import 'package:spots_app/services/optional_update_service.dart';
 import 'package:spots_app/widgets/adaptive_banner_ad.dart';
@@ -59,7 +60,7 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => AppShellState();
 }
 
-class AppShellState extends State<AppShell> {
+class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   static const _personalSpotBadgePreferenceKey =
       'unread_personal_spot_badge_count';
   static const Map<int, String> _analyticsScreenNames = {
@@ -89,6 +90,10 @@ class AppShellState extends State<AppShell> {
   @override
   void initState() {
     super.initState();
+    if (!widget.disablePostLaunchTasksForTesting) {
+      WidgetsBinding.instance.addObserver(this);
+      unawaited(MarineLocationController.instance.initialize());
+    }
     _addSpotRequests = ValueNotifier<int>(0);
     _mapIsActive = ValueNotifier<bool>(_currentIndex == 3);
     _spotSelectionRequests = ValueNotifier<SpotSelectionRequest?>(null);
@@ -103,6 +108,13 @@ class AppShellState extends State<AppShell> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         unawaited(_startPostLaunchTasks());
       });
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && !widget.disablePostLaunchTasksForTesting) {
+      unawaited(MarineLocationController.instance.refresh());
     }
   }
 
@@ -310,6 +322,7 @@ class AppShellState extends State<AppShell> {
     _mapIsActive.dispose();
     _spotSelectionRequests.dispose();
     _userSpotSelectionRequests.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 

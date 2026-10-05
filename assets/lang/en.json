@@ -526,7 +526,7 @@
     "tomorrowShort": "D+1",
     "forecastInfoSemantics": "Important forecast information",
     "forecastDialogTitle": "Marine forecasts",
-    "forecastDisclaimer": "These forecasts are indicative and come from a marine model. Accuracy is limited near the coast. Do not use them for navigation, and always check official local bulletins and schedules.",
+    "forecastDisclaimer": "Tide heights are modelled relative to global mean sea level and include the forecast effects of tides and storm surge. Accuracy is limited near the coast. Do not use them for navigation, and always check official local bulletins and schedules.",
     "understood": "Understood",
     "hourSemantics": "{hour} hours",
     "moonNew": "New Moon",
@@ -673,5 +673,23 @@
     "confirm": "Confirm",
     "pressBackAgainToExit": "Press Back again to exit.",
     "ngf": "{height}m NGF"
+  },
+  "marineLocation": {
+    "choose": "Choose a location",
+    "automatic": "Near me · nearest weather point",
+    "manual": "Manually selected location",
+    "lastKnown": "Last known location · position not updated",
+    "permission": "Allow location access or choose a location.",
+    "disabled": "Enable location services or choose a location.",
+    "unavailable": "Position unavailable. You can choose a location.",
+    "usePosition": "Use my location",
+    "search": "Search a city or coastal area",
+    "distance": "Weather point {distance} km from your position",
+    "noWeather": "No weather point within 75 km. Choose a covered location.",
+    "noTides": "No tide data within 75 km of this location. Weather forecasts may still be available.",
+    "noCoefficients": "Local tide coefficients are unavailable for this station.",
+    "noAstronomy": "Local solunar times and overall activity index are unavailable for this station.",
+    "tideSource": "Tides and conditions: {name} · {distance} km from the selected location",
+    "openForecast": "Open forecasts for this location"
   }
 }

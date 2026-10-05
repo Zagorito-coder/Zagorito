@@ -526,7 +526,7 @@
     "tomorrowShort": "D+1",
     "forecastInfoSemantics": "Información importante sobre las previsiones",
     "forecastDialogTitle": "Previsiones marinas",
-    "forecastDisclaimer": "Estas previsiones son orientativas y proceden de un modelo marino. La precisión es limitada cerca de la costa. No las utilice para la navegación y consulte siempre los boletines y horarios oficiales locales.",
+    "forecastDisclaimer": "Las alturas de marea se modelizan respecto al nivel medio global del mar e incluyen los efectos previstos de las mareas y las marejadas ciclónicas. La precisión es limitada cerca de la costa. No las utilice para la navegación y consulte siempre los boletines y horarios oficiales locales.",
     "understood": "Entendido",
     "hourSemantics": "{hour} horas",
     "moonNew": "Luna nueva",
@@ -673,5 +673,23 @@
     "confirm": "Confirmar",
     "pressBackAgainToExit": "Pulsa Atrás otra vez para salir.",
     "ngf": "{height}m NGF"
+  },
+  "marineLocation": {
+    "choose": "Elegir un lugar",
+    "automatic": "Cerca de mí · punto meteorológico más cercano",
+    "manual": "Lugar elegido manualmente",
+    "lastKnown": "Último lugar conocido · posición sin actualizar",
+    "permission": "Permite la ubicación o elige un lugar.",
+    "disabled": "Activa la ubicación o elige un lugar.",
+    "unavailable": "Posición no disponible. Puedes elegir un lugar.",
+    "usePosition": "Usar mi ubicación",
+    "search": "Buscar ciudad o zona costera",
+    "distance": "Punto meteorológico a {distance} km de tu posición",
+    "noWeather": "Ningún punto meteorológico a menos de 75 km. Elige un lugar con cobertura.",
+    "noTides": "No hay datos de mareas a menos de 75 km de este lugar. Las previsiones meteorológicas pueden estar disponibles.",
+    "noCoefficients": "Coeficientes locales no disponibles para esta estación.",
+    "noAstronomy": "Horarios solunares e índice global locales no disponibles para esta estación.",
+    "tideSource": "Mareas y condiciones: {name} · a {distance} km del lugar elegido",
+    "openForecast": "Abrir las previsiones de este lugar"
   }
 }

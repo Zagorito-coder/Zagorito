@@ -297,7 +297,9 @@ class _OfflineMapManagerSheetState extends State<OfflineMapManagerSheet> {
       onRefresh: _service.refreshCatalog,
       child: ListView.separated(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.only(bottom: 24),
+        padding: EdgeInsets.only(
+          bottom: 24 + MediaQuery.paddingOf(context).bottom,
+        ),
         itemCount: _service.regions.length,
         separatorBuilder: (_, __) => Divider(
           height: 1,

@@ -10,7 +10,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/tide_page_models.dart' as tm;
 import '../models/tide_data.dart' as tide_data;
-import '../services/forecast_firestore_service.dart';
+import '../services/marine_location_controller.dart';
+import '../widgets/marine_location_selector.dart';
+import '../data/marine_weather_points.dart';
+import 'forecast_page.dart';
 import '../services/tide_service.dart' as tide_svc;
 import '../services/casablanca_tide_reference.dart';
 import '../services/tide_coefficient_service.dart';
@@ -75,10 +78,7 @@ String _localizedMoonPhase(BuildContext context, String phase) {
 }
 
 // ── Conversion TideService → modèle TidePage ─────────────────
-tm.TideData _fromTideService(
-  tide_data.TideData src, {
-  GfsWeatherTimeline? gfsWeather,
-}) {
+tm.TideData _fromTideService(tide_data.TideData src) {
   final now = DateTime.now();
   final currentHour = now.hour;
 
@@ -166,9 +166,6 @@ tm.TideData _fromTideService(
     final windWaveH = matchPoint?.windWaveHeight ?? 0.0;
     final windSpeed = matchPoint?.windSpeedKmh?.round().clamp(0, 200) ?? 0;
     final temperature = matchPoint?.temperatureC?.round() ?? 0;
-    final requestedTime = DateTime(today.year, today.month, today.day, h);
-    final gfsPoint = gfsWeather?.nearestTo(requestedTime);
-
     hourlyCards.add(tm.HourlyCard(
       hour: h,
       label: '${h.toString().padLeft(2, '0')}:00',
@@ -181,31 +178,22 @@ tm.TideData _fromTideService(
       windDirection: windDir,
       waveHeight: windWaveH,
       temp: temperature,
-      pressureHpa: matchPoint?.pressureHpa ?? gfsPoint?.pressureHpa,
-      precipitationProbabilityPct: matchPoint?.precipitationProbabilityPct ??
-          gfsPoint?.precipitationProbabilityPct,
-      relativeHumidityPct:
-          matchPoint?.relativeHumidityPct ?? gfsPoint?.relativeHumidityPct,
-      windGustKmh: matchPoint?.windGustKmh ?? gfsPoint?.windGustKmh,
-      visibilityKm: matchPoint?.visibilityKm ?? gfsPoint?.visibilityKm,
-      cloudCoverPct: matchPoint?.cloudCoverPct ?? gfsPoint?.cloudCoverPct,
-      precipitationMm: matchPoint?.precipitationMm ?? gfsPoint?.precipitationMm,
-      swellHeightM: matchPoint?.swellHeightM ?? gfsPoint?.swellHeightM,
-      swellPeriodS: matchPoint?.swellPeriodS ?? gfsPoint?.swellPeriodS,
-      swellDirectionDeg:
-          matchPoint?.swellDirectionDeg ?? gfsPoint?.swellDirectionDeg,
-      secondarySwellHeightM:
-          matchPoint?.secondarySwellHeightM ?? gfsPoint?.secondarySwellHeightM,
-      secondarySwellPeriodS:
-          matchPoint?.secondarySwellPeriodS ?? gfsPoint?.secondarySwellPeriodS,
-      secondarySwellDirectionDeg: matchPoint?.secondarySwellDirectionDeg ??
-          gfsPoint?.secondarySwellDirectionDeg,
-      seaSurfaceTemperatureC: matchPoint?.seaSurfaceTemperatureC ??
-          gfsPoint?.seaSurfaceTemperatureC,
-      oceanCurrentSpeedKmh:
-          matchPoint?.oceanCurrentSpeedKmh ?? gfsPoint?.oceanCurrentSpeedKmh,
-      oceanCurrentDirectionDeg: matchPoint?.oceanCurrentDirectionDeg ??
-          gfsPoint?.oceanCurrentDirectionDeg,
+      pressureHpa: matchPoint?.pressureHpa,
+      precipitationProbabilityPct: matchPoint?.precipitationProbabilityPct,
+      relativeHumidityPct: matchPoint?.relativeHumidityPct,
+      windGustKmh: matchPoint?.windGustKmh,
+      visibilityKm: matchPoint?.visibilityKm,
+      cloudCoverPct: matchPoint?.cloudCoverPct,
+      precipitationMm: matchPoint?.precipitationMm,
+      swellHeightM: matchPoint?.swellHeightM,
+      swellPeriodS: matchPoint?.swellPeriodS,
+      swellDirectionDeg: matchPoint?.swellDirectionDeg,
+      secondarySwellHeightM: matchPoint?.secondarySwellHeightM,
+      secondarySwellPeriodS: matchPoint?.secondarySwellPeriodS,
+      secondarySwellDirectionDeg: matchPoint?.secondarySwellDirectionDeg,
+      seaSurfaceTemperatureC: matchPoint?.seaSurfaceTemperatureC,
+      oceanCurrentSpeedKmh: matchPoint?.oceanCurrentSpeedKmh,
+      oceanCurrentDirectionDeg: matchPoint?.oceanCurrentDirectionDeg,
       isIdeal: activity > 0.7,
       isNow: isNow,
       wavePeriod: wavePeriodH.round(),
@@ -221,7 +209,10 @@ tm.TideData _fromTideService(
       ? TideForecastPresentationService.attachCasablancaTides(
           groupedHourlyForecastDays,
         )
-      : groupedHourlyForecastDays;
+      : TideForecastPresentationService.attachPublishedTides(
+          groupedHourlyForecastDays,
+          src.hourlyPoints,
+        );
 
   final events = <tm.TideEvent>[];
   if (tidePoints.length >= 3) {
@@ -314,8 +305,12 @@ tm.TideData _fromTideService(
   final overallLabel = astro.activityLabel;
 
   final bestHours = <String>[];
-  if (astro.lunarTransit.isNotEmpty) bestHours.add(astro.lunarTransit);
-  if (astro.lunarUnder.isNotEmpty) bestHours.add(astro.lunarUnder);
+  if (usesCasablancaReference && astro.lunarTransit.isNotEmpty) {
+    bestHours.add(astro.lunarTransit);
+  }
+  if (usesCasablancaReference && astro.lunarUnder.isNotEmpty) {
+    bestHours.add(astro.lunarUnder);
+  }
 
   return tm.TideData(
     location: src.location,
@@ -447,11 +442,15 @@ class TidePage extends StatefulWidget {
   const TidePage({
     super.key,
     this.embeddedInBottomNavigation = false,
+    this.locationController,
+    this.tideLoader,
   });
 
   /// Masque la navigation de retour et suspend les tâches périodiques lorsque
   /// la page est conservée hors écran par la barre de navigation principale.
   final bool embeddedInBottomNavigation;
+  final MarineLocationController? locationController;
+  final Future<tide_data.TideData> Function(tide_svc.TideStation)? tideLoader;
 
   @override
   State<TidePage> createState() => _TidePageState();
@@ -475,6 +474,12 @@ class _TidePageState extends State<TidePage>
 
   bool _isLoading = true;
   tm.TideData _data = _emptyData();
+  late final _location =
+      widget.locationController ?? MarineLocationController.instance;
+  int _locationRevision = -1;
+  int _loadRequest = 0;
+  tide_svc.TideStation? _tideStation;
+  bool get _isCasablanca => _tideStation?.id == 'casablanca_maroc';
   final _scrollController = ScrollController();
   final _clockNotifier = ValueNotifier<DateTime>(DateTime.now());
   Timer? _clockTimer;
@@ -513,22 +518,44 @@ class _TidePageState extends State<TidePage>
     );
   }
 
+  void _onLocationChanged() {
+    if (!mounted || _locationRevision == _location.revision) return;
+    _locationRevision = _location.revision;
+    _loadRequest++;
+    final position = _location.coordinates;
+    setState(() {
+      _loadInProgress = false;
+      _data = _emptyData();
+      _coefficientMonth = null;
+      _coefficientLoading = false;
+      _coefficientError = null;
+      _selectedTideView = _TideView.today;
+      _lastLoadedAt = null;
+      _lastLoadAttemptAt = null;
+      _tideStation = position == null
+          ? null
+          : tide_svc.TideService.stationForPosition(
+              position.latitude, position.longitude);
+      _isLoading = _tideStation != null;
+    });
+    if (_tideStation != null) unawaited(_loadTideData());
+  }
+
   Future<void> _loadTideData() async {
     if (_loadInProgress) return;
+    final station = _tideStation;
+    if (station == null) return;
+    final request = ++_loadRequest;
     _loadInProgress = true;
     _lastLoadAttemptAt = DateTime.now();
     final hadUsableData = _data.hourlyCards.isNotEmpty;
-    final gfsFuture = ForecastFirestoreService.fetchGfsWeather(
-      'casablanca_maroc',
-    )
-        .timeout(
-          const Duration(seconds: 12),
-          onTimeout: () => null,
-        )
-        .catchError((_) => null);
     try {
-      final d = await tide_svc.TideService.fetchTides();
-      if (!mounted) return;
+      final d = await (widget.tideLoader?.call(station) ??
+          tide_svc.TideService.fetchTides(
+              latitude: station.latitude,
+              longitude: station.longitude,
+              locationName: station.name));
+      if (!mounted || request != _loadRequest) return;
       final hasUsableData = d.hourlyPoints.isNotEmpty;
       setState(() {
         if (hasUsableData || !hadUsableData) {
@@ -550,21 +577,13 @@ class _TidePageState extends State<TidePage>
           if (mounted) _autoScroll();
         });
       }
-      final gfsWeather = await gfsFuture;
-      if (!mounted || gfsWeather == null || d.hourlyPoints.isEmpty) return;
-      setState(() {
-        _data = _fromTideService(d, gfsWeather: gfsWeather);
-        if (_selectedHourIndex >= _data.hourlyCards.length) {
-          _selectedHourIndex = 0;
-        }
-      });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || request != _loadRequest) return;
       setState(() {
         _isLoading = false;
       });
     } finally {
-      _loadInProgress = false;
+      if (request == _loadRequest) _loadInProgress = false;
     }
   }
 
@@ -575,7 +594,10 @@ class _TidePageState extends State<TidePage>
     _appIsResumed = WidgetsBinding.instance.lifecycleState == null ||
         WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
     ThemeController.instance.addListener(_onThemeChanged);
-    unawaited(_loadTideData());
+    _location.addListener(_onLocationChanged);
+    unawaited(_location.initialize().then((_) {
+      if (mounted) _onLocationChanged();
+    }));
     _ctrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 1400));
     const items = 12;
@@ -717,6 +739,8 @@ class _TidePageState extends State<TidePage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     ThemeController.instance.removeListener(_onThemeChanged);
+    _location.removeListener(_onLocationChanged);
+    _loadRequest++;
     _ctrl.dispose();
     _stopClock();
     _clockNotifier.dispose();
@@ -733,7 +757,10 @@ class _TidePageState extends State<TidePage>
   }
 
   Future<void> _loadCoefficientMonth() async {
-    if (_coefficientMonth != null || _coefficientLoading) return;
+    if (!_isCasablanca || _coefficientMonth != null || _coefficientLoading) {
+      return;
+    }
+    final revision = _locationRevision;
     setState(() {
       _coefficientLoading = true;
       _coefficientError = null;
@@ -744,14 +771,14 @@ class _TidePageState extends State<TidePage>
         buildCasablancaTideCoefficientMonth,
         DateTime(now.year, now.month),
       );
-      if (!mounted) return;
+      if (!mounted || revision != _locationRevision || !_isCasablanca) return;
       setState(() {
         _coefficientMonth = result;
         _selectedCoefficientDay = now.day.clamp(1, result.days.length);
         _coefficientLoading = false;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || revision != _locationRevision || !_isCasablanca) return;
       setState(() {
         _coefficientLoading = false;
         _coefficientError = error;
@@ -760,6 +787,12 @@ class _TidePageState extends State<TidePage>
   }
 
   Widget _buildCoefficientSection() {
+    if (!_isCasablanca) {
+      return Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(context.tr('marineLocation.noCoefficients'),
+              textAlign: TextAlign.center));
+    }
     final month = _coefficientMonth;
     if (month != null) {
       return TideCoefficientsView(
@@ -840,13 +873,16 @@ class _TidePageState extends State<TidePage>
     if (_isLoading) {
       return _buildPageShell(
         SafeArea(
-          child: Stack(
+          child: SingleChildScrollView(
+              child: Column(
             children: [
               if (!widget.embeddedInBottomNavigation)
                 const Align(
                   alignment: Alignment.topLeft,
                   child: AppBackButton(),
                 ),
+              MarineLocationSelector(controller: _location),
+              const SizedBox(height: 24),
               Center(
                 child: CircularProgressIndicator(
                   color: _accent,
@@ -854,19 +890,21 @@ class _TidePageState extends State<TidePage>
                 ),
               ),
             ],
-          ),
+          )),
         ),
       );
     }
     if (_data.hourlyCards.isEmpty) {
       return _buildPageShell(
         SafeArea(
-          child: Column(
+          child: SingleChildScrollView(
+              child: Column(
             children: [
               if (!widget.embeddedInBottomNavigation)
                 const Align(
                     alignment: Alignment.centerLeft, child: AppBackButton()),
-              const Spacer(),
+              MarineLocationSelector(controller: _location),
+              const SizedBox(height: 20),
               Icon(Icons.cloud_off_outlined, color: _txt(0.55), size: 48),
               const SizedBox(height: 16),
               Text(
@@ -879,7 +917,11 @@ class _TidePageState extends State<TidePage>
               ),
               const SizedBox(height: 8),
               Text(
-                context.tr('tide.marineDataUnavailableMessage'),
+                context.tr(_location.coordinates == null
+                    ? 'marineLocation.choose'
+                    : _tideStation == null
+                        ? 'marineLocation.noTides'
+                        : 'tide.marineDataUnavailableMessage'),
                 style: TextStyle(color: _txt(0.55), fontSize: 13),
                 textAlign: TextAlign.center,
               ),
@@ -887,16 +929,23 @@ class _TidePageState extends State<TidePage>
               OutlinedButton(
                 onPressed: () {
                   setState(() {
-                    _isLoading = true;
+                    _isLoading = _tideStation != null;
                     _data = _emptyData();
                   });
                   unawaited(_loadTideData());
                 },
                 child: Text(context.tr('tide.retry')),
               ),
-              const Spacer(),
+              if (_location.weatherPoint != null)
+                TextButton(
+                    onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                            builder: (_) =>
+                                ForecastPage(locationController: _location))),
+                    child: Text(context.tr('marineLocation.openForecast'))),
+              const SizedBox(height: 20),
             ],
-          ),
+          )),
         ),
       );
     }
@@ -906,14 +955,30 @@ class _TidePageState extends State<TidePage>
           key: const Key('tide-page-scroll'),
           physics: const BouncingScrollPhysics(),
           slivers: [
+            SliverToBoxAdapter(
+                child: MarineLocationSelector(controller: _location)),
             SliverToBoxAdapter(child: _buildHeader()),
+            SliverToBoxAdapter(
+                child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                  context.trArgs('marineLocation.tideSource', args: {
+                    'name': _tideStation!.name,
+                    'distance': MarineWeatherPoint('', '',
+                            _tideStation!.latitude, _tideStation!.longitude)
+                        .distanceKm(_location.coordinates!.latitude,
+                            _location.coordinates!.longitude)
+                        .toStringAsFixed(1),
+                  }),
+                  textAlign: TextAlign.center),
+            )),
             SliverToBoxAdapter(child: _buildTideModeSelector()),
             if (_selectedTideView == _TideView.forecasts) ...[
               SliverToBoxAdapter(child: _buildHourlyForecastSection()),
             ] else if (_selectedTideView == _TideView.coefficients) ...[
               SliverToBoxAdapter(child: _buildCoefficientSection()),
             ] else ...[
-              SliverToBoxAdapter(child: _buildScoreCard()),
+              if (_isCasablanca) SliverToBoxAdapter(child: _buildScoreCard()),
               SliverToBoxAdapter(child: _buildCurrentTideRibbon()),
               SliverToBoxAdapter(child: _buildCurveCard()),
               SliverToBoxAdapter(child: _buildHourlyActivitySection()),
@@ -1629,16 +1694,18 @@ class _TidePageState extends State<TidePage>
                   setState(() => _selectedTideView = _TideView.forecasts);
                 },
               ),
-              const SizedBox(width: 4),
-              _buildTideModeButton(
-                label: context.tr('tide.coefficients'),
-                selected: _selectedTideView == _TideView.coefficients,
-                onTap: () {
-                  if (_selectedTideView == _TideView.coefficients) return;
-                  setState(() => _selectedTideView = _TideView.coefficients);
-                  _loadCoefficientMonth();
-                },
-              ),
+              if (_isCasablanca) ...[
+                const SizedBox(width: 4),
+                _buildTideModeButton(
+                  label: context.tr('tide.coefficients'),
+                  selected: _selectedTideView == _TideView.coefficients,
+                  onTap: () {
+                    if (_selectedTideView == _TideView.coefficients) return;
+                    setState(() => _selectedTideView = _TideView.coefficients);
+                    _loadCoefficientMonth();
+                  },
+                ),
+              ],
             ],
           ),
         ),

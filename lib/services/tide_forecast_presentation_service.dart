@@ -1,4 +1,5 @@
 import '../models/tide_page_models.dart';
+import '../models/tide_data.dart' as source;
 import 'casablanca_tide_reference.dart';
 import 'tide_coefficient_service.dart';
 
@@ -16,6 +17,80 @@ class TideForecastPresentationService {
     List<HourlyForecastDay> days,
   ) {
     return days.map(_attachDay).toList(growable: false);
+  }
+
+  /// Associe aux créneaux météo les niveaux marins horaires publiés par le
+  /// backend pour la même station. Aucun calcul Casablanca ni hauteur de vague
+  /// n'est utilisé comme substitut de marée.
+  static List<HourlyForecastDay> attachPublishedTides(
+    List<HourlyForecastDay> days,
+    List<source.TidePoint> sourcePoints,
+  ) {
+    if (sourcePoints.length < 3) return days;
+    final points = List<source.TidePoint>.of(sourcePoints)
+      ..sort((a, b) => a.time.compareTo(b.time));
+    final extrema = <source.TidePoint, bool>{};
+    for (var index = 1; index < points.length - 1; index++) {
+      final previous = points[index - 1].height;
+      final current = points[index].height;
+      final next = points[index + 1].height;
+      if (current > previous && current > next) {
+        extrema[points[index]] = true;
+      } else if (current < previous && current < next) {
+        extrema[points[index]] = false;
+      }
+    }
+
+    return days.map((day) {
+      final enriched = day.slots.map((slot) {
+        var nearestIndex = -1;
+        var nearestDifference = const Duration(days: 365);
+        for (var index = 0; index < points.length; index++) {
+          final difference = points[index].time.difference(slot.time).abs();
+          if (difference < nearestDifference) {
+            nearestDifference = difference;
+            nearestIndex = index;
+          }
+        }
+        if (nearestIndex < 0 ||
+            nearestDifference >
+                const Duration(minutes: _maximumExtremumDistanceMinutes)) {
+          return slot;
+        }
+        final point = points[nearestIndex];
+        final after = points[nearestIndex == points.length - 1
+                ? points.length - 1
+                : nearestIndex + 1]
+            .height;
+
+        TideForecastExtremum? attachedExtremum;
+        source.TidePoint? closestExtremum;
+        var extremumDifference = const Duration(days: 365);
+        for (final candidate in extrema.keys) {
+          final difference = candidate.time.difference(slot.time).abs();
+          if (difference < extremumDifference) {
+            extremumDifference = difference;
+            closestExtremum = candidate;
+          }
+        }
+        if (closestExtremum != null &&
+            extremumDifference <=
+                const Duration(minutes: _maximumExtremumDistanceMinutes)) {
+          attachedExtremum = TideForecastExtremum(
+            time: closestExtremum.time,
+            heightM: closestExtremum.height,
+            isHigh: extrema[closestExtremum]!,
+          );
+        }
+
+        return slot.copyWithTide(
+          tideHeightM: point.height,
+          tideIsRising: after >= point.height,
+          tideExtremum: attachedExtremum,
+        );
+      }).toList(growable: false);
+      return HourlyForecastDay(date: day.date, slots: enriched);
+    }).toList(growable: false);
   }
 
   static HourlyForecastDay _attachDay(HourlyForecastDay day) {

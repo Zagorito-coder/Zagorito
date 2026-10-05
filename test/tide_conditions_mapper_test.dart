@@ -51,6 +51,8 @@ void main() {
     expect(result.hourlyForecast.first.activityScore, 80);
     expect(result.low, -0.35);
     expect(result.high, 1.08);
+    expect(result.astro.sunRise, '06:15');
+    expect(result.astro.sunSet, '20:42');
   });
 
   test('interprète les heures Open-Meteo sans suffixe comme UTC', () {
@@ -101,7 +103,7 @@ void main() {
     );
   });
 
-  test('la météo GFS absente reste rétrocompatible', () {
+  test('la météo horaire reste complète sans résumé GFS', () {
     final document = _conditionsDocument(
       tideHeights: const [0.1, 0.4, 0.2],
       waveHeights: const [1.1, 1.2, 1.3],
@@ -113,9 +115,10 @@ void main() {
       now: DateTime.utc(2026, 7, 26, 1).toLocal(),
     );
 
-    expect(result.hourlyPoints.first.pressureHpa, isNull);
-    expect(result.hourlyPoints.first.precipitationProbabilityPct, isNull);
-    expect(result.hourlyPoints.first.relativeHumidityPct, isNull);
+    expect(result.hourlyPoints.first.pressureHpa, 1014);
+    expect(result.hourlyPoints.first.precipitationProbabilityPct, 18);
+    expect(result.hourlyPoints.first.relativeHumidityPct, 72);
+    expect(result.hourlyPoints.first.visibilityKm, 14);
   });
 
   test('ignore les valeurs GFS hors limites', () {
@@ -125,6 +128,13 @@ void main() {
     );
     final gfs = document['gfs'] as Map<String, dynamic>;
     final slots = gfs['hourly'] as List<Map<String, dynamic>>;
+    final weather = document['weather'] as Map<String, dynamic>;
+    final weatherSlots = weather['hourly'] as List<Map<String, dynamic>>;
+    weatherSlots.first
+      ..remove('pressureHpa')
+      ..remove('precipitationProbabilityPct')
+      ..remove('relativeHumidityPct')
+      ..remove('visibilityKm');
     slots.first
       ..['pressureHpa'] = 400
       ..['precipitationProbabilityPct'] = 150
@@ -197,6 +207,13 @@ Map<String, dynamic> _conditionsDocument({
       'temperatureC': 24,
       'windSpeedKmh': 18,
       'windDirectionDeg': 225,
+      'windGustKmh': 32,
+      'pressureHpa': 1014,
+      'precipitationProbabilityPct': 18,
+      'precipitationMm': 0.4,
+      'relativeHumidityPct': 72,
+      'cloudCoverPct': 42,
+      'visibilityKm': 14,
     });
   }
   return {
@@ -206,6 +223,11 @@ Map<String, dynamic> _conditionsDocument({
     'moon': {
       'phaseName': 'Waxing Gibbous',
       'ageDays': 11.2,
+    },
+    'sun': {
+      'date': '2026-07-26',
+      'sunrise': '2026-07-26T06:15',
+      'sunset': '2026-07-26T20:42',
     },
     'tide': {'hourly': tideSlots},
     'weather': {'hourly': weatherSlots},

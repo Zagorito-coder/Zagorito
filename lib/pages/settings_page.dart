@@ -542,6 +542,7 @@ class SettingsPage extends StatelessWidget {
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (_) => const _PublicProfileSheet(),
     );
@@ -715,7 +716,12 @@ class _BlockedUsersSheetState extends State<_BlockedUsersSheet> {
                   );
                 }
                 return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
+                  padding: EdgeInsets.fromLTRB(
+                    14,
+                    14,
+                    14,
+                    24 + MediaQuery.paddingOf(context).bottom,
+                  ),
                   itemCount: users.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 9),
                   itemBuilder: (context, index) {

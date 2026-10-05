@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../models/tide_data.dart';
 import 'astronomy_service.dart';
 
@@ -65,120 +67,254 @@ class TideConditionsMapper {
 
       final weatherAtTime = weatherByTime[time.millisecondsSinceEpoch];
       final gfsAtTime = _nearestSlot(gfsByTime, time);
-      final totalWaveHeight = _number(slot, 'waveHeightM');
-      final windWaveHeight = _number(slot, 'windWaveHeightM');
-      final wavePeriod = _number(slot, 'wavePeriodS');
+      final totalWaveHeight = _boundedNumber(
+        slot,
+        'waveHeightM',
+        minimum: 0,
+        maximum: 40,
+      );
+      final wavePeriod = _boundedNumber(
+        slot,
+        'wavePeriodS',
+        minimum: 0,
+        maximum: 60,
+      );
+      final windDirection = _boundedNumber(
+            weatherAtTime,
+            'windDirectionDeg',
+            minimum: 0,
+            maximum: 360,
+          ) ??
+          _boundedNumber(
+            slot,
+            'windWaveDirectionDeg',
+            minimum: 0,
+            maximum: 360,
+          );
+      final temperature = _boundedNumber(
+        weatherAtTime,
+        'temperatureC',
+        minimum: -90,
+        maximum: 60,
+      );
+      final windSpeed = _boundedNumber(
+        weatherAtTime,
+        'windSpeedKmh',
+        minimum: 0,
+        maximum: 400,
+      );
+
+      if (totalWaveHeight == null ||
+          wavePeriod == null ||
+          windDirection == null ||
+          temperature == null ||
+          windSpeed == null) {
+        throw const FormatException(
+          'Créneau marin incomplet : publication refusée.',
+        );
+      }
 
       points.add(
         TidePoint(
           time: time,
           height: height,
-          windDirectionDeg: _number(weatherAtTime, 'windDirectionDeg') ??
-              _number(slot, 'windDirectionDeg') ??
-              0,
-          wavePeriod:
-              wavePeriod != null && wavePeriod.isFinite && wavePeriod >= 0
-                  ? wavePeriod
-                  : 0,
-          windWaveHeight: totalWaveHeight ?? windWaveHeight ?? 0,
-          temperatureC: _number(weatherAtTime, 'temperatureC'),
-          windSpeedKmh: _number(weatherAtTime, 'windSpeedKmh'),
+          windDirectionDeg: windDirection,
+          wavePeriod: wavePeriod,
+          windWaveHeight: totalWaveHeight,
+          temperatureC: temperature,
+          windSpeedKmh: windSpeed,
           pressureHpa: _boundedNumber(
-            gfsAtTime,
-            'pressureHpa',
-            minimum: 800,
-            maximum: 1200,
-          ),
+                weatherAtTime,
+                'pressureHpa',
+                minimum: 800,
+                maximum: 1200,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'pressureHpa',
+                minimum: 800,
+                maximum: 1200,
+              ),
           precipitationProbabilityPct: _boundedNumber(
-            gfsAtTime,
-            'precipitationProbabilityPct',
-            minimum: 0,
-            maximum: 100,
-          ),
+                weatherAtTime,
+                'precipitationProbabilityPct',
+                minimum: 0,
+                maximum: 100,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'precipitationProbabilityPct',
+                minimum: 0,
+                maximum: 100,
+              ),
           relativeHumidityPct: _boundedNumber(
-            gfsAtTime,
-            'relativeHumidityPct',
-            minimum: 0,
-            maximum: 100,
-          ),
+                weatherAtTime,
+                'relativeHumidityPct',
+                minimum: 0,
+                maximum: 100,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'relativeHumidityPct',
+                minimum: 0,
+                maximum: 100,
+              ),
           windGustKmh: _boundedNumber(
-            gfsAtTime,
-            'windGustKmh',
-            minimum: 0,
-            maximum: 400,
-          ),
+                weatherAtTime,
+                'windGustKmh',
+                minimum: 0,
+                maximum: 500,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'windGustKmh',
+                minimum: 0,
+                maximum: 500,
+              ),
           visibilityKm: _boundedNumber(
-            gfsAtTime,
-            'visibilityKm',
-            minimum: 0,
-            maximum: 100,
-          ),
+                weatherAtTime,
+                'visibilityKm',
+                minimum: 0,
+                maximum: 100,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'visibilityKm',
+                minimum: 0,
+                maximum: 100,
+              ),
           cloudCoverPct: _boundedNumber(
-            gfsAtTime,
-            'cloudCoverPct',
-            minimum: 0,
-            maximum: 100,
-          ),
+                weatherAtTime,
+                'cloudCoverPct',
+                minimum: 0,
+                maximum: 100,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'cloudCoverPct',
+                minimum: 0,
+                maximum: 100,
+              ),
           precipitationMm: _boundedNumber(
-            gfsAtTime,
-            'precipitationMm',
-            minimum: 0,
-            maximum: 500,
-          ),
+                weatherAtTime,
+                'precipitationMm',
+                minimum: 0,
+                maximum: 500,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'precipitationMm',
+                minimum: 0,
+                maximum: 500,
+              ),
           swellHeightM: _boundedNumber(
-            gfsAtTime,
-            'swellHeightM',
-            minimum: 0,
-            maximum: 40,
-          ),
+                slot,
+                'swellHeightM',
+                minimum: 0,
+                maximum: 40,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'swellHeightM',
+                minimum: 0,
+                maximum: 40,
+              ),
           swellPeriodS: _boundedNumber(
-            gfsAtTime,
-            'swellPeriodS',
-            minimum: 0,
-            maximum: 60,
-          ),
+                slot,
+                'swellPeriodS',
+                minimum: 0,
+                maximum: 60,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'swellPeriodS',
+                minimum: 0,
+                maximum: 60,
+              ),
           swellDirectionDeg: _boundedNumber(
-            gfsAtTime,
-            'swellDirectionDeg',
-            minimum: 0,
-            maximum: 360,
-          ),
+                slot,
+                'swellDirectionDeg',
+                minimum: 0,
+                maximum: 360,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'swellDirectionDeg',
+                minimum: 0,
+                maximum: 360,
+              ),
           secondarySwellHeightM: _boundedNumber(
-            gfsAtTime,
-            'secondarySwellHeightM',
-            minimum: 0,
-            maximum: 40,
-          ),
+                slot,
+                'secondarySwellHeightM',
+                minimum: 0,
+                maximum: 40,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'secondarySwellHeightM',
+                minimum: 0,
+                maximum: 40,
+              ),
           secondarySwellPeriodS: _boundedNumber(
-            gfsAtTime,
-            'secondarySwellPeriodS',
-            minimum: 0,
-            maximum: 60,
-          ),
+                slot,
+                'secondarySwellPeriodS',
+                minimum: 0,
+                maximum: 60,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'secondarySwellPeriodS',
+                minimum: 0,
+                maximum: 60,
+              ),
           secondarySwellDirectionDeg: _boundedNumber(
-            gfsAtTime,
-            'secondarySwellDirectionDeg',
-            minimum: 0,
-            maximum: 360,
-          ),
+                slot,
+                'secondarySwellDirectionDeg',
+                minimum: 0,
+                maximum: 360,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'secondarySwellDirectionDeg',
+                minimum: 0,
+                maximum: 360,
+              ),
           seaSurfaceTemperatureC: _boundedNumber(
-            gfsAtTime,
-            'seaSurfaceTemperatureC',
-            minimum: -5,
-            maximum: 45,
-          ),
+                slot,
+                'seaSurfaceTemperatureC',
+                minimum: -5,
+                maximum: 45,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'seaSurfaceTemperatureC',
+                minimum: -5,
+                maximum: 45,
+              ),
           oceanCurrentSpeedKmh: _boundedNumber(
-            gfsAtTime,
-            'oceanCurrentSpeedKmh',
-            minimum: 0,
-            maximum: 30,
-          ),
+                slot,
+                'oceanCurrentSpeedKmh',
+                minimum: 0,
+                maximum: 30,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'oceanCurrentSpeedKmh',
+                minimum: 0,
+                maximum: 30,
+              ),
           oceanCurrentDirectionDeg: _boundedNumber(
-            gfsAtTime,
-            'oceanCurrentDirectionDeg',
-            minimum: 0,
-            maximum: 360,
-          ),
+                slot,
+                'oceanCurrentDirectionDeg',
+                minimum: 0,
+                maximum: 360,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'oceanCurrentDirectionDeg',
+                minimum: 0,
+                maximum: 360,
+              ),
         ),
       );
     }
@@ -231,6 +367,9 @@ class TideConditionsMapper {
         ? computedAstro.moonPhase
         : (ageDays / 29.5305882).clamp(0.0, 1.0);
 
+    final sun = _asMap(data['sun']);
+    final sunrise = _timeOfDay(sun?['sunrise']) ?? computedAstro.sunRise;
+    final sunset = _timeOfDay(sun?['sunset']) ?? computedAstro.sunSet;
     final location = (data['name'] as String?)?.trim();
     return TideData(
       hourlyPoints: points,
@@ -252,8 +391,8 @@ class TideConditionsMapper {
         activityLabel: _activityLabel(safeScore),
         moonRise: computedAstro.moonRise,
         moonSet: computedAstro.moonSet,
-        sunRise: computedAstro.sunRise,
-        sunSet: computedAstro.sunSet,
+        sunRise: sunrise,
+        sunSet: sunset,
         lunarTransit: computedAstro.lunarTransit,
         lunarUnder: computedAstro.lunarUnder,
       ),
@@ -296,8 +435,18 @@ class TideConditionsMapper {
   }
 
   static DateTime? _parseTimestamp(dynamic value) {
+    if (value is Timestamp) return value.toDate().toLocal();
+    if (value is DateTime) return value.toLocal();
     if (value is! String || value.trim().isEmpty) return null;
     return DateTime.tryParse(value.trim())?.toLocal();
+  }
+
+  static String? _timeOfDay(dynamic value) {
+    if (value is! String || value.trim().isEmpty) return null;
+    final parsed = DateTime.tryParse(value.trim());
+    if (parsed == null) return null;
+    return '${parsed.hour.toString().padLeft(2, '0')}:'
+        '${parsed.minute.toString().padLeft(2, '0')}';
   }
 
   static List<HourlyForecastPoint> _parseHourlyForecast(

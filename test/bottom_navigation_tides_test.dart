@@ -86,7 +86,12 @@ void main() {
     expect(tidePageSource, contains('ValueNotifier<DateTime>'));
     expect(tidePageSource, contains('currentHour: now.hour + now.minute / 60'));
     expect(tidePageSource, contains('if (_loadInProgress) return;'));
-    expect(tidePageSource, contains('const Duration(seconds: 12)'));
+    expect(
+      tidePageSource,
+      isNot(contains('ForecastFirestoreService.fetchGfsWeather')),
+      reason:
+          'La page Marées doit utiliser son document conditions déjà complet sans seconde lecture Firestore.',
+    );
     expect(tidePageSource, contains('_maybeRefreshData();'));
     expect(tidePageSource, contains('if (!hadUsableData)'));
     expect(

@@ -43,6 +43,7 @@
 # ============================================================================
 
 import os
+import math
 import random
 import threading
 import time
@@ -61,10 +62,10 @@ from firebase_admin import credentials, firestore
 OPEN_METEO_API_KEY = (os.environ.get("OPEN_METEO_API_KEY") or "").strip() or None
 FORECAST_RUN_ID = (os.environ.get("FORECAST_RUN_ID") or "").strip() or None
 
-# Un document météo de dix jours pèse environ 90 Kio avec les trois modèles.
-# Firestore refuse tout Commit supérieur à 10 Mio. Une limite fixe de vingt
-# stations garde chaque requête très loin de ce plafond, y compris lorsque les
-# cinq résumés ``conditions`` sont présents dans le même lot.
+# Les documents météo et conditions contiennent dix jours de données. Firestore
+# refuse tout Commit supérieur à 10 Mio. Une limite fixe de vingt stations garde
+# chaque requête loin de ce plafond même lorsque les trois documents de chacune
+# des 143 stations sont écrits ensemble.
 PUBLISH_BATCH_STATION_COUNT = 20
 EXPECTED_STATION_COUNT = 143
 
@@ -253,17 +254,11 @@ MAX_STATION_WORKERS = 6
 RETRYABLE_HTTP_STATUSES = {408, 425, 429, 500, 502, 503, 504}
 _HTTP_LOCAL = threading.local()
 
-# Les cinq stations de la page Marées utilisent déjà `conditions/{id}`.
-# On y recopie uniquement un résumé météo GFS très léger : le téléphone évite
-# ainsi de télécharger le document `spots_meteo` complet (15 jours, 3 modèles)
-# lorsqu'il affiche la fiche Intelligence ou la page Marées.
-CONDITIONS_SPOT_IDS = {
-    "casablanca_maroc": "casablanca",
-    "rabat_maroc": "rabat",
-    "agadir_maroc": "agadir",
-    "tanger_maroc": "tanger",
-    "essaouira_maroc": "essaouira",
-}
+# Chaque point côtier dispose de son propre document léger `conditions/{id}`.
+# L'identifiant reste strictement identique dans le catalogue, Firestore et le
+# client Flutter : aucune ville ne peut ainsi recevoir silencieusement les
+# données d'une autre station.
+CONDITIONS_SPOT_IDS = {spot["id"]: spot["id"] for spot in SPOTS}
 CONDITIONS_GFS_DAYS = 10
 EXPECTED_SLOTS_PER_DAY = 24 // STEP_HOURS
 FRESHNESS_CLOCK_SKEW = timedelta(minutes=5)
@@ -397,7 +392,8 @@ HOURLY_WAVE = (
     "secondary_swell_wave_height,secondary_swell_wave_period,"
     "secondary_swell_wave_direction,"
     "wind_wave_height,wind_wave_period,wind_wave_direction,"
-    "sea_surface_temperature,ocean_current_velocity,ocean_current_direction"
+    "sea_surface_temperature,ocean_current_velocity,ocean_current_direction,"
+    "sea_level_height_msl"
 )
 
 
@@ -488,6 +484,10 @@ def fetch_wave_model(lat, lon):
     params = _base_params(lat, lon)
     params.update({
         "hourly": HOURLY_WAVE,
+        # Explicite même si l'API Marine utilise actuellement `sea` par défaut.
+        # Cette option empêche une future évolution de valeur par défaut de
+        # sélectionner une cellule terrestre pour une ville côtière.
+        "cell_selection": "sea",
     })
     return _fetch_json(url, params)
 
@@ -644,6 +644,7 @@ def _extract_wave_model_slot(wave_data, wave_by_time, t):
         "ocean_current_direction_deg": _hourly_num(
             h, "ocean_current_direction", i
         ),
+        "sea_level_height_msl": _hourly_num(h, "sea_level_height_msl", i),
     }
 
 
@@ -981,6 +982,217 @@ def build_conditions_gfs_summary(
     return summary
 
 
+_MARINE_CONDITIONS_FIELDS = (
+    ("sea_level_height_msl", "height", -10.0, 10.0),
+    ("wave_height", "waveHeightM", 0.0, 40.0),
+    ("wave_period", "wavePeriodS", 0.0, 60.0),
+    ("wave_direction", "waveDirectionDeg", 0.0, 360.0),
+    ("wind_wave_height", "windWaveHeightM", 0.0, 40.0),
+    ("wind_wave_period", "windWavePeriodS", 0.0, 60.0),
+    ("wind_wave_direction", "windWaveDirectionDeg", 0.0, 360.0),
+    ("swell_wave_height", "swellHeightM", 0.0, 40.0),
+    ("swell_wave_period", "swellPeriodS", 0.0, 60.0),
+    ("swell_wave_direction", "swellDirectionDeg", 0.0, 360.0),
+    ("secondary_swell_wave_height", "secondarySwellHeightM", 0.0, 40.0),
+    ("secondary_swell_wave_period", "secondarySwellPeriodS", 0.0, 60.0),
+    ("secondary_swell_wave_direction", "secondarySwellDirectionDeg", 0.0, 360.0),
+    ("sea_surface_temperature", "seaSurfaceTemperatureC", -5.0, 45.0),
+    ("ocean_current_velocity", "oceanCurrentSpeedKmh", 0.0, 30.0),
+    ("ocean_current_direction", "oceanCurrentDirectionDeg", 0.0, 360.0),
+)
+
+_WEATHER_CONDITIONS_FIELDS = (
+    ("temperature_2m", "temperatureC", -90.0, 60.0, 1.0),
+    ("wind_speed_10m", "windSpeedKmh", 0.0, 400.0, 3.6),
+    ("wind_gusts_10m", "windGustKmh", 0.0, 500.0, 3.6),
+    ("wind_direction_10m", "windDirectionDeg", 0.0, 360.0, 1.0),
+    ("weather_code", "weatherCode", 0.0, 99.0, 1.0),
+    ("is_day", "isDay", 0.0, 1.0, 1.0),
+    ("pressure_msl", "pressureHpa", 800.0, 1200.0, 1.0),
+    ("precipitation_probability", "precipitationProbabilityPct", 0.0, 100.0, 1.0),
+    ("precipitation", "precipitationMm", 0.0, 500.0, 1.0),
+    ("relative_humidity_2m", "relativeHumidityPct", 0.0, 100.0, 1.0),
+    ("cloud_cover", "cloudCoverPct", 0.0, 100.0, 1.0),
+    ("visibility", "visibilityKm", 0.0, 100.0, 0.001),
+)
+
+
+def _utc_iso_from_open_meteo(local_timestamp, utc_offset_seconds):
+    """Normalise une heure locale Open-Meteo vers un ISO UTC non ambigu."""
+    parsed = datetime.fromisoformat(local_timestamp)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(
+            tzinfo=timezone(timedelta(seconds=int(utc_offset_seconds or 0)))
+        )
+    return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _haversine_km(lat1, lon1, lat2, lon2):
+    radians = math.pi / 180.0
+    d_lat = (lat2 - lat1) * radians
+    d_lon = (lon2 - lon1) * radians
+    a = (
+        math.sin(d_lat / 2) ** 2
+        + math.cos(lat1 * radians)
+        * math.cos(lat2 * radians)
+        * math.sin(d_lon / 2) ** 2
+    )
+    return 6371.0 * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+def _validated_number(hourly, api_key, index, minimum, maximum, label):
+    value = _hourly_num(hourly, api_key, index)
+    if value is None or not math.isfinite(value) or value < minimum or value > maximum:
+        raise ValueError(
+            f"{label} : {api_key} absent ou hors limites au créneau {index}."
+        )
+    return value
+
+
+def _validate_hourly_continuity(slots, label):
+    if len(slots) < 24 * 9:
+        raise ValueError(
+            f"{label} : couverture insuffisante ({len(slots)} créneaux)."
+        )
+    parsed = []
+    for slot in slots:
+        raw_time = slot.get("time")
+        if not isinstance(raw_time, str):
+            raise ValueError(f"{label} : heure absente.")
+        parsed.append(datetime.fromisoformat(raw_time.replace("Z", "+00:00")))
+    if parsed != sorted(parsed) or len(set(parsed)) != len(parsed):
+        raise ValueError(f"{label} : heures dupliquées ou non triées.")
+    for previous, current in zip(parsed, parsed[1:]):
+        if current - previous != timedelta(hours=1):
+            raise ValueError(
+                f"{label} : rupture horaire entre {previous} et {current}."
+            )
+
+
+def build_conditions_document(
+    spot,
+    wind_json,
+    wave_json,
+    published_days,
+    *,
+    forecast_run_id,
+    last_update,
+):
+    """Construit le document complet consommé par la page Marées.
+
+    Toute valeur visible dans l'application est obligatoire ici. Une valeur
+    absente fait échouer le run avant écriture, ce qui conserve dans Firestore
+    le dernier document complet au lieu de publier un faux zéro.
+    """
+    published_dates = {day["date"] for day in published_days}
+    wave_hourly = wave_json.get("hourly") or {}
+    wind_hourly = wind_json.get("hourly") or {}
+    wave_times = wave_hourly.get("time") or []
+    wind_times = wind_hourly.get("time") or []
+    wave_offset = int(_safe_num(wave_json.get("utc_offset_seconds"), 0) or 0)
+    wind_offset = int(_safe_num(wind_json.get("utc_offset_seconds"), 0) or 0)
+
+    tide_slots = []
+    for index, local_time in enumerate(wave_times):
+        if not isinstance(local_time, str) or local_time[:10] not in published_dates:
+            continue
+        slot = {"time": _utc_iso_from_open_meteo(local_time, wave_offset)}
+        for api_key, output_key, minimum, maximum in _MARINE_CONDITIONS_FIELDS:
+            slot[output_key] = _validated_number(
+                wave_hourly,
+                api_key,
+                index,
+                minimum,
+                maximum,
+                f"conditions/{spot['id']}.tide",
+            )
+        tide_slots.append(slot)
+    _validate_hourly_continuity(tide_slots, f"conditions/{spot['id']}.tide")
+
+    weather_slots = []
+    for index, local_time in enumerate(wind_times):
+        if not isinstance(local_time, str) or local_time[:10] not in published_dates:
+            continue
+        slot = {"time": _utc_iso_from_open_meteo(local_time, wind_offset)}
+        for api_key, output_key, minimum, maximum, multiplier in _WEATHER_CONDITIONS_FIELDS:
+            value = _validated_number(
+                wind_hourly,
+                api_key,
+                index,
+                minimum / multiplier,
+                maximum / multiplier,
+                f"conditions/{spot['id']}.weather",
+            )
+            converted = value * multiplier
+            slot[output_key] = round(converted) if output_key in {"weatherCode", "isDay"} else round(converted, 2)
+        weather_slots.append(slot)
+    _validate_hourly_continuity(
+        weather_slots,
+        f"conditions/{spot['id']}.weather",
+    )
+    if [slot["time"] for slot in tide_slots] != [
+        slot["time"] for slot in weather_slots
+    ]:
+        raise ValueError(
+            f"conditions/{spot['id']} : les séries marines et météo ne sont "
+            "pas alignées heure par heure."
+        )
+
+    first_day = published_days[0]
+    sunrise = first_day.get("sunrise")
+    sunset = first_day.get("sunset")
+    if not isinstance(sunrise, str) or not isinstance(sunset, str):
+        raise ValueError(
+            f"conditions/{spot['id']} : lever ou coucher du soleil absent."
+        )
+
+    source_latitude = _safe_num(wave_json.get("latitude"))
+    source_longitude = _safe_num(wave_json.get("longitude"))
+    if source_latitude is None or source_longitude is None:
+        raise ValueError(f"conditions/{spot['id']} : cellule marine absente.")
+    source_distance_km = _haversine_km(
+        spot["lat"],
+        spot["lon"],
+        source_latitude,
+        source_longitude,
+    )
+    if source_distance_km > 30.0:
+        raise ValueError(
+            f"conditions/{spot['id']} : cellule marine à "
+            f"{source_distance_km:.1f} km (> 30 km)."
+        )
+
+    return {
+        "schema_version": 2,
+        "forecast_run_id": forecast_run_id,
+        "spot_id": spot["id"],
+        "name": spot["name"],
+        "lat": spot["lat"],
+        "lon": spot["lon"],
+        "timestamp": last_update,
+        "tide_datum": "global_mean_sea_level",
+        "source": {
+            "provider": "Open-Meteo",
+            "marineLatitude": source_latitude,
+            "marineLongitude": source_longitude,
+            "marineDistanceKm": round(source_distance_km, 1),
+        },
+        "sun": {
+            "date": first_day["date"],
+            "sunrise": sunrise,
+            "sunset": sunset,
+        },
+        "tide": {"hourly": tide_slots},
+        "weather": {"hourly": weather_slots},
+        "gfs": build_conditions_gfs_summary(
+            published_days,
+            forecast_run_id=forecast_run_id,
+            spot_id=spot["id"],
+            last_update=last_update,
+        ),
+    }
+
+
 def _require_station_models(station_result):
     """Retourne les trois modèles ou interrompt la récolte au premier manque."""
     spot = station_result["spot"]
@@ -1044,7 +1256,7 @@ def _build_station_publication(
     validate_payload(days_payload, utc_offset_seconds)
 
     # L'interface publie explicitement dix jours. Limiter le document à cette
-    # fenêtre maintient aussi la publication totale de 291 écritures nettement sous
+    # fenêtre maintient aussi la publication totale de 429 écritures nettement sous
     # la limite Firestore de 10 Mio, contrairement aux quinze jours bruts
     # demandés à Open-Meteo (utiles comme marge de collecte/validation).
     published_days = days_payload[:CONDITIONS_GFS_DAYS]
@@ -1067,19 +1279,21 @@ def _build_station_publication(
     if "sunset" in first_day:
         weather_doc["sunset"] = first_day["sunset"]
 
-    conditions_summary = None
+    conditions_doc = None
     if spot["id"] in conditions_spot_ids:
-        conditions_summary = build_conditions_gfs_summary(
+        conditions_doc = build_conditions_document(
+            spot,
+            wind_json,
+            wave_json,
             published_days,
             forecast_run_id=run_id,
-            spot_id=spot["id"],
             last_update=firestore.SERVER_TIMESTAMP,
         )
 
     return {
         "spot": spot,
         "weather_doc": weather_doc,
-        "conditions_summary": conditions_summary,
+        "conditions_doc": conditions_doc,
     }
 
 
@@ -1114,23 +1328,25 @@ def _validate_publications_before_commit(
         ) != spot.get("lon"):
             raise ValueError(f"Coordonnées météo incohérentes pour {spot_id}.")
 
-        conditions_summary = publication.get("conditions_summary")
+        conditions_doc = publication.get("conditions_doc")
         if spot_id in condition_spot_ids:
-            if not isinstance(conditions_summary, dict):
+            if not isinstance(conditions_doc, dict):
                 raise ValueError(
-                    f"Résumé conditions manquant pour le spot requis {spot_id}."
+                    f"Document conditions manquant pour le spot requis {spot_id}."
                 )
-            if conditions_summary.get("forecast_run_id") != run_id:
+            if conditions_doc.get("forecast_run_id") != run_id:
                 raise ValueError(
                     f"Run id conditions incohérent pour le spot {spot_id}."
                 )
-            if conditions_summary.get("spot_id") != spot_id:
+            if conditions_doc.get("spot_id") != spot_id:
                 raise ValueError(
                     f"Spot id conditions incohérent pour le spot {spot_id}."
                 )
-        elif conditions_summary is not None:
+            if conditions_doc.get("name") != spot.get("name"):
+                raise ValueError(f"Nom conditions incohérent pour {spot_id}.")
+        elif conditions_doc is not None:
             raise ValueError(
-                f"Résumé conditions inattendu pour le spot {spot_id}."
+                f"Document conditions inattendu pour le spot {spot_id}."
             )
 
     missing_conditions = condition_spot_ids - seen_spot_ids
@@ -1150,8 +1366,8 @@ def _write_forecast_batches(
 ):
     """Publie des lots atomiques bornés après validation du run complet.
 
-    Les trois documents éventuels d'une station (météo, index et résumé de
-    conditions) restent toujours dans le même WriteBatch. Si un Commit échoue,
+    Les trois documents d'une station (météo, index et conditions) restent
+    toujours dans le même WriteBatch. Si un Commit échoue,
     les stations déjà publiées restent cohérentes et les autres conservent leur
     dernière version valide ; l'exception interrompt immédiatement le job.
     """
@@ -1197,11 +1413,9 @@ def _write_forecast_batches(
                 conditions_ref = db.collection("conditions").document(
                     conditions_id
                 )
-                batch.set(
-                    conditions_ref,
-                    {"gfs": publication["conditions_summary"]},
-                    merge=True,
-                )
+                # Remplacement complet : un ancien champ ne doit pas survivre à
+                # une évolution de schéma et être pris pour une donnée fraîche.
+                batch.set(conditions_ref, publication["conditions_doc"])
                 write_count += 1
                 batch_write_count += 1
 
@@ -1291,6 +1505,87 @@ def _verify_freshness(data, label, run_started_at, now):
         raise RuntimeError(
             f"Vérification Production : {label} possède une date future invalide."
         )
+
+
+def _verify_timestamp_field(data, field, label, run_started_at, now):
+    updated_at = _utc_datetime(data.get(field), label)
+    if updated_at < run_started_at - FRESHNESS_CLOCK_SKEW:
+        raise RuntimeError(
+            f"Vérification Production : {label} est antérieur au run courant."
+        )
+    if updated_at > now + FRESHNESS_CLOCK_SKEW:
+        raise RuntimeError(
+            f"Vérification Production : {label} possède une date future invalide."
+        )
+
+
+def _verify_conditions_payload(data, spot, run_id, label, run_started_at, now):
+    if data.get("schema_version") != 2:
+        raise RuntimeError(f"Vérification Production : schéma incorrect dans {label}.")
+    if data.get("forecast_run_id") != run_id or data.get("spot_id") != spot["id"]:
+        raise RuntimeError(
+            f"Vérification Production : identité incorrecte dans {label}."
+        )
+    if data.get("name") != spot["name"]:
+        raise RuntimeError(f"Vérification Production : nom incorrect dans {label}.")
+    for field, expected in (("lat", spot["lat"]), ("lon", spot["lon"])):
+        actual = data.get(field)
+        if (
+            isinstance(actual, bool)
+            or not isinstance(actual, (int, float))
+            or abs(float(actual) - float(expected)) > 1e-6
+        ):
+            raise RuntimeError(
+                f"Vérification Production : {field} incorrect dans {label}."
+            )
+    _verify_timestamp_field(data, "timestamp", label, run_started_at, now)
+    if data.get("tide_datum") != "global_mean_sea_level":
+        raise RuntimeError(
+            f"Vérification Production : référence de marée incorrecte dans {label}."
+        )
+
+    tide = data.get("tide")
+    weather = data.get("weather")
+    tide_slots = tide.get("hourly") if isinstance(tide, dict) else None
+    weather_slots = weather.get("hourly") if isinstance(weather, dict) else None
+    if not isinstance(tide_slots, list) or not isinstance(weather_slots, list):
+        raise RuntimeError(
+            f"Vérification Production : séries horaires absentes dans {label}."
+        )
+    try:
+        _validate_hourly_continuity(tide_slots, f"{label}.tide")
+        _validate_hourly_continuity(weather_slots, f"{label}.weather")
+    except ValueError as error:
+        raise RuntimeError(f"Vérification Production : {error}") from error
+
+    for index, slot in enumerate(tide_slots):
+        for _, output_key, minimum, maximum in _MARINE_CONDITIONS_FIELDS:
+            value = slot.get(output_key)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or value < minimum
+                or value > maximum
+            ):
+                raise RuntimeError(
+                    f"Vérification Production : {label}.tide[{index}]."
+                    f"{output_key} invalide."
+                )
+    for index, slot in enumerate(weather_slots):
+        for _, output_key, minimum, maximum, _ in _WEATHER_CONDITIONS_FIELDS:
+            value = slot.get(output_key)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or value < minimum
+                or value > maximum
+            ):
+                raise RuntimeError(
+                    f"Vérification Production : {label}.weather[{index}]."
+                    f"{output_key} invalide."
+                )
 
 
 def _verify_spot_identity(data, spot, run_id, name_field, label):
@@ -1389,22 +1684,30 @@ def verify_production_state(
         conditions_id = conditions_spot_ids.get(spot["id"])
         if conditions_id is None:
             continue
-        conditions_label = f"conditions/{conditions_id}.gfs"
+        conditions_label = f"conditions/{conditions_id}"
         conditions_doc = _snapshot_data(
             db.collection("conditions").document(conditions_id).get(),
-            f"conditions/{conditions_id}",
+            conditions_label,
+        )
+        _verify_conditions_payload(
+            conditions_doc,
+            spot,
+            run_id,
+            conditions_label,
+            run_started_at,
+            now,
         )
         gfs = conditions_doc.get("gfs")
         if not isinstance(gfs, dict):
             raise RuntimeError(
-                f"Vérification Production : {conditions_label} est absent ou invalide."
+                f"Vérification Production : {conditions_label}.gfs est absent ou invalide."
             )
         if gfs.get("forecast_run_id") != run_id or gfs.get("spot_id") != spot["id"]:
             raise RuntimeError(
                 f"Vérification Production : métadonnées incorrectes dans "
-                f"{conditions_label}."
+                f"{conditions_label}.gfs."
             )
-        _verify_freshness(gfs, conditions_label, run_started_at, now)
+        _verify_freshness(gfs, f"{conditions_label}.gfs", run_started_at, now)
 
         expected_summary = build_conditions_gfs_summary(
             weather["days"],
@@ -1417,7 +1720,7 @@ def verify_production_state(
         if gfs.get("hourly") != expected_summary["hourly"]:
             raise RuntimeError(
                 f"Vérification Production : résumé horaire incohérent dans "
-                f"{conditions_label}."
+                f"{conditions_label}.gfs."
             )
         if len(expected_summary["hourly"]) != (
             CONDITIONS_GFS_DAYS * EXPECTED_SLOTS_PER_DAY
@@ -1565,9 +1868,13 @@ def main():
             "Catalogue de récolte inattendu : "
             f"{len(SPOTS)} spots au lieu de {EXPECTED_STATION_COUNT}."
         )
-    if len(CONDITIONS_SPOT_IDS) != 5:
+    if (
+        len(CONDITIONS_SPOT_IDS) != EXPECTED_STATION_COUNT
+        or set(CONDITIONS_SPOT_IDS) != {spot["id"] for spot in SPOTS}
+    ):
         raise SystemExit(
-            "Configuration conditions inattendue : cinq résumés sont requis."
+            "Configuration conditions inattendue : chaque station du catalogue "
+            "doit posséder son propre document."
         )
 
     start_time = time.time()

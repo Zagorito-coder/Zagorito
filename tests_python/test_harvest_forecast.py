@@ -57,10 +57,69 @@ def _valid_days(day_count=10):
         days.append(
             {
                 "date": current_day.date().isoformat(),
+                "sunrise": current_day.replace(hour=6).isoformat(timespec="minutes"),
+                "sunset": current_day.replace(hour=19).isoformat(timespec="minutes"),
                 "slots": slots,
             }
         )
     return days
+
+
+def _complete_hourly_api_payloads(spot, day_count=15):
+    first_hour = datetime(2026, 8, 1)
+    times = [
+        (first_hour + timedelta(hours=index)).isoformat(timespec="minutes")
+        for index in range(day_count * 24)
+    ]
+    wind_values = {
+        "temperature_2m": 24.0,
+        "wind_speed_10m": 5.0,
+        "wind_gusts_10m": 8.0,
+        "wind_direction_10m": 225.0,
+        "weather_code": 1.0,
+        "is_day": 1.0,
+        "pressure_msl": 1014.0,
+        "precipitation_probability": 10.0,
+        "precipitation": 0.0,
+        "relative_humidity_2m": 70.0,
+        "cloud_cover": 15.0,
+        "visibility": 20000.0,
+    }
+    marine_values = {
+        "sea_level_height_msl": 0.4,
+        "wave_height": 1.2,
+        "wave_period": 9.0,
+        "wave_direction": 310.0,
+        "wind_wave_height": 0.5,
+        "wind_wave_period": 6.0,
+        "wind_wave_direction": 300.0,
+        "swell_wave_height": 1.0,
+        "swell_wave_period": 11.0,
+        "swell_wave_direction": 315.0,
+        "secondary_swell_wave_height": 0.3,
+        "secondary_swell_wave_period": 7.0,
+        "secondary_swell_wave_direction": 270.0,
+        "sea_surface_temperature": 19.2,
+        "ocean_current_velocity": 0.8,
+        "ocean_current_direction": 45.0,
+    }
+    wind = {
+        "utc_offset_seconds": 3600,
+        "hourly": {
+            "time": times,
+            **{key: [value] * len(times) for key, value in wind_values.items()},
+        },
+    }
+    wave = {
+        "utc_offset_seconds": 3600,
+        "latitude": spot["lat"],
+        "longitude": spot["lon"],
+        "hourly": {
+            "time": times,
+            **{key: [value] * len(times) for key, value in marine_values.items()},
+        },
+    }
+    return wind, wave
 
 
 class _FakeSnapshot:
@@ -312,6 +371,20 @@ class SpotCatalogTests(unittest.TestCase):
             self.assertGreaterEqual(spot["lon"], -180)
             self.assertLessEqual(spot["lon"], 180)
 
+    def test_every_catalog_spot_has_its_own_conditions_document(self):
+        self.assertEqual(143, len(harvest_forecast.CONDITIONS_SPOT_IDS))
+        self.assertEqual(
+            {spot["id"] for spot in harvest_forecast.SPOTS},
+            set(harvest_forecast.CONDITIONS_SPOT_IDS),
+        )
+        self.assertTrue(
+            all(
+                source_id == document_id
+                for source_id, document_id in
+                harvest_forecast.CONDITIONS_SPOT_IDS.items()
+            )
+        )
+
     def test_known_inland_cells_keep_their_validated_coastal_coordinates(self):
         by_id = {spot["id"]: spot for spot in harvest_forecast.SPOTS}
         expected = {
@@ -479,19 +552,30 @@ class ProductionWriteAndVerificationTests(unittest.TestCase):
             spot_id=self.spot["id"],
             last_update=self.updated,
         )
+        wind, wave = _complete_hourly_api_payloads(self.spot)
+        conditions = harvest_forecast.build_conditions_document(
+            self.spot,
+            wind,
+            wave,
+            days,
+            forecast_run_id=self.run_id,
+            last_update=self.updated,
+        )
+        conditions["gfs"] = gfs
         return {
             ("spots_meteo", self.spot["id"]): weather,
             ("spots_index", self.spot["id"]): index,
-            ("conditions", "test_condition"): {"gfs": gfs},
+            ("conditions", "test_condition"): conditions,
         }
 
     def test_station_publication_keeps_exactly_ten_validated_days(self):
+        wind, wave = _complete_hourly_api_payloads(self.spot)
         station_result = {
             "spot": self.spot,
             "models": {
-                "wind": {"hourly": {"time": []}, "utc_offset_seconds": 3600},
+                "wind": wind,
                 "hires": {"hourly": {"time": []}},
-                "wave": {"hourly": {"time": []}},
+                "wave": wave,
             },
             "errors": {},
         }
@@ -508,8 +592,12 @@ class ProductionWriteAndVerificationTests(unittest.TestCase):
 
         self.assertEqual(10, len(publication["weather_doc"]["days"]))
         self.assertEqual(
-            80,
-            len(publication["conditions_summary"]["hourly"]),
+            240,
+            len(publication["conditions_doc"]["tide"]["hourly"]),
+        )
+        self.assertEqual(
+            240,
+            len(publication["conditions_doc"]["weather"]["hourly"]),
         )
 
     def test_global_write_uses_bounded_atomic_batches_for_251_documents(self):
@@ -529,11 +617,12 @@ class ProductionWriteAndVerificationTests(unittest.TestCase):
         }
         publications = []
         for spot in spots:
-            summary = None
+            conditions_doc = None
             if spot["id"] in conditions_spot_ids:
-                summary = {
+                conditions_doc = {
                     "forecast_run_id": self.run_id,
                     "spot_id": spot["id"],
+                    "name": spot["name"],
                 }
             publications.append(
                 {
@@ -545,7 +634,7 @@ class ProductionWriteAndVerificationTests(unittest.TestCase):
                         "latitude": spot["lat"],
                         "longitude": spot["lon"],
                     },
-                    "conditions_summary": summary,
+                    "conditions_doc": conditions_doc,
                 }
             )
 
@@ -613,7 +702,7 @@ class ProductionWriteAndVerificationTests(unittest.TestCase):
                         "latitude": spot["lat"],
                         "longitude": spot["lon"],
                     },
-                    "conditions_summary": None,
+                    "conditions_doc": None,
                 }
             )
 
@@ -643,7 +732,7 @@ class ProductionWriteAndVerificationTests(unittest.TestCase):
         first_publication = {
             "spot": first_spot,
             "weather_doc": {"days": _valid_days()},
-            "conditions_summary": None,
+            "conditions_doc": None,
         }
         with mock.patch.object(
             harvest_forecast,

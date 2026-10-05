@@ -1,18 +1,22 @@
+import 'dart:async';
 // ============================================================================
 // forecast_page.dart
 //
 // Page complete "marees" style Forecast avec geolocalisation automatique :
-// - Detecte la position GPS de l'utilisateur
-// - Cherche le spot cotier le plus proche dans Firestore
+// - Partage la sélection GPS ou manuelle avec la page Marées
+// - Cherche le point météo existant le plus proche dans le catalogue local
 // - Affiche le tableau Forecast pour ce spot
-// - Permet de changer manuellement de spot via un dropdown
+// - Permet de rechercher et sélectionner une ville
 //
-// Donnees : lues depuis Firestore (remplies chaque nuit par
+// Donnees : lues depuis Firestore (publiées par
 // harvest_forecast.py + GitHub Actions)
 // ============================================================================
 
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
+import '../services/marine_location_controller.dart';
+import '../widgets/marine_location_selector.dart';
+import '../data/marine_weather_points.dart';
+import '../l10n/app_localizations.dart';
 import 'package:spots_app/services/forecast_firestore_service.dart';
 import 'package:spots_app/widgets/forecast_table.dart';
 import 'package:spots_app/widgets/app_back_button.dart';
@@ -20,46 +24,13 @@ import 'package:spots_app/widgets/open_meteo_attribution.dart';
 import 'package:spots_app/theme.dart';
 
 @visibleForTesting
-String fallbackForecastSpotId(List<Map<String, dynamic>> spots) {
-  final validSpots = spots.where((spot) {
-    final id = spot['id'];
-    return id is String && id.trim().isNotEmpty;
-  }).toList()
-    ..sort(
-      (a, b) => (a['id'] as String)
-          .toLowerCase()
-          .compareTo((b['id'] as String).toLowerCase()),
-    );
-
-  if (validSpots.isEmpty) {
-    throw StateError('Aucun identifiant de spot météo valide.');
-  }
-
-  for (final spot in validSpots) {
-    final id = (spot['id'] as String).trim();
-    final name = (spot['name'] as String? ?? '').trim();
-    if (id.toLowerCase().contains('casablanca') ||
-        name.toLowerCase().contains('casablanca')) {
-      return id;
-    }
-  }
-
-  return (validSpots.first['id'] as String).trim();
-}
-
-/// Sélectionne une station selon la disponibilité réelle de la position.
-///
-/// Une position absente conserve le repli explicite et déterministe existant.
-/// Lorsqu'une position est connue, aucune station située au-delà du rayon
-/// professionnel de 75 km n'est substituée silencieusement.
-@visibleForTesting
 String? forecastSpotIdForPosition({
   required List<Map<String, dynamic>> spots,
   required double? latitude,
   required double? longitude,
 }) {
   if (latitude == null || longitude == null) {
-    return fallbackForecastSpotId(spots);
+    return null;
   }
   return ForecastFirestoreService.nearestWeatherStationIdWithinRadius(
     stations: spots,
@@ -73,7 +44,10 @@ class ForecastPage extends StatefulWidget {
   /// Sinon, utilise le spotId fourni directement.
   final String? spotId;
 
-  const ForecastPage({super.key, this.spotId});
+  final MarineLocationController? locationController;
+  final Future<SpotForecast?> Function(String)? forecastLoader;
+  const ForecastPage(
+      {super.key, this.spotId, this.locationController, this.forecastLoader});
 
   @override
   State<ForecastPage> createState() => _ForecastPageState();
@@ -88,107 +62,68 @@ class _ForecastPageState extends State<ForecastPage> {
   /// Index du jour selectionne dans `dayStarts`
   int? _selectedDayIndex;
 
-  /// Liste des spots disponibles (charges depuis Firestore)
-  List<Map<String, dynamic>> _availableSpots = [];
-  String? _currentSpotId;
+  late final _location =
+      widget.locationController ?? MarineLocationController.instance;
+  int _locationRevision = -1;
+  int _loadRequest = 0;
 
   static const _joursFr = ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di'];
 
   @override
   void initState() {
     super.initState();
-    _init();
+    _location.addListener(_onLocationChanged);
+    unawaited(_init());
+  }
+
+  @override
+  void dispose() {
+    _loadRequest++;
+    _location.removeListener(_onLocationChanged);
+    super.dispose();
   }
 
   Future<void> _init() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
-    try {
-      // 1. Charger la liste des spots disponibles depuis Firestore
-      _availableSpots = await ForecastFirestoreService.listAvailableSpots();
-
-      if (_availableSpots.isEmpty) {
-        setState(() {
-          _error = 'Aucun spot disponible pour le moment.\n'
-              'Veuillez reessayer plus tard.';
-          _isLoading = false;
-        });
-        return;
-      }
-
-      // 2. Determiner quel spot utiliser
-      String? spotId;
-      if (widget.spotId != null) {
-        spotId = widget.spotId!;
-      } else {
-        spotId = await _findNearestSpot();
-      }
-
-      if (spotId == null) {
-        if (!mounted) return;
-        setState(() {
-          _error = 'Aucune station météo disponible à moins de '
-              '${ForecastFirestoreService.maximumWeatherStationDistanceKm.toInt()} km '
-              'de votre position.';
-          _isLoading = false;
-        });
-        return;
-      }
-
-      // 3. Charger les previsions
-      await _loadForecast(spotId);
-    } catch (e) {
-      debugPrint('[ForecastPage] Erreur init: $e');
-      if (!mounted) return;
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
+    await _location.initialize();
+    if (!mounted) return;
+    if (widget.spotId != null) {
+      final point =
+          marineWeatherPoints.where((p) => p.id == widget.spotId).firstOrNull;
+      if (point != null) await _location.selectManual(point);
     }
+    if (mounted) _onLocationChanged();
   }
 
-  /// Trouve le spot le plus proche de la position GPS actuelle
-  Future<String?> _findNearestSpot() async {
-    final fallbackSpotId = fallbackForecastSpotId(_availableSpots);
-
-    // Cette détection est facultative : elle ne demande jamais une permission
-    // au démarrage. Sans accès déjà accordé, Casablanca reste le repli stable.
-    final LocationPermission perm = await Geolocator.checkPermission();
-    if (perm == LocationPermission.denied ||
-        perm == LocationPermission.deniedForever) {
-      return fallbackSpotId;
+  void _onLocationChanged({bool force = false}) {
+    if (!mounted || (!force && _locationRevision == _location.revision)) return;
+    _locationRevision = _location.revision;
+    final point = _location.weatherPoint;
+    _loadRequest++;
+    if (point == null) {
+      setState(() {
+        _future = null;
+        _isLoading = false;
+        _error = context.tr(_location.coordinates == null
+            ? 'marineLocation.choose'
+            : 'marineLocation.noWeather');
+      });
+      return;
     }
-
-    try {
-      final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.low,
-          timeLimit: Duration(seconds: 5),
-        ),
-      );
-
-      return forecastSpotIdForPosition(
-        spots: _availableSpots,
-        latitude: pos.latitude,
-        longitude: pos.longitude,
-      );
-    } catch (_) {
-      return fallbackSpotId;
-    }
+    unawaited(_loadForecast(point.id));
   }
 
   Future<void> _loadForecast(String spotId) async {
+    final request = ++_loadRequest;
     setState(() {
       _isLoading = true;
       _error = null;
-      _currentSpotId = spotId;
+      _future = null;
     });
     try {
-      final forecast = await ForecastFirestoreService.fetchSpot(spotId);
-      if (!mounted) return;
+      final forecast = await (widget.forecastLoader ??
+              ForecastFirestoreService.fetchSpot)(spotId)
+          .timeout(const Duration(seconds: 15));
+      if (!mounted || request != _loadRequest) return;
       if (forecast == null) {
         setState(() {
           _error = 'Connectez-vous pour voir les prévisions météo.';
@@ -203,7 +138,7 @@ class _ForecastPageState extends State<ForecastPage> {
       });
     } catch (e) {
       debugPrint('[ForecastPage] Erreur chargement $spotId: $e');
-      if (!mounted) return;
+      if (!mounted || request != _loadRequest) return;
       setState(() {
         _error = 'Spot "$spotId": ${e.toString()}';
         _isLoading = false;
@@ -245,7 +180,13 @@ class _ForecastPageState extends State<ForecastPage> {
       ),
       body: SafeArea(
         top: false,
-        child: _buildBody(),
+        child: NestedScrollView(
+          headerSliverBuilder: (context, _) => [
+            SliverToBoxAdapter(
+                child: MarineLocationSelector(controller: _location))
+          ],
+          body: _buildBody(),
+        ),
       ),
     );
   }
@@ -257,7 +198,7 @@ class _ForecastPageState extends State<ForecastPage> {
 
     if (_error != null) {
       final tc = ThemeColors.of(context);
-      return Center(
+      return SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Column(
@@ -277,7 +218,7 @@ class _ForecastPageState extends State<ForecastPage> {
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
-                onPressed: _init,
+                onPressed: () => _onLocationChanged(force: true),
                 icon: const Icon(Icons.refresh),
                 label: const Text('Réessayer'),
               ),
@@ -310,7 +251,7 @@ class _ForecastPageState extends State<ForecastPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildSpotSelector(forecast),
+                    _buildHeader(forecast),
                     _buildHeaderBandeau(forecast),
                     _buildDateBar(forecast),
                     const Divider(height: 1),
@@ -334,57 +275,6 @@ class _ForecastPageState extends State<ForecastPage> {
           },
         );
       },
-    );
-  }
-
-  Widget _buildSpotSelector(SpotForecast forecast) {
-    if (_availableSpots.length <= 1) {
-      return _buildHeader(forecast);
-    }
-
-    final colors = ThemeColors.of(context);
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-      child: Row(
-        children: [
-          const Icon(Icons.location_on, size: 18, color: Colors.blueGrey),
-          const SizedBox(width: 4),
-          Expanded(
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _currentSpotId,
-                isExpanded: true,
-                dropdownColor: colors.surface,
-                style: TextStyle(
-                  color: colors.textPrimary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
-                icon: Icon(
-                  Icons.arrow_drop_down,
-                  size: 20,
-                  color: colors.textSecondary,
-                ),
-                items: _availableSpots.map((spot) {
-                  return DropdownMenuItem<String>(
-                    value: spot['id'] as String,
-                    child: Text(
-                      spot['name'] as String,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  );
-                }).toList(),
-                onChanged: (id) {
-                  if (id != null && id != _currentSpotId) {
-                    _loadForecast(id);
-                  }
-                },
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 

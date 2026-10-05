@@ -1089,7 +1089,12 @@ class _CatchDetailsSheetState extends State<_CatchDetailsSheet> {
           ),
           child: ListView(
             controller: controller,
-            padding: const EdgeInsets.fromLTRB(17, 10, 17, 28),
+            padding: EdgeInsets.fromLTRB(
+              17,
+              10,
+              17,
+              28 + MediaQuery.paddingOf(context).bottom,
+            ),
             children: [
               Center(
                 child: Container(

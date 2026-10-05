@@ -3,8 +3,8 @@ import 'package:spots_app/services/tide_service.dart';
 
 void main() {
   group('rayon des stations de marée', () {
-    test('utilise le seuil côtier de 100 km', () {
-      expect(TideService.maximumTideStationDistanceKm, 100.0);
+    test('utilise le seuil côtier conservateur de 75 km', () {
+      expect(TideService.maximumTideStationDistanceKm, 75.0);
     });
 
     test('sélectionne uniquement la station la plus proche dans le rayon', () {
@@ -28,7 +28,7 @@ void main() {
       expect(result, 'station-11-km');
     });
 
-    test('retourne null lorsque la station la plus proche dépasse 100 km', () {
+    test('retourne null lorsque la station la plus proche dépasse 75 km', () {
       final result = TideService.nearestTideStationIdWithinRadius(
         stations: const [
           {
@@ -48,8 +48,8 @@ void main() {
         'une position distante connue renvoie un fallback honnête, jamais Casablanca',
         () async {
       final result = await TideService.fetchTides(
-        latitude: 5.35,
-        longitude: -4.02,
+        latitude: 40.0,
+        longitude: -100.0,
       );
 
       expect(result.hourlyPoints, isEmpty);
@@ -66,13 +66,13 @@ void main() {
     test('une position distante conserve son nom explicite sans station locale',
         () async {
       final result = await TideService.fetchTides(
-        latitude: 5.35,
-        longitude: -4.02,
-        locationName: "Abidjan, Côte d'Ivoire",
+        latitude: 40.0,
+        longitude: -100.0,
+        locationName: 'Position intérieure de test',
       );
 
       expect(result.hourlyPoints, isEmpty);
-      expect(result.location, "Abidjan, Côte d'Ivoire");
+      expect(result.location, 'Position intérieure de test');
       expect(result.location.toLowerCase(), isNot(contains('casablanca')));
     });
 

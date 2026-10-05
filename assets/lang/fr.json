@@ -526,7 +526,7 @@
     "tomorrowShort": "J+1",
     "forecastInfoSemantics": "Informations importantes sur les prévisions",
     "forecastDialogTitle": "Prévisions marines",
-    "forecastDisclaimer": "Ces prévisions sont indicatives et issues d’un modèle marin. La précision est limitée près des côtes. Ne les utilisez pas pour la navigation et vérifiez toujours les bulletins et horaires officiels locaux.",
+    "forecastDisclaimer": "Les hauteurs de marée sont modélisées par rapport au niveau moyen global de la mer et incluent l’effet prévu des marées et des surcotes. La précision est limitée près des côtes. Ne les utilisez pas pour la navigation et vérifiez toujours les bulletins et horaires officiels locaux.",
     "understood": "Compris",
     "hourSemantics": "{hour} heures",
     "moonNew": "Nouvelle Lune",
@@ -673,5 +673,23 @@
     "confirm": "Confirmer",
     "pressBackAgainToExit": "Appuyez encore une fois sur Retour pour quitter.",
     "ngf": "{height}m NGF"
+  },
+  "marineLocation": {
+    "choose": "Choisir un lieu",
+    "automatic": "Autour de moi · point météo le plus proche",
+    "manual": "Lieu choisi manuellement",
+    "lastKnown": "Dernier lieu connu · position non actualisée",
+    "permission": "Autorisez la localisation ou choisissez un lieu.",
+    "disabled": "Activez la localisation ou choisissez un lieu.",
+    "unavailable": "Position indisponible. Vous pouvez choisir un lieu.",
+    "usePosition": "Utiliser ma position",
+    "search": "Rechercher une ville ou un secteur",
+    "distance": "Point météo à {distance} km de votre position",
+    "noWeather": "Aucun point météo disponible à moins de 75 km. Choisissez un lieu couvert.",
+    "noTides": "Pas de données de marée à moins de 75 km pour ce lieu. Les prévisions météo peuvent rester disponibles.",
+    "noCoefficients": "Les coefficients locaux ne sont pas disponibles pour cette station.",
+    "noAstronomy": "Horaires solunaires et indice global locaux indisponibles pour cette station.",
+    "tideSource": "Marées et conditions : {name} · à {distance} km du lieu sélectionné",
+    "openForecast": "Ouvrir les prévisions de ce lieu"
   }
 }
