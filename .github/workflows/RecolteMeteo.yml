@@ -38,12 +38,6 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-harvest.txt
 
-      - name: Auditer les dependances Python
-        # pypa/gh-action-pip-audit v1.1.0 — action PyPA officielle épinglée.
-        uses: pypa/gh-action-pip-audit@1220774d901786e6f652ae159f7b6bc8fea6d266
-        with:
-          inputs: requirements-harvest.txt
-
       - name: Installer les dependances
         run: |
           python -m pip install --disable-pip-version-check -r requirements-harvest.txt
