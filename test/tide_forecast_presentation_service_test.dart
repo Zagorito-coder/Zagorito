@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spots_app/models/tide_data.dart' as source;
 import 'package:spots_app/models/tide_page_models.dart';
+import 'package:spots_app/services/casablanca_tide_reference.dart';
 import 'package:spots_app/services/tide_coefficient_service.dart';
 import 'package:spots_app/services/tide_forecast_presentation_service.dart';
 
@@ -64,6 +65,26 @@ void main() {
         isTrue,
       );
     }
+  });
+
+  test('convertit les heures civiles Casablanca avec le fuseau de la station',
+      () {
+    final civilTime = DateTime(2026, 8, 20, 12);
+    final day = HourlyForecastDay(
+      date: DateTime(2026, 8, 20),
+      slots: [HourlyForecastSlot(time: civilTime)],
+    );
+
+    final result = TideForecastPresentationService.attachCasablancaTides(
+      [day],
+      utcOffsetSeconds: 3600,
+    ).single;
+    final expectedInstant = DateTime.utc(2026, 8, 20, 11);
+
+    expect(
+      result.slots.single.tideHeightM,
+      closeTo(CasablancaTideReference.heightAtUtc(expectedInstant), 0.000001),
+    );
   });
 
   test('associe les marées horaires publiées à une station hors Casablanca',

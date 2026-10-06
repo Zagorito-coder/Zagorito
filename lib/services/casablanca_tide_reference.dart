@@ -46,13 +46,15 @@ class CasablancaTideReference {
         .map(
           (point) => _withHeight(
             point,
-            heightAtUtc(point.time.toUtc()),
+            heightAtUtc(
+              point.instantUtc ?? source.stationInstantAt(point.time),
+            ),
           ),
         )
         .toList(growable: false);
     final low = calibratedPoints.map((point) => point.height).reduce(math.min);
     final high = calibratedPoints.map((point) => point.height).reduce(math.max);
-    final referenceTime = now ?? DateTime.now();
+    final referenceTime = source.stationTimeAt(now ?? DateTime.now());
     final nextPoint = calibratedPoints
             .where((point) => point.time.isAfter(referenceTime))
             .firstOrNull ??
@@ -67,6 +69,8 @@ class CasablancaTideReference {
       waveHeight: source.waveHeight,
       location: source.location,
       generatedAt: source.generatedAt,
+      utcOffsetSeconds: source.utcOffsetSeconds,
+      timeZoneId: source.timeZoneId,
       astro: source.astro,
     );
   }
@@ -74,6 +78,7 @@ class CasablancaTideReference {
   static TidePoint _withHeight(TidePoint point, double calibratedHeight) =>
       TidePoint(
         time: point.time,
+        instantUtc: point.instantUtc,
         height: calibratedHeight,
         windDirectionDeg: point.windDirectionDeg,
         wavePeriod: point.wavePeriod,

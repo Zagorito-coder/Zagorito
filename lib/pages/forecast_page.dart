@@ -140,14 +140,14 @@ class _ForecastPageState extends State<ForecastPage> {
       debugPrint('[ForecastPage] Erreur chargement $spotId: $e');
       if (!mounted || request != _loadRequest) return;
       setState(() {
-        _error = 'Spot "$spotId": ${e.toString()}';
+        _error = 'Prévisions temporairement indisponibles pour ce lieu.';
         _isLoading = false;
       });
     }
   }
 
   int _findDayIndexForToday(SpotForecast forecast) {
-    final now = DateTime.now();
+    final now = forecast.stationTimeAt(DateTime.now());
     for (int i = 0; i < forecast.dayStarts.length; i++) {
       if (_isSameDay(forecast.dayStarts[i], now)) return i;
     }
@@ -304,17 +304,23 @@ class _ForecastPageState extends State<ForecastPage> {
     }
 
     String formatTime(String? iso) {
-      if (iso == null) return '-';
-      // Extraire HH:MM de "2026-07-10T06:28"
-      final parts = iso.split('T');
-      if (parts.length == 2) return parts[1].substring(0, 5);
-      return iso;
+      if (iso == null || iso.trim().isEmpty) return '-';
+      final parsed = DateTime.tryParse(iso.trim());
+      if (parsed == null) return '-';
+      return '${parsed.hour.toString().padLeft(2, '0')}:'
+          '${parsed.minute.toString().padLeft(2, '0')}';
     }
 
     String waterTempStr() {
       if (forecast.waterTempC == null) return '-';
       return '${forecast.waterTempC!.toStringAsFixed(1)}°C';
     }
+
+    final selectedIndex = _selectedDayIndex ?? 0;
+    final selectedSunrise = forecast.sunriseForDay(selectedIndex) ??
+        (selectedIndex == 0 ? forecast.sunrise : null);
+    final selectedSunset = forecast.sunsetForDay(selectedIndex) ??
+        (selectedIndex == 0 ? forecast.sunset : null);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -333,7 +339,7 @@ class _ForecastPageState extends State<ForecastPage> {
           Icon(Icons.wb_sunny, size: 14, color: Colors.orange),
           const SizedBox(width: 2),
           Text(
-            formatTime(forecast.sunrise),
+            formatTime(selectedSunrise),
             style: TextStyle(fontSize: 11, color: textColor),
           ),
           const SizedBox(width: 12),
@@ -341,7 +347,7 @@ class _ForecastPageState extends State<ForecastPage> {
           Icon(Icons.nights_stay, size: 14, color: Colors.indigo),
           const SizedBox(width: 2),
           Text(
-            formatTime(forecast.sunset),
+            formatTime(selectedSunset),
             style: TextStyle(fontSize: 11, color: textColor),
           ),
           const SizedBox(width: 12),

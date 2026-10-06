@@ -263,12 +263,17 @@ class WindAnimationProvider extends ChangeNotifier {
   }
 
   int _findClosestHourIndex(SpotForecast forecast) {
-    final now = DateTime.now();
+    final instantNow = DateTime.now().toUtc();
+    final stationNow = forecast.stationTimeAt(instantNow);
     int best = 0;
     double bestDiff = double.infinity;
     for (int i = 0; i < forecast.slots.length; i++) {
-      final diff =
-          forecast.slots[i].dateTime.difference(now).abs().inMinutes.toDouble();
+      final slot = forecast.slots[i];
+      final diff = (slot.instantUtc?.difference(instantNow) ??
+              slot.dateTime.difference(stationNow))
+          .abs()
+          .inMinutes
+          .toDouble();
       if (diff < bestDiff) {
         bestDiff = diff;
         best = i;
@@ -283,9 +288,14 @@ class WindAnimationProvider extends ChangeNotifier {
       return;
     }
     final slot = _forecast!.slots[_selectedHourIndex];
-    final speed =
-        slot.windGustKnots > 0 ? slot.windGustKnots : slot.windSpeedKnots;
+    final speed = slot.windGustKnots != null && slot.windGustKnots! > 0
+        ? slot.windGustKnots
+        : slot.windSpeedKnots;
     final dirDeg = slot.windDirectionDeg;
+    if (speed == null || dirDeg == null) {
+      _currentVector = null;
+      return;
+    }
     final angleRad = (270 - dirDeg) * pi / 180.0;
     _currentVector = WindVector(
       u: speed * cos(angleRad),

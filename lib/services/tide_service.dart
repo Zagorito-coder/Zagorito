@@ -10,6 +10,7 @@ import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 
 import '../data/marine_weather_points.dart';
 import '../models/tide_data.dart';
+import '../utils/station_time_zone.dart';
 import 'astronomy_service.dart';
 import 'casablanca_tide_reference.dart';
 import 'tide_conditions_mapper.dart';
@@ -18,6 +19,7 @@ class TideService {
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
   static const Duration _requestTimeout = Duration(seconds: 15);
   static const Duration _maximumForecastAge = Duration(hours: 36);
+  static const String casablancaTimeZoneId = 'Africa/Casablanca';
   static const String unavailableLocationLabel =
       'Données marines indisponibles';
 
@@ -111,23 +113,36 @@ class TideService {
   /// indisponibles au lieu d'afficher des valeurs inventées.
   @visibleForTesting
   static TideData casablancaOfflineFallback({DateTime? now}) {
-    final referenceTime = (now ?? DateTime.now()).toLocal();
+    final referenceInstant = (now ?? DateTime.now()).toUtc();
+    final referenceTime = StationTimeZone.civilAt(
+      referenceInstant,
+      timeZoneId: casablancaTimeZoneId,
+    );
     final start = DateTime(
       referenceTime.year,
       referenceTime.month,
       referenceTime.day,
     );
+    final startInstant = StationTimeZone.instantAt(
+      start,
+      timeZoneId: casablancaTimeZoneId,
+    );
     final points = List<TidePoint>.generate(49, (index) {
-      final time = start.add(Duration(hours: index));
+      final instant = startInstant.add(Duration(hours: index));
+      final time = StationTimeZone.civilAt(
+        instant,
+        timeZoneId: casablancaTimeZoneId,
+      );
       return TidePoint(
         time: time,
-        height: CasablancaTideReference.heightAtUtc(time.toUtc()),
+        instantUtc: instant,
+        height: CasablancaTideReference.heightAtUtc(instant),
       );
     }, growable: false);
     final low = points.map((point) => point.height).reduce(math.min);
     final high = points.map((point) => point.height).reduce(math.max);
     final next = points
-            .where((point) => point.time.isAfter(referenceTime))
+            .where((point) => point.instantUtc!.isAfter(referenceInstant))
             .firstOrNull ??
         points.last;
 
@@ -139,6 +154,11 @@ class TideService {
       waveHeight: 0,
       location: 'Casablanca, Maroc',
       generatedAt: null,
+      utcOffsetSeconds: StationTimeZone.offsetSecondsAt(
+        referenceInstant,
+        timeZoneId: casablancaTimeZoneId,
+      ),
+      timeZoneId: casablancaTimeZoneId,
       astro: AstronomyService.calculate(referenceTime, low, high),
     );
   }

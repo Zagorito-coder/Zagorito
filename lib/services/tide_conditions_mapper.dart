@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/tide_data.dart';
+import '../utils/station_time_zone.dart';
 import 'astronomy_service.dart';
 
 /// Convertit le document Firestore `conditions/{station}` en données marines.
@@ -18,6 +19,14 @@ class TideConditionsMapper {
     required String fallbackLocation,
     DateTime? now,
   }) {
+    final utcOffsetSeconds = _utcOffsetSeconds(data['utc_offset_seconds']);
+    final timeZoneId = _timeZoneId(data['timezone']);
+    final referenceInstant = (now ?? DateTime.now()).toUtc();
+    final referenceTime = StationTimeZone.civilAt(
+      referenceInstant,
+      timeZoneId: timeZoneId,
+      fallbackOffsetSeconds: utcOffsetSeconds,
+    );
     final tide = _asMap(data['tide']);
     final weather = _asMap(data['weather']);
     final gfs = _asMap(data['gfs']);
@@ -33,9 +42,14 @@ class TideConditionsMapper {
     if (weatherSlots is List<dynamic>) {
       for (final raw in weatherSlots) {
         final slot = _asMap(raw);
-        final time = _parseForecastTime(slot?['time']);
+        final time = _parseStationForecastTime(
+          slot?['time'],
+          utcOffsetSeconds,
+          timeZoneId: timeZoneId,
+          legacyUnzonedIsUtc: true,
+        );
         if (slot != null && time != null) {
-          weatherByTime[time.millisecondsSinceEpoch] = slot;
+          weatherByTime[time.instantUtc.millisecondsSinceEpoch] = slot;
         }
       }
     }
@@ -44,11 +58,13 @@ class TideConditionsMapper {
     if (gfsSlots is List<dynamic>) {
       for (final raw in gfsSlots) {
         final slot = _asMap(raw);
-        // Le job GFS utilise `timezone=auto` et publie donc une heure locale,
-        // contrairement au document de conditions dont les heures sont UTC.
-        final time = _parseLocalForecastTime(slot?['time']);
+        final time = _parseStationForecastTime(
+          slot?['time'],
+          utcOffsetSeconds,
+          timeZoneId: timeZoneId,
+        );
         if (slot != null && time != null) {
-          gfsByTime[time.millisecondsSinceEpoch] = slot;
+          gfsByTime[time.instantUtc.millisecondsSinceEpoch] = slot;
         }
       }
     }
@@ -56,7 +72,12 @@ class TideConditionsMapper {
     final points = <TidePoint>[];
     for (final raw in tideSlots) {
       final slot = _asMap(raw);
-      final time = _parseForecastTime(slot?['time']);
+      final time = _parseStationForecastTime(
+        slot?['time'],
+        utcOffsetSeconds,
+        timeZoneId: timeZoneId,
+        legacyUnzonedIsUtc: true,
+      );
       final height = _number(slot, 'height');
       if (slot == null ||
           time == null ||
@@ -67,8 +88,9 @@ class TideConditionsMapper {
         continue;
       }
 
-      final weatherAtTime = weatherByTime[time.millisecondsSinceEpoch];
-      final gfsAtTime = _nearestSlot(gfsByTime, time);
+      final weatherAtTime =
+          weatherByTime[time.instantUtc.millisecondsSinceEpoch];
+      final gfsAtTime = _nearestSlot(gfsByTime, time.instantUtc);
       final totalWaveHeight = _boundedNumber(
         slot,
         'waveHeightM',
@@ -118,7 +140,8 @@ class TideConditionsMapper {
 
       points.add(
         TidePoint(
-          time: time,
+          time: time.civil,
+          instantUtc: time.instantUtc,
           height: height,
           windDirectionDeg: windDirection,
           wavePeriod: wavePeriod,
@@ -324,12 +347,17 @@ class TideConditionsMapper {
     if (points.length < 3) {
       throw const FormatException('Prévisions de marée insuffisantes.');
     }
-    points.sort((a, b) => a.time.compareTo(b.time));
+    points.sort(
+      (a, b) => a.instantUtc!.compareTo(b.instantUtc!),
+    );
 
-    final referenceTime = now ?? DateTime.now();
     const coverageTolerance = Duration(minutes: 90);
-    if (referenceTime.isBefore(points.first.time.subtract(coverageTolerance)) ||
-        referenceTime.isAfter(points.last.time.add(coverageTolerance))) {
+    if (referenceInstant.isBefore(
+          points.first.instantUtc!.subtract(coverageTolerance),
+        ) ||
+        referenceInstant.isAfter(
+          points.last.instantUtc!.add(coverageTolerance),
+        )) {
       throw const FormatException(
         'La série de marée ne couvre pas l’heure actuelle.',
       );
@@ -343,13 +371,13 @@ class TideConditionsMapper {
     }
 
     final nearest = points.reduce(
-      (a, b) => a.time.difference(referenceTime).abs() <=
-              b.time.difference(referenceTime).abs()
+      (a, b) => a.instantUtc!.difference(referenceInstant).abs() <=
+              b.instantUtc!.difference(referenceInstant).abs()
           ? a
           : b,
     );
     final next = points
-            .where((point) => point.time.isAfter(referenceTime))
+            .where((point) => point.instantUtc!.isAfter(referenceInstant))
             .firstOrNull ??
         points.last;
 
@@ -369,20 +397,27 @@ class TideConditionsMapper {
         ? computedAstro.moonPhase
         : (ageDays / 29.5305882).clamp(0.0, 1.0);
 
-    final sun = _asMap(data['sun']);
-    final sunrise = _timeOfDay(sun?['sunrise']) ?? computedAstro.sunRise;
-    final sunset = _timeOfDay(sun?['sunset']) ?? computedAstro.sunSet;
+    final sun = _sunTimesForDate(_asMap(data['sun']), referenceTime);
+    final sunrise = sun?.sunrise ?? '--:--';
+    final sunset = sun?.sunset ?? '--:--';
     final location = (data['name'] as String?)?.trim();
     return TideData(
       hourlyPoints: points,
-      hourlyForecast: _parseHourlyForecast(gfsSlots, referenceTime),
+      hourlyForecast: _parseHourlyForecast(
+        gfsSlots,
+        referenceTime,
+        utcOffsetSeconds,
+        timeZoneId,
+      ),
       low: low,
       high: high,
       next: next.height,
-      waveHeight: nearest.windWaveHeight,
+      waveHeight: nearest.windWaveHeight!,
       location:
           location == null || location.isEmpty ? fallbackLocation : location,
       generatedAt: _parseTimestamp(data['timestamp']),
+      utcOffsetSeconds: utcOffsetSeconds,
+      timeZoneId: timeZoneId,
       astro: AstroData(
         moonPhase: phase,
         moonPhaseName: phaseName == null || phaseName.isEmpty
@@ -401,18 +436,57 @@ class TideConditionsMapper {
     );
   }
 
-  static DateTime? _parseForecastTime(dynamic value) {
+  /// Convertit un instant ISO explicite vers l'heure civile de la station.
+  ///
+  /// Les anciens résumés GFS ne possédaient pas de suffixe UTC : ils étaient
+  /// déjà exprimés dans l'heure locale Open-Meteo et restent donc inchangés.
+  /// Les nouveaux documents utilisent tous un ISO UTC explicite et le
+  /// décalage publié avec la station.
+  static _ParsedStationTime? _parseStationForecastTime(
+    dynamic value,
+    int? utcOffsetSeconds, {
+    String? timeZoneId,
+    bool legacyUnzonedIsUtc = false,
+  }) {
     if (value is! String || value.trim().isEmpty) return null;
     final raw = value.trim();
     final hasOffset =
         raw.endsWith('Z') || RegExp(r'[+-]\d{2}:\d{2}$').hasMatch(raw);
-    final parsed = DateTime.tryParse(hasOffset ? raw : '${raw}Z');
-    return parsed?.toLocal();
+    final parsed =
+        DateTime.tryParse(!hasOffset && legacyUnzonedIsUtc ? '${raw}Z' : raw);
+    if (parsed == null) return null;
+
+    final instantUtc = hasOffset || legacyUnzonedIsUtc
+        ? parsed.toUtc()
+        : StationTimeZone.instantAt(
+            parsed,
+            timeZoneId: timeZoneId,
+            fallbackOffsetSeconds: utcOffsetSeconds,
+          );
+    return _ParsedStationTime(
+      instantUtc: instantUtc,
+      civil: StationTimeZone.civilAt(
+        instantUtc,
+        timeZoneId: timeZoneId,
+        fallbackOffsetSeconds: utcOffsetSeconds,
+      ),
+    );
   }
 
-  static DateTime? _parseLocalForecastTime(dynamic value) {
+  static int? _utcOffsetSeconds(dynamic value) {
+    if (value is! num || !value.isFinite) return null;
+    final rounded = value.round();
+    if ((value.toDouble() - rounded).abs() > 0.001 ||
+        rounded < -18 * 3600 ||
+        rounded > 18 * 3600) {
+      return null;
+    }
+    return rounded;
+  }
+
+  static String? _timeZoneId(dynamic value) {
     if (value is! String || value.trim().isEmpty) return null;
-    return DateTime.tryParse(value.trim())?.toLocal();
+    return value.trim();
   }
 
   static Map<String, dynamic>? _nearestSlot(
@@ -422,9 +496,10 @@ class TideConditionsMapper {
     Map<String, dynamic>? nearest;
     var shortestDifference = const Duration(days: 365);
     for (final entry in slots.entries) {
-      final difference = DateTime.fromMillisecondsSinceEpoch(entry.key)
-          .difference(target)
-          .abs();
+      final difference = DateTime.fromMillisecondsSinceEpoch(
+        entry.key,
+        isUtc: true,
+      ).difference(target).abs();
       if (difference < shortestDifference) {
         shortestDifference = difference;
         nearest = entry.value;
@@ -451,9 +526,44 @@ class TideConditionsMapper {
         '${parsed.minute.toString().padLeft(2, '0')}';
   }
 
+  static ({String sunrise, String sunset})? _sunTimesForDate(
+    Map<String, dynamic>? sun,
+    DateTime stationTime,
+  ) {
+    if (sun == null) return null;
+    final dateKey = '${stationTime.year.toString().padLeft(4, '0')}-'
+        '${stationTime.month.toString().padLeft(2, '0')}-'
+        '${stationTime.day.toString().padLeft(2, '0')}';
+
+    final daily = sun['daily'];
+    if (daily is List<dynamic>) {
+      for (final raw in daily) {
+        final entry = _asMap(raw);
+        if (entry?['date'] != dateKey) continue;
+        final sunrise = _timeOfDay(entry?['sunrise']);
+        final sunset = _timeOfDay(entry?['sunset']);
+        if (sunrise != null && sunset != null) {
+          return (sunrise: sunrise, sunset: sunset);
+        }
+      }
+    }
+
+    // Compatibilité avec les documents antérieurs : les champs racine ne
+    // sont utilisés que s'ils appartiennent réellement au jour affiché.
+    final legacyDate = sun['date'];
+    if (legacyDate != null && legacyDate != dateKey) return null;
+    final sunrise = _timeOfDay(sun['sunrise']);
+    final sunset = _timeOfDay(sun['sunset']);
+    return sunrise == null || sunset == null
+        ? null
+        : (sunrise: sunrise, sunset: sunset);
+  }
+
   static List<HourlyForecastPoint> _parseHourlyForecast(
     dynamic rawSlots,
     DateTime referenceTime,
+    int? utcOffsetSeconds,
+    String? timeZoneId,
   ) {
     if (rawSlots is! List<dynamic>) return const [];
 
@@ -465,9 +575,13 @@ class TideConditionsMapper {
     final parsed = <HourlyForecastPoint>[];
     for (final raw in rawSlots) {
       final slot = _asMap(raw);
-      final time = _parseLocalForecastTime(slot?['time']);
+      final time = _parseStationForecastTime(
+        slot?['time'],
+        utcOffsetSeconds,
+        timeZoneId: timeZoneId,
+      );
       if (slot == null || time == null) continue;
-      final day = DateTime(time.year, time.month, time.day);
+      final day = DateTime(time.civil.year, time.civil.month, time.civil.day);
       if (day.isBefore(firstDay)) continue;
 
       final weatherCode = _boundedNumber(
@@ -490,7 +604,8 @@ class TideConditionsMapper {
       );
       parsed.add(
         HourlyForecastPoint(
-          time: time,
+          time: time.civil,
+          instantUtc: time.instantUtc,
           windSpeedKmh: _boundedNumber(
             slot,
             'windSpeedKmh',
@@ -576,7 +691,9 @@ class TideConditionsMapper {
       );
     }
 
-    parsed.sort((a, b) => a.time.compareTo(b.time));
+    parsed.sort(
+      (a, b) => a.instantUtc!.compareTo(b.instantUtc!),
+    );
     final acceptedDays = <String>{};
     final result = <HourlyForecastPoint>[];
     for (final point in parsed) {
@@ -636,4 +753,14 @@ class TideConditionsMapper {
       _ => value,
     };
   }
+}
+
+class _ParsedStationTime {
+  final DateTime instantUtc;
+  final DateTime civil;
+
+  const _ParsedStationTime({
+    required this.instantUtc,
+    required this.civil,
+  });
 }

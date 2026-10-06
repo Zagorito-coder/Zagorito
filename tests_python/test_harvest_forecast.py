@@ -1,8 +1,10 @@
 import threading
 import time
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 from unittest import mock
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -105,6 +107,7 @@ def _complete_hourly_api_payloads(spot, day_count=15):
     }
     wind = {
         "utc_offset_seconds": 3600,
+        "timezone": "Africa/Casablanca",
         "hourly": {
             "time": times,
             **{key: [value] * len(times) for key, value in wind_values.items()},
@@ -112,6 +115,7 @@ def _complete_hourly_api_payloads(spot, day_count=15):
     }
     wave = {
         "utc_offset_seconds": 3600,
+        "timezone": "Africa/Casablanca",
         "latitude": spot["lat"],
         "longitude": spot["lon"],
         "hourly": {
@@ -120,6 +124,112 @@ def _complete_hourly_api_payloads(spot, day_count=15):
         },
     }
     return wind, wave
+
+
+def _dst_hourly_api_payloads(
+    spot,
+    first_day,
+    *,
+    day_count=8,
+    timezone_name="Africa/Casablanca",
+):
+    """Réponses horaires réalistes avec heure sautée/répétée selon IANA."""
+    station_timezone = ZoneInfo(timezone_name)
+    start = datetime.combine(
+        first_day,
+        datetime.min.time(),
+        tzinfo=station_timezone,
+    ).astimezone(timezone.utc)
+    end = datetime.combine(
+        first_day + timedelta(days=day_count),
+        datetime.min.time(),
+        tzinfo=station_timezone,
+    ).astimezone(timezone.utc)
+    utc_times = []
+    cursor = start
+    while cursor < end:
+        utc_times.append(cursor)
+        cursor += timedelta(hours=1)
+    local_times = [
+        instant.astimezone(station_timezone)
+        .replace(tzinfo=None)
+        .isoformat(timespec="minutes")
+        for instant in utc_times
+    ]
+    initial_offset = int(
+        start.astimezone(station_timezone).utcoffset().total_seconds()
+    )
+
+    wind_values = {
+        "temperature_2m": 24.0,
+        "wind_speed_10m": 5.0,
+        "wind_gusts_10m": 8.0,
+        "wind_direction_10m": 225.0,
+        "weather_code": 1.0,
+        "is_day": 1.0,
+        "pressure_msl": 1014.0,
+        "precipitation_probability": 10.0,
+        "precipitation": 0.0,
+        "relative_humidity_2m": 70.0,
+        "cloud_cover": 15.0,
+        "cloud_cover_low": 5.0,
+        "cloud_cover_mid": 10.0,
+        "cloud_cover_high": 15.0,
+        "visibility": 20000.0,
+    }
+    marine_values = {
+        "sea_level_height_msl": 0.4,
+        "wave_height": 1.2,
+        "wave_period": 9.0,
+        "wave_direction": 310.0,
+        "wind_wave_height": 0.5,
+        "wind_wave_period": 6.0,
+        "wind_wave_direction": 300.0,
+        "swell_wave_height": 1.0,
+        "swell_wave_period": 11.0,
+        "swell_wave_direction": 315.0,
+        "secondary_swell_wave_height": 0.3,
+        "secondary_swell_wave_period": 7.0,
+        "secondary_swell_wave_direction": 270.0,
+        "sea_surface_temperature": 19.2,
+        "ocean_current_velocity": 0.8,
+        "ocean_current_direction": 45.0,
+    }
+    response_metadata = {
+        "utc_offset_seconds": initial_offset,
+        "timezone": timezone_name,
+    }
+    wind = {
+        **response_metadata,
+        "hourly": {
+            "time": local_times,
+            **{
+                key: [value] * len(local_times)
+                for key, value in wind_values.items()
+            },
+        },
+    }
+    wave = {
+        **response_metadata,
+        "latitude": spot["lat"],
+        "longitude": spot["lon"],
+        "hourly": {
+            "time": local_times,
+            **{
+                key: [value] * len(local_times)
+                for key, value in marine_values.items()
+            },
+        },
+    }
+    daily = {}
+    for day_index in range(day_count):
+        current_day = first_day + timedelta(days=day_index)
+        day_key = current_day.isoformat()
+        daily[day_key] = {
+            "sunrise": f"{day_key}T07:00",
+            "sunset": f"{day_key}T19:00",
+        }
+    return wind, wave, daily, utc_times
 
 
 class _FakeSnapshot:
@@ -490,6 +600,72 @@ class NativeGfsStepTests(unittest.TestCase):
             )
         )
 
+    def test_casablanca_repeated_hour_maps_to_two_distinct_utc_instants(self):
+        resolved = harvest_forecast._utc_datetimes_from_open_meteo(
+            [
+                "2026-02-15T00:00",
+                "2026-02-15T01:00",
+                "2026-02-15T02:00",
+                "2026-02-15T02:00",
+                "2026-02-15T03:00",
+            ],
+            3600,
+            "Africa/Casablanca",
+        )
+
+        self.assertEqual(
+            [
+                "2026-02-14T23:00:00Z",
+                "2026-02-15T00:00:00Z",
+                "2026-02-15T01:00:00Z",
+                "2026-02-15T02:00:00Z",
+                "2026-02-15T03:00:00Z",
+            ],
+            [harvest_forecast._utc_iso(value) for value in resolved],
+        )
+
+    def test_casablanca_skipped_hour_preserves_continuous_utc_instants(self):
+        resolved = harvest_forecast._utc_datetimes_from_open_meteo(
+            [
+                "2026-03-22T00:00",
+                "2026-03-22T01:00",
+                "2026-03-22T03:00",
+                "2026-03-22T04:00",
+            ],
+            0,
+            "Africa/Casablanca",
+        )
+
+        self.assertEqual(
+            [
+                "2026-03-22T00:00:00Z",
+                "2026-03-22T01:00:00Z",
+                "2026-03-22T02:00:00Z",
+                "2026-03-22T03:00:00Z",
+            ],
+            [harvest_forecast._utc_iso(value) for value in resolved],
+        )
+
+        with self.assertRaisesRegex(ValueError, "Impossible de résoudre"):
+            harvest_forecast._utc_datetimes_from_open_meteo(
+                ["2026-03-22T01:00", "2026-03-22T02:00"],
+                0,
+                "Africa/Casablanca",
+            )
+
+    def test_casablanca_uses_permanent_gmt_after_september_2026(self):
+        resolved = harvest_forecast._utc_datetimes_from_open_meteo(
+            ["2026-10-05T00:00", "2026-10-05T01:00"],
+            # Une valeur de tête ancienne ne doit pas prévaloir sur IANA.
+            3600,
+            "Africa/Casablanca",
+        )
+
+        self.assertEqual(
+            ["2026-10-05T00:00:00Z", "2026-10-05T01:00:00Z"],
+            [harvest_forecast._utc_iso(value) for value in resolved],
+        )
+
 
 class PayloadValidationTests(unittest.TestCase):
     def test_ten_complete_consecutive_native_gfs_days_are_valid(self):
@@ -525,6 +701,15 @@ class PayloadValidationTests(unittest.TestCase):
                 utc_offset_seconds=3600,
             )
 
+    def test_incomplete_hires_coverage_is_rejected(self):
+        days = _valid_days()
+        for day in days:
+            for slot in day["slots"]:
+                slot["models"]["hires"] = None
+
+        with self.assertRaisesRegex(ValueError, "IFS-HRES"):
+            harvest_forecast.validate_payload(days, utc_offset_seconds=3600)
+
         unsorted = _valid_days()
         unsorted[0], unsorted[1] = unsorted[1], unsorted[0]
         with self.assertRaisesRegex(ValueError, "triées"):
@@ -532,6 +717,113 @@ class PayloadValidationTests(unittest.TestCase):
                 unsorted,
                 utc_offset_seconds=3600,
             )
+
+
+class PayloadBuildTests(unittest.TestCase):
+    def test_rating_is_absent_when_one_input_is_missing(self):
+        self.assertIsNone(harvest_forecast.compute_rating(12.0, None, 10.0))
+        self.assertIsNone(harvest_forecast.compute_rating(None, 1.2, 10.0))
+        self.assertIsNone(harvest_forecast.compute_rating(12.0, 1.2, None))
+        self.assertEqual(5, harvest_forecast.compute_rating(12.0, 1.2, 10.0))
+
+    def test_water_temperature_uses_measurement_nearest_to_run_time(self):
+        spot = {"id": "test", "name": "Test", "lat": 33.1, "lon": -7.2}
+        wind, wave = _complete_hourly_api_payloads(spot, day_count=1)
+        slot_count = len(wind["hourly"]["time"])
+        for key, value in {
+            "cloud_cover_low": 5.0,
+            "cloud_cover_mid": 10.0,
+            "cloud_cover_high": 15.0,
+        }.items():
+            wind["hourly"][key] = [value] * slot_count
+        hires = {
+            "hourly": {
+                key: list(values)
+                for key, values in wind["hourly"].items()
+            }
+        }
+        temperatures = wave["hourly"]["sea_surface_temperature"]
+        temperatures[1] = 18.4
+        temperatures[4] = 19.1
+        temperatures[-1] = 31.0
+        wind["hourly"]["cloud_cover"][1] = None
+        wind["hourly"]["cloud_cover_low"][1] = None
+        wind["hourly"]["cloud_cover_mid"][1] = None
+        wind["hourly"]["cloud_cover_high"][1] = None
+
+        days, water_temperature = harvest_forecast.build_days_payload(
+            wind,
+            hires,
+            wave,
+            {},
+            reference_time=datetime(2026, 8, 1, 3, 10, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(19.1, water_temperature)
+        self.assertIsNone(days[0]["slots"][0]["cloud_pct"])
+
+    def test_dst_windows_publish_exact_utc_without_removing_legacy_hours(self):
+        spot = {"id": "test", "name": "Test", "lat": 33.1, "lon": -7.2}
+        transitions = (
+            (date(2026, 2, 15), 193),
+            (date(2026, 3, 22), 191),
+        )
+
+        for first_day, expected_hour_count in transitions:
+            with self.subTest(first_day=first_day):
+                wind, wave, daily, utc_times = _dst_hourly_api_payloads(
+                    spot,
+                    first_day,
+                    day_count=15,
+                )
+                days, _ = harvest_forecast.build_days_payload(
+                    wind,
+                    wind,
+                    wave,
+                    daily,
+                    reference_time=utc_times[0],
+                )
+
+                harvest_forecast.validate_payload(
+                    days,
+                    utc_offset_seconds=wind["utc_offset_seconds"],
+                    required_days=10,
+                    timezone_name=wind["timezone"],
+                )
+                conditions = harvest_forecast.build_conditions_document(
+                    spot,
+                    wind,
+                    wave,
+                    days[:harvest_forecast.CONDITIONS_FORECAST_DAYS],
+                    forecast_run_id="dst-test",
+                    last_update=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                )
+
+                self.assertEqual("Africa/Casablanca", conditions["timezone"])
+                self.assertEqual(
+                    expected_hour_count,
+                    len(conditions["tide"]["hourly"]),
+                )
+                self.assertEqual(
+                    expected_hour_count,
+                    len(conditions["weather"]["hourly"]),
+                )
+                self.assertEqual(
+                    [
+                        harvest_forecast._utc_iso(value)
+                        for value in utc_times[:expected_hour_count]
+                    ],
+                    [slot["time"] for slot in conditions["tide"]["hourly"]],
+                )
+                self.assertTrue(
+                    all(
+                        "hour" in slot
+                        and "hour_utc" in slot
+                        and slot["hour_utc"].endswith("Z")
+                        for day in days
+                        for slot in day["slots"]
+                    )
+                )
 
 
 class ProductionWriteAndVerificationTests(unittest.TestCase):
@@ -556,6 +848,7 @@ class ProductionWriteAndVerificationTests(unittest.TestCase):
             "latitude": self.spot["lat"],
             "longitude": self.spot["lon"],
             "utc_offset_seconds": 3600,
+            "timezone": "Africa/Casablanca",
             "days": days,
         }
         index = {
@@ -568,6 +861,8 @@ class ProductionWriteAndVerificationTests(unittest.TestCase):
         }
         gfs = harvest_forecast.build_conditions_gfs_summary(
             days,
+            utc_offset_seconds=3600,
+            timezone_name="Africa/Casablanca",
             forecast_run_id=self.run_id,
             spot_id=self.spot["id"],
             last_update=self.updated,
@@ -594,7 +889,7 @@ class ProductionWriteAndVerificationTests(unittest.TestCase):
             "spot": self.spot,
             "models": {
                 "wind": wind,
-                "hires": {"hourly": {"time": []}},
+                "hires": wind,
                 "wave": wave,
             },
             "errors": {},
@@ -612,12 +907,25 @@ class ProductionWriteAndVerificationTests(unittest.TestCase):
 
         self.assertEqual(10, len(publication["weather_doc"]["days"]))
         self.assertEqual(
+            "Africa/Casablanca",
+            publication["weather_doc"]["timezone"],
+        )
+        self.assertEqual(
             192,
             len(publication["conditions_doc"]["tide"]["hourly"]),
         )
         self.assertEqual(
             192,
             len(publication["conditions_doc"]["weather"]["hourly"]),
+        )
+        self.assertEqual(3600, publication["conditions_doc"]["utc_offset_seconds"])
+        self.assertEqual(
+            "Africa/Casablanca",
+            publication["conditions_doc"]["timezone"],
+        )
+        self.assertEqual(
+            8,
+            len(publication["conditions_doc"]["sun"]["daily"]),
         )
 
     def test_global_write_uses_bounded_atomic_batches_for_251_documents(self):
@@ -720,8 +1028,22 @@ class ProductionWriteAndVerificationTests(unittest.TestCase):
             {"test_condition", "legacy_condition"},
             {operation[0][1] for operation in condition_operations},
         )
-        self.assertTrue(
-            all(operation[1] is conditions_doc for operation in condition_operations)
+        canonical = next(
+            operation[1]
+            for operation in condition_operations
+            if operation[0][1] == "test_condition"
+        )
+        legacy = next(
+            operation[1]
+            for operation in condition_operations
+            if operation[0][1] == "legacy_condition"
+        )
+        self.assertIs(conditions_doc, canonical)
+        self.assertIsNot(conditions_doc, legacy)
+        self.assertEqual(self.run_id, legacy["forecast_run_id"])
+        self.assertRegex(
+            legacy["timestamp"],
+            r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$",
         )
 
     def test_station_failure_before_publication_creates_no_batch_or_commit(self):
@@ -827,9 +1149,9 @@ class ProductionWriteAndVerificationTests(unittest.TestCase):
 
     def test_post_write_verification_checks_legacy_alias_document(self):
         documents = self._documents()
-        documents[("conditions", "legacy_condition")] = documents[
-            ("conditions", "test_condition")
-        ]
+        legacy = dict(documents[("conditions", "test_condition")])
+        legacy["timestamp"] = self.updated.isoformat().replace("+00:00", "Z")
+        documents[("conditions", "legacy_condition")] = legacy
         database = _FakeDatabase(documents)
 
         harvest_forecast.verify_production_state(
@@ -875,18 +1197,38 @@ class ProductionWriteAndVerificationTests(unittest.TestCase):
             )
 
     def test_missing_model_fails_fast(self):
+        minimal_model = {"hourly": {"time": ["2026-08-01T00:00"]}}
         station_result = {
             "spot": self.spot,
-            "models": {"wind": {}, "hires": None, "wave": {}},
+            "models": {
+                "wind": minimal_model,
+                "hires": None,
+                "wave": minimal_model,
+            },
             "errors": {"hires": requests.ReadTimeout("timeout")},
         }
 
         with self.assertRaisesRegex(RuntimeError, "modèle hires indisponible"):
             harvest_forecast._require_station_models(station_result)
 
+    def test_empty_hourly_model_fails_before_publication(self):
+        minimal_model = {"hourly": {"time": ["2026-08-01T00:00"]}}
+        station_result = {
+            "spot": self.spot,
+            "models": {
+                "wind": minimal_model,
+                "hires": {"hourly": {"time": []}},
+                "wave": minimal_model,
+            },
+            "errors": {},
+        }
+
+        with self.assertRaisesRegex(RuntimeError, "hires sans série horaire"):
+            harvest_forecast._require_station_models(station_result)
+
 
 class ConditionsGfsSummaryTests(unittest.TestCase):
-    def test_summary_keeps_ten_days_and_all_tide_page_metrics(self):
+    def test_summary_keeps_eight_marine_days_and_all_tide_page_metrics(self):
         def slot(time, pressure):
             return {
                 "hour": time,
@@ -948,7 +1290,7 @@ class ConditionsGfsSummaryTests(unittest.TestCase):
         self.assertEqual(update_time, result["last_update"])
         self.assertEqual(8, len(result["hourly"]))
         first = result["hourly"][0]
-        self.assertEqual("2026-08-01T00:00", first["time"])
+        self.assertEqual("2026-08-01T00:00:00Z", first["time"])
         self.assertEqual(23.2, first["windSpeedKmh"])
         self.assertEqual(220.0, first["windDirectionDeg"])
         self.assertEqual(2, first["weatherCode"])
@@ -976,6 +1318,31 @@ class ConditionsGfsSummaryTests(unittest.TestCase):
         self.assertEqual(45.0, first["oceanCurrentDirectionDeg"])
         self.assertNotIn("wind_speed_kt", first)
 
+    def test_summary_publishes_unambiguous_utc_times_for_remote_stations(self):
+        days = [
+            {
+                "slots": [
+                    {
+                        "hour": "2026-08-01T01:00",
+                        "wind_speed_kt": 10.0,
+                        "models": {"wind": {}, "wave": {}},
+                    }
+                ]
+            }
+        ]
+
+        east = harvest_forecast.build_conditions_gfs_summary(
+            days,
+            utc_offset_seconds=3600,
+        )
+        west = harvest_forecast.build_conditions_gfs_summary(
+            days,
+            utc_offset_seconds=-5 * 3600,
+        )
+
+        self.assertEqual("2026-08-01T00:00:00Z", east["hourly"][0]["time"])
+        self.assertEqual("2026-08-01T06:00:00Z", west["hourly"][0]["time"])
+
     def test_summary_ignores_slots_without_any_requested_metric(self):
         result = harvest_forecast.build_conditions_gfs_summary([
             {
@@ -989,6 +1356,19 @@ class ConditionsGfsSummaryTests(unittest.TestCase):
         ])
 
         self.assertEqual([], result["hourly"])
+
+
+class WorkflowConfigurationTests(unittest.TestCase):
+    def test_only_complete_forecast_writer_is_scheduled(self):
+        workflows = Path(".github/workflows")
+        complete = (workflows / "RecolteMeteo.yml").read_text(encoding="utf-8")
+        quality = (workflows / "mobile-quality.yml").read_text(encoding="utf-8")
+
+        self.assertFalse((workflows / "daily-conditions.yml").exists())
+        self.assertIn("schedule:", complete)
+        self.assertIn("harvest_forecast.py", complete)
+        self.assertNotIn("gh-action-pip-audit", complete)
+        self.assertIn("gh-action-pip-audit", quality)
 
 
 if __name__ == "__main__":

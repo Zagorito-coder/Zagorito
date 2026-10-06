@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:spots_app/services/casablanca_tide_reference.dart';
 import 'package:spots_app/services/tide_service.dart';
 
 void main() {
@@ -102,29 +103,93 @@ void main() {
     });
 
     test('le repli Casablanca reste utilisable sans réseau', () {
-      final now = DateTime(2026, 9, 30, 14, 25);
+      final now = DateTime.utc(2026, 9, 30, 13, 25);
       final result = TideService.casablancaOfflineFallback(now: now);
 
       expect(result.location, 'Casablanca, Maroc');
       expect(result.generatedAt, isNull);
+      expect(
+        result.utcOffsetSeconds,
+        0,
+      );
+      expect(result.timeZoneId, TideService.casablancaTimeZoneId);
+      expect(result.stationTimeAt(now), DateTime(2026, 9, 30, 13, 25));
       expect(result.hourlyPoints, hasLength(49));
       expect(result.hourlyPoints.first.time, DateTime(2026, 9, 30));
       expect(result.hourlyPoints.last.time, DateTime(2026, 10, 2));
+      expect(
+        result.stationInstantAt(result.hourlyPoints.first.time),
+        DateTime.utc(2026, 9, 30),
+      );
+      expect(
+        result.hourlyPoints.first.height,
+        closeTo(
+          CasablancaTideReference.heightAtUtc(
+            DateTime.utc(2026, 9, 30),
+          ),
+          0.000000001,
+        ),
+      );
       expect(result.low, lessThan(result.high));
       expect(result.next, isNonZero);
       expect(result.waveHeight, 0);
+      expect(result.hourlyPoints.first.windDirectionDeg, isNull);
+      expect(result.hourlyPoints.first.windSpeedKmh, isNull);
+      expect(result.hourlyPoints.first.temperatureC, isNull);
+      expect(result.hourlyPoints.first.wavePeriod, isNull);
+      expect(result.hourlyPoints.first.windWaveHeight, isNull);
       expect(
-        now.isAfter(
-          result.hourlyPoints.first.time.subtract(const Duration(minutes: 90)),
-        ),
+        result.stationTimeAt(now).isAfter(
+              result.hourlyPoints.first.time
+                  .subtract(const Duration(minutes: 90)),
+            ),
         isTrue,
       );
       expect(
-        now.isBefore(
-          result.hourlyPoints.last.time.add(const Duration(minutes: 90)),
-        ),
+        result.stationTimeAt(now).isBefore(
+              result.hourlyPoints.last.time.add(const Duration(minutes: 90)),
+            ),
         isTrue,
       );
+    });
+
+    test('le repli Casablanca ne dépend pas du fuseau du téléphone', () {
+      final sameInstantUtc = DateTime.utc(2026, 9, 30, 23, 30);
+      final sameInstantWithOffset = DateTime.parse('2026-10-01T01:30:00+02:00');
+
+      final fromUtc =
+          TideService.casablancaOfflineFallback(now: sameInstantUtc);
+      final fromOtherZone =
+          TideService.casablancaOfflineFallback(now: sameInstantWithOffset);
+
+      expect(fromUtc.hourlyPoints.first.time, DateTime(2026, 9, 30));
+      expect(fromOtherZone.hourlyPoints.first.time, DateTime(2026, 9, 30));
+      expect(
+        fromOtherZone.hourlyPoints.map((point) => point.time),
+        orderedEquals(fromUtc.hourlyPoints.map((point) => point.time)),
+      );
+      for (var index = 0; index < fromUtc.hourlyPoints.length; index++) {
+        expect(
+          fromOtherZone.hourlyPoints[index].height,
+          closeTo(fromUtc.hourlyPoints[index].height, 0.000000001),
+        );
+      }
+    });
+
+    test('le repli Casablanca respecte la suspension Ramadan', () {
+      final instantDuringSuspension = DateTime.utc(2026, 2, 20, 12, 30);
+      final result = TideService.casablancaOfflineFallback(
+        now: instantDuringSuspension,
+      );
+
+      expect(result.timeZoneId, 'Africa/Casablanca');
+      expect(result.utcOffsetSeconds, 0);
+      expect(
+        result.stationTimeAt(instantDuringSuspension),
+        DateTime(2026, 2, 20, 12, 30),
+      );
+      expect(result.hourlyPoints.first.time, DateTime(2026, 2, 20));
+      expect(result.hourlyPoints.first.instantUtc, DateTime.utc(2026, 2, 20));
     });
   });
 }

@@ -91,6 +91,25 @@ void main() {
       expect(
           absoluteErrors.reduce((a, b) => a > b ? a : b), lessThanOrEqualTo(6));
     });
+
+    test('respecte les journées Casablanca de 23 et 25 heures', () {
+      final repeatedHourDay = TideCoefficientService.buildCasablancaDay(
+        DateTime(2026, 2, 15),
+        timeZoneId: 'Africa/Casablanca',
+      );
+      final skippedHourDay = TideCoefficientService.buildCasablancaDay(
+        DateTime(2026, 3, 22),
+        timeZoneId: 'Africa/Casablanca',
+      );
+      final permanentGmtTransition = TideCoefficientService.buildCasablancaDay(
+        DateTime(2026, 9, 20),
+        timeZoneId: 'Africa/Casablanca',
+      );
+
+      expect(repeatedHourDay.samples, hasLength(51));
+      expect(skippedHourDay.samples, hasLength(47));
+      expect(permanentGmtTransition.samples, hasLength(51));
+    });
   });
 
   group('MoroccanTideTradition', () {

@@ -79,10 +79,10 @@ String _localizedMoonPhase(BuildContext context, String phase) {
 
 // ── Conversion TideService → modèle TidePage ─────────────────
 tm.TideData _fromTideService(tide_data.TideData src) {
-  final now = DateTime.now();
+  final now = src.stationTimeAt(DateTime.now());
   final currentHour = now.hour;
 
-  final today = DateTime.now();
+  final today = now;
   final todayOnly = src.hourlyPoints
       .where((p) =>
           p.time.year == today.year &&
@@ -97,6 +97,7 @@ tm.TideData _fromTideService(tide_data.TideData src) {
       ? _casablancaReferencePoints(
           todayStart,
           const Duration(days: 1),
+          src,
         )
       : (todayOnly.isNotEmpty ? todayOnly : src.hourlyPoints);
 
@@ -160,12 +161,13 @@ tm.TideData _fromTideService(tide_data.TideData src) {
             : src.hourlyPoints.reduce((a, b) =>
                 (a.time.hour - h).abs() <= (b.time.hour - h).abs() ? a : b));
 
+    final windDirectionDeg = matchPoint?.windDirectionDeg;
     final windDir =
-        matchPoint != null ? _degToCompass(matchPoint.windDirectionDeg) : 'N';
-    final wavePeriodH = matchPoint?.wavePeriod ?? 0.0;
-    final windWaveH = matchPoint?.windWaveHeight ?? 0.0;
-    final windSpeed = matchPoint?.windSpeedKmh?.round().clamp(0, 200) ?? 0;
-    final temperature = matchPoint?.temperatureC?.round() ?? 0;
+        windDirectionDeg == null ? null : _degToCompass(windDirectionDeg);
+    final wavePeriodH = matchPoint?.wavePeriod;
+    final windWaveH = matchPoint?.windWaveHeight;
+    final windSpeed = matchPoint?.windSpeedKmh?.round().clamp(0, 200);
+    final temperature = matchPoint?.temperatureC?.round();
     hourlyCards.add(tm.HourlyCard(
       hour: h,
       label: '${h.toString().padLeft(2, '0')}:00',
@@ -196,7 +198,7 @@ tm.TideData _fromTideService(tide_data.TideData src) {
       oceanCurrentDirectionDeg: matchPoint?.oceanCurrentDirectionDeg,
       isIdeal: activity > 0.7,
       isNow: isNow,
-      wavePeriod: wavePeriodH.round(),
+      wavePeriod: wavePeriodH?.round(),
     ));
   }
 
@@ -208,6 +210,8 @@ tm.TideData _fromTideService(tide_data.TideData src) {
   final hourlyForecastDays = usesCasablancaReference
       ? TideForecastPresentationService.attachCasablancaTides(
           groupedHourlyForecastDays,
+          utcOffsetSeconds: src.utcOffsetSeconds,
+          timeZoneId: src.timeZoneId,
         )
       : TideForecastPresentationService.attachPublishedTides(
           groupedHourlyForecastDays,
@@ -263,6 +267,7 @@ tm.TideData _fromTideService(tide_data.TideData src) {
       ? _casablancaReferencePoints(
           todayStart,
           const Duration(days: 2),
+          src,
         )
       : src.hourlyPoints;
   for (int i = 1; i < sourcePoints.length - 1; i++) {
@@ -315,6 +320,8 @@ tm.TideData _fromTideService(tide_data.TideData src) {
   return tm.TideData(
     location: src.location,
     generatedAt: src.generatedAt,
+    utcOffsetSeconds: src.utcOffsetSeconds,
+    timeZoneId: src.timeZoneId,
     hourlyCards: hourlyCards,
     hourlyForecastDays: hourlyForecastDays,
     tidePoints: tidePoints,
@@ -330,18 +337,14 @@ tm.TideData _fromTideService(tide_data.TideData src) {
     bestHours: bestHours,
     waveInfo: tm.WaveInfo(
       height: src.waveHeight,
-      period: src.hourlyPoints.isNotEmpty
-          ? src.hourlyPoints.first.wavePeriod.round()
-          : 0,
+      period: src.hourlyPoints.firstOrNull?.wavePeriod?.round() ?? 0,
       swell: src.waveHeight > 0 ? 'Houle disponible' : 'Données indisponibles',
     ),
     windInfo: tm.WindInfo(
-      speed: src.hourlyPoints.isNotEmpty
-          ? (src.hourlyPoints.first.windSpeedKmh?.round() ?? 0)
-          : 0,
-      direction: src.hourlyPoints.isNotEmpty
-          ? _degToCompass(src.hourlyPoints.first.windDirectionDeg)
-          : '--',
+      speed: src.hourlyPoints.firstOrNull?.windSpeedKmh?.round() ?? 0,
+      direction: src.hourlyPoints.firstOrNull?.windDirectionDeg == null
+          ? '--'
+          : _degToCompass(src.hourlyPoints.first.windDirectionDeg!),
       gust: 0,
     ),
   );
@@ -365,15 +368,17 @@ List<tm.HourlyForecastDay> _groupHourlyForecast(
     grouped.putIfAbsent(date, () => <tm.HourlyForecastSlot>[]).add(
           tm.HourlyForecastSlot(
             time: point.time,
-            windSpeedKmh: point.windSpeedKmh ?? todayCard?.windSpeed.toDouble(),
+            instantUtc: point.instantUtc,
+            windSpeedKmh:
+                point.windSpeedKmh ?? todayCard?.windSpeed?.toDouble(),
             windGustKmh: point.windGustKmh ?? todayCard?.windGustKmh,
             windDirectionDeg: point.windDirectionDeg,
             weatherCode: point.weatherCode,
             isDay: point.isDay,
-            temperatureC: point.temperatureC ?? todayCard?.temp.toDouble(),
+            temperatureC: point.temperatureC ?? todayCard?.temp?.toDouble(),
             pressureHpa: point.pressureHpa ?? todayCard?.pressureHpa,
             waveHeightM: point.waveHeightM ?? todayCard?.waveHeight,
-            wavePeriodS: point.wavePeriodS ?? todayCard?.wavePeriod.toDouble(),
+            wavePeriodS: point.wavePeriodS ?? todayCard?.wavePeriod?.toDouble(),
             waveDirectionDeg: point.waveDirectionDeg,
             precipitationProbabilityPct: point.precipitationProbabilityPct ??
                 todayCard?.precipitationProbabilityPct,
@@ -396,12 +401,12 @@ List<tm.HourlyForecastDay> _groupHourlyForecast(
               todayDate.day,
               card.hour,
             ),
-            windSpeedKmh: card.windSpeed.toDouble(),
+            windSpeedKmh: card.windSpeed?.toDouble(),
             windGustKmh: card.windGustKmh,
-            temperatureC: card.temp.toDouble(),
+            temperatureC: card.temp?.toDouble(),
             pressureHpa: card.pressureHpa,
             waveHeightM: card.waveHeight,
-            wavePeriodS: card.wavePeriod.toDouble(),
+            wavePeriodS: card.wavePeriod?.toDouble(),
             precipitationProbabilityPct: card.precipitationProbabilityPct,
             cloudCoverPct: card.cloudCoverPct,
             activityScore: card.activityScore,
@@ -425,14 +430,19 @@ List<tm.HourlyForecastDay> _groupHourlyForecast(
 List<tide_data.TidePoint> _casablancaReferencePoints(
   DateTime startLocal,
   Duration duration,
+  tide_data.TideData source,
 ) {
   const step = Duration(minutes: 1);
-  final count = duration.inMinutes ~/ step.inMinutes;
+  final startInstant = source.stationInstantAt(startLocal);
+  final endInstant = source.stationInstantAt(startLocal.add(duration));
+  final count = endInstant.difference(startInstant).inMinutes ~/ step.inMinutes;
   return List<tide_data.TidePoint>.generate(count + 1, (index) {
-    final localTime = startLocal.add(Duration(minutes: index));
+    final instant = startInstant.add(Duration(minutes: index));
+    final localTime = source.stationTimeAt(instant);
     return tide_data.TidePoint(
       time: localTime,
-      height: CasablancaTideReference.heightAtUtc(localTime.toUtc()),
+      instantUtc: instant,
+      height: CasablancaTideReference.heightAtUtc(instant),
     );
   }, growable: false);
 }
@@ -574,6 +584,7 @@ class _TidePageState extends State<TidePage>
       });
       if (!hasUsableData) return;
       _lastLoadedAt = DateTime.now();
+      _updateClock();
       if (!hadUsableData) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) _autoScroll();
@@ -664,7 +675,7 @@ class _TidePageState extends State<TidePage>
   }
 
   void _updateClock() {
-    final now = DateTime.now();
+    final now = _data.stationTimeAt(DateTime.now());
     final previousHour = _clockNotifier.value.hour;
     _clockNotifier.value = now;
     if (!mounted ||
@@ -753,8 +764,8 @@ class _TidePageState extends State<TidePage>
   void _onCardTap(int index) {
     setState(() {
       _selectedHourIndex = index;
-      _followsCurrentHour =
-          _data.hourlyCards[index].hour == DateTime.now().hour;
+      _followsCurrentHour = _data.hourlyCards[index].hour ==
+          _data.stationTimeAt(DateTime.now()).hour;
     });
   }
 
@@ -768,10 +779,15 @@ class _TidePageState extends State<TidePage>
       _coefficientError = null;
     });
     try {
-      final now = DateTime.now();
+      final now = _data.stationTimeAt(DateTime.now());
       final result = await compute(
         buildCasablancaTideCoefficientMonth,
-        DateTime(now.year, now.month),
+        <String, dynamic>{
+          'year': now.year,
+          'month': now.month,
+          'utcOffsetSeconds': _data.utcOffsetSeconds,
+          'timeZoneId': _data.timeZoneId,
+        },
       );
       if (!mounted || revision != _locationRevision || !_isCasablanca) return;
       setState(() {
@@ -1523,8 +1539,8 @@ class _TidePageState extends State<TidePage>
   }
 
   tm.TideEvent? _nextEvent(String type) {
-    final currentDecimalHour =
-        DateTime.now().hour + DateTime.now().minute / 60.0;
+    final now = _data.stationTimeAt(DateTime.now());
+    final currentDecimalHour = now.hour + now.minute / 60.0;
     final futureEvents = _data.tideEvents
         .where(
             (event) => event.type == type && event.time >= currentDecimalHour)
@@ -2166,7 +2182,7 @@ class _TidePageState extends State<TidePage>
     tm.HourlyForecastSlot slot, {
     required bool isLast,
   }) {
-    final now = DateTime.now();
+    final now = _data.stationTimeAt(DateTime.now());
     final isCurrentSlot = slot.time.year == now.year &&
         slot.time.month == now.month &&
         slot.time.day == now.day &&
@@ -2486,7 +2502,7 @@ class _TidePageState extends State<TidePage>
   }
 
   bool _isToday(DateTime time) {
-    final now = DateTime.now();
+    final now = _data.stationTimeAt(DateTime.now());
     return time.year == now.year &&
         time.month == now.month &&
         time.day == now.day;
@@ -2896,8 +2912,8 @@ class _TidePageState extends State<TidePage>
                         size: 20,
                       ),
                       label: context.tr('tide.wind').toUpperCase(),
-                      value: selected.windSpeed > 0
-                          ? '${selected.windSpeed} km/h\n${selected.windDirection}'
+                      value: selected.windSpeed != null
+                          ? '${selected.windSpeed} km/h\n${selected.windDirection ?? '--'}'
                           : context.tr('tide.unavailable'),
                     ),
                   ),
@@ -2910,8 +2926,8 @@ class _TidePageState extends State<TidePage>
                         size: 20,
                       ),
                       label: context.tr('tide.waves').toUpperCase(),
-                      value: selected.waveHeight > 0
-                          ? '${selected.waveHeight.toStringAsFixed(1)} m / ${selected.wavePeriod} s'
+                      value: selected.waveHeight != null
+                          ? '${selected.waveHeight!.toStringAsFixed(1)} m${selected.wavePeriod == null ? '' : ' / ${selected.wavePeriod} s'}'
                           : context.tr('tide.unavailable'),
                     ),
                   ),
@@ -3076,7 +3092,11 @@ class _TidePageState extends State<TidePage>
     final isHigh = event.type == 'high';
     final color = isHigh ? _accent : _red;
     final dateTime = event.dateTime;
-    final tomorrow = dateTime != null && dateTime.day != DateTime.now().day;
+    final now = _data.stationTimeAt(DateTime.now());
+    final tomorrow = dateTime != null &&
+        (dateTime.year != now.year ||
+            dateTime.month != now.month ||
+            dateTime.day != now.day);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
       decoration: BoxDecoration(
@@ -3565,24 +3585,27 @@ class _HourlyCardWidget extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  card.windDirection,
+                  card.windDirection ?? '--',
                   style: TextStyle(
                     color: isSelected ? selectedText : accentText,
                     fontSize: 8,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                Transform.rotate(
-                  angle: _compassToRadians(card.windDirection),
-                  child: Icon(
-                    Icons.arrow_downward_rounded,
-                    size: 14,
-                    color: isSelected ? selectedText : accentText,
+                Opacity(
+                  opacity: card.windDirection == null ? 0 : 1,
+                  child: Transform.rotate(
+                    angle: _compassToRadians(card.windDirection ?? 'N'),
+                    child: Icon(
+                      Icons.arrow_downward_rounded,
+                      size: 14,
+                      color: isSelected ? selectedText : accentText,
+                    ),
                   ),
                 ),
                 Text(
-                  card.waveHeight > 0
-                      ? card.waveHeight.toStringAsFixed(1)
+                  card.waveHeight != null
+                      ? card.waveHeight!.toStringAsFixed(1)
                       : context.tr('tide.unavailableShort'),
                   style: TextStyle(
                     color: isSelected ? selectedText : _txt(0.94),
@@ -3591,7 +3614,7 @@ class _HourlyCardWidget extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  card.wavePeriod > 0
+                  card.wavePeriod != null
                       ? '${card.wavePeriod}s'
                       : context.tr('tide.unavailableShort'),
                   style: TextStyle(

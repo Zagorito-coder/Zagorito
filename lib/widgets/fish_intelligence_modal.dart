@@ -493,7 +493,7 @@ class _TideBlockState extends State<_TideBlock> {
 
   double _getTideActivity(TideData t) {
     if (t.hourlyPoints.isEmpty) return 0.0;
-    final now = DateTime.now();
+    final now = t.stationTimeAt(DateTime.now());
     double cur = t.low;
     for (final p in t.hourlyPoints) {
       if (p.time.isAfter(now)) {
@@ -508,7 +508,7 @@ class _TideBlockState extends State<_TideBlock> {
 
   TidePoint? _currentPoint(TideData t) {
     if (t.hourlyPoints.isEmpty) return null;
-    final now = DateTime.now();
+    final now = t.stationTimeAt(DateTime.now());
     return t.hourlyPoints.firstWhere(
       (point) => point.time.isAfter(now),
       orElse: () => t.hourlyPoints.last,
@@ -582,7 +582,11 @@ class _TideBlockState extends State<_TideBlock> {
 
     final activity = _getTideActivity(t);
     final point = _currentPoint(t);
-    final gfsPoint = _gfsWeather?.nearestTo(point?.time ?? DateTime.now());
+    final referenceInstant = point?.instantUtc ??
+        (point == null
+            ? DateTime.now().toUtc()
+            : t.stationInstantAt(point.time));
+    final gfsPoint = _gfsWeather?.nearestTo(referenceInstant);
     final wind = point?.windSpeedKmh;
     final temp = point?.temperatureC;
     final pressure = point?.pressureHpa ?? gfsPoint?.pressureHpa;

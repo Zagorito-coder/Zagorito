@@ -361,7 +361,7 @@ class _ConditionsHero extends StatelessWidget {
 
   TidePoint? get _currentPoint {
     if (!_hasData) return null;
-    final now = DateTime.now();
+    final now = tideData.stationTimeAt(DateTime.now());
     return tideData.hourlyPoints.reduce(
       (a, b) =>
           a.time.difference(now).abs() <= b.time.difference(now).abs() ? a : b,
@@ -370,7 +370,7 @@ class _ConditionsHero extends StatelessWidget {
 
   String get _nextTime {
     if (!_hasData) return '--:--';
-    final now = DateTime.now();
+    final now = tideData.stationTimeAt(DateTime.now());
     final upcoming = tideData.hourlyPoints.where((p) => p.time.isAfter(now));
     final point =
         upcoming.isEmpty ? tideData.hourlyPoints.last : upcoming.first;
@@ -402,8 +402,9 @@ class _ConditionsHero extends StatelessWidget {
     final windValue = current?.windSpeedKmh == null
         ? '--'
         : '${current!.windSpeedKmh!.round()} km/h';
+    final waveHeight = current?.windWaveHeight;
     final waveValue =
-        _hasData ? '${tideData.waveHeight.toStringAsFixed(1)} m' : '--';
+        waveHeight == null ? '--' : '${waveHeight.toStringAsFixed(1)} m';
 
     return Center(
       child: ConstrainedBox(
@@ -534,9 +535,9 @@ class _ConditionsHero extends StatelessWidget {
                               icon: Icons.water_rounded,
                               label: context.tr('home.sea'),
                               value: waveValue,
-                              detail: _hasData
-                                  ? '${current?.wavePeriod.round() ?? 0} s'
-                                  : '--',
+                              detail: current?.wavePeriod == null
+                                  ? '--'
+                                  : '${current!.wavePeriod!.round()} s',
                             ),
                           ),
                           _HeroDivider(color: palette.heroPanelBorder),
