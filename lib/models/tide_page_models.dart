@@ -176,6 +176,7 @@ class TideEvent {
   final double height;
   final String label;
   final DateTime? dateTime;
+  final DateTime instantUtc;
 
   const TideEvent({
     required this.type,
@@ -183,6 +184,7 @@ class TideEvent {
     required this.height,
     required this.label,
     this.dateTime,
+    required this.instantUtc,
   });
 }
 

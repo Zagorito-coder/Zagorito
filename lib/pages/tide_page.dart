@@ -17,6 +17,8 @@ import 'forecast_page.dart';
 import '../services/tide_service.dart' as tide_svc;
 import '../services/casablanca_tide_reference.dart';
 import '../services/tide_coefficient_service.dart';
+import '../services/tide_event_timeline.dart';
+import '../services/tide_extrema_service.dart';
 import '../services/tide_forecast_presentation_service.dart';
 import '../theme_controller.dart';
 import '../widgets/app_back_button.dart';
@@ -218,51 +220,23 @@ tm.TideData _fromTideService(tide_data.TideData src) {
           src.hourlyPoints,
         );
 
-  final events = <tm.TideEvent>[];
-  if (tidePoints.length >= 3) {
-    for (int i = 1; i < tidePoints.length - 1; i++) {
-      final a = tidePoints[i - 1].height;
-      final b = tidePoints[i].height;
-      final c = tidePoints[i + 1].height;
-      if (b < a && b < c) {
-        events.add(tm.TideEvent(
-            type: 'low',
-            time: tidePoints[i].time,
-            height: b,
-            label: 'Basse Mer',
-            dateTime: DateTime(today.year, today.month, today.day)
-                .add(Duration(minutes: (tidePoints[i].time * 60).round()))));
-      } else if (b > a && b > c) {
-        events.add(tm.TideEvent(
-            type: 'high',
-            time: tidePoints[i].time,
-            height: b,
-            label: 'Haute Mer',
-            dateTime: DateTime(today.year, today.month, today.day)
-                .add(Duration(minutes: (tidePoints[i].time * 60).round()))));
-      }
-    }
-  }
-  if (events.isEmpty) {
-    final lowPoint = tidePoints.reduce((a, b) => a.height <= b.height ? a : b);
-    final highPoint = tidePoints.reduce((a, b) => a.height >= b.height ? a : b);
-    events.add(tm.TideEvent(
-        type: 'low',
-        time: lowPoint.time,
-        height: lowPoint.height,
-        label: 'Basse Mer',
-        dateTime: DateTime(today.year, today.month, today.day)
-            .add(Duration(minutes: (lowPoint.time * 60).round()))));
-    events.add(tm.TideEvent(
-        type: 'high',
-        time: highPoint.time,
-        height: highPoint.height,
-        label: 'Haute Mer',
-        dateTime: DateTime(today.year, today.month, today.day)
-            .add(Duration(minutes: (highPoint.time * 60).round()))));
-  }
+  final events = TideExtremaService.detect(
+    chartSourcePoints,
+    instantOf: (point) => point.instantUtc ?? src.stationInstantAt(point.time),
+    civilAt: src.stationTimeAt,
+  )
+      .map(
+        (extremum) => tm.TideEvent(
+          type: extremum.isHigh ? 'high' : 'low',
+          time: extremum.time.hour + extremum.time.minute / 60,
+          height: extremum.height,
+          label: extremum.isHigh ? 'Haute Mer' : 'Basse Mer',
+          dateTime: extremum.time,
+          instantUtc: extremum.instantUtc,
+        ),
+      )
+      .toList(growable: false);
 
-  final upcomingEvents = <tm.TideEvent>[];
   final sourcePoints = usesCasablancaReference
       ? _casablancaReferencePoints(
           todayStart,
@@ -270,33 +244,25 @@ tm.TideData _fromTideService(tide_data.TideData src) {
           src,
         )
       : src.hourlyPoints;
-  for (int i = 1; i < sourcePoints.length - 1; i++) {
-    final previous = sourcePoints[i - 1].height;
-    final current = sourcePoints[i].height;
-    final next = sourcePoints[i + 1].height;
-    final point = sourcePoints[i];
-    if (point.time.isBefore(now.subtract(const Duration(minutes: 30)))) {
-      continue;
-    }
-    if (current > previous && current > next) {
-      upcomingEvents.add(tm.TideEvent(
-        type: 'high',
-        time: point.time.hour + point.time.minute / 60,
-        height: current,
-        label: 'Haute Mer',
-        dateTime: point.time,
-      ));
-    } else if (current < previous && current < next) {
-      upcomingEvents.add(tm.TideEvent(
-        type: 'low',
-        time: point.time.hour + point.time.minute / 60,
-        height: current,
-        label: 'Basse Mer',
-        dateTime: point.time,
-      ));
-    }
-    if (upcomingEvents.length == 4) break;
-  }
+  final referenceInstant = DateTime.now().toUtc();
+  final upcomingEvents = TideExtremaService.detect(
+    sourcePoints,
+    instantOf: (point) => point.instantUtc ?? src.stationInstantAt(point.time),
+    civilAt: src.stationTimeAt,
+  )
+      .where((extremum) => !extremum.instantUtc.isBefore(referenceInstant))
+      .take(8)
+      .map(
+        (extremum) => tm.TideEvent(
+          type: extremum.isHigh ? 'high' : 'low',
+          time: extremum.time.hour + extremum.time.minute / 60,
+          height: extremum.height,
+          label: extremum.isHigh ? 'Haute Mer' : 'Basse Mer',
+          dateTime: extremum.time,
+          instantUtc: extremum.instantUtc,
+        ),
+      )
+      .toList(growable: false);
 
   final astro = src.astro;
   final moon = astro.moonPhaseName;
@@ -326,7 +292,7 @@ tm.TideData _fromTideService(tide_data.TideData src) {
     hourlyForecastDays: hourlyForecastDays,
     tidePoints: tidePoints,
     tideEvents: events,
-    upcomingEvents: upcomingEvents.isEmpty ? events : upcomingEvents,
+    upcomingEvents: upcomingEvents,
     currentHour: currentHour,
     moonInfo: tm.MoonInfo(phaseName: moon, influence: influence),
     sunTimes: tm.SunTimes(
@@ -1413,8 +1379,6 @@ class _TidePageState extends State<TidePage>
   Widget _buildCurrentTideRibbon() {
     final selected = _data.hourlyCards[_selectedHourIndex];
     final rising = selected.tideTrend == 'montante';
-    final nextHigh = _nextEvent('high');
-    final nextLow = _nextEvent('low');
     return FadeTransition(
       opacity: _fadeAnims[2],
       child: SlideTransition(
@@ -1510,23 +1474,30 @@ class _TidePageState extends State<TidePage>
                   const SizedBox(width: 9),
                   Expanded(
                     flex: 10,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          context.tr('tide.nextExtremes').toUpperCase(),
-                          style: TextStyle(
-                            color: _txt(0.52),
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                        const SizedBox(height: 7),
-                        _compactEventLine(nextHigh, true),
-                        const SizedBox(height: 7),
-                        _compactEventLine(nextLow, false),
-                      ],
+                    child: ValueListenableBuilder<DateTime>(
+                      valueListenable: _clockNotifier,
+                      builder: (context, _, __) {
+                        final nextHigh = _nextEvent('high');
+                        final nextLow = _nextEvent('low');
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              context.tr('tide.nextExtremes').toUpperCase(),
+                              style: TextStyle(
+                                color: _txt(0.52),
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                            const SizedBox(height: 7),
+                            _compactEventLine(nextHigh, true),
+                            const SizedBox(height: 7),
+                            _compactEventLine(nextLow, false),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ],
@@ -1539,15 +1510,36 @@ class _TidePageState extends State<TidePage>
   }
 
   tm.TideEvent? _nextEvent(String type) {
+    return _futureEvents().where((event) => event.type == type).firstOrNull;
+  }
+
+  List<tm.TideEvent> _futureEvents() {
+    return TideEventTimeline.upcoming(
+      _data.upcomingEvents,
+      referenceInstant: DateTime.now(),
+    );
+  }
+
+  String _eventTimeLabel(tm.TideEvent event) {
+    final time = _formatDecimalTime(event.time);
+    final dayLabel = _eventDayLabel(event);
+    return dayLabel == null ? time : '$dayLabel $time';
+  }
+
+  String? _eventDayLabel(tm.TideEvent event) {
+    final dateTime = event.dateTime;
+    if (dateTime == null) return null;
     final now = _data.stationTimeAt(DateTime.now());
-    final currentDecimalHour = now.hour + now.minute / 60.0;
-    final futureEvents = _data.tideEvents
-        .where(
-            (event) => event.type == type && event.time >= currentDecimalHour)
-        .toList()
-      ..sort((a, b) => a.time.compareTo(b.time));
-    if (futureEvents.isNotEmpty) return futureEvents.first;
-    return _data.tideEvents.where((event) => event.type == type).firstOrNull;
+    final dayDifference = TideEventTimeline.dayDifference(
+      eventCivilTime: dateTime,
+      referenceCivilTime: now,
+    );
+    if (dayDifference == 1) return context.tr('tide.tomorrowShort');
+    if (dayDifference > 1) {
+      return '${dateTime.day.toString().padLeft(2, '0')}/'
+          '${dateTime.month.toString().padLeft(2, '0')}';
+    }
+    return null;
   }
 
   Widget _compactEventLine(tm.TideEvent? event, bool isHigh) {
@@ -1564,7 +1556,7 @@ class _TidePageState extends State<TidePage>
           child: Text(
             event == null
                 ? '${context.tr(isHigh ? 'tide.highTideLabel' : 'tide.lowTideLabel')} —'
-                : '${context.tr(isHigh ? 'tide.highTideLabel' : 'tide.lowTideLabel')} ${_formatDecimalTime(event.time)} · ${event.height.toStringAsFixed(2)} m',
+                : '${context.tr(isHigh ? 'tide.highTideLabel' : 'tide.lowTideLabel')} ${_eventTimeLabel(event)} · ${event.height.toStringAsFixed(2)} m',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
@@ -3052,51 +3044,52 @@ class _TidePageState extends State<TidePage>
   }
 
   Widget _buildEventsPanel() {
-    final events = _data.upcomingEvents.take(4).toList();
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 5, 16, 4),
-      child: _glassPanel(
-        borderRadius: BorderRadius.circular(14),
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 9),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              context.tr('tide.upcomingTideEvents').toUpperCase(),
-              style: TextStyle(
-                color: _txt(0.64),
-                fontSize: _conditionSectionTitleFontSize,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.9,
-              ),
+    return ValueListenableBuilder<DateTime>(
+      valueListenable: _clockNotifier,
+      builder: (context, _, __) {
+        final events = _futureEvents().take(4).toList();
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 5, 16, 4),
+          child: _glassPanel(
+            borderRadius: BorderRadius.circular(14),
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 9),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  context.tr('tide.upcomingTideEvents').toUpperCase(),
+                  style: TextStyle(
+                    color: _txt(0.64),
+                    fontSize: _conditionSectionTitleFontSize,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.9,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                SizedBox(
+                  height: 55,
+                  child: Row(
+                    children: [
+                      for (var index = 0; index < events.length; index++) ...[
+                        Expanded(child: _compactEventCard(events[index])),
+                        if (index != events.length - 1)
+                          const SizedBox(width: 5),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 6),
-            SizedBox(
-              height: 55,
-              child: Row(
-                children: [
-                  for (var index = 0; index < events.length; index++) ...[
-                    Expanded(child: _compactEventCard(events[index])),
-                    if (index != events.length - 1) const SizedBox(width: 5),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
   Widget _compactEventCard(tm.TideEvent event) {
     final isHigh = event.type == 'high';
     final color = isHigh ? _accent : _red;
-    final dateTime = event.dateTime;
-    final now = _data.stationTimeAt(DateTime.now());
-    final tomorrow = dateTime != null &&
-        (dateTime.year != now.year ||
-            dateTime.month != now.month ||
-            dateTime.day != now.day);
+    final dayLabel = _eventDayLabel(event);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
       decoration: BoxDecoration(
@@ -3141,7 +3134,7 @@ class _TidePageState extends State<TidePage>
             ),
           ),
           Text(
-            '${event.height.toStringAsFixed(2)} m${tomorrow ? ' · ${context.tr('tide.tomorrowShort')}' : ''}',
+            '${event.height.toStringAsFixed(2)} m${dayLabel == null ? '' : ' · $dayLabel'}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
