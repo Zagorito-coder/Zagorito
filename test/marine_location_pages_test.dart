@@ -224,4 +224,68 @@ void main() {
     await t.pumpWidget(const SizedBox());
     c.dispose();
   });
+
+  testWidgets(
+      'Rabat explicite le référentiel MSL sans hauteur négative ambiguë',
+      (t) async {
+    t.view.physicalSize = const Size(1080, 2400);
+    t.view.devicePixelRatio = 2.5;
+    addTearDown(t.view.reset);
+    final c = MarineLocationController(
+        locate: (_) async => throw MarineLocationIssue.permission);
+    await c.selectManual(point('rabat'));
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day);
+    final hourlyPoints = List<TidePoint>.generate(
+      8 * 24 + 1,
+      (index) => TidePoint(
+        time: start.add(Duration(hours: index)),
+        height: -1.32,
+        windWaveHeight: 1.1,
+        wavePeriod: 8,
+      ),
+      growable: false,
+    );
+    final hourlyForecast = List<HourlyForecastPoint>.generate(
+      8 * 8,
+      (index) => HourlyForecastPoint(
+        time: start.add(Duration(hours: index * 3)),
+        waveHeightM: 1.1,
+        wavePeriodS: 8,
+      ),
+      growable: false,
+    );
+    final reference = TideService.casablancaOfflineFallback();
+
+    await t.pumpWidget(app(TidePage(
+      embeddedInBottomNavigation: true,
+      locationController: c,
+      tideLoader: (_) async => TideData(
+        hourlyPoints: hourlyPoints,
+        hourlyForecast: hourlyForecast,
+        low: -1.32,
+        high: -1.32,
+        next: -1.32,
+        waveHeight: 1.1,
+        location: 'Rabat, Maroc',
+        tideHeightDatum: TideHeightDatum.globalMeanSeaLevel,
+        astro: reference.astro,
+      ),
+    )));
+    await pump(t);
+
+    expect(find.text('-1.32 m'), findsNothing);
+    expect(find.textContaining('sous le NMM'), findsWidgets);
+
+    await t.tap(find.text('Prévisions'));
+    await pump(t);
+    expect(find.textContaining('Référence verticale'), findsOneWidget);
+    expect(find.text('-1.32 m'), findsNothing);
+    expect(find.text('1.32 m'), findsWidgets);
+    expect(find.textContaining('↓ NMM'), findsWidgets);
+    expect(t.takeException(), isNull);
+
+    await t.pumpWidget(const SizedBox());
+    c.dispose();
+  });
 }

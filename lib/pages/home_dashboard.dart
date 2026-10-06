@@ -11,6 +11,7 @@ import '../l10n/app_localizations.dart';
 import '../models.dart';
 import '../models/tide_data.dart';
 import '../theme_controller.dart';
+import '../utils/tide_height_formatter.dart';
 import 'settings_page.dart';
 
 class HomeDashboard extends StatefulWidget {
@@ -394,11 +395,27 @@ class _ConditionsHero extends StatelessWidget {
     final current = _currentPoint;
     final activity =
         _hasData ? tideData.astro.fishActivity.clamp(0.0, 1.0) : 0.0;
-    final activityValue =
-        _hasData && tideData.location.toLowerCase().contains('casablanca')
-            ? '${(activity * 100).round()}%'
-            : '--';
-    final tideValue = _hasData ? '${tideData.next.toStringAsFixed(1)} m' : '--';
+    final usesCasablancaReference =
+        tideData.tideHeightDatum == TideHeightDatum.casablancaBmi ||
+            (tideData.tideHeightDatum == TideHeightDatum.unknown &&
+                tideData.location.toLowerCase().contains('casablanca'));
+    final activityValue = _hasData && usesCasablancaReference
+        ? '${(activity * 100).round()}%'
+        : '--';
+    final tideValue = _hasData
+        ? TideHeightFormatter.value(
+            tideData.next,
+            tideData.tideHeightDatum,
+            fractionDigits: 1,
+          )
+        : '--';
+    final tideReference = _hasData
+        ? TideHeightFormatter.compactQualifier(
+            context,
+            tideData.next,
+            tideData.tideHeightDatum,
+          )
+        : '';
     final windValue = current?.windSpeedKmh == null
         ? '--'
         : '${current!.windSpeedKmh!.round()} km/h';
@@ -517,7 +534,10 @@ class _ConditionsHero extends StatelessWidget {
                               icon: Icons.waves_rounded,
                               label: context.tr('home.tidesTitle'),
                               value: tideValue,
-                              detail: _nextTime,
+                              detail: <String>[
+                                tideReference,
+                                _nextTime,
+                              ].where((part) => part.isNotEmpty).join(' · '),
                             ),
                           ),
                           _HeroDivider(color: palette.heroPanelBorder),

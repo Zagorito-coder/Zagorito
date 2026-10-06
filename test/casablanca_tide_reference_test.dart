@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:spots_app/models/tide_data.dart';
 import 'package:spots_app/services/astronomy_service.dart';
 import 'package:spots_app/services/casablanca_tide_reference.dart';
+import 'package:spots_app/services/tide_service.dart';
 
 void main() {
   test('retrouve les quatre extrema de Casablanca au plus près de la table',
@@ -101,6 +102,7 @@ void main() {
       now: now,
     );
 
+    expect(calibrated.tideHeightDatum, TideHeightDatum.casablancaBmi);
     expect(calibrated.next, greaterThan(0));
     expect(calibrated.low, greaterThanOrEqualTo(0));
     expect(calibrated.hourlyPoints.first.windWaveHeight, 1.2);
@@ -108,5 +110,25 @@ void main() {
     expect(calibrated.hourlyPoints.first.pressureHpa, 1014);
     expect(calibrated.waveHeight, source.waveHeight);
     expect(calibrated.astro, same(source.astro));
+  });
+
+  test('le repli hors ligne Casablanca conserve le référentiel BMI', () {
+    final fallback = TideService.casablancaOfflineFallback(
+      now: DateTime.utc(2026, 8, 8, 12),
+    );
+
+    expect(fallback.tideHeightDatum, TideHeightDatum.casablancaBmi);
+  });
+
+  test('qualifie aussi une prévision Casablanca vide sans inventer de points',
+      () {
+    final source = TideData.fallback(location: 'Casablanca, Maroc');
+
+    final calibrated = CasablancaTideReference.calibrateForecast(source);
+
+    expect(calibrated.tideHeightDatum, TideHeightDatum.casablancaBmi);
+    expect(calibrated.hourlyPoints, isEmpty);
+    expect(calibrated.low, source.low);
+    expect(calibrated.high, source.high);
   });
 }

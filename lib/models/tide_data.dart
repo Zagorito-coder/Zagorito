@@ -5,6 +5,18 @@
 import '../services/astronomy_service.dart';
 import '../utils/station_time_zone.dart';
 
+/// Référence verticale utilisée pour exprimer les hauteurs de marée.
+///
+/// Une valeur n'est comparable à une table hydrographique locale que si son
+/// référentiel est identifié explicitement. Les documents Open-Meteo sont
+/// relatifs au niveau moyen mondial de la mer, tandis que Casablanca dispose
+/// d'une calibration locale BMI propre à cette station.
+enum TideHeightDatum {
+  globalMeanSeaLevel,
+  casablancaBmi,
+  unknown,
+}
+
 /// Représente un point de données de marée (heure + hauteur)
 class TidePoint {
   final DateTime time;
@@ -111,6 +123,7 @@ class TideData {
   final DateTime? generatedAt;
   final int? utcOffsetSeconds;
   final String? timeZoneId;
+  final TideHeightDatum tideHeightDatum;
   final AstroData astro; // Phase lune, coef, activité, transit...
 
   const TideData({
@@ -124,6 +137,7 @@ class TideData {
     this.generatedAt,
     this.utcOffsetSeconds,
     this.timeZoneId,
+    this.tideHeightDatum = TideHeightDatum.unknown,
     required this.astro,
   });
 

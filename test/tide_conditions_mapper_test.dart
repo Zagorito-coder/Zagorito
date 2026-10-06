@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:spots_app/models/tide_data.dart';
 import 'package:spots_app/services/tide_conditions_mapper.dart';
 
 void main() {
@@ -53,6 +54,41 @@ void main() {
     expect(result.high, 1.08);
     expect(result.astro.sunRise, '06:15');
     expect(result.astro.sunSet, '20:42');
+    expect(
+      result.tideHeightDatum,
+      TideHeightDatum.globalMeanSeaLevel,
+      reason: 'Un ancien document sans tide_datum reste identifié comme MSL.',
+    );
+  });
+
+  test('propage le référentiel MSL explicitement publié', () {
+    final document = _conditionsDocument(
+      tideHeights: const [0.1, 0.4, 0.2],
+      waveHeights: const [1.1, 1.2, 1.3],
+    )..['tide_datum'] = 'global_mean_sea_level';
+
+    final result = TideConditionsMapper.fromDocument(
+      document,
+      fallbackLocation: 'Fallback',
+      now: DateTime.utc(2026, 7, 26, 1),
+    );
+
+    expect(result.tideHeightDatum, TideHeightDatum.globalMeanSeaLevel);
+  });
+
+  test('ne qualifie pas un référentiel publié inconnu', () {
+    final document = _conditionsDocument(
+      tideHeights: const [0.1, 0.4, 0.2],
+      waveHeights: const [1.1, 1.2, 1.3],
+    )..['tide_datum'] = 'unsupported_local_datum';
+
+    final result = TideConditionsMapper.fromDocument(
+      document,
+      fallbackLocation: 'Fallback',
+      now: DateTime.utc(2026, 7, 26, 1),
+    );
+
+    expect(result.tideHeightDatum, TideHeightDatum.unknown);
   });
 
   test('interprète les heures Open-Meteo sans suffixe comme UTC', () {

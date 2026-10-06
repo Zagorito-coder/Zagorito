@@ -15,6 +15,7 @@ import 'package:spots_app/models/tide_data.dart';
 import 'package:spots_app/services/forecast_firestore_service.dart';
 import 'package:spots_app/services/tide_service.dart';
 import 'package:spots_app/theme.dart';
+import 'package:spots_app/utils/tide_height_formatter.dart';
 
 class FishIntelligenceModal extends StatelessWidget {
   final FishModel fish;
@@ -670,7 +671,11 @@ class _TideBlockState extends State<_TideBlock> {
                 Expanded(
                   child: ClipRRect(
                     child: Text(
-                      '${t.next.toStringAsFixed(2)} m  ·  ${t.low.toStringAsFixed(1)}–${t.high.toStringAsFixed(1)} m',
+                      '${TideHeightFormatter.full(context, t.next, t.tideHeightDatum)}  ·  '
+                      '${TideHeightFormatter.full(context, t.low, t.tideHeightDatum)}–'
+                      '${TideHeightFormatter.full(context, t.high, t.tideHeightDatum)}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: palette.mutedText,
                         fontSize: 8.5,

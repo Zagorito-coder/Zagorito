@@ -1,6 +1,7 @@
 // ============================================================
 
 import '../utils/station_time_zone.dart';
+import 'tide_data.dart' show TideHeightDatum;
 //  tide_page_models.dart — Modèles de données pour la page Marées
 // ============================================================
 
@@ -243,6 +244,7 @@ class TideData {
   final DateTime? generatedAt;
   final int? utcOffsetSeconds;
   final String? timeZoneId;
+  final TideHeightDatum tideHeightDatum;
   final List<HourlyCard> hourlyCards;
   final List<HourlyForecastDay> hourlyForecastDays;
   final List<TidePoint> tidePoints;
@@ -263,6 +265,7 @@ class TideData {
     this.generatedAt,
     this.utcOffsetSeconds,
     this.timeZoneId,
+    this.tideHeightDatum = TideHeightDatum.unknown,
     required this.hourlyCards,
     this.hourlyForecastDays = const [],
     required this.tidePoints,

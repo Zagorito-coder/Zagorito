@@ -7,7 +7,10 @@ void main() {
     final tideSource = File('lib/pages/tide_page.dart').readAsStringSync();
     final coefficientsSource =
         File('lib/widgets/tide_coefficients_view.dart').readAsStringSync();
-    final localizedTideSource = '$tideSource\n$coefficientsSource';
+    final heightFormatterSource =
+        File('lib/utils/tide_height_formatter.dart').readAsStringSync();
+    final localizedTideSource =
+        '$tideSource\n$coefficientsSource\n$heightFormatterSource';
     final attributionSource =
         File('lib/widgets/open_meteo_attribution.dart').readAsStringSync();
 
@@ -35,6 +38,13 @@ void main() {
       'tide.humidity',
       'tide.upcomingTideEvents',
       'tide.forecastDisclaimer',
+      'tide.meanSeaLevelReference',
+      'tide.aboveMeanSeaLevelShort',
+      'tide.belowMeanSeaLevelShort',
+      'tide.atMeanSeaLevelShort',
+      'tide.aboveMeanSeaLevelCompact',
+      'tide.belowMeanSeaLevelCompact',
+      'tide.atMeanSeaLevelCompact',
       'tide.hourSemantics',
       'tide.unavailableShort',
       'tide.viewSelector',

@@ -418,6 +418,7 @@ class TideConditionsMapper {
       generatedAt: _parseTimestamp(data['timestamp']),
       utcOffsetSeconds: utcOffsetSeconds,
       timeZoneId: timeZoneId,
+      tideHeightDatum: _tideHeightDatum(data['tide_datum']),
       astro: AstroData(
         moonPhase: phase,
         moonPhaseName: phaseName == null || phaseName.isEmpty
@@ -434,6 +435,21 @@ class TideConditionsMapper {
         lunarUnder: computedAstro.lunarUnder,
       ),
     );
+  }
+
+  /// Les documents historiques proviennent du même champ Open-Meteo
+  /// `sea_level_height_msl`, mais ont été publiés avant l'ajout explicite de
+  /// `tide_datum`. Seule l'absence du champ bénéficie de cette compatibilité ;
+  /// toute valeur présente mais inconnue reste volontairement non qualifiée.
+  static TideHeightDatum _tideHeightDatum(dynamic value) {
+    if (value == null) return TideHeightDatum.globalMeanSeaLevel;
+    if (value is! String) return TideHeightDatum.unknown;
+
+    return switch (value.trim()) {
+      'global_mean_sea_level' => TideHeightDatum.globalMeanSeaLevel,
+      'casablanca_bmi' => TideHeightDatum.casablancaBmi,
+      _ => TideHeightDatum.unknown,
+    };
   }
 
   /// Convertit un instant ISO explicite vers l'heure civile de la station.

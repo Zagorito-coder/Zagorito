@@ -89,7 +89,8 @@ class TideService {
           data,
           fallbackLocation: station.name,
         );
-        return station.id == 'casablanca_maroc'
+        return station.id == 'casablanca_maroc' &&
+                mapped.tideHeightDatum != TideHeightDatum.casablancaBmi
             ? CasablancaTideReference.calibrateForecast(mapped)
             : mapped;
       } catch (error) {
@@ -159,6 +160,7 @@ class TideService {
         timeZoneId: casablancaTimeZoneId,
       ),
       timeZoneId: casablancaTimeZoneId,
+      tideHeightDatum: TideHeightDatum.casablancaBmi,
       astro: AstronomyService.calculate(referenceTime, low, high),
     );
   }

@@ -40,7 +40,22 @@ class CasablancaTideReference {
     TideData source, {
     DateTime? now,
   }) {
-    if (source.hourlyPoints.isEmpty) return source;
+    if (source.hourlyPoints.isEmpty) {
+      return TideData(
+        hourlyPoints: source.hourlyPoints,
+        hourlyForecast: source.hourlyForecast,
+        low: source.low,
+        high: source.high,
+        next: source.next,
+        waveHeight: source.waveHeight,
+        location: source.location,
+        generatedAt: source.generatedAt,
+        utcOffsetSeconds: source.utcOffsetSeconds,
+        timeZoneId: source.timeZoneId,
+        tideHeightDatum: TideHeightDatum.casablancaBmi,
+        astro: source.astro,
+      );
+    }
 
     final calibratedPoints = source.hourlyPoints
         .map(
@@ -71,6 +86,7 @@ class CasablancaTideReference {
       generatedAt: source.generatedAt,
       utcOffsetSeconds: source.utcOffsetSeconds,
       timeZoneId: source.timeZoneId,
+      tideHeightDatum: TideHeightDatum.casablancaBmi,
       astro: source.astro,
     );
   }
