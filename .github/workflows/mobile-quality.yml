@@ -100,6 +100,13 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      - name: Auditer les dépendances Python de la récolte
+        # L'audit reste bloquant dans la CI, mais il ne peut plus interrompre
+        # le job Production qui renouvelle les prévisions toutes les six heures.
+        uses: pypa/gh-action-pip-audit@1220774d901786e6f652ae159f7b6bc8fea6d266 # v1.1.0
+        with:
+          inputs: requirements-harvest.txt
+
       - name: Installer et auditer les dépendances Node
         run: |
           npm ci --ignore-scripts --prefix functions

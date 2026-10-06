@@ -13,7 +13,7 @@
 #   "latitude": -31.02, "longitude": 115.33,
 #   "sunrise": "2026-07-08T06:30",   // nouveau – jour J+0
 #   "sunset": "2026-07-08T20:15",    // nouveau – jour J+0
-#   "water_temp_c": 22.4,            // nouveau – derniere SST non-null
+#   "water_temp_c": 22.4,            // nouveau – SST la plus proche du run
 #   "days": [
 #     { "date": "2026-07-08",
 #       "sunrise": "2026-07-08T06:30",
@@ -50,6 +50,24 @@ import time
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from datetime import date, datetime, timedelta, timezone
 from collections import defaultdict
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError, reset_tzpath
+
+try:
+    # Le runner GitHub peut embarquer une base système plus ancienne que le
+    # retour définitif du Maroc à GMT du 20 septembre 2026. La dépendance
+    # Python épinglée garantit la même règle IANA en CI et en Production.
+    import importlib.resources as importlib_resources
+    import tzdata
+
+    reset_tzpath(
+        [str(importlib_resources.files(tzdata).joinpath("zoneinfo"))]
+    )
+    ZoneInfo.clear_cache()
+except ImportError:
+    # En développement local, ZoneInfo conserve la base du système. Le job
+    # Production installe toujours requirements-harvest.txt et ne passe donc
+    # jamais par ce repli.
+    pass
 
 import requests
 import firebase_admin
@@ -311,19 +329,19 @@ def ms_to_knots(v):
 
 
 def compute_rating(wind_kt, wave_m, precip_pct):
-    """Note simplifiee sur 5 etoiles."""
+    """Note simplifiee sur 5 etoiles, uniquement si elle est complète."""
+    if wind_kt is None or wave_m is None or precip_pct is None:
+        return None
     score = 0
-    if wind_kt is not None:
-        if 8 <= wind_kt <= 22:
-            score += 2
-        elif 5 <= wind_kt < 8 or 22 < wind_kt <= 28:
-            score += 1
-    if wave_m is not None:
-        if 0.5 <= wave_m <= 2.5:
-            score += 2
-        elif wave_m < 0.5:
-            score += 1
-    if precip_pct is not None and precip_pct < 30:
+    if 8 <= wind_kt <= 22:
+        score += 2
+    elif 5 <= wind_kt < 8 or 22 < wind_kt <= 28:
+        score += 1
+    if 0.5 <= wave_m <= 2.5:
+        score += 2
+    elif wave_m < 0.5:
+        score += 1
+    if precip_pct < 30:
         score += 1
     return max(0, min(5, score))
 
@@ -346,16 +364,159 @@ def _hourly_num(hourly, key, index, default=None):
     return _safe_num(values[index], default)
 
 
-def _is_native_gfs_step(local_timestamp, utc_offset_seconds):
+def _open_meteo_timezone(timezone_name, utc_offset_seconds=0):
+    """Retourne le fuseau IANA de la réponse, ou le décalage historique.
+
+    ``utc_offset_seconds`` reste accepté pour les anciens documents/tests et
+    pour une éventuelle réponse dépourvue de nom de fuseau. Une réponse qui
+    annonce un nom IANA invalide échoue volontairement : utiliser alors le
+    décalage unique pourrait décaler silencieusement une partie des 15 jours.
+    """
+    if isinstance(timezone_name, str) and timezone_name.strip():
+        try:
+            return ZoneInfo(timezone_name.strip())
+        except ZoneInfoNotFoundError as error:
+            raise ValueError(
+                f"Fuseau Open-Meteo inconnu : {timezone_name!r}."
+            ) from error
+    return timezone(timedelta(seconds=int(utc_offset_seconds or 0)))
+
+
+def _utc_candidates_for_local(local_time, station_timezone):
+    """Instants UTC valides correspondant à une heure civile locale."""
+    if local_time.tzinfo is not None:
+        return [local_time.astimezone(timezone.utc)]
+
+    candidates = []
+    for fold in (0, 1):
+        aware = local_time.replace(tzinfo=station_timezone, fold=fold)
+        candidate = aware.astimezone(timezone.utc)
+        # Un aller-retour élimine les heures inexistantes du passage à
+        # l'heure d'été. Les deux folds restent disponibles lors du retour à
+        # l'heure standard.
+        round_trip = candidate.astimezone(station_timezone).replace(tzinfo=None)
+        if round_trip == local_time and candidate not in candidates:
+            candidates.append(candidate)
+    return sorted(candidates)
+
+
+def _utc_datetimes_from_open_meteo(
+    local_timestamps,
+    utc_offset_seconds=0,
+    timezone_name=None,
+):
+    """Résout une série locale Open-Meteo en instants UTC non ambigus.
+
+    L'ordre de la série permet de distinguer les deux occurrences d'une heure
+    répétée à la fin de l'heure d'été. Une heure civile inexistante ou une
+    série qui recule fait échouer la récolte avant toute écriture Firestore.
+    """
+    station_timezone = _open_meteo_timezone(
+        timezone_name,
+        utc_offset_seconds,
+    )
+    resolved = []
+    previous = None
+    for raw_timestamp in local_timestamps:
+        if not isinstance(raw_timestamp, str) or not raw_timestamp.strip():
+            raise ValueError("Horodatage Open-Meteo absent ou invalide.")
+        try:
+            local_time = datetime.fromisoformat(raw_timestamp)
+        except ValueError as error:
+            raise ValueError(
+                f"Horodatage Open-Meteo invalide : {raw_timestamp!r}."
+            ) from error
+
+        candidates = _utc_candidates_for_local(local_time, station_timezone)
+        if previous is not None:
+            candidates = [candidate for candidate in candidates if candidate > previous]
+        if not candidates:
+            raise ValueError(
+                "Impossible de résoudre sans ambiguïté l'heure locale "
+                f"Open-Meteo {raw_timestamp!r} dans {timezone_name or 'le fuseau fixe'}."
+            )
+        selected = candidates[0]
+        resolved.append(selected)
+        previous = selected
+    return resolved
+
+
+def _utc_iso(instant):
+    return instant.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _parse_utc_instant(raw_timestamp, label="instant UTC"):
+    if not isinstance(raw_timestamp, str) or not raw_timestamp.strip():
+        raise ValueError(f"{label} absent ou invalide.")
+    try:
+        parsed = datetime.fromisoformat(raw_timestamp.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ValueError(f"{label} invalide : {raw_timestamp!r}.") from error
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError(f"{label} doit contenir un décalage UTC explicite.")
+    return parsed.astimezone(timezone.utc)
+
+
+def _expected_utc_grid_instants(
+    first_local_date,
+    day_count,
+    station_timezone,
+    *,
+    step_hours,
+):
+    """Instants d'une grille UTC appartenant à des dates civiles locales."""
+    last_local_date = first_local_date + timedelta(days=day_count)
+    # Deux jours de marge couvrent tous les décalages IANA actuels, y compris
+    # les changements exceptionnels de date civile.
+    cursor = datetime.combine(
+        first_local_date - timedelta(days=2),
+        datetime.min.time(),
+        tzinfo=timezone.utc,
+    )
+    end = datetime.combine(
+        last_local_date + timedelta(days=2),
+        datetime.min.time(),
+        tzinfo=timezone.utc,
+    )
+    remainder = cursor.hour % step_hours
+    if remainder:
+        cursor += timedelta(hours=step_hours - remainder)
+
+    expected = []
+    while cursor < end:
+        local_date = cursor.astimezone(station_timezone).date()
+        if first_local_date <= local_date < last_local_date:
+            expected.append(cursor)
+        cursor += timedelta(hours=step_hours)
+    return expected
+
+
+def _is_native_gfs_instant(utc_time):
+    return (
+        utc_time.second == 0
+        and utc_time.microsecond == 0
+        and utc_time.minute == 0
+        and utc_time.hour % STEP_HOURS == 0
+    )
+
+
+def _is_native_gfs_step(
+    local_timestamp,
+    utc_offset_seconds,
+    timezone_name=None,
+):
     """Indique si une heure locale correspond à un pas GFS UTC de 3 h.
 
     Open-Meteo renvoie les horodatages dans le fuseau demandé. La grille GFS
     reste toutefois calée sur 00/03/06 UTC. À Casablanca (UTC+1), les créneaux
     comparables sont donc 01/04/07, et non 00/03/06.
     """
-    local_time = datetime.fromisoformat(local_timestamp)
-    utc_time = local_time - timedelta(seconds=int(utc_offset_seconds or 0))
-    return utc_time.minute == 0 and utc_time.hour % STEP_HOURS == 0
+    utc_time = _utc_datetimes_from_open_meteo(
+        [local_timestamp],
+        utc_offset_seconds,
+        timezone_name,
+    )[0]
+    return _is_native_gfs_instant(utc_time)
 
 
 def _error_summary(error):
@@ -677,7 +838,14 @@ def _extract_wave_model_slot(wave_data, wave_by_time, t):
 # ---------------------------------------------------------------------------
 # 4. Fusion des 3 modeles + champs racine historiques
 # ---------------------------------------------------------------------------
-def build_days_payload(wind_json, hires_json, wave_json, daily_json):
+def build_days_payload(
+    wind_json,
+    hires_json,
+    wave_json,
+    daily_json,
+    *,
+    reference_time=None,
+):
     """
     wind_json  : reponse GFS (contient aussi sunrise/sunset dans daily)
     hires_json : reponse ECMWF IFS
@@ -691,18 +859,38 @@ def build_days_payload(wind_json, hires_json, wave_json, daily_json):
     h_data = hires_json["hourly"]
     m_data = wave_json["hourly"]
 
-    wind_by_time = {t: i for i, t in enumerate(w_data["time"])}
-    hires_by_time = {t: i for i, t in enumerate(h_data["time"])}
-    wave_by_time = {t: i for i, t in enumerate(m_data["time"])}
-
     days = defaultdict(list)
+    reference_time = reference_time or datetime.now(timezone.utc)
+    if reference_time.tzinfo is None:
+        reference_time = reference_time.replace(tzinfo=timezone.utc)
+    else:
+        reference_time = reference_time.astimezone(timezone.utc)
     water_temp_values = []
     utc_offset_seconds = int(
         _safe_num(wind_json.get("utc_offset_seconds"), 0) or 0
     )
+    wind_timezone_name = wind_json.get("timezone")
+    wind_utc_times = _utc_datetimes_from_open_meteo(
+        w_data["time"],
+        utc_offset_seconds,
+        wind_timezone_name,
+    )
+    hires_utc_times = _utc_datetimes_from_open_meteo(
+        h_data["time"],
+        int(_safe_num(hires_json.get("utc_offset_seconds"), 0) or 0),
+        hires_json.get("timezone"),
+    )
+    wave_utc_times = _utc_datetimes_from_open_meteo(
+        m_data["time"],
+        int(_safe_num(wave_json.get("utc_offset_seconds"), 0) or 0),
+        wave_json.get("timezone"),
+    )
+    wind_by_time = {instant: i for i, instant in enumerate(wind_utc_times)}
+    hires_by_time = {instant: i for i, instant in enumerate(hires_utc_times)}
+    wave_by_time = {instant: i for i, instant in enumerate(wave_utc_times)}
 
-    for i, t in enumerate(w_data["time"]):
-        if not _is_native_gfs_step(t, utc_offset_seconds):
+    for i, (t, utc_time) in enumerate(zip(w_data["time"], wind_utc_times)):
+        if not _is_native_gfs_instant(utc_time):
             continue
 
         # --- modele vent GFS (utilise comme champs racine pour compat arriere) ---
@@ -713,7 +901,7 @@ def build_days_payload(wind_json, hires_json, wave_json, daily_json):
         precip = _safe_num(w_data["precipitation_probability"][i])
 
         # --- modele vagues (houle primaire pour champs racine) ---
-        mi = wave_by_time.get(t)
+        mi = wave_by_time.get(utc_time)
         wave_h = _safe_num(m_data["wave_height"][mi]) if mi is not None else None
         wave_p = _safe_num(m_data["wave_period"][mi]) if mi is not None else None
         wave_d = _safe_num(m_data["wave_direction"][mi]) if mi is not None else None
@@ -721,22 +909,38 @@ def build_days_payload(wind_json, hires_json, wave_json, daily_json):
         # SST
         sst = _safe_num(m_data["sea_surface_temperature"][mi]) if mi is not None else None
         if sst is not None:
-            water_temp_values.append(sst)
+            water_temp_values.append(
+                (
+                    abs((utc_time - reference_time).total_seconds()),
+                    sst,
+                )
+            )
 
         # --- sous-objet models ---
-        wind_slot = _extract_wind_model_slot(wind_json, wind_by_time, t)
-        hires_slot = _extract_hires_model_slot(hires_json, hires_by_time, t)
-        wave_slot = _extract_wave_model_slot(wave_json, wave_by_time, t)
+        wind_slot = _extract_wind_model_slot(wind_json, wind_by_time, utc_time)
+        hires_slot = _extract_hires_model_slot(hires_json, hires_by_time, utc_time)
+        wave_slot = _extract_wave_model_slot(wave_json, wave_by_time, utc_time)
 
         # --- cloud_pct pour champs racine (on utilise low+mid+high du modele vent) ---
-        cloud_low = _safe_num(w_data["cloud_cover_low"][i]) or 0
-        cloud_mid = _safe_num(w_data["cloud_cover_mid"][i]) or 0
-        cloud_high = _safe_num(w_data["cloud_cover_high"][i]) or 0
-        cloud_total = max(cloud_low, cloud_mid, cloud_high)  # approximation
+        cloud_total = _hourly_num(w_data, "cloud_cover", i)
+        if cloud_total is None:
+            cloud_layers = [
+                value
+                for value in (
+                    _safe_num(w_data["cloud_cover_low"][i]),
+                    _safe_num(w_data["cloud_cover_mid"][i]),
+                    _safe_num(w_data["cloud_cover_high"][i]),
+                )
+                if value is not None
+            ]
+            cloud_total = max(cloud_layers) if cloud_layers else None
 
         slot = {
             # champs racine (compat arriere)
             "hour": t,
+            # Champ additif : la v1.0.9 (24) continue de lire `hour`, tandis
+            # que les nouveaux consommateurs disposent d'un instant absolu.
+            "hour_utc": _utc_iso(utc_time),
             "wind_speed_kt": wind_kt,
             "wind_gust_kt": gust_kt,
             "wind_dir_deg": wind_dir,
@@ -744,7 +948,7 @@ def build_days_payload(wind_json, hires_json, wave_json, daily_json):
             "wave_period_s": wave_p,
             "wave_dir_deg": wave_d,
             "temp_c": round(temp_c) if temp_c is not None else None,
-            "cloud_pct": round(cloud_total),
+            "cloud_pct": round(cloud_total) if cloud_total is not None else None,
             "precip_pct": precip,
             "weather_code": _hourly_num(w_data, "weather_code", i),
             "is_day": _hourly_num(w_data, "is_day", i),
@@ -769,7 +973,14 @@ def build_days_payload(wind_json, hires_json, wave_json, daily_json):
             day_info["sunset"] = daily_json[d].get("sunset")
         days_payload.append(day_info)
 
-    water_temp_c = round(water_temp_values[-1], 1) if water_temp_values else None
+    # La valeur racine est présentée comme la température actuelle dans
+    # Marées Pro. Choisir le créneau le plus proche de l'heure du run évite
+    # d'afficher comme actuelle une SST située plusieurs jours dans le futur.
+    water_temp_c = (
+        round(min(water_temp_values, key=lambda item: item[0])[1], 1)
+        if water_temp_values
+        else None
+    )
     return days_payload, water_temp_c
 
 
@@ -780,15 +991,14 @@ def validate_payload(
     days_payload,
     utc_offset_seconds=0,
     required_days=PUBLISHED_FORECAST_DAYS,
+    timezone_name=None,
 ):
     """Valide la structure servie par l'application avant toute écriture.
 
-    Les échéances GFS natives sont espacées de trois heures en UTC. Les
-    réponses Open-Meteo de ce pipeline utilisent un décalage UTC unique pour
-    la fenêtre demandée ; chaque journée locale doit donc contenir exactement
-    huit échéances. Si cette hypothèse change un jour (transition DST exposée
-    par slot, par exemple), la récolte échouera explicitement au lieu de
-    publier silencieusement un tableau incomplet ou décalé.
+    Les échéances GFS natives sont espacées de trois heures en UTC. Le nom IANA
+    renvoyé par Open-Meteo est utilisé pour chaque créneau : un changement
+    d'heure inclus dans la fenêtre ne dépend donc jamais du décalage unique de
+    tête de réponse.
 
     La validation historique de couverture vent/vagues reste appliquée à
     l'ensemble du payload après les contrôles structurels des dix premiers
@@ -817,6 +1027,21 @@ def validate_payload(
         raise ValueError("Une date de prévision n'est pas au format ISO.") from error
 
     first_dates = parsed_dates[:required_days]
+    station_timezone = _open_meteo_timezone(
+        timezone_name,
+        utc_offset_seconds,
+    )
+    expected_utc_times = _expected_utc_grid_instants(
+        first_dates[0],
+        required_days,
+        station_timezone,
+        step_hours=STEP_HOURS,
+    )
+    expected_by_date = defaultdict(list)
+    for instant in expected_utc_times:
+        expected_by_date[instant.astimezone(station_timezone).date()].append(instant)
+
+    validated_slots = []
     for index, current_date in enumerate(first_dates):
         expected_date = first_dates[0] + timedelta(days=index)
         if current_date != expected_date:
@@ -827,10 +1052,17 @@ def validate_payload(
             )
 
         slots = days_payload[index].get("slots")
-        if not isinstance(slots, list) or len(slots) != EXPECTED_SLOTS_PER_DAY:
+        expected_count = len(expected_by_date[current_date])
+        if not isinstance(slots, list) or len(slots) != expected_count:
+            if not timezone_name and expected_count == EXPECTED_SLOTS_PER_DAY:
+                raise ValueError(
+                    f"{current_date.isoformat()} doit contenir exactement "
+                    f"{EXPECTED_SLOTS_PER_DAY} créneaux GFS natifs."
+                )
             raise ValueError(
                 f"{current_date.isoformat()} doit contenir exactement "
-                f"{EXPECTED_SLOTS_PER_DAY} créneaux GFS natifs."
+                f"{expected_count} créneaux GFS natifs selon le fuseau "
+                f"{timezone_name}."
             )
 
         if any(not isinstance(slot, dict) for slot in slots):
@@ -842,7 +1074,9 @@ def validate_payload(
             raise ValueError(
                 f"Créneau horaire ISO manquant le {current_date.isoformat()}."
             )
-        if len(set(raw_hours)) != len(raw_hours) or raw_hours != sorted(raw_hours):
+        if raw_hours != sorted(raw_hours) or (
+            not timezone_name and len(set(raw_hours)) != len(raw_hours)
+        ):
             raise ValueError(
                 f"Les créneaux du {current_date.isoformat()} doivent être "
                 "uniques et triés."
@@ -856,6 +1090,10 @@ def validate_payload(
             ) from error
 
         for slot_time, raw_hour in zip(parsed_hours, raw_hours):
+            if slot_time.tzinfo is not None:
+                raise ValueError(
+                    f"Le créneau local {raw_hour} ne doit pas contenir de fuseau."
+                )
             if slot_time.date() != current_date:
                 raise ValueError(
                     f"Le créneau {raw_hour} n'appartient pas au jour "
@@ -863,20 +1101,66 @@ def validate_payload(
                 )
             if slot_time.second != 0 or slot_time.microsecond != 0:
                 raise ValueError(f"Le créneau {raw_hour} n'est pas une heure pleine.")
-            if not _is_native_gfs_step(raw_hour, utc_offset_seconds):
+            if not timezone_name and not _is_native_gfs_step(
+                raw_hour,
+                utc_offset_seconds,
+            ):
                 raise ValueError(
                     f"Le créneau {raw_hour} n'est pas aligné sur un pas GFS UTC."
                 )
-
-        for previous, current in zip(parsed_hours, parsed_hours[1:]):
-            if current - previous != timedelta(hours=STEP_HOURS):
+        if not timezone_name:
+            for previous, current in zip(parsed_hours, parsed_hours[1:]):
+                if current - previous == timedelta(hours=STEP_HOURS):
+                    continue
                 raise ValueError(
                     f"Les créneaux du {current_date.isoformat()} ne sont pas "
                     f"espacés de {STEP_HOURS} heures."
                 )
+        validated_slots.extend(zip(slots, parsed_hours))
+
+    explicit_utc = [slot.get("hour_utc") for slot, _ in validated_slots]
+    has_explicit_utc = [
+        isinstance(value, str) and bool(value.strip())
+        for value in explicit_utc
+    ]
+    if any(has_explicit_utc) and not all(has_explicit_utc):
+        raise ValueError("Les instants UTC des créneaux sont partiellement absents.")
+
+    if all(has_explicit_utc):
+        try:
+            actual_utc_times = [
+                _parse_utc_instant(value, "Instant UTC de créneau")
+                for value in explicit_utc
+            ]
+        except ValueError as error:
+            raise ValueError("Un instant UTC de créneau est invalide.") from error
+    else:
+        actual_utc_times = _utc_datetimes_from_open_meteo(
+            [slot["hour"] for slot, _ in validated_slots],
+            utc_offset_seconds,
+            timezone_name,
+        )
+
+    for (slot, local_time), utc_time in zip(validated_slots, actual_utc_times):
+        if not _is_native_gfs_instant(utc_time):
+            raise ValueError(
+                f"Le créneau {slot['hour']} n'est pas aligné sur un pas GFS UTC."
+            )
+        resolved_local = utc_time.astimezone(station_timezone).replace(tzinfo=None)
+        if resolved_local != local_time:
+            raise ValueError(
+                f"Le créneau local {slot['hour']} ne correspond pas à "
+                f"l'instant UTC {slot.get('hour_utc')}."
+            )
+
+    if actual_utc_times != expected_utc_times:
+        raise ValueError(
+            "La séquence des créneaux GFS UTC est incomplète, dupliquée ou décalée."
+        )
 
     total = 0
     ok_wind = 0
+    ok_hires = 0
     ok_wave = 0
     for day in days_payload:
         for slot in day["slots"]:
@@ -884,6 +1168,9 @@ def validate_payload(
             if slot.get("wind_speed_kt") is not None:
                 ok_wind += 1
             models = slot.get("models", {})
+            hires_model = models.get("hires", {}) if models else {}
+            if hires_model and hires_model.get("wind_speed_kt") is not None:
+                ok_hires += 1
             wave_model = models.get("wave", {}) if models else {}
             if wave_model and wave_model.get("wave_height_m") is not None:
                 ok_wave += 1
@@ -892,6 +1179,7 @@ def validate_payload(
         raise ValueError("Payload vide : aucun slot genere.")
 
     ratio_wind = ok_wind / total
+    ratio_hires = ok_hires / total
     ratio_wave = ok_wave / total
 
     if ratio_wind < 0.5:
@@ -899,20 +1187,29 @@ def validate_payload(
             f"Validation echouee : seulement {ratio_wind:.1%} des slots "
             f"ont wind_speed_kt non-null (seuil 50%)."
         )
+    if ratio_hires < 0.95:
+        raise ValueError(
+            f"Validation echouee : seulement {ratio_hires:.1%} des slots "
+            "ont une prévision IFS-HRES exploitable (seuil 95%)."
+        )
     if ratio_wave < 0.5:
         raise ValueError(
             f"Validation echouee : seulement {ratio_wave:.1%} des slots "
             f"ont wave.height_m non-null (seuil 50%)."
         )
 
-    print(f"  Validation OK : wind={ratio_wind:.1%} wave={ratio_wave:.1%} "
-          f"sur {total} slots.")
+    print(
+        f"  Validation OK : wind={ratio_wind:.1%} "
+        f"hires={ratio_hires:.1%} wave={ratio_wave:.1%} sur {total} slots."
+    )
 
 
 def build_conditions_gfs_summary(
     days_payload,
     max_days=CONDITIONS_FORECAST_DAYS,
     *,
+    utc_offset_seconds=0,
+    timezone_name=None,
     forecast_run_id=None,
     spot_id=None,
     last_update=None,
@@ -932,8 +1229,32 @@ def build_conditions_gfs_summary(
             wave = models.get("wave") or {}
             gust_knots = wind.get("wind_gust_kt")
             visibility_m = wind.get("visibility_m")
+            raw_time = slot.get("hour")
+            raw_utc_time = slot.get("hour_utc")
             values = {
-                "time": slot.get("hour"),
+                # `days` conserve les heures locales historiques consommées
+                # par Marées Pro. Le résumé `conditions.gfs`, lui, est
+                # rapproché des séries marines et météo horaires publiées en
+                # UTC. Un ISO UTC explicite évite que le téléphone interprète
+                # cette heure comme appartenant à son propre fuseau.
+                "time": (
+                    _utc_iso(
+                        _parse_utc_instant(
+                            raw_utc_time,
+                            "Instant UTC du résumé GFS",
+                        )
+                    )
+                    if isinstance(raw_utc_time, str) and raw_utc_time.strip()
+                    else (
+                        _utc_iso_from_open_meteo(
+                            raw_time,
+                            utc_offset_seconds,
+                            timezone_name,
+                        )
+                        if isinstance(raw_time, str) and raw_time.strip()
+                        else None
+                    )
+                ),
                 "windSpeedKmh": (
                     round(slot["wind_speed_kt"] * 1.852, 1)
                     if slot.get("wind_speed_kt") is not None
@@ -1043,14 +1364,18 @@ _WEATHER_CONDITIONS_FIELDS = (
 )
 
 
-def _utc_iso_from_open_meteo(local_timestamp, utc_offset_seconds):
+def _utc_iso_from_open_meteo(
+    local_timestamp,
+    utc_offset_seconds,
+    timezone_name=None,
+):
     """Normalise une heure locale Open-Meteo vers un ISO UTC non ambigu."""
-    parsed = datetime.fromisoformat(local_timestamp)
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(
-            tzinfo=timezone(timedelta(seconds=int(utc_offset_seconds or 0)))
-        )
-    return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    parsed = _utc_datetimes_from_open_meteo(
+        [local_timestamp],
+        utc_offset_seconds,
+        timezone_name,
+    )[0]
+    return _utc_iso(parsed)
 
 
 def _haversine_km(lat1, lon1, lat2, lon2):
@@ -1090,7 +1415,7 @@ def _validate_hourly_continuity(
         raw_time = slot.get("time")
         if not isinstance(raw_time, str):
             raise ValueError(f"{label} : heure absente.")
-        parsed.append(datetime.fromisoformat(raw_time.replace("Z", "+00:00")))
+        parsed.append(_parse_utc_instant(raw_time, f"{label} : heure"))
     if parsed != sorted(parsed) or len(set(parsed)) != len(parsed):
         raise ValueError(f"{label} : heures dupliquées ou non triées.")
     for previous, current in zip(parsed, parsed[1:]):
@@ -1127,12 +1452,41 @@ def build_conditions_document(
     wind_times = wind_hourly.get("time") or []
     wave_offset = int(_safe_num(wave_json.get("utc_offset_seconds"), 0) or 0)
     wind_offset = int(_safe_num(wind_json.get("utc_offset_seconds"), 0) or 0)
+    wave_timezone_name = wave_json.get("timezone")
+    wind_timezone_name = wind_json.get("timezone")
+    wave_timezone = _open_meteo_timezone(wave_timezone_name, wave_offset)
+    wind_timezone = _open_meteo_timezone(wind_timezone_name, wind_offset)
+    wave_utc_times = _utc_datetimes_from_open_meteo(
+        wave_times,
+        wave_offset,
+        wave_timezone_name,
+    )
+    wind_utc_times = _utc_datetimes_from_open_meteo(
+        wind_times,
+        wind_offset,
+        wind_timezone_name,
+    )
+    first_published_date = date.fromisoformat(published_days[0]["date"])
+    expected_wave_times = _expected_utc_grid_instants(
+        first_published_date,
+        CONDITIONS_FORECAST_DAYS,
+        wave_timezone,
+        step_hours=1,
+    )
+    expected_wind_times = _expected_utc_grid_instants(
+        first_published_date,
+        CONDITIONS_FORECAST_DAYS,
+        wind_timezone,
+        step_hours=1,
+    )
 
     tide_slots = []
-    for index, local_time in enumerate(wave_times):
+    for index, (local_time, utc_time) in enumerate(
+        zip(wave_times, wave_utc_times)
+    ):
         if not isinstance(local_time, str) or local_time[:10] not in published_dates:
             continue
-        slot = {"time": _utc_iso_from_open_meteo(local_time, wave_offset)}
+        slot = {"time": _utc_iso(utc_time)}
         for api_key, output_key, minimum, maximum in _MARINE_CONDITIONS_FIELDS:
             slot[output_key] = _validated_number(
                 wave_hourly,
@@ -1143,13 +1497,25 @@ def build_conditions_document(
                 f"conditions/{spot['id']}.tide",
             )
         tide_slots.append(slot)
-    _validate_hourly_continuity(tide_slots, f"conditions/{spot['id']}.tide")
+    _validate_hourly_continuity(
+        tide_slots,
+        f"conditions/{spot['id']}.tide",
+        expected_hours=len(expected_wave_times),
+    )
+    if [slot["time"] for slot in tide_slots] != [
+        _utc_iso(instant) for instant in expected_wave_times
+    ]:
+        raise ValueError(
+            f"conditions/{spot['id']}.tide : grille UTC incomplète ou décalée."
+        )
 
     weather_slots = []
-    for index, local_time in enumerate(wind_times):
+    for index, (local_time, utc_time) in enumerate(
+        zip(wind_times, wind_utc_times)
+    ):
         if not isinstance(local_time, str) or local_time[:10] not in published_dates:
             continue
-        slot = {"time": _utc_iso_from_open_meteo(local_time, wind_offset)}
+        slot = {"time": _utc_iso(utc_time)}
         for api_key, output_key, minimum, maximum, multiplier in _WEATHER_CONDITIONS_FIELDS:
             value = _validated_number(
                 wind_hourly,
@@ -1165,7 +1531,14 @@ def build_conditions_document(
     _validate_hourly_continuity(
         weather_slots,
         f"conditions/{spot['id']}.weather",
+        expected_hours=len(expected_wind_times),
     )
+    if [slot["time"] for slot in weather_slots] != [
+        _utc_iso(instant) for instant in expected_wind_times
+    ]:
+        raise ValueError(
+            f"conditions/{spot['id']}.weather : grille UTC incomplète ou décalée."
+        )
     if [slot["time"] for slot in tide_slots] != [
         slot["time"] for slot in weather_slots
     ]:
@@ -1174,13 +1547,27 @@ def build_conditions_document(
             "pas alignées heure par heure."
         )
 
-    first_day = published_days[0]
-    sunrise = first_day.get("sunrise")
-    sunset = first_day.get("sunset")
-    if not isinstance(sunrise, str) or not isinstance(sunset, str):
-        raise ValueError(
-            f"conditions/{spot['id']} : lever ou coucher du soleil absent."
+    daily_sun = []
+    for day in published_days:
+        day_date = day.get("date")
+        sunrise = day.get("sunrise")
+        sunset = day.get("sunset")
+        if not all(
+            isinstance(value, str) and value.strip()
+            for value in (day_date, sunrise, sunset)
+        ):
+            raise ValueError(
+                f"conditions/{spot['id']} : lever ou coucher du soleil "
+                "quotidien absent."
+            )
+        daily_sun.append(
+            {
+                "date": day_date,
+                "sunrise": sunrise,
+                "sunset": sunset,
+            }
         )
+    first_sun = daily_sun[0]
 
     source_latitude = _safe_num(wave_json.get("latitude"))
     source_longitude = _safe_num(wave_json.get("longitude"))
@@ -1198,13 +1585,14 @@ def build_conditions_document(
             f"{source_distance_km:.1f} km (> 30 km)."
         )
 
-    return {
+    document = {
         "schema_version": 2,
         "forecast_run_id": forecast_run_id,
         "spot_id": spot["id"],
         "name": spot["name"],
         "lat": spot["lat"],
         "lon": spot["lon"],
+        "utc_offset_seconds": wind_offset,
         "timestamp": last_update,
         "tide_datum": "global_mean_sea_level",
         "source": {
@@ -1214,19 +1602,29 @@ def build_conditions_document(
             "marineDistanceKm": round(source_distance_km, 1),
         },
         "sun": {
-            "date": first_day["date"],
-            "sunrise": sunrise,
-            "sunset": sunset,
+            # Champs historiques conservés pour BoosterFish 1.0.9 (24).
+            "date": first_sun["date"],
+            "sunrise": first_sun["sunrise"],
+            "sunset": first_sun["sunset"],
+            # Le client récent choisit le jour de la station. Cela empêche
+            # d'afficher les horaires de la veille entre minuit et le prochain
+            # passage du job planifié.
+            "daily": daily_sun,
         },
         "tide": {"hourly": tide_slots},
         "weather": {"hourly": weather_slots},
         "gfs": build_conditions_gfs_summary(
             published_days,
+            utc_offset_seconds=wind_offset,
+            timezone_name=wind_timezone_name,
             forecast_run_id=forecast_run_id,
             spot_id=spot["id"],
             last_update=last_update,
         ),
     }
+    if isinstance(wind_timezone_name, str) and wind_timezone_name.strip():
+        document["timezone"] = wind_timezone_name.strip()
+    return document
 
 
 def _require_station_models(station_result):
@@ -1243,6 +1641,13 @@ def _require_station_models(station_result):
             raise RuntimeError(
                 f"Récolte interrompue pour {spot['id']} : "
                 f"modèle {model_name} indisponible ({detail})."
+            )
+        hourly = model_json.get("hourly")
+        times = hourly.get("time") if isinstance(hourly, dict) else None
+        if not isinstance(times, list) or not times:
+            raise RuntimeError(
+                f"Récolte interrompue pour {spot['id']} : "
+                f"modèle {model_name} sans série horaire."
             )
         required[model_name] = model_json
     return required["wind"], required["hires"], required["wave"]
@@ -1289,7 +1694,25 @@ def _build_station_publication(
     utc_offset_seconds = int(
         _safe_num(wind_json.get("utc_offset_seconds"), 0) or 0
     )
-    validate_payload(days_payload, utc_offset_seconds)
+    timezone_name = wind_json.get("timezone")
+    if not isinstance(timezone_name, str) or not timezone_name.strip():
+        raise ValueError(
+            f"Récolte interrompue pour {spot['id']} : fuseau IANA absent."
+        )
+    timezone_name = timezone_name.strip()
+    _open_meteo_timezone(timezone_name, utc_offset_seconds)
+    for model_name, model_json in (("hires", hires_json), ("wave", wave_json)):
+        model_timezone = model_json.get("timezone")
+        if not isinstance(model_timezone, str) or model_timezone.strip() != timezone_name:
+            raise ValueError(
+                f"Récolte interrompue pour {spot['id']} : fuseau IANA "
+                f"incohérent pour {model_name}."
+            )
+    validate_payload(
+        days_payload,
+        utc_offset_seconds,
+        timezone_name=timezone_name,
+    )
 
     # La météo générale conserve dix jours. Les conditions de la page Marées
     # utilisent les huit jours entièrement couverts par l'API Marine.
@@ -1306,6 +1729,8 @@ def _build_station_publication(
         "utc_offset_seconds": utc_offset_seconds,
         "days": published_days,
     }
+    if isinstance(timezone_name, str) and timezone_name.strip():
+        weather_doc["timezone"] = timezone_name.strip()
     if water_temp_c is not None:
         weather_doc["water_temp_c"] = water_temp_c
     first_day = published_days[0]
@@ -1436,6 +1861,15 @@ def _write_forecast_batches(
     )
     write_count = 0
     commit_count = 0
+    # BoosterFish 1.0.9 (24) ne sait lire `conditions.timestamp` que sous
+    # forme de chaîne ISO. Les documents canoniques conservent le Timestamp
+    # serveur ; seuls les cinq alias temporaires reçoivent cette représentation
+    # historique, calculée une fois pour rendre le lot cohérent.
+    legacy_alias_timestamp = (
+        datetime.now(timezone.utc)
+        .isoformat(timespec="milliseconds")
+        .replace("+00:00", "Z")
+    )
     for start in range(0, len(publications), PUBLISH_BATCH_STATION_COUNT):
         station_batch = publications[
             start : start + PUBLISH_BATCH_STATION_COUNT
@@ -1478,7 +1912,11 @@ def _write_forecast_batches(
                 alias_id = conditions_aliases.get(spot_id)
                 if alias_id is not None:
                     alias_ref = db.collection("conditions").document(alias_id)
-                    batch.set(alias_ref, publication["conditions_doc"])
+                    alias_document = {
+                        **publication["conditions_doc"],
+                        "timestamp": legacy_alias_timestamp,
+                    }
+                    batch.set(alias_ref, alias_document)
                     write_count += 1
                     batch_write_count += 1
 
@@ -1576,8 +2014,27 @@ def _verify_freshness(data, label, run_started_at, now):
         )
 
 
-def _verify_timestamp_field(data, field, label, run_started_at, now):
-    updated_at = _utc_datetime(data.get(field), label)
+def _verify_timestamp_field(
+    data,
+    field,
+    label,
+    run_started_at,
+    now,
+    *,
+    allow_iso_string=False,
+):
+    raw_value = data.get(field)
+    if allow_iso_string and isinstance(raw_value, str):
+        try:
+            updated_at = datetime.fromisoformat(raw_value.replace("Z", "+00:00"))
+        except ValueError as error:
+            raise RuntimeError(
+                f"Vérification Production : horodatage {label} "
+                "absent ou invalide."
+            ) from error
+        updated_at = _utc_datetime(updated_at, label)
+    else:
+        updated_at = _utc_datetime(raw_value, label)
     if updated_at < run_started_at - FRESHNESS_CLOCK_SKEW:
         raise RuntimeError(
             f"Vérification Production : {label} est antérieur au run courant."
@@ -1588,7 +2045,18 @@ def _verify_timestamp_field(data, field, label, run_started_at, now):
         )
 
 
-def _verify_conditions_payload(data, spot, run_id, label, run_started_at, now):
+def _verify_conditions_payload(
+    data,
+    spot,
+    run_id,
+    label,
+    run_started_at,
+    now,
+    *,
+    allow_iso_timestamp=False,
+    expected_utc_offset_seconds=None,
+    expected_timezone_name=None,
+):
     if data.get("schema_version") != 2:
         raise RuntimeError(f"Vérification Production : schéma incorrect dans {label}.")
     if data.get("forecast_run_id") != run_id or data.get("spot_id") != spot["id"]:
@@ -1607,7 +2075,87 @@ def _verify_conditions_payload(data, spot, run_id, label, run_started_at, now):
             raise RuntimeError(
                 f"Vérification Production : {field} incorrect dans {label}."
             )
-    _verify_timestamp_field(data, "timestamp", label, run_started_at, now)
+    _verify_timestamp_field(
+        data,
+        "timestamp",
+        label,
+        run_started_at,
+        now,
+        allow_iso_string=allow_iso_timestamp,
+    )
+    utc_offset_seconds = data.get("utc_offset_seconds")
+    if (
+        isinstance(utc_offset_seconds, bool)
+        or not isinstance(utc_offset_seconds, (int, float))
+        or (
+            expected_utc_offset_seconds is not None
+            and int(utc_offset_seconds) != int(expected_utc_offset_seconds)
+        )
+    ):
+        raise RuntimeError(
+            f"Vérification Production : décalage UTC incorrect dans {label}."
+        )
+    timezone_name = data.get("timezone")
+    if expected_timezone_name is not None and timezone_name != expected_timezone_name:
+        raise RuntimeError(
+            f"Vérification Production : fuseau IANA incorrect dans {label}."
+        )
+    try:
+        station_timezone = _open_meteo_timezone(
+            timezone_name,
+            utc_offset_seconds,
+        )
+    except ValueError as error:
+        raise RuntimeError(
+            f"Vérification Production : fuseau IANA invalide dans {label}."
+        ) from error
+
+    sun = data.get("sun")
+    daily_sun = sun.get("daily") if isinstance(sun, dict) else None
+    if not isinstance(daily_sun, list) or len(daily_sun) != CONDITIONS_FORECAST_DAYS:
+        raise RuntimeError(
+            f"Vérification Production : calendrier solaire incomplet dans {label}."
+        )
+    sun_dates = []
+    for entry in daily_sun:
+        if not isinstance(entry, dict):
+            raise RuntimeError(
+                f"Vérification Production : calendrier solaire invalide dans {label}."
+            )
+        raw_date = entry.get("date")
+        sunrise = entry.get("sunrise")
+        sunset = entry.get("sunset")
+        try:
+            parsed_date = date.fromisoformat(raw_date)
+            parsed_sunrise = datetime.fromisoformat(sunrise)
+            parsed_sunset = datetime.fromisoformat(sunset)
+        except (TypeError, ValueError) as error:
+            raise RuntimeError(
+                f"Vérification Production : calendrier solaire invalide dans {label}."
+            ) from error
+        if (
+            parsed_sunrise.date() != parsed_date
+            or parsed_sunset.date() != parsed_date
+            or parsed_sunrise >= parsed_sunset
+        ):
+            raise RuntimeError(
+                f"Vérification Production : calendrier solaire incohérent "
+                f"dans {label}."
+            )
+        sun_dates.append(parsed_date)
+    if any(
+        current != sun_dates[0] + timedelta(days=index)
+        for index, current in enumerate(sun_dates)
+    ):
+        raise RuntimeError(
+            f"Vérification Production : dates solaires non consécutives "
+            f"dans {label}."
+        )
+    if any(sun.get(key) != daily_sun[0].get(key) for key in ("date", "sunrise", "sunset")):
+        raise RuntimeError(
+            f"Vérification Production : champs solaires historiques incohérents "
+            f"dans {label}."
+        )
     if data.get("tide_datum") != "global_mean_sea_level":
         raise RuntimeError(
             f"Vérification Production : référence de marée incorrecte dans {label}."
@@ -1622,8 +2170,30 @@ def _verify_conditions_payload(data, spot, run_id, label, run_started_at, now):
             f"Vérification Production : séries horaires absentes dans {label}."
         )
     try:
-        _validate_hourly_continuity(tide_slots, f"{label}.tide")
-        _validate_hourly_continuity(weather_slots, f"{label}.weather")
+        expected_hourly_times = _expected_utc_grid_instants(
+            sun_dates[0],
+            CONDITIONS_FORECAST_DAYS,
+            station_timezone,
+            step_hours=1,
+        )
+        expected_hour_count = len(expected_hourly_times)
+        _validate_hourly_continuity(
+            tide_slots,
+            f"{label}.tide",
+            expected_hours=expected_hour_count,
+        )
+        _validate_hourly_continuity(
+            weather_slots,
+            f"{label}.weather",
+            expected_hours=expected_hour_count,
+        )
+        expected_iso_times = [
+            _utc_iso(instant) for instant in expected_hourly_times
+        ]
+        if [slot.get("time") for slot in tide_slots] != expected_iso_times:
+            raise ValueError(f"{label}.tide : grille UTC incomplète ou décalée.")
+        if [slot.get("time") for slot in weather_slots] != expected_iso_times:
+            raise ValueError(f"{label}.weather : grille UTC incomplète ou décalée.")
     except ValueError as error:
         raise RuntimeError(f"Vérification Production : {error}") from error
 
@@ -1752,11 +2322,22 @@ def verify_production_state(
             raise RuntimeError(
                 f"Vérification Production : décalage UTC invalide dans {weather_label}."
             )
+        timezone_name = weather.get("timezone")
+        weather_days = weather.get("days")
+        if not (
+            isinstance(timezone_name, str) and timezone_name.strip()
+        ):
+            raise RuntimeError(
+                f"Vérification Production : fuseau IANA absent dans {weather_label}."
+            )
+        if isinstance(timezone_name, str):
+            timezone_name = timezone_name.strip() or None
         try:
             validate_payload(
-                weather.get("days"),
+                weather_days,
                 int(utc_offset_seconds),
                 PUBLISHED_FORECAST_DAYS,
+                timezone_name=timezone_name,
             )
         except (TypeError, ValueError) as error:
             raise RuntimeError(
@@ -1783,6 +2364,8 @@ def verify_production_state(
         expected_summary = build_conditions_gfs_summary(
             weather["days"],
             CONDITIONS_FORECAST_DAYS,
+            utc_offset_seconds=int(utc_offset_seconds),
+            timezone_name=timezone_name,
         )
         for conditions_id in condition_document_ids:
             conditions_label = f"conditions/{conditions_id}"
@@ -1797,6 +2380,11 @@ def verify_production_state(
                 conditions_label,
                 run_started_at,
                 now,
+                allow_iso_timestamp=(
+                    alias_id is not None and conditions_id == alias_id
+                ),
+                expected_utc_offset_seconds=int(utc_offset_seconds),
+                expected_timezone_name=timezone_name,
             )
             gfs = conditions_doc.get("gfs")
             if not isinstance(gfs, dict):
@@ -1828,12 +2416,22 @@ def verify_production_state(
                     f"Vérification Production : résumé horaire incohérent dans "
                     f"{conditions_label}.gfs."
                 )
-            if len(expected_summary["hourly"]) != (
-                CONDITIONS_FORECAST_DAYS * EXPECTED_SLOTS_PER_DAY
-            ):
+            station_timezone = _open_meteo_timezone(
+                timezone_name,
+                utc_offset_seconds,
+            )
+            expected_gfs_count = len(
+                _expected_utc_grid_instants(
+                    date.fromisoformat(weather["days"][0]["date"]),
+                    CONDITIONS_FORECAST_DAYS,
+                    station_timezone,
+                    step_hours=STEP_HOURS,
+                )
+            )
+            if len(expected_summary["hourly"]) != expected_gfs_count:
                 raise RuntimeError(
                     f"Vérification Production : {conditions_label} ne contient pas "
-                    f"les {CONDITIONS_FORECAST_DAYS * EXPECTED_SLOTS_PER_DAY} "
+                    f"les {expected_gfs_count} "
                     "créneaux attendus."
                 )
             verified_condition_documents.add(conditions_id)
