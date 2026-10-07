@@ -403,18 +403,14 @@ class _ConditionsHero extends StatelessWidget {
         ? '${(activity * 100).round()}%'
         : '--';
     final tideValue = _hasData
-        ? TideHeightFormatter.value(
+        ? TideHeightFormatter.coordinateValue(
             tideData.next,
             tideData.tideHeightDatum,
             fractionDigits: 1,
           )
         : '--';
     final tideReference = _hasData
-        ? TideHeightFormatter.compactQualifier(
-            context,
-            tideData.next,
-            tideData.tideHeightDatum,
-          )
+        ? TideHeightFormatter.datumLabel(context, tideData.tideHeightDatum)
         : '';
     final windValue = current?.windSpeedKmh == null
         ? '--'

@@ -402,8 +402,11 @@
   },
   "tide": {
     "tideCurveTitle": "Courbe des Marées · 24h",
+    "meanSeaLevelCurveTitle": "Niveau marin relatif au NMM · 24h",
     "tideCurveJrcSource": "Hauteurs locales : modèle harmonique JRC / Commission européenne (CC BY 4.0)",
-    "meanSeaLevelReference": "Référence verticale : niveau moyen global de la mer (NMM) · ↑ au-dessus · ↓ sous",
+    "meanSeaLevelReference": "Référence : niveau moyen global de la mer (NMM) · + au-dessus · − sous. Valeur indicative, pas une profondeur.",
+    "moroccoModeledDatumReference": "Hauteurs indicatives : courbe locale Open-Meteo alignée sur le repère vertical Casablanca/BMI. Ne pas utiliser pour la navigation.",
+    "meanSeaLevelAbbreviation": "NMM",
     "aboveMeanSeaLevelShort": "au-dessus du NMM",
     "belowMeanSeaLevelShort": "sous le NMM",
     "atMeanSeaLevelShort": "au NMM",

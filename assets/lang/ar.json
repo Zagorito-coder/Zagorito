@@ -402,8 +402,11 @@
   },
   "tide": {
     "tideCurveTitle": "منحنى المد والجزر · 24 ساعة",
+    "meanSeaLevelCurveTitle": "مستوى البحر بالنسبة للمتوسط · 24 ساعة",
     "tideCurveJrcSource": "الارتفاعات المحلية: النموذج التوافقي لمركز JRC / المفوضية الأوروبية (CC BY 4.0)",
-    "meanSeaLevelReference": "المرجع الرأسي: المتوسط العالمي لمستوى سطح البحر · ↑ فوقه · ↓ تحته",
+    "meanSeaLevelReference": "المرجع: المتوسط العالمي لمستوى سطح البحر · + فوقه · − تحته. مستوى إرشادي وليس عمقًا.",
+    "moroccoModeledDatumReference": "ارتفاعات إرشادية: منحنى Open-Meteo المحلي مضبوط على المرجع الرأسي للدار البيضاء/BMI. لا يُستخدم للملاحة.",
+    "meanSeaLevelAbbreviation": "NMM",
     "aboveMeanSeaLevelShort": "فوق المتوسط",
     "belowMeanSeaLevelShort": "تحت المتوسط",
     "atMeanSeaLevelShort": "عند المتوسط",

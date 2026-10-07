@@ -18,6 +18,15 @@ class CasablancaTideReference {
   static const double _bmiScale = 0.961;
   static const double _bmiOffsetMeters = -0.075;
 
+  /// Niveau moyen du modèle Casablanca exprimé sur le repère local BMI.
+  ///
+  /// Cette constante sert uniquement à présenter les anomalies MSL des
+  /// stations marocaines sur une échelle positive cohérente avec Casablanca.
+  /// Elle ne transforme pas ces stations en marégraphes hydrographiques et ne
+  /// doit pas être utilisée pour la navigation.
+  static const double moroccoModeledMeanMeters =
+      _meanLevelMeters * _bmiScale + _bmiOffsetMeters;
+
   /// Hauteur en mètres au-dessus de la référence locale BMI.
   static double heightAtUtc(DateTime instant) {
     final utc = instant.toUtc();
@@ -90,6 +99,70 @@ class CasablancaTideReference {
       astro: source.astro,
     );
   }
+
+  /// Aligne une courbe marocaine Open-Meteo sur le repère vertical indicatif
+  /// de Casablanca sans toucher à ses heures, phases ou amplitudes locales.
+  ///
+  /// Open-Meteo fournit une anomalie signée par rapport au niveau moyen global
+  /// de la mer. On lui applique ici uniquement la transformation verticale du
+  /// modèle Casablanca/BMI. La courbe propre à la station reste inchangée ;
+  /// aucun point Casablanca n'est substitué à Rabat, Dakhla ou une autre ville.
+  static TideData calibrateMoroccanForecast(
+    TideData source, {
+    DateTime? now,
+  }) {
+    if (source.hourlyPoints.isEmpty) {
+      return TideData(
+        hourlyPoints: source.hourlyPoints,
+        hourlyForecast: source.hourlyForecast,
+        low: source.low,
+        high: source.high,
+        next: source.next,
+        waveHeight: source.waveHeight,
+        location: source.location,
+        generatedAt: source.generatedAt,
+        utcOffsetSeconds: source.utcOffsetSeconds,
+        timeZoneId: source.timeZoneId,
+        tideHeightDatum: TideHeightDatum.moroccoCasablancaModel,
+        astro: source.astro,
+      );
+    }
+
+    final calibratedPoints = source.hourlyPoints
+        .map(
+          (point) => _withHeight(
+            point,
+            moroccanHeightFromMeanSeaLevel(point.height),
+          ),
+        )
+        .toList(growable: false);
+    final low = calibratedPoints.map((point) => point.height).reduce(math.min);
+    final high = calibratedPoints.map((point) => point.height).reduce(math.max);
+    final referenceTime = source.stationTimeAt(now ?? DateTime.now());
+    final nextPoint = calibratedPoints
+            .where((point) => point.time.isAfter(referenceTime))
+            .firstOrNull ??
+        calibratedPoints.last;
+
+    return TideData(
+      hourlyPoints: calibratedPoints,
+      hourlyForecast: source.hourlyForecast,
+      low: low,
+      high: high,
+      next: nextPoint.height,
+      waveHeight: source.waveHeight,
+      location: source.location,
+      generatedAt: source.generatedAt,
+      utcOffsetSeconds: source.utcOffsetSeconds,
+      timeZoneId: source.timeZoneId,
+      tideHeightDatum: TideHeightDatum.moroccoCasablancaModel,
+      astro: source.astro,
+    );
+  }
+
+  /// Convertit une anomalie MSL en hauteur sur le repère indicatif marocain.
+  static double moroccanHeightFromMeanSeaLevel(double heightMeters) =>
+      heightMeters * _bmiScale + moroccoModeledMeanMeters;
 
   static TidePoint _withHeight(TidePoint point, double calibratedHeight) =>
       TidePoint(

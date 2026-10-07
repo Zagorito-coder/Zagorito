@@ -89,10 +89,16 @@ class TideService {
           data,
           fallbackLocation: station.name,
         );
-        return station.id == 'casablanca_maroc' &&
-                mapped.tideHeightDatum != TideHeightDatum.casablancaBmi
-            ? CasablancaTideReference.calibrateForecast(mapped)
-            : mapped;
+        if (station.id == 'casablanca_maroc') {
+          return mapped.tideHeightDatum == TideHeightDatum.casablancaBmi
+              ? mapped
+              : CasablancaTideReference.calibrateForecast(mapped);
+        }
+        if (_isMoroccanStation(station) &&
+            mapped.tideHeightDatum == TideHeightDatum.globalMeanSeaLevel) {
+          return CasablancaTideReference.calibrateMoroccanForecast(mapped);
+        }
+        return mapped;
       } catch (error) {
         debugPrint(
           '[TideService] Conditions publiees indisponibles '
@@ -184,6 +190,9 @@ class TideService {
     final legacy = legacyIds[stationId];
     return legacy == null ? <String>[stationId] : <String>[stationId, legacy];
   }
+
+  static bool _isMoroccanStation(TideStation station) =>
+      station.id.endsWith('_maroc');
 
   static String _fallbackLocation(String? locationName) {
     final normalized = locationName?.trim();

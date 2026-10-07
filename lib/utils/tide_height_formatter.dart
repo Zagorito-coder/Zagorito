@@ -94,6 +94,54 @@ class TideHeightFormatter {
         trimTrailingZeros: trimTrailingZeros,
       )} m';
 
+  /// Coordonnée verticale compacte, destinée aux axes et tableaux étroits.
+  ///
+  /// Contrairement à [value], qui privilégie une formulation naturelle avec
+  /// « au-dessus/sous », cette représentation conserve explicitement le signe
+  /// mathématique du niveau MSL. La tendance de la marée peut ainsi garder sa
+  /// propre icône sans être confondue avec la position verticale.
+  static String coordinateNumber(
+    double meters,
+    TideHeightDatum datum, {
+    int fractionDigits = 2,
+    bool trimTrailingZeros = false,
+  }) {
+    if (datum != TideHeightDatum.globalMeanSeaLevel) {
+      return number(
+        meters,
+        datum,
+        fractionDigits: fractionDigits,
+        trimTrailingZeros: trimTrailingZeros,
+      );
+    }
+
+    var magnitude = meters.abs().toStringAsFixed(fractionDigits);
+    if (trimTrailingZeros && magnitude.contains('.')) {
+      magnitude = magnitude.replaceFirst(RegExp(r'0+$'), '');
+      magnitude = magnitude.replaceFirst(RegExp(r'\.$'), '');
+    }
+    if (double.tryParse(magnitude) == 0) return magnitude;
+    return '${meters > 0 ? '+' : '−'}$magnitude';
+  }
+
+  static String coordinateValue(
+    double meters,
+    TideHeightDatum datum, {
+    int fractionDigits = 2,
+    bool trimTrailingZeros = false,
+  }) =>
+      '${coordinateNumber(
+        meters,
+        datum,
+        fractionDigits: fractionDigits,
+        trimTrailingZeros: trimTrailingZeros,
+      )} m';
+
+  static String datumLabel(BuildContext context, TideHeightDatum datum) =>
+      datum == TideHeightDatum.globalMeanSeaLevel
+          ? context.tr('tide.meanSeaLevelAbbreviation')
+          : '';
+
   static String qualifier(
     BuildContext context,
     double meters,
@@ -152,13 +200,13 @@ class TideHeightFormatter {
     int fractionDigits = 2,
     bool trimTrailingZeros = false,
   }) {
-    final formatted = value(
+    final formatted = coordinateValue(
       meters,
       datum,
       fractionDigits: fractionDigits,
       trimTrailingZeros: trimTrailingZeros,
     );
-    final reference = compactQualifier(context, meters, datum);
+    final reference = datumLabel(context, datum);
     return reference.isEmpty ? formatted : '$formatted $reference';
   }
 }

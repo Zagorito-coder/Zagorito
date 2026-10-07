@@ -402,8 +402,11 @@
   },
   "tide": {
     "tideCurveTitle": "Tide Curve · 24h",
+    "meanSeaLevelCurveTitle": "Sea level relative to MSL · 24h",
     "tideCurveJrcSource": "Local heights: JRC / European Commission harmonic model (CC BY 4.0)",
-    "meanSeaLevelReference": "Vertical reference: global mean sea level (MSL) · ↑ above · ↓ below",
+    "meanSeaLevelReference": "Reference: global mean sea level (MSL) · + above · − below. Indicative level, not a depth.",
+    "moroccoModeledDatumReference": "Indicative heights: local Open-Meteo curve aligned to the Casablanca/BMI vertical reference. Do not use for navigation.",
+    "meanSeaLevelAbbreviation": "MSL",
     "aboveMeanSeaLevelShort": "above MSL",
     "belowMeanSeaLevelShort": "below MSL",
     "atMeanSeaLevelShort": "at MSL",

@@ -448,6 +448,7 @@ class TideConditionsMapper {
     return switch (value.trim()) {
       'global_mean_sea_level' => TideHeightDatum.globalMeanSeaLevel,
       'casablanca_bmi' => TideHeightDatum.casablancaBmi,
+      'morocco_casablanca_model' => TideHeightDatum.moroccoCasablancaModel,
       _ => TideHeightDatum.unknown,
     };
   }

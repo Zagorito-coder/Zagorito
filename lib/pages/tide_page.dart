@@ -25,6 +25,7 @@ import '../widgets/app_back_button.dart';
 import '../widgets/open_meteo_attribution.dart';
 import '../widgets/tide_coefficients_view.dart';
 import '../l10n/app_localizations.dart';
+import '../utils/tide_chart_scale.dart';
 import '../utils/tide_height_formatter.dart';
 import '../utils/wind_direction.dart';
 
@@ -464,6 +465,10 @@ class _TidePageState extends State<TidePage>
       _data.tideHeightDatum == tide_data.TideHeightDatum.globalMeanSeaLevel;
   bool get _usesCasablancaBmiDatum =>
       _data.tideHeightDatum == tide_data.TideHeightDatum.casablancaBmi;
+  bool get _usesMoroccoCasablancaModel =>
+      _data.tideHeightDatum == tide_data.TideHeightDatum.moroccoCasablancaModel;
+  bool get _usesFixedLocalDatum =>
+      _usesCasablancaBmiDatum || _usesMoroccoCasablancaModel;
   final _scrollController = ScrollController();
   final _clockNotifier = ValueNotifier<DateTime>(DateTime.now());
   Timer? _clockTimer;
@@ -1565,7 +1570,7 @@ class _TidePageState extends State<TidePage>
           child: Text(
             event == null
                 ? '${context.tr(isHigh ? 'tide.highTideLabel' : 'tide.lowTideLabel')} —'
-                : '${context.tr(isHigh ? 'tide.highTideLabel' : 'tide.lowTideLabel')} ${_eventTimeLabel(event)} · ${_tideHeightFull(event.height)}',
+                : '${context.tr(isHigh ? 'tide.highTideLabel' : 'tide.lowTideLabel')} ${_eventTimeLabel(event)} · ${_usesMeanSeaLevelDatum ? _tideHeightCompactFull(event.height) : _tideHeightFull(event.height)}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
@@ -1596,7 +1601,11 @@ class _TidePageState extends State<TidePage>
                   children: [
                     Expanded(
                       child: Text(
-                        context.tr('tide.tideCurveTitle').toUpperCase(),
+                        context
+                            .tr(_usesMeanSeaLevelDatum
+                                ? 'tide.meanSeaLevelCurveTitle'
+                                : 'tide.tideCurveTitle')
+                            .toUpperCase(),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -1620,7 +1629,9 @@ class _TidePageState extends State<TidePage>
                     builder: (context, now, _) => Semantics(
                       image: true,
                       label: <String>[
-                        context.tr('tide.tideCurveTitle'),
+                        context.tr(_usesMeanSeaLevelDatum
+                            ? 'tide.meanSeaLevelCurveTitle'
+                            : 'tide.tideCurveTitle'),
                         if (_usesMeanSeaLevelDatum)
                           context.tr('tide.meanSeaLevelReference'),
                       ].join('. '),
@@ -1634,27 +1645,23 @@ class _TidePageState extends State<TidePage>
                             nowLabel: context.tr('tide.nowShort'),
                             highTideShort: context.tr('tide.highTide'),
                             lowTideShort: context.tr('tide.lowTide'),
-                            aboveMeanSeaLevelCompact:
-                                context.tr('tide.aboveMeanSeaLevelCompact'),
-                            belowMeanSeaLevelCompact:
-                                context.tr('tide.belowMeanSeaLevelCompact'),
-                            atMeanSeaLevelCompact:
-                                context.tr('tide.atMeanSeaLevelCompact'),
                             isDark: _isDark,
                             usesMeanSeaLevelDatum: _usesMeanSeaLevelDatum,
-                            fixedChartDatumScale: _usesCasablancaBmiDatum,
+                            fixedChartDatumScale: _usesFixedLocalDatum,
                           ),
                         ),
                       ),
                     ),
                   ),
                 ),
-                if (_usesCasablancaBmiDatum || _usesMeanSeaLevelDatum) ...[
+                if (_usesFixedLocalDatum || _usesMeanSeaLevelDatum) ...[
                   const SizedBox(height: 7),
                   Text(
                     _usesCasablancaBmiDatum
                         ? context.tr('tide.tideCurveJrcSource')
-                        : context.tr('tide.meanSeaLevelReference'),
+                        : _usesMoroccoCasablancaModel
+                            ? context.tr('tide.moroccoModeledDatumReference')
+                            : context.tr('tide.meanSeaLevelReference'),
                     style: TextStyle(
                       color: _txt(0.42),
                       fontSize: 10.5,
@@ -2500,7 +2507,12 @@ class _TidePageState extends State<TidePage>
 
     final isHigh = extremum?.isHigh;
     final isRising = slot.tideIsRising ?? false;
-    final datumQualifier = _tideHeightCompactQualifier(height);
+    final heightLabel = _usesMeanSeaLevelDatum
+        ? TideHeightFormatter.coordinateValue(
+            height,
+            _data.tideHeightDatum,
+          )
+        : _tideHeightValue(height);
     final color = isHigh == true
         ? const Color(0xFF35D66F)
         : isHigh == false
@@ -2520,7 +2532,7 @@ class _TidePageState extends State<TidePage>
         Icon(icon, color: color, size: compact ? 15 : 17),
         const SizedBox(height: 1),
         Text(
-          _tideHeightValue(height),
+          heightLabel,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
@@ -2529,12 +2541,9 @@ class _TidePageState extends State<TidePage>
             fontWeight: FontWeight.w900,
           ),
         ),
-        if (datumQualifier.isNotEmpty || extremum != null)
+        if (extremum != null)
           Text(
-            <String>[
-              datumQualifier,
-              if (extremum != null) _formatForecastEventTime(extremum.time),
-            ].where((part) => part.isNotEmpty).join(' · '),
+            _formatForecastEventTime(extremum.time),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
@@ -2573,13 +2582,6 @@ class _TidePageState extends State<TidePage>
       );
 
   String _tideHeightQualifier(double value) => TideHeightFormatter.qualifier(
-        context,
-        value,
-        _data.tideHeightDatum,
-      );
-
-  String _tideHeightCompactQualifier(double value) =>
-      TideHeightFormatter.compactQualifier(
         context,
         value,
         _data.tideHeightDatum,
@@ -3727,9 +3729,6 @@ class _PillCurvePainter extends CustomPainter {
   final String nowLabel;
   final String highTideShort;
   final String lowTideShort;
-  final String aboveMeanSeaLevelCompact;
-  final String belowMeanSeaLevelCompact;
-  final String atMeanSeaLevelCompact;
   final bool isDark;
   final bool usesMeanSeaLevelDatum;
   final bool fixedChartDatumScale;
@@ -3740,9 +3739,6 @@ class _PillCurvePainter extends CustomPainter {
       required this.nowLabel,
       required this.highTideShort,
       required this.lowTideShort,
-      required this.aboveMeanSeaLevelCompact,
-      required this.belowMeanSeaLevelCompact,
-      required this.atMeanSeaLevelCompact,
       required this.isDark,
       required this.usesMeanSeaLevelDatum,
       required this.fixedChartDatumScale});
@@ -3765,35 +3761,42 @@ class _PillCurvePainter extends CustomPainter {
     final h = chartBottom - chartTop;
     if (h <= 0 || w <= 0) return;
 
-    final maxH = sampled.map((p) => p.height).reduce(math.max);
-    final minH = sampled.map((p) => p.height).reduce(math.min);
-    final range = (maxH - minH).clamp(0.02, 100.0);
-    final paddedMin = minH - range * 0.1;
-    final paddedRange = range * 1.2;
-    final axisMin = fixedChartDatumScale ? 0.0 : paddedMin;
-    final axisRange = fixedChartDatumScale ? 5.0 : paddedRange;
-    final tickCount = fixedChartDatumScale ? 5 : 4;
+    final dataRange = (sampled.map((p) => p.height).reduce(math.max) -
+            sampled.map((p) => p.height).reduce(math.min))
+        .clamp(0.02, 100.0)
+        .toDouble();
+    final scale = TideChartScale.forValues(
+      sampled.map((point) => point.height),
+      fixedChartDatumScale: fixedChartDatumScale,
+      usesMeanSeaLevelDatum: usesMeanSeaLevelDatum,
+    );
+    final axisMin = scale.min;
+    final axisRange = scale.range;
+    final tickCount = scale.tickCount;
 
     double xFor(double t) => _padL + (t / 24.0) * w;
     double yFor(double v) => chartTop + h - ((v - axisMin) / axisRange) * h;
 
-    final decimals = fixedChartDatumScale ? 0 : (range < 0.5 ? 2 : 1);
+    final decimals = fixedChartDatumScale ? 0 : (dataRange < 0.5 ? 2 : 1);
     for (int i = 0; i <= tickCount; i++) {
-      final v = axisMin + axisRange * i / tickCount;
+      final v = scale.tickAt(i);
       final gy = chartTop + h - h * i / tickCount;
+      final isMeanSeaLevel = usesMeanSeaLevelDatum && v.abs() < 1e-9;
       canvas.drawLine(
           Offset(_padL, gy),
           Offset(_padL + w, gy),
           Paint()
-            ..color = _txt(0.06)
-            ..strokeWidth = 0.6);
+            ..color =
+                isMeanSeaLevel ? _accent.withValues(alpha: 0.34) : _txt(0.06)
+            ..strokeWidth = isMeanSeaLevel ? 1.25 : 0.6);
       final tp = TextPainter(
           text: TextSpan(
               text: _axisHeightLabel(v, decimals),
               style: TextStyle(
-                  color: _txt(0.45),
+                  color: isMeanSeaLevel ? _accent : _txt(0.45),
                   fontSize: 11.5,
-                  fontWeight: FontWeight.w600)),
+                  fontWeight:
+                      isMeanSeaLevel ? FontWeight.w800 : FontWeight.w600)),
           textDirection: TextDirection.ltr)
         ..layout();
       tp.paint(canvas, Offset(_padL + w + 8, gy - tp.height / 2));
@@ -3881,8 +3884,18 @@ class _PillCurvePainter extends CustomPainter {
                   fontWeight: FontWeight.w800)),
           textDirection: TextDirection.ltr)
         ..layout();
+      final symTp = TextPainter(
+          text: TextSpan(
+              text: symbol,
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800)),
+          textDirection: TextDirection.ltr)
+        ..layout();
       const hPad = 11.0;
-      final pillW = tp.width + hPad * 2 + 9;
+      const symbolGap = 4.0;
+      final pillW = tp.width + symTp.width + symbolGap + hPad * 2;
       const pillH = 28.0;
       // Les étiquettes restent dans la zone de tracé afin de ne jamais
       // recouvrir l'échelle verticale réservée à droite.
@@ -3899,28 +3912,27 @@ class _PillCurvePainter extends CustomPainter {
       placedPills.add(rect);
       canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(14)),
           Paint()..color = color);
-      tp.paint(canvas,
-          Offset(rect.left + hPad + 8, rect.top + (pillH - tp.height) / 2));
-      final symTp = TextPainter(
-          text: TextSpan(
-              text: symbol,
-              style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w800)),
-          textDirection: TextDirection.ltr)
-        ..layout();
       symTp.paint(canvas,
           Offset(rect.left + hPad, rect.top + (pillH - symTp.height) / 2));
+      tp.paint(
+        canvas,
+        Offset(
+          rect.left + hPad + symTp.width + symbolGap,
+          rect.top + (pillH - tp.height) / 2,
+        ),
+      );
     }
 
     drawPill(nx, nowLabel.toUpperCase(), _green, '●', isNow: true);
     for (final e in events) {
       final isHigh = e.type == 'high';
       final ex = xFor(e.time);
+      final eventType = isHigh ? highTideShort : lowTideShort;
       drawPill(
           ex,
-          '${_eventHeightLabel(e.height)} ${isHigh ? highTideShort : lowTideShort}',
+          usesMeanSeaLevelDatum
+              ? '$eventType ${_eventHeightLabel(e.height)}'
+              : '${_eventHeightLabel(e.height)} $eventType',
           isHigh ? _accent : _red,
           isHigh ? '▲' : '▼');
       canvas.drawCircle(Offset(ex, yFor(e.height)), 5,
@@ -3941,22 +3953,16 @@ class _PillCurvePainter extends CustomPainter {
     if (!usesMeanSeaLevelDatum) {
       return '${value.toStringAsFixed(decimals)}m';
     }
-    final direction = value > 0
-        ? '↑'
-        : value < 0
-            ? '↓'
-            : '';
-    return '${value.abs().toStringAsFixed(decimals)}m$direction';
+    final magnitude = value.abs().toStringAsFixed(decimals);
+    if (double.tryParse(magnitude) == 0) return '0m';
+    return '${value > 0 ? '+' : '−'}${magnitude}m';
   }
 
   String _eventHeightLabel(double value) {
     if (!usesMeanSeaLevelDatum) return '${value.toStringAsFixed(2)}m';
-    final reference = value > 0
-        ? aboveMeanSeaLevelCompact
-        : value < 0
-            ? belowMeanSeaLevelCompact
-            : atMeanSeaLevelCompact;
-    return '${value.abs().toStringAsFixed(2)}m $reference';
+    final magnitude = value.abs().toStringAsFixed(2);
+    if (double.tryParse(magnitude) == 0) return '0.00m';
+    return '${value > 0 ? '+' : '−'}${magnitude}m';
   }
 
   @override
@@ -3967,9 +3973,6 @@ class _PillCurvePainter extends CustomPainter {
       old.nowLabel != nowLabel ||
       old.highTideShort != highTideShort ||
       old.lowTideShort != lowTideShort ||
-      old.aboveMeanSeaLevelCompact != aboveMeanSeaLevelCompact ||
-      old.belowMeanSeaLevelCompact != belowMeanSeaLevelCompact ||
-      old.atMeanSeaLevelCompact != atMeanSeaLevelCompact ||
       old.isDark != isDark ||
       old.usesMeanSeaLevelDatum != usesMeanSeaLevelDatum ||
       old.fixedChartDatumScale != fixedChartDatumScale;

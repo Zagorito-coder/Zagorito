@@ -5,6 +5,7 @@ import 'package:spots_app/models/tide_data.dart';
 import 'package:spots_app/services/astronomy_service.dart';
 import 'package:spots_app/services/casablanca_tide_reference.dart';
 import 'package:spots_app/services/tide_service.dart';
+import 'package:spots_app/utils/tide_chart_scale.dart';
 
 void main() {
   test('retrouve les quatre extrema de Casablanca au plus près de la table',
@@ -55,9 +56,16 @@ void main() {
 
   test('la courbe Casablanca utilise une échelle fixe 0 à 5 sans écrêtage', () {
     final source = File('lib/pages/tide_page.dart').readAsStringSync();
+    final scale = TideChartScale.forValues(
+      const [1.05, 3.39],
+      fixedChartDatumScale: true,
+      usesMeanSeaLevelDatum: false,
+    );
 
-    expect(source, contains('fixedChartDatumScale ? 0.0 : paddedMin'));
-    expect(source, contains('fixedChartDatumScale ? 5.0 : paddedRange'));
+    expect(scale.min, 0);
+    expect(scale.max, 5);
+    expect(scale.contains(1.05), isTrue);
+    expect(scale.contains(3.39), isTrue);
     expect(source, contains("context.tr('tide.tideCurveJrcSource')"));
     expect(
       source,
@@ -108,6 +116,55 @@ void main() {
     expect(calibrated.hourlyPoints.first.windWaveHeight, 1.2);
     expect(calibrated.hourlyPoints.first.windSpeedKmh, 22);
     expect(calibrated.hourlyPoints.first.pressureHpa, 1014);
+    expect(calibrated.waveHeight, source.waveHeight);
+    expect(calibrated.astro, same(source.astro));
+  });
+
+  test(
+      'le modèle marocain conserve la courbe locale et utilise le repère Casablanca',
+      () {
+    final now = DateTime(2026, 10, 7, 12);
+    final source = TideData(
+      hourlyPoints: [
+        TidePoint(
+          time: now.subtract(const Duration(hours: 1)),
+          height: -1.48,
+          windWaveHeight: 0.7,
+        ),
+        TidePoint(
+          time: now.add(const Duration(hours: 1)),
+          height: 0.96,
+          windWaveHeight: 0.8,
+        ),
+      ],
+      low: -1.48,
+      high: 0.96,
+      next: 0.96,
+      waveHeight: 0.8,
+      location: 'Rabat, Maroc',
+      tideHeightDatum: TideHeightDatum.globalMeanSeaLevel,
+      astro: AstroData.fallback(),
+    );
+
+    final calibrated = CasablancaTideReference.calibrateMoroccanForecast(
+      source,
+      now: now,
+    );
+
+    expect(
+      calibrated.tideHeightDatum,
+      TideHeightDatum.moroccoCasablancaModel,
+    );
+    expect(calibrated.low, closeTo(0.684, 0.002));
+    expect(calibrated.high, closeTo(3.029, 0.002));
+    expect(
+      calibrated.high - calibrated.low,
+      closeTo((source.high - source.low) * 0.961, 1e-9),
+      reason: 'Le marnage local ne doit jamais être remplacé par Casablanca.',
+    );
+    expect(calibrated.next, closeTo(calibrated.high, 1e-9));
+    expect(calibrated.hourlyPoints.first.time, source.hourlyPoints.first.time);
+    expect(calibrated.hourlyPoints.first.windWaveHeight, 0.7);
     expect(calibrated.waveHeight, source.waveHeight);
     expect(calibrated.astro, same(source.astro));
   });

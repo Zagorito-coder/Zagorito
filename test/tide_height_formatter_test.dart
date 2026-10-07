@@ -40,6 +40,31 @@ void main() {
     );
   });
 
+  test('la coordonnée compacte MSL conserve un signe mathématique explicite',
+      () {
+    expect(
+      TideHeightFormatter.coordinateValue(
+        -1.32,
+        TideHeightDatum.globalMeanSeaLevel,
+      ),
+      '−1.32 m',
+    );
+    expect(
+      TideHeightFormatter.coordinateValue(
+        0.75,
+        TideHeightDatum.globalMeanSeaLevel,
+      ),
+      '+0.75 m',
+    );
+    expect(
+      TideHeightFormatter.coordinateValue(
+        -0.004,
+        TideHeightDatum.globalMeanSeaLevel,
+      ),
+      '0.00 m',
+    );
+  });
+
   test('Casablanca et une référence inconnue ne sont jamais recalibrées', () {
     expect(
       TideHeightFormatter.value(-0.4, TideHeightDatum.casablancaBmi),
@@ -89,7 +114,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('1.32 m sous le NMM'), findsOneWidget);
-    expect(find.text('1.32 m ↓ NMM'), findsOneWidget);
-    expect(find.textContaining('-1.32 m'), findsNothing);
+    expect(find.text('−1.32 m NMM'), findsOneWidget);
+    expect(find.textContaining('↓ NMM'), findsNothing);
   });
 }

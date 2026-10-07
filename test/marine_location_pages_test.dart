@@ -228,8 +228,9 @@ void main() {
   testWidgets(
       'Rabat explicite le référentiel MSL sans hauteur négative ambiguë',
       (t) async {
-    t.view.physicalSize = const Size(1080, 2400);
-    t.view.devicePixelRatio = 2.5;
+    // Format logique du Samsung S23 Ultra utilisé pour la validation physique.
+    t.view.physicalSize = const Size(1080, 2316);
+    t.view.devicePixelRatio = 3;
     addTearDown(t.view.reset);
     final c = MarineLocationController(
         locate: (_) async => throw MarineLocationIssue.permission);
@@ -279,10 +280,12 @@ void main() {
 
     await t.tap(find.text('Prévisions'));
     await pump(t);
-    expect(find.textContaining('Référence verticale'), findsOneWidget);
-    expect(find.text('-1.32 m'), findsNothing);
-    expect(find.text('1.32 m'), findsWidgets);
-    expect(find.textContaining('↓ NMM'), findsWidgets);
+    expect(find.textContaining('Référence :'), findsOneWidget);
+    // La colonne étroite conserve le signe ; la référence NMM est portée par
+    // le bandeau immédiatement au-dessus pour éviter toute troncature.
+    expect(find.text('−1.32 m'), findsWidgets);
+    expect(find.textContaining('(NMM)'), findsOneWidget);
+    expect(find.textContaining('↓ NMM'), findsNothing);
     expect(t.takeException(), isNull);
 
     await t.pumpWidget(const SizedBox());
