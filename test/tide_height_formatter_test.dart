@@ -117,4 +117,23 @@ void main() {
     expect(find.text('−1.32 m NMM'), findsOneWidget);
     expect(find.textContaining('↓ NMM'), findsNothing);
   });
+
+  test('identifie les deux versions du repère de présentation', () {
+    expect(
+      TideHeightFormatter.isPresentationDatum(
+        TideHeightDatum.casablancaPresentationModel,
+      ),
+      isTrue,
+    );
+    expect(
+      TideHeightFormatter.isPresentationDatum(
+        TideHeightDatum.moroccoCasablancaModel,
+      ),
+      isTrue,
+    );
+    expect(
+      TideHeightFormatter.isPresentationDatum(TideHeightDatum.casablancaBmi),
+      isFalse,
+    );
+  });
 }

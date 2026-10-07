@@ -61,6 +61,21 @@ void main() {
     expect(find.text('92%'), findsNothing);
   });
 
+  testWidgets('qualifie le repère positif dans le résumé des marées',
+      (tester) async {
+    await _setViewport(tester, const Size(430, 932));
+    await tester.pumpWidget(
+      _testApp(
+        tideData: _marineData(
+          datum: TideHeightDatum.casablancaPresentationModel,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Présentation à 06:00'), findsOneWidget);
+  });
+
   testWidgets('ne fabrique aucune métrique quand les données sont absentes',
       (tester) async {
     await _setViewport(tester, const Size(390, 844));
@@ -577,7 +592,7 @@ class _TolerantGoldenComparator extends LocalFileComparator {
   }
 }
 
-TideData _marineData() {
+TideData _marineData({TideHeightDatum datum = TideHeightDatum.unknown}) {
   final reference = DateTime(2099, 1, 1, 6);
   return TideData(
     hourlyPoints: [
@@ -603,6 +618,7 @@ TideData _marineData() {
     next: 1.4,
     waveHeight: 1.4,
     location: 'Casablanca',
+    tideHeightDatum: datum,
     astro: const AstroData(
       moonPhase: 0.5,
       moonPhaseName: 'Pleine Lune',

@@ -10,12 +10,16 @@ import '../utils/station_time_zone.dart';
 /// Une valeur n'est comparable à une table hydrographique locale que si son
 /// référentiel est identifié explicitement. Les documents Open-Meteo sont
 /// relatifs au niveau moyen mondial de la mer, tandis que Casablanca dispose
-/// d'une calibration locale BMI propre à cette station. Les stations
-/// marocaines sans marégraphe local peuvent utiliser le même repère vertical
-/// indicatif que Casablanca tout en conservant leur propre courbe Open-Meteo.
+/// d'une calibration locale BMI propre à cette station. Les autres stations
+/// peuvent utiliser un repère de présentation inspiré de Casablanca tout en
+/// conservant leur propre courbe Open-Meteo, leurs heures et leur marnage.
 enum TideHeightDatum {
   globalMeanSeaLevel,
   casablancaBmi,
+  casablancaPresentationModel,
+  // Compatibilité avec les données créées par la première version marocaine
+  // du modèle de présentation. Les nouvelles données utilisent le membre
+  // générique ci-dessus, valable pour toutes les stations publiées.
   moroccoCasablancaModel,
   unknown,
 }

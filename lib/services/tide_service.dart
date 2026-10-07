@@ -89,16 +89,7 @@ class TideService {
           data,
           fallbackLocation: station.name,
         );
-        if (station.id == 'casablanca_maroc') {
-          return mapped.tideHeightDatum == TideHeightDatum.casablancaBmi
-              ? mapped
-              : CasablancaTideReference.calibrateForecast(mapped);
-        }
-        if (_isMoroccanStation(station) &&
-            mapped.tideHeightDatum == TideHeightDatum.globalMeanSeaLevel) {
-          return CasablancaTideReference.calibrateMoroccanForecast(mapped);
-        }
-        return mapped;
+        return applyPresentationReference(station, mapped);
       } catch (error) {
         debugPrint(
           '[TideService] Conditions publiees indisponibles '
@@ -191,8 +182,25 @@ class TideService {
     return legacy == null ? <String>[stationId] : <String>[stationId, legacy];
   }
 
-  static bool _isMoroccanStation(TideStation station) =>
-      station.id.endsWith('_maroc');
+  /// Applique le référentiel d'affichage sans dépendre de Firestore.
+  ///
+  /// Toutes les stations Open-Meteo reçoivent le même traitement, quel que
+  /// soit leur suffixe pays. Casablanca conserve son modèle harmonique JRC.
+  @visibleForTesting
+  static TideData applyPresentationReference(
+    TideStation station,
+    TideData mapped, {
+    DateTime? now,
+  }) {
+    if (station.id == 'casablanca_maroc') {
+      return mapped.tideHeightDatum == TideHeightDatum.casablancaBmi
+          ? mapped
+          : CasablancaTideReference.calibrateForecast(mapped, now: now);
+    }
+    return mapped.tideHeightDatum == TideHeightDatum.globalMeanSeaLevel
+        ? CasablancaTideReference.calibratePublishedForecast(mapped, now: now)
+        : mapped;
+  }
 
   static String _fallbackLocation(String? locationName) {
     final normalized = locationName?.trim();

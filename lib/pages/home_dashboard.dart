@@ -412,6 +412,17 @@ class _ConditionsHero extends StatelessWidget {
     final tideReference = _hasData
         ? TideHeightFormatter.datumLabel(context, tideData.tideHeightDatum)
         : '';
+    final tideDetail = !_hasData
+        ? ''
+        : TideHeightFormatter.isPresentationDatum(tideData.tideHeightDatum)
+            ? context.trArgs(
+                'tide.presentationLevelAt',
+                args: {'time': _nextTime},
+              )
+            : <String>[
+                tideReference,
+                _nextTime,
+              ].where((part) => part.isNotEmpty).join(' · ');
     final windValue = current?.windSpeedKmh == null
         ? '--'
         : '${current!.windSpeedKmh!.round()} km/h';
@@ -530,10 +541,7 @@ class _ConditionsHero extends StatelessWidget {
                               icon: Icons.waves_rounded,
                               label: context.tr('home.tidesTitle'),
                               value: tideValue,
-                              detail: <String>[
-                                tideReference,
-                                _nextTime,
-                              ].where((part) => part.isNotEmpty).join(' · '),
+                              detail: tideDetail,
                             ),
                           ),
                           _HeroDivider(color: palette.heroPanelBorder),

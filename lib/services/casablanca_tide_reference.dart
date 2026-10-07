@@ -21,11 +21,14 @@ class CasablancaTideReference {
   /// Niveau moyen du modèle Casablanca exprimé sur le repère local BMI.
   ///
   /// Cette constante sert uniquement à présenter les anomalies MSL des
-  /// stations marocaines sur une échelle positive cohérente avec Casablanca.
+  /// stations publiées sur une échelle positive cohérente avec Casablanca.
   /// Elle ne transforme pas ces stations en marégraphes hydrographiques et ne
   /// doit pas être utilisée pour la navigation.
-  static const double moroccoModeledMeanMeters =
+  static const double presentationMeanMeters =
       _meanLevelMeters * _bmiScale + _bmiOffsetMeters;
+
+  @Deprecated('Use presentationMeanMeters')
+  static const double moroccoModeledMeanMeters = presentationMeanMeters;
 
   /// Hauteur en mètres au-dessus de la référence locale BMI.
   static double heightAtUtc(DateTime instant) {
@@ -100,14 +103,15 @@ class CasablancaTideReference {
     );
   }
 
-  /// Aligne une courbe marocaine Open-Meteo sur le repère vertical indicatif
-  /// de Casablanca sans toucher à ses heures, phases ou amplitudes locales.
+  /// Aligne une courbe Open-Meteo sur le repère vertical de présentation
+  /// inspiré de Casablanca sans toucher à ses heures, phases ou marnage.
   ///
   /// Open-Meteo fournit une anomalie signée par rapport au niveau moyen global
-  /// de la mer. On lui applique ici uniquement la transformation verticale du
-  /// modèle Casablanca/BMI. La courbe propre à la station reste inchangée ;
-  /// aucun point Casablanca n'est substitué à Rabat, Dakhla ou une autre ville.
-  static TideData calibrateMoroccanForecast(
+  /// de la mer. On lui ajoute ici uniquement un décalage vertical. Le décalage
+  /// Casablanca est préféré ; il n'est ajusté que si la série sortirait de la
+  /// fenêtre 0–5 m. Aucun point Casablanca n'est substitué à la station et le
+  /// marnage reste mathématiquement identique.
+  static TideData calibratePublishedForecast(
     TideData source, {
     DateTime? now,
   }) {
@@ -123,16 +127,44 @@ class CasablancaTideReference {
         generatedAt: source.generatedAt,
         utcOffsetSeconds: source.utcOffsetSeconds,
         timeZoneId: source.timeZoneId,
-        tideHeightDatum: TideHeightDatum.moroccoCasablancaModel,
+        tideHeightDatum: TideHeightDatum.casablancaPresentationModel,
         astro: source.astro,
       );
     }
+
+    final finiteHeights = source.hourlyPoints
+        .map((point) => point.height)
+        .where((height) => height.isFinite)
+        .toList(growable: false);
+    if (finiteHeights.isEmpty) {
+      return TideData(
+        hourlyPoints: source.hourlyPoints,
+        hourlyForecast: source.hourlyForecast,
+        low: source.low,
+        high: source.high,
+        next: source.next,
+        waveHeight: source.waveHeight,
+        location: source.location,
+        generatedAt: source.generatedAt,
+        utcOffsetSeconds: source.utcOffsetSeconds,
+        timeZoneId: source.timeZoneId,
+        tideHeightDatum: TideHeightDatum.casablancaPresentationModel,
+        astro: source.astro,
+      );
+    }
+
+    final sourceLow = finiteHeights.reduce(math.min);
+    final sourceHigh = finiteHeights.reduce(math.max);
+    final offset = presentationOffsetForMeanSeaLevel(
+      sourceLow: sourceLow,
+      sourceHigh: sourceHigh,
+    );
 
     final calibratedPoints = source.hourlyPoints
         .map(
           (point) => _withHeight(
             point,
-            moroccanHeightFromMeanSeaLevel(point.height),
+            point.height + offset,
           ),
         )
         .toList(growable: false);
@@ -155,14 +187,41 @@ class CasablancaTideReference {
       generatedAt: source.generatedAt,
       utcOffsetSeconds: source.utcOffsetSeconds,
       timeZoneId: source.timeZoneId,
-      tideHeightDatum: TideHeightDatum.moroccoCasablancaModel,
+      tideHeightDatum: TideHeightDatum.casablancaPresentationModel,
       astro: source.astro,
     );
   }
 
-  /// Convertit une anomalie MSL en hauteur sur le repère indicatif marocain.
+  /// Choisit un décalage vertical stable, en privilégiant le niveau moyen du
+  /// modèle Casablanca. Lorsque la courbe complète ne tient pas entre 0 et
+  /// 5 m, son minimum est placé à zéro et l'axe peut s'étendre au-delà de 5 m
+  /// sans écrêter ni comprimer le marnage réel.
+  static double presentationOffsetForMeanSeaLevel({
+    required double sourceLow,
+    required double sourceHigh,
+  }) {
+    final minimumOffset = -sourceLow;
+    final maximumOffset = 5.0 - sourceHigh;
+    if (minimumOffset <= maximumOffset) {
+      return presentationMeanMeters.clamp(
+        minimumOffset,
+        maximumOffset,
+      );
+    }
+    return minimumOffset;
+  }
+
+  /// Compatibilité source pour les appels introduits par la version marocaine.
+  @Deprecated('Use calibratePublishedForecast')
+  static TideData calibrateMoroccanForecast(
+    TideData source, {
+    DateTime? now,
+  }) =>
+      calibratePublishedForecast(source, now: now);
+
+  @Deprecated('Use height + presentationOffsetForMeanSeaLevel(...)')
   static double moroccanHeightFromMeanSeaLevel(double heightMeters) =>
-      heightMeters * _bmiScale + moroccoModeledMeanMeters;
+      heightMeters + presentationMeanMeters;
 
   static TidePoint _withHeight(TidePoint point, double calibratedHeight) =>
       TidePoint(

@@ -595,6 +595,16 @@ class _TideBlockState extends State<_TideBlock> {
         gfsPoint?.precipitationProbabilityPct;
     final humidity =
         point?.relativeHumidityPct ?? gfsPoint?.relativeHumidityPct;
+    final tideSummary =
+        '${TideHeightFormatter.full(context, t.next, t.tideHeightDatum)}  ·  '
+        '${TideHeightFormatter.full(context, t.low, t.tideHeightDatum)}–'
+        '${TideHeightFormatter.full(context, t.high, t.tideHeightDatum)}';
+    final tideDatumLabel =
+        TideHeightFormatter.isPresentationDatum(t.tideHeightDatum)
+            ? context.tr('tide.presentationLevel')
+            : '';
+    final qualifiedTideSummary =
+        tideDatumLabel.isEmpty ? tideSummary : '$tideDatumLabel : $tideSummary';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -671,9 +681,7 @@ class _TideBlockState extends State<_TideBlock> {
                 Expanded(
                   child: ClipRRect(
                     child: Text(
-                      '${TideHeightFormatter.full(context, t.next, t.tideHeightDatum)}  ·  '
-                      '${TideHeightFormatter.full(context, t.low, t.tideHeightDatum)}–'
-                      '${TideHeightFormatter.full(context, t.high, t.tideHeightDatum)}',
+                      qualifiedTideSummary,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(

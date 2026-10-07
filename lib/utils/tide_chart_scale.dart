@@ -2,9 +2,10 @@ import 'dart:math' as math;
 
 /// Échelle verticale d'une courbe de niveau marin.
 ///
-/// Casablanca utilise une référence hydrographique locale fixe de 0 à 5 m.
-/// Les autres stations Open-Meteo sont exprimées autour du niveau moyen
-/// global de la mer : leur échelle doit donc rester signée et montrer le zéro.
+/// Casablanca utilise une référence hydrographique locale de 0 à 5 m. Les
+/// autres stations suivent la même fenêtre de présentation tant que leur
+/// marnage y tient ; l'axe s'étend automatiquement au lieu d'écrêter une marée
+/// supérieure à 5 m.
 class TideChartScale {
   const TideChartScale({
     required this.min,
@@ -17,17 +18,23 @@ class TideChartScale {
     required bool fixedChartDatumScale,
     required bool usesMeanSeaLevelDatum,
   }) {
-    if (fixedChartDatumScale) {
-      return const TideChartScale(min: 0, max: 5, tickCount: 5);
-    }
-
     final finiteValues = values.where((value) => value.isFinite).toList();
     if (finiteValues.isEmpty) {
-      return const TideChartScale(min: 0, max: 1, tickCount: 4);
+      return fixedChartDatumScale
+          ? const TideChartScale(min: 0, max: 5, tickCount: 5)
+          : const TideChartScale(min: 0, max: 1, tickCount: 4);
     }
 
     final minimum = finiteValues.reduce(math.min);
     final maximum = finiteValues.reduce(math.max);
+    if (fixedChartDatumScale) {
+      final upperBound = math.max(5.0, maximum).ceilToDouble();
+      return TideChartScale(
+        min: math.min(0.0, minimum).floorToDouble(),
+        max: upperBound,
+        tickCount: upperBound <= 5 ? 5 : upperBound.round(),
+      );
+    }
     final dataRange = (maximum - minimum).clamp(0.02, 100.0).toDouble();
     final paddedMinimum = minimum - dataRange * 0.1;
     final paddedMaximum = maximum + dataRange * 0.1;

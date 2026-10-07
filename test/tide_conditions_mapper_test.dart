@@ -76,6 +76,24 @@ void main() {
     expect(result.tideHeightDatum, TideHeightDatum.globalMeanSeaLevel);
   });
 
+  test('reconnaît le repère mondial de présentation Casablanca', () {
+    final document = _conditionsDocument(
+      tideHeights: const [0.1, 0.4, 0.2],
+      waveHeights: const [1.1, 1.2, 1.3],
+    )..['tide_datum'] = 'casablanca_presentation_model';
+
+    final result = TideConditionsMapper.fromDocument(
+      document,
+      fallbackLocation: 'Fallback',
+      now: DateTime.utc(2026, 7, 26, 1),
+    );
+
+    expect(
+      result.tideHeightDatum,
+      TideHeightDatum.casablancaPresentationModel,
+    );
+  });
+
   test('ne qualifie pas un référentiel publié inconnu', () {
     final document = _conditionsDocument(
       tideHeights: const [0.1, 0.4, 0.2],

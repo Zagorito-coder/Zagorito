@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:spots_app/data/marine_weather_points.dart';
 import 'package:spots_app/models/tide_data.dart';
 import 'package:spots_app/services/astronomy_service.dart';
 import 'package:spots_app/services/casablanca_tide_reference.dart';
@@ -121,7 +122,7 @@ void main() {
   });
 
   test(
-      'le modèle marocain conserve la courbe locale et utilise le repère Casablanca',
+      'le modèle de présentation mondial conserve la courbe locale et le marnage',
       () {
     final now = DateTime(2026, 10, 7, 12);
     final source = TideData(
@@ -141,32 +142,98 @@ void main() {
       high: 0.96,
       next: 0.96,
       waveHeight: 0.8,
-      location: 'Rabat, Maroc',
+      location: 'Dakar, Sénégal',
       tideHeightDatum: TideHeightDatum.globalMeanSeaLevel,
       astro: AstroData.fallback(),
     );
 
-    final calibrated = CasablancaTideReference.calibrateMoroccanForecast(
+    final calibrated = CasablancaTideReference.calibratePublishedForecast(
       source,
       now: now,
     );
 
     expect(
       calibrated.tideHeightDatum,
-      TideHeightDatum.moroccoCasablancaModel,
+      TideHeightDatum.casablancaPresentationModel,
     );
-    expect(calibrated.low, closeTo(0.684, 0.002));
-    expect(calibrated.high, closeTo(3.029, 0.002));
+    expect(calibrated.low, closeTo(0.626, 0.002));
+    expect(calibrated.high, closeTo(3.066, 0.002));
     expect(
       calibrated.high - calibrated.low,
-      closeTo((source.high - source.low) * 0.961, 1e-9),
-      reason: 'Le marnage local ne doit jamais être remplacé par Casablanca.',
+      closeTo(source.high - source.low, 1e-9),
+      reason: 'Le décalage vertical ne doit jamais modifier le marnage local.',
     );
     expect(calibrated.next, closeTo(calibrated.high, 1e-9));
     expect(calibrated.hourlyPoints.first.time, source.hourlyPoints.first.time);
     expect(calibrated.hourlyPoints.first.windWaveHeight, 0.7);
     expect(calibrated.waveHeight, source.waveHeight);
     expect(calibrated.astro, same(source.astro));
+  });
+
+  test('une station à fort marnage étend son axe sans écrêtage', () {
+    final offset = CasablancaTideReference.presentationOffsetForMeanSeaLevel(
+      sourceLow: -4,
+      sourceHigh: 2,
+    );
+    final values = [-4 + offset, 2 + offset];
+    final scale = TideChartScale.forValues(
+      values,
+      fixedChartDatumScale: true,
+      usesMeanSeaLevelDatum: false,
+    );
+
+    expect(values, [0, 6]);
+    expect(scale.min, 0);
+    expect(scale.max, 6);
+    expect(values.every(scale.contains), isTrue);
+  });
+
+  test('le service applique le bon repère aux 143 lieux du sélecteur manuel',
+      () {
+    final now = DateTime.utc(2026, 10, 7, 12);
+    final source = TideData(
+      hourlyPoints: [
+        TidePoint(time: now.subtract(const Duration(hours: 1)), height: -0.8),
+        TidePoint(time: now.add(const Duration(hours: 1)), height: 0.6),
+      ],
+      low: -0.8,
+      high: 0.6,
+      next: 0.6,
+      waveHeight: 1,
+      location: 'Station',
+      tideHeightDatum: TideHeightDatum.globalMeanSeaLevel,
+      astro: AstroData.fallback(),
+    );
+
+    expect(marineWeatherPoints, hasLength(143));
+    for (final point in marineWeatherPoints) {
+      final station = TideStation(
+        id: point.id,
+        name: point.name,
+        latitude: point.latitude,
+        longitude: point.longitude,
+      );
+      final result = TideService.applyPresentationReference(
+        station,
+        source,
+        now: now,
+      );
+      expect(
+        result.tideHeightDatum,
+        station.id == 'casablanca_maroc'
+            ? TideHeightDatum.casablancaBmi
+            : TideHeightDatum.casablancaPresentationModel,
+        reason: station.id,
+      );
+      expect(result.low, greaterThanOrEqualTo(0), reason: station.id);
+      if (station.id != 'casablanca_maroc') {
+        expect(
+          result.high - result.low,
+          closeTo(1.4, 1e-12),
+          reason: station.id,
+        );
+      }
+    }
   });
 
   test('le repli hors ligne Casablanca conserve le référentiel BMI', () {

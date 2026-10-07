@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import '../utils/station_time_zone.dart';
 import 'casablanca_tide_reference.dart';
 
-/// Une hauteur harmonique utilisée par la courbe journalière compacte.
+/// Une hauteur utilisée par la courbe journalière compacte.
 class LocalTideSample {
   const LocalTideSample({
     required this.time,
@@ -16,7 +16,7 @@ class LocalTideSample {
   final double height;
 }
 
-/// Un extremum (haute ou basse mer) issu du moteur harmonique local.
+/// Un extremum (haute ou basse mer) de la station affichée.
 class LocalTideExtremum {
   const LocalTideExtremum({
     required this.time,
@@ -31,7 +31,17 @@ class LocalTideExtremum {
   final bool isHigh;
 }
 
-/// Données scientifiques d'une journée civile à Casablanca.
+/// Origine des valeurs présentées dans le volet Coefficients.
+enum TideCoefficientSource {
+  /// Prédiction harmonique mensuelle du marégraphe Casablanca/JRC.
+  casablancaHarmonic,
+
+  /// Indice relatif construit depuis les jours civils complets Open-Meteo de
+  /// la station.
+  localForecast,
+}
+
+/// Données d'une journée civile présentées dans le volet Coefficients.
 class LocalTideCoefficientDay {
   const LocalTideCoefficientDay({
     required this.date,
@@ -50,19 +60,72 @@ class LocalTideCoefficientDay {
   final List<LocalTideExtremum> extrema;
 
   double get tidalRangeMeters => highMeters - lowMeters;
+
+  /// Premier instant réellement représenté par la courbe quotidienne.
+  DateTime get curveStartInstant => samples.isEmpty
+      ? DateTime.utc(date.year, date.month, date.day)
+      : samples.first.instantUtc;
+
+  /// Fin réelle de la journée représentée.
+  ///
+  /// Casablanca fournit explicitement l'échantillon de minuit suivant. Les
+  /// prévisions horaires Open-Meteo s'arrêtent à 23 h : on ajoute alors leur
+  /// pas réel. Cette distinction conserve une chronologie juste pendant les
+  /// journées DST de 23 ou 25 heures.
+  DateTime get curveEndInstant {
+    if (samples.isEmpty) {
+      return curveStartInstant.add(const Duration(hours: 24));
+    }
+    final last = samples.last;
+    final lastIsNextCivilDay = last.time.year != date.year ||
+        last.time.month != date.month ||
+        last.time.day != date.day;
+    if (lastIsNextCivilDay) return last.instantUtc;
+    final step = samples.length < 2
+        ? const Duration(hours: 1)
+        : samples.last.instantUtc.difference(
+            samples[samples.length - 2].instantUtc,
+          );
+    return last.instantUtc.add(
+      step > Duration.zero ? step : const Duration(hours: 1),
+    );
+  }
+
+  /// Position chronologique d'un instant sur la journée, entre 0 et 1.
+  /// L'heure civile n'est volontairement pas utilisée : elle se répète lors
+  /// du passage à l'heure d'hiver.
+  double curveProgress(DateTime instantUtc) {
+    final start = curveStartInstant;
+    final duration = curveEndInstant.difference(start).inMicroseconds;
+    if (duration <= 0) return 0;
+    return (instantUtc.toUtc().difference(start.toUtc()).inMicroseconds /
+            duration)
+        .clamp(0.0, 1.0);
+  }
 }
 
 class LocalTideCoefficientMonth {
   const LocalTideCoefficientMonth({
     required this.month,
     required this.days,
+    this.source = TideCoefficientSource.casablancaHarmonic,
+    this.showMoroccanTradition = true,
   });
 
   final DateTime month;
   final List<LocalTideCoefficientDay> days;
+  final TideCoefficientSource source;
+  final bool showMoroccanTradition;
 
-  LocalTideCoefficientDay day(int dayOfMonth) =>
-      days[(dayOfMonth - 1).clamp(0, days.length - 1)];
+  /// [selection] est un index 1-based dans la période affichée. Pour le mois
+  /// complet de Casablanca il correspond aussi au numéro du jour. Pour une
+  /// prévision locale de huit jours, il reste correct lors d'un changement de
+  /// mois (par exemple du 29 octobre au 5 novembre).
+  LocalTideCoefficientDay day(int selection) =>
+      days[(selection - 1).clamp(0, days.length - 1)];
+
+  bool get isCasablancaHarmonic =>
+      source == TideCoefficientSource.casablancaHarmonic;
 }
 
 enum MoroccanTidePeriod {

@@ -57,6 +57,10 @@ class TideHeightReading {
 class TideHeightFormatter {
   const TideHeightFormatter._();
 
+  static bool isPresentationDatum(TideHeightDatum datum) =>
+      datum == TideHeightDatum.casablancaPresentationModel ||
+      datum == TideHeightDatum.moroccoCasablancaModel;
+
   static TideHeightReading reading(
     double meters,
     TideHeightDatum datum,
