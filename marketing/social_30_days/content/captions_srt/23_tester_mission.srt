@@ -1,0 +1,15 @@
+1
+00:00:00,000 --> 00:00:03,000
+Testez comme lors d'une vraie sortie
+
+2
+00:00:03,000 --> 00:00:06,000
+Démarrage • carte • marées
+
+3
+00:00:06,000 --> 00:00:09,000
+Spots privés • communauté • hors ligne
+
+4
+00:00:09,000 --> 00:00:12,000
+قول لينا فين كاين المشكل

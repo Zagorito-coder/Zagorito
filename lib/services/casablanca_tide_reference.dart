@@ -18,6 +18,18 @@ class CasablancaTideReference {
   static const double _bmiScale = 0.961;
   static const double _bmiOffsetMeters = -0.075;
 
+  /// Niveau moyen du modèle Casablanca exprimé sur le repère local BMI.
+  ///
+  /// Cette constante sert uniquement à présenter les anomalies MSL des
+  /// stations publiées sur une échelle positive cohérente avec Casablanca.
+  /// Elle ne transforme pas ces stations en marégraphes hydrographiques et ne
+  /// doit pas être utilisée pour la navigation.
+  static const double presentationMeanMeters =
+      _meanLevelMeters * _bmiScale + _bmiOffsetMeters;
+
+  @Deprecated('Use presentationMeanMeters')
+  static const double moroccoModeledMeanMeters = presentationMeanMeters;
+
   /// Hauteur en mètres au-dessus de la référence locale BMI.
   static double heightAtUtc(DateTime instant) {
     final utc = instant.toUtc();
@@ -40,19 +52,36 @@ class CasablancaTideReference {
     TideData source, {
     DateTime? now,
   }) {
-    if (source.hourlyPoints.isEmpty) return source;
+    if (source.hourlyPoints.isEmpty) {
+      return TideData(
+        hourlyPoints: source.hourlyPoints,
+        hourlyForecast: source.hourlyForecast,
+        low: source.low,
+        high: source.high,
+        next: source.next,
+        waveHeight: source.waveHeight,
+        location: source.location,
+        generatedAt: source.generatedAt,
+        utcOffsetSeconds: source.utcOffsetSeconds,
+        timeZoneId: source.timeZoneId,
+        tideHeightDatum: TideHeightDatum.casablancaBmi,
+        astro: source.astro,
+      );
+    }
 
     final calibratedPoints = source.hourlyPoints
         .map(
           (point) => _withHeight(
             point,
-            heightAtUtc(point.time.toUtc()),
+            heightAtUtc(
+              point.instantUtc ?? source.stationInstantAt(point.time),
+            ),
           ),
         )
         .toList(growable: false);
     final low = calibratedPoints.map((point) => point.height).reduce(math.min);
     final high = calibratedPoints.map((point) => point.height).reduce(math.max);
-    final referenceTime = now ?? DateTime.now();
+    final referenceTime = source.stationTimeAt(now ?? DateTime.now());
     final nextPoint = calibratedPoints
             .where((point) => point.time.isAfter(referenceTime))
             .firstOrNull ??
@@ -67,13 +96,137 @@ class CasablancaTideReference {
       waveHeight: source.waveHeight,
       location: source.location,
       generatedAt: source.generatedAt,
+      utcOffsetSeconds: source.utcOffsetSeconds,
+      timeZoneId: source.timeZoneId,
+      tideHeightDatum: TideHeightDatum.casablancaBmi,
       astro: source.astro,
     );
   }
 
+  /// Aligne une courbe Open-Meteo sur le repère vertical de présentation
+  /// inspiré de Casablanca sans toucher à ses heures, phases ou marnage.
+  ///
+  /// Open-Meteo fournit une anomalie signée par rapport au niveau moyen global
+  /// de la mer. On lui ajoute ici uniquement un décalage vertical. Le décalage
+  /// Casablanca est préféré ; il n'est ajusté que si la série sortirait de la
+  /// fenêtre 0–5 m. Aucun point Casablanca n'est substitué à la station et le
+  /// marnage reste mathématiquement identique.
+  static TideData calibratePublishedForecast(
+    TideData source, {
+    DateTime? now,
+  }) {
+    if (source.hourlyPoints.isEmpty) {
+      return TideData(
+        hourlyPoints: source.hourlyPoints,
+        hourlyForecast: source.hourlyForecast,
+        low: source.low,
+        high: source.high,
+        next: source.next,
+        waveHeight: source.waveHeight,
+        location: source.location,
+        generatedAt: source.generatedAt,
+        utcOffsetSeconds: source.utcOffsetSeconds,
+        timeZoneId: source.timeZoneId,
+        tideHeightDatum: TideHeightDatum.casablancaPresentationModel,
+        astro: source.astro,
+      );
+    }
+
+    final finiteHeights = source.hourlyPoints
+        .map((point) => point.height)
+        .where((height) => height.isFinite)
+        .toList(growable: false);
+    if (finiteHeights.isEmpty) {
+      return TideData(
+        hourlyPoints: source.hourlyPoints,
+        hourlyForecast: source.hourlyForecast,
+        low: source.low,
+        high: source.high,
+        next: source.next,
+        waveHeight: source.waveHeight,
+        location: source.location,
+        generatedAt: source.generatedAt,
+        utcOffsetSeconds: source.utcOffsetSeconds,
+        timeZoneId: source.timeZoneId,
+        tideHeightDatum: TideHeightDatum.casablancaPresentationModel,
+        astro: source.astro,
+      );
+    }
+
+    final sourceLow = finiteHeights.reduce(math.min);
+    final sourceHigh = finiteHeights.reduce(math.max);
+    final offset = presentationOffsetForMeanSeaLevel(
+      sourceLow: sourceLow,
+      sourceHigh: sourceHigh,
+    );
+
+    final calibratedPoints = source.hourlyPoints
+        .map(
+          (point) => _withHeight(
+            point,
+            point.height + offset,
+          ),
+        )
+        .toList(growable: false);
+    final low = calibratedPoints.map((point) => point.height).reduce(math.min);
+    final high = calibratedPoints.map((point) => point.height).reduce(math.max);
+    final referenceTime = source.stationTimeAt(now ?? DateTime.now());
+    final nextPoint = calibratedPoints
+            .where((point) => point.time.isAfter(referenceTime))
+            .firstOrNull ??
+        calibratedPoints.last;
+
+    return TideData(
+      hourlyPoints: calibratedPoints,
+      hourlyForecast: source.hourlyForecast,
+      low: low,
+      high: high,
+      next: nextPoint.height,
+      waveHeight: source.waveHeight,
+      location: source.location,
+      generatedAt: source.generatedAt,
+      utcOffsetSeconds: source.utcOffsetSeconds,
+      timeZoneId: source.timeZoneId,
+      tideHeightDatum: TideHeightDatum.casablancaPresentationModel,
+      astro: source.astro,
+    );
+  }
+
+  /// Choisit un décalage vertical stable, en privilégiant le niveau moyen du
+  /// modèle Casablanca. Lorsque la courbe complète ne tient pas entre 0 et
+  /// 5 m, son minimum est placé à zéro et l'axe peut s'étendre au-delà de 5 m
+  /// sans écrêter ni comprimer le marnage réel.
+  static double presentationOffsetForMeanSeaLevel({
+    required double sourceLow,
+    required double sourceHigh,
+  }) {
+    final minimumOffset = -sourceLow;
+    final maximumOffset = 5.0 - sourceHigh;
+    if (minimumOffset <= maximumOffset) {
+      return presentationMeanMeters.clamp(
+        minimumOffset,
+        maximumOffset,
+      );
+    }
+    return minimumOffset;
+  }
+
+  /// Compatibilité source pour les appels introduits par la version marocaine.
+  @Deprecated('Use calibratePublishedForecast')
+  static TideData calibrateMoroccanForecast(
+    TideData source, {
+    DateTime? now,
+  }) =>
+      calibratePublishedForecast(source, now: now);
+
+  @Deprecated('Use height + presentationOffsetForMeanSeaLevel(...)')
+  static double moroccanHeightFromMeanSeaLevel(double heightMeters) =>
+      heightMeters + presentationMeanMeters;
+
   static TidePoint _withHeight(TidePoint point, double calibratedHeight) =>
       TidePoint(
         time: point.time,
+        instantUtc: point.instantUtc,
         height: calibratedHeight,
         windDirectionDeg: point.windDirectionDeg,
         wavePeriod: point.wavePeriod,

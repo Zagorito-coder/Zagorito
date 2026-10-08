@@ -3,14 +3,35 @@
 // ============================================================
 
 import '../services/astronomy_service.dart';
+import '../utils/station_time_zone.dart';
+
+/// Référence verticale utilisée pour exprimer les hauteurs de marée.
+///
+/// Une valeur n'est comparable à une table hydrographique locale que si son
+/// référentiel est identifié explicitement. Les documents Open-Meteo sont
+/// relatifs au niveau moyen mondial de la mer, tandis que Casablanca dispose
+/// d'une calibration locale BMI propre à cette station. Les autres stations
+/// peuvent utiliser un repère de présentation inspiré de Casablanca tout en
+/// conservant leur propre courbe Open-Meteo, leurs heures et leur marnage.
+enum TideHeightDatum {
+  globalMeanSeaLevel,
+  casablancaBmi,
+  casablancaPresentationModel,
+  // Compatibilité avec les données créées par la première version marocaine
+  // du modèle de présentation. Les nouvelles données utilisent le membre
+  // générique ci-dessus, valable pour toutes les stations publiées.
+  moroccoCasablancaModel,
+  unknown,
+}
 
 /// Représente un point de données de marée (heure + hauteur)
 class TidePoint {
   final DateTime time;
+  final DateTime? instantUtc;
   final double height; // en mètres
-  final double windDirectionDeg; // degrés météo (direction d'où vient le vent)
-  final double wavePeriod; // secondes
-  final double windWaveHeight; // mètres
+  final double? windDirectionDeg; // degrés météo (direction d'où vient le vent)
+  final double? wavePeriod; // secondes
+  final double? windWaveHeight; // mètres
   final double? temperatureC;
   final double? windSpeedKmh;
   final double? pressureHpa;
@@ -32,10 +53,11 @@ class TidePoint {
 
   const TidePoint({
     required this.time,
+    this.instantUtc,
     required this.height,
-    this.windDirectionDeg = 0.0,
-    this.wavePeriod = 7.0,
-    this.windWaveHeight = 0.0,
+    this.windDirectionDeg,
+    this.wavePeriod,
+    this.windWaveHeight,
     this.temperatureC,
     this.windSpeedKmh,
     this.pressureHpa,
@@ -62,6 +84,7 @@ class TidePoint {
 /// Firestore que les marées afin de ne pas ajouter de lecture côté mobile.
 class HourlyForecastPoint {
   final DateTime time;
+  final DateTime? instantUtc;
   final double? windSpeedKmh;
   final double? windGustKmh;
   final double? windDirectionDeg;
@@ -78,6 +101,7 @@ class HourlyForecastPoint {
 
   const HourlyForecastPoint({
     required this.time,
+    this.instantUtc,
     this.windSpeedKmh,
     this.windGustKmh,
     this.windDirectionDeg,
@@ -104,6 +128,9 @@ class TideData {
   final double waveHeight; // Hauteur significative des vagues (m)
   final String location;
   final DateTime? generatedAt;
+  final int? utcOffsetSeconds;
+  final String? timeZoneId;
+  final TideHeightDatum tideHeightDatum;
   final AstroData astro; // Phase lune, coef, activité, transit...
 
   const TideData({
@@ -115,8 +142,35 @@ class TideData {
     required this.waveHeight,
     required this.location,
     this.generatedAt,
+    this.utcOffsetSeconds,
+    this.timeZoneId,
+    this.tideHeightDatum = TideHeightDatum.unknown,
     required this.astro,
   });
+
+  /// Heure civile de la station pour un instant donné.
+  ///
+  /// Les valeurs horaires affichées par les pages Marées sont des heures
+  /// locales de station. Sans ce décalage, une ville choisie manuellement dans
+  /// un autre fuseau serait regroupée selon la date du téléphone.
+  DateTime stationTimeAt(DateTime instant) {
+    return StationTimeZone.civilAt(
+      instant,
+      timeZoneId: timeZoneId,
+      fallbackOffsetSeconds: utcOffsetSeconds,
+    );
+  }
+
+  /// Convertit une heure civile de station vers l'instant UTC correspondant.
+  /// Cette opération est notamment nécessaire au modèle harmonique de
+  /// Casablanca, qui travaille exclusivement sur des instants UTC.
+  DateTime stationInstantAt(DateTime stationTime) {
+    return StationTimeZone.instantAt(
+      stationTime,
+      timeZoneId: timeZoneId,
+      fallbackOffsetSeconds: utcOffsetSeconds,
+    );
+  }
 
   /// Valeurs par défaut quand l'API échoue
   factory TideData.fallback({String location = 'Casablanca Morocco'}) {
@@ -129,6 +183,8 @@ class TideData {
       waveHeight: 0.0,
       location: location,
       generatedAt: null,
+      utcOffsetSeconds: null,
+      timeZoneId: null,
       astro: AstroData.fallback(),
     );
   }

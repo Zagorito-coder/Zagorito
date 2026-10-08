@@ -315,6 +315,7 @@ class _ShopsMapPageState extends State<ShopsMapPage> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      useSafeArea: true,
       builder: (ctx) => _ShopDetailsSheet(shop: shop, tc: tc),
     );
   }
@@ -394,7 +395,12 @@ class _ShopDetailsSheet extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(18),
+              padding: EdgeInsets.fromLTRB(
+                18,
+                18,
+                18,
+                18 + MediaQuery.paddingOf(context).bottom,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

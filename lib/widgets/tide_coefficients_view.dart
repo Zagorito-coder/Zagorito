@@ -46,10 +46,15 @@ class TideCoefficientsView extends StatelessWidget {
             _buildIndexAndDailyCurve(context, day),
             const SizedBox(height: 10),
             _buildMonthlyCycle(context),
-            const SizedBox(height: 10),
-            _buildTraditionalReading(context, tradition),
-            const SizedBox(height: 10),
-            _buildCulturalNotice(context),
+            if (month.showMoroccanTradition) ...[
+              const SizedBox(height: 10),
+              _buildTraditionalReading(context, tradition),
+              const SizedBox(height: 10),
+              _buildCulturalNotice(context),
+            ] else ...[
+              const SizedBox(height: 10),
+              _buildLocalForecastNotice(context),
+            ],
             const SizedBox(height: 12),
             _buildSourceFooter(context),
           ],
@@ -148,7 +153,9 @@ class TideCoefficientsView extends StatelessWidget {
                       const SizedBox(height: 11),
                       _summaryLine(
                         icon: Icons.functions_rounded,
-                        label: context.tr('tide.localHarmonicCalculation'),
+                        label: context.tr(month.isCasablancaHarmonic
+                            ? 'tide.localHarmonicCalculation'
+                            : 'tide.localForecastCalculation'),
                       ),
                     ],
                   ),
@@ -228,6 +235,23 @@ class TideCoefficientsView extends StatelessWidget {
   Widget _buildMonthlyCycle(BuildContext context) {
     final selected = month.day(selectedDay);
     final monthName = _monthName(context, month.month.month).toUpperCase();
+    final cycleTitle = month.isCasablancaHarmonic
+        ? '${context.tr('tide.monthlyCycle').toUpperCase()} · $monthName'
+        : context.trArgs(
+            'tide.forecastCoefficientCycle',
+            args: {'count': '${month.days.length}'},
+          ).toUpperCase();
+    String semanticValueFor(int selection) {
+      final day = month.day(selection);
+      return context.trArgs(
+        'tide.selectedCoefficientDaySemantics',
+        args: {
+          'day': _shortDate(day.date),
+          'index': '${day.localIndex}',
+        },
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 13, 8, 10),
       decoration: _panelDecoration(),
@@ -240,7 +264,7 @@ class TideCoefficientsView extends StatelessWidget {
               const SizedBox(width: 9),
               Expanded(
                 child: Text(
-                  '${context.tr('tide.monthlyCycle').toUpperCase()} · $monthName',
+                  cycleTitle,
                   style: TextStyle(
                     color: _text(0.95),
                     fontSize: 14,
@@ -254,13 +278,18 @@ class TideCoefficientsView extends StatelessWidget {
           const SizedBox(height: 7),
           Semantics(
             slider: true,
-            value: context.trArgs(
-              'tide.selectedCoefficientDaySemantics',
-              args: {
-                'day': '$selectedDay',
-                'index': '${selected.localIndex}',
-              },
-            ),
+            value: semanticValueFor(selectedDay),
+            increasedValue: selectedDay < month.days.length
+                ? semanticValueFor(selectedDay + 1)
+                : null,
+            decreasedValue:
+                selectedDay > 1 ? semanticValueFor(selectedDay - 1) : null,
+            onIncrease: selectedDay < month.days.length
+                ? () => onSelectedDayChanged(selectedDay + 1)
+                : null,
+            onDecrease: selectedDay > 1
+                ? () => onSelectedDayChanged(selectedDay - 1)
+                : null,
             child: LayoutBuilder(
               builder: (context, constraints) {
                 return GestureDetector(
@@ -286,8 +315,9 @@ class TideCoefficientsView extends StatelessWidget {
                         month: month,
                         selectedDay: selectedDay,
                         isDark: isDark,
-                        selectedLabel:
-                            '$selectedDay $monthName · ${selected.localIndex}',
+                        selectedLabel: month.isCasablancaHarmonic
+                            ? '${selected.date.day} $monthName · ${selected.localIndex}'
+                            : '${_shortDate(selected.date)} · ${selected.localIndex}',
                         axisLabel: context.tr('tide.localIndex').toUpperCase(),
                       ),
                     ),
@@ -301,9 +331,24 @@ class TideCoefficientsView extends StatelessWidget {
             spacing: 12,
             runSpacing: 6,
             children: [
-              _legend(context.tr('tide.neapTideRange'), _coefficientBlue),
-              _legend(context.tr('tide.transitionRange'), _coefficientGreen),
-              _legend(context.tr('tide.springTideRange'), _coefficientOrange),
+              _legend(
+                context.tr(month.isCasablancaHarmonic
+                    ? 'tide.neapTideRange'
+                    : 'tide.relativeLowRange'),
+                _coefficientBlue,
+              ),
+              _legend(
+                context.tr(month.isCasablancaHarmonic
+                    ? 'tide.transitionRange'
+                    : 'tide.relativeMediumRange'),
+                _coefficientGreen,
+              ),
+              _legend(
+                context.tr(month.isCasablancaHarmonic
+                    ? 'tide.springTideRange'
+                    : 'tide.relativeHighRange'),
+                _coefficientOrange,
+              ),
             ],
           ),
         ],
@@ -510,6 +555,54 @@ class TideCoefficientsView extends StatelessWidget {
         ),
       );
 
+  Widget _buildLocalForecastNotice(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
+        decoration: _panelDecoration(radius: 16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(
+              Icons.insights_rounded,
+              color: _coefficientCyan,
+              size: 24,
+            ),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    context
+                        .tr('tide.localForecastCoefficientNoticeTitle')
+                        .toUpperCase(),
+                    style: TextStyle(
+                      color: _text(0.94),
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    context.trArgs(
+                      'tide.localForecastCoefficientNotice',
+                      args: {'count': '${month.days.length}'},
+                    ),
+                    style: TextStyle(
+                      color: _text(0.72),
+                      fontSize: 11.5,
+                      height: 1.42,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+
   Widget _buildSourceFooter(BuildContext context) => Row(
         children: [
           Container(
@@ -525,7 +618,9 @@ class TideCoefficientsView extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              context.tr('tide.localHarmonicIndicative'),
+              context.tr(month.isCasablancaHarmonic
+                  ? 'tide.localHarmonicIndicative'
+                  : 'tide.localForecastIndicative'),
               style: TextStyle(
                 color: _text(0.55),
                 fontSize: 10.5,
@@ -556,6 +651,13 @@ class TideCoefficientsView extends StatelessWidget {
   }
 
   String _categoryLabel(BuildContext context, _CoefficientCategory category) {
+    if (!month.isCasablancaHarmonic) {
+      return switch (category) {
+        _CoefficientCategory.neap => context.tr('tide.relativeLow'),
+        _CoefficientCategory.transition => context.tr('tide.relativeMedium'),
+        _CoefficientCategory.spring => context.tr('tide.relativeHigh'),
+      };
+    }
     switch (category) {
       case _CoefficientCategory.neap:
         return context.tr('tide.neapTide');
@@ -616,6 +718,10 @@ class TideCoefficientsView extends StatelessWidget {
     ];
     return context.tr('tide.months.${keys[month - 1]}');
   }
+
+  static String _shortDate(DateTime date) =>
+      '${date.day.toString().padLeft(2, '0')}/'
+      '${date.month.toString().padLeft(2, '0')}';
 }
 
 enum _CoefficientCategory { neap, transition, spring }
@@ -826,9 +932,8 @@ class _DailyTideCurvePainter extends CustomPainter {
     final maxHeight = math.max(0.5, (day.highMeters * 2).ceil() / 2);
     final minHeight = math.min(0.0, (day.lowMeters * 2).floor() / 2);
     final range = math.max(0.1, maxHeight - minHeight);
-    double x(DateTime time) =>
-        chart.left +
-        (time.difference(day.date).inMinutes / (24 * 60)) * chart.width;
+    double x(DateTime instantUtc) =>
+        chart.left + day.curveProgress(instantUtc) * chart.width;
     double y(double height) =>
         chart.bottom - ((height - minHeight) / range) * chart.height;
 
@@ -854,7 +959,7 @@ class _DailyTideCurvePainter extends CustomPainter {
     final path = Path();
     for (var i = 0; i < day.samples.length; i++) {
       final sample = day.samples[i];
-      final point = Offset(x(sample.time), y(sample.height));
+      final point = Offset(x(sample.instantUtc), y(sample.height));
       i == 0
           ? path.moveTo(point.dx, point.dy)
           : path.lineTo(point.dx, point.dy);
@@ -877,7 +982,7 @@ class _DailyTideCurvePainter extends CustomPainter {
     );
 
     for (final extremum in day.extrema.take(4)) {
-      final xx = x(extremum.time);
+      final xx = x(extremum.instantUtc);
       final yy = y(extremum.height);
       _dashedLine(
           canvas, Offset(xx, yy + 5), Offset(xx, chart.bottom), _text(0.45));
@@ -907,9 +1012,12 @@ class _DailyTideCurvePainter extends CustomPainter {
       );
     }
 
-    for (final hour in [0, 6, 12, 18, 24]) {
-      final xx = chart.left + chart.width * hour / 24;
-      final label = '${hour.toString().padLeft(2, '0')}h';
+    for (var tick = 0; tick <= 4; tick++) {
+      final progress = tick / 4;
+      final xx = chart.left + chart.width * progress;
+      final label = tick == 4
+          ? '24h'
+          : '${_civilHourAtProgress(day, progress).toString().padLeft(2, '0')}h';
       _paintText(
         canvas,
         label,
@@ -923,6 +1031,25 @@ class _DailyTideCurvePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DailyTideCurvePainter oldDelegate) =>
       day != oldDelegate.day || isDark != oldDelegate.isDark;
+
+  static int _civilHourAtProgress(
+    LocalTideCoefficientDay day,
+    double progress,
+  ) {
+    if (day.samples.isEmpty) return (progress * 24).round().clamp(0, 23);
+    final start = day.curveStartInstant;
+    final totalMicros = day.curveEndInstant.difference(start).inMicroseconds;
+    final target = start.add(
+      Duration(microseconds: (totalMicros * progress).round()),
+    );
+    final nearest = day.samples.reduce(
+      (a, b) => a.instantUtc.difference(target).abs() <=
+              b.instantUtc.difference(target).abs()
+          ? a
+          : b,
+    );
+    return nearest.time.hour;
+  }
 }
 
 class _MonthlyCoefficientPainter extends CustomPainter {
@@ -984,8 +1111,8 @@ class _MonthlyCoefficientPainter extends CustomPainter {
     );
     canvas.restore();
 
-    final points = month.days
-        .map((day) => Offset(x(day.date.day), y(day.localIndex)))
+    final points = month.days.indexed
+        .map((entry) => Offset(x(entry.$1 + 1), y(entry.$2.localIndex)))
         .toList(growable: false);
     final curve = _smoothPath(points);
     final fill = Path.from(curve)
@@ -1067,26 +1194,36 @@ class _MonthlyCoefficientPainter extends CustomPainter {
       Offset(pillLeft + 11, 4 + (30 - labelPainter.height) / 2),
     );
 
-    final tickDays = <int>{
-      1,
-      4,
-      7,
-      10,
-      13,
-      16,
-      19,
-      22,
-      25,
-      28,
-      month.days.length
-    };
-    for (final day in tickDays) {
+    final tickSelections = month.days.length <= 10
+        ? <int>{for (var index = 1; index <= month.days.length; index++) index}
+        : <int>{
+            1,
+            4,
+            7,
+            10,
+            13,
+            16,
+            19,
+            22,
+            25,
+            28,
+            month.days.length,
+          };
+    final crossesMonth =
+        month.days.map((day) => day.date.month).toSet().length > 1;
+    for (final selection in tickSelections) {
+      if (selection < 1 || selection > month.days.length) continue;
+      final date = month.days[selection - 1].date;
+      final label = crossesMonth ? '${date.day}/${date.month}' : '${date.day}';
       _paintText(
         canvas,
-        '$day',
-        Offset((x(day) - 7).clamp(0.0, size.width - 15), chart.bottom + 8),
+        label,
+        Offset(
+          (x(selection) - 9).clamp(0.0, size.width - 22),
+          chart.bottom + 8,
+        ),
         color: _text(0.7),
-        size: 9.5,
+        size: crossesMonth ? 8.5 : 9.5,
       );
     }
   }

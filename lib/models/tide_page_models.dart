@@ -1,4 +1,7 @@
 // ============================================================
+
+import '../utils/station_time_zone.dart';
+import 'tide_data.dart' show TideHeightDatum;
 //  tide_page_models.dart — Modèles de données pour la page Marées
 // ============================================================
 
@@ -10,10 +13,10 @@ class HourlyCard {
   final int activityScore;
   final String activityLevel; // "high" | "mid" | "low"
   final String activityLabel;
-  final int windSpeed;
-  final String windDirection;
-  final double waveHeight;
-  final int temp;
+  final int? windSpeed;
+  final String? windDirection;
+  final double? waveHeight;
+  final int? temp;
   final double? pressureHpa;
   final double? precipitationProbabilityPct;
   final double? relativeHumidityPct;
@@ -32,7 +35,7 @@ class HourlyCard {
   final double? oceanCurrentDirectionDeg;
   final bool isIdeal;
   final bool isNow;
-  final int wavePeriod; // secondes, NOUVEAU
+  final int? wavePeriod; // secondes
 
   const HourlyCard({
     required this.hour,
@@ -64,7 +67,7 @@ class HourlyCard {
     this.oceanCurrentDirectionDeg,
     this.isIdeal = false,
     this.isNow = false,
-    this.wavePeriod = 7,
+    this.wavePeriod,
   });
 }
 
@@ -85,6 +88,7 @@ class TideForecastExtremum {
 
 class HourlyForecastSlot {
   final DateTime time;
+  final DateTime? instantUtc;
   final double? windSpeedKmh;
   final double? windGustKmh;
   final double? windDirectionDeg;
@@ -104,6 +108,7 @@ class HourlyForecastSlot {
 
   const HourlyForecastSlot({
     required this.time,
+    this.instantUtc,
     this.windSpeedKmh,
     this.windGustKmh,
     this.windDirectionDeg,
@@ -129,6 +134,7 @@ class HourlyForecastSlot {
   }) {
     return HourlyForecastSlot(
       time: time,
+      instantUtc: instantUtc,
       windSpeedKmh: windSpeedKmh,
       windGustKmh: windGustKmh,
       windDirectionDeg: windDirectionDeg,
@@ -171,6 +177,7 @@ class TideEvent {
   final double height;
   final String label;
   final DateTime? dateTime;
+  final DateTime instantUtc;
 
   const TideEvent({
     required this.type,
@@ -178,6 +185,7 @@ class TideEvent {
     required this.height,
     required this.label,
     this.dateTime,
+    required this.instantUtc,
   });
 }
 
@@ -234,6 +242,9 @@ class WindInfo {
 class TideData {
   final String location;
   final DateTime? generatedAt;
+  final int? utcOffsetSeconds;
+  final String? timeZoneId;
+  final TideHeightDatum tideHeightDatum;
   final List<HourlyCard> hourlyCards;
   final List<HourlyForecastDay> hourlyForecastDays;
   final List<TidePoint> tidePoints;
@@ -252,6 +263,9 @@ class TideData {
   const TideData({
     required this.location,
     this.generatedAt,
+    this.utcOffsetSeconds,
+    this.timeZoneId,
+    this.tideHeightDatum = TideHeightDatum.unknown,
     required this.hourlyCards,
     this.hourlyForecastDays = const [],
     required this.tidePoints,
@@ -267,4 +281,12 @@ class TideData {
     required this.waveInfo,
     required this.windInfo,
   });
+
+  DateTime stationTimeAt(DateTime instant) {
+    return StationTimeZone.civilAt(
+      instant,
+      timeZoneId: timeZoneId,
+      fallbackOffsetSeconds: utcOffsetSeconds,
+    );
+  }
 }

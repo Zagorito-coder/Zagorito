@@ -8,13 +8,13 @@ import 'dart:ui' as ui;
 
 import 'package:executor_lib/executor_lib.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'
-    show SystemChrome, SystemUiMode, SystemUiOverlayStyle;
+import 'package:flutter/services.dart' show SystemChrome, SystemUiOverlayStyle;
 import 'package:flutter/foundation.dart' show ValueListenable, kDebugMode;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:spots_app/data/coastal_cities.dart';
 import 'package:spots_app/models.dart';
 import 'package:spots_app/models/compass_readings.dart';
 import 'package:spots_app/models/offline_map_region.dart';
@@ -30,6 +30,7 @@ import 'package:spots_app/spots_canvas_layer.dart';
 import 'package:spots_app/theme.dart';
 import 'package:spots_app/theme_controller.dart';
 import 'package:spots_app/utils/map_flight_plan.dart';
+import 'package:spots_app/utils/city_spot_search.dart';
 import 'package:spots_app/utils/map_zoom_limits.dart';
 import 'package:spots_app/widgets/app_tile_layer.dart';
 import 'package:spots_app/widgets/finite_map_controller.dart';
@@ -75,9 +76,7 @@ void _bootstrap() {
     debugPrint = (String? message, {int? wrapWidth}) {};
   }
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.dark,
-    systemNavigationBarColor: Colors.transparent,
     systemNavigationBarIconBrightness: Brightness.dark,
   ));
   runApp(const SpotsApp());
@@ -94,10 +93,8 @@ class SpotsApp extends StatelessWidget {
         final isDark = ThemeController.instance.isDark;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-            statusBarColor: Colors.transparent,
             statusBarIconBrightness:
                 isDark ? Brightness.light : Brightness.dark,
-            systemNavigationBarColor: ThemeColors.of(context).background,
             systemNavigationBarIconBrightness:
                 isDark ? Brightness.light : Brightness.dark,
           ));
@@ -269,20 +266,26 @@ class SpotLabel extends StatelessWidget {
 
 class _SearchBar extends StatelessWidget {
   final TextEditingController controller;
-  final List<Spot> results;
+  final List<CoastalCity> cityResults;
+  final List<Spot> spotResults;
+  final CoastalCity? selectedCity;
   final ValueChanged<String> onChanged;
   final VoidCallback onClear;
-  final void Function(Spot) onSelect;
+  final void Function(CoastalCity) onSelectCity;
+  final void Function(Spot) onSelectSpot;
   final String Function(Spot) distanceText;
   final String? measurementText;
   final VoidCallback onStopMeasurement;
   final VoidCallback? onTap;
   const _SearchBar(
       {required this.controller,
-      required this.results,
+      required this.cityResults,
+      required this.spotResults,
+      required this.selectedCity,
       required this.onChanged,
       required this.onClear,
-      required this.onSelect,
+      required this.onSelectCity,
+      required this.onSelectSpot,
       required this.distanceText,
       required this.onStopMeasurement,
       this.measurementText,
@@ -292,6 +295,7 @@ class _SearchBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context);
+    final entries = _buildEntries();
     return Column(mainAxisAlignment: MainAxisAlignment.end, children: [
       Stack(clipBehavior: Clip.none, children: [
         Padding(
@@ -347,7 +351,11 @@ class _SearchBar extends StatelessWidget {
                     textInputAction: TextInputAction.search,
                     onChanged: onChanged,
                     onSubmitted: (_) {
-                      if (results.isNotEmpty) onSelect(results.first);
+                      if (cityResults.isNotEmpty) {
+                        onSelectCity(cityResults.first);
+                      } else if (spotResults.isNotEmpty) {
+                        onSelectSpot(spotResults.first);
+                      }
                     }))),
         if (measurementText != null)
           Positioned(
@@ -422,7 +430,7 @@ class _SearchBar extends StatelessWidget {
                                 onPressed: onStopMeasurement))))
               ]))),
       ]),
-      if (controller.text.isNotEmpty && results.isNotEmpty)
+      if (controller.text.isNotEmpty && entries.isNotEmpty)
         Container(
             margin: const EdgeInsets.only(bottom: 8),
             constraints: const BoxConstraints(maxHeight: 240),
@@ -441,44 +449,188 @@ class _SearchBar extends StatelessWidget {
                 child: ListView.builder(
                     shrinkWrap: true,
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemCount: results.length,
+                    itemCount: entries.length,
                     itemBuilder: (context, index) {
-                      final spot = results[index];
-                      return Container(
-                          margin: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                              color: tc.surfaceLight.withValues(alpha: 0.8),
-                              borderRadius: BorderRadius.circular(10)),
-                          child: ListTile(
+                      final entry = entries[index];
+                      if (entry.sectionKey != null) {
+                        return Padding(
+                          key: ValueKey<String>(entry.sectionKey!),
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 5),
+                          child: Text(
+                            entry.sectionLabel!(l10n),
+                            style: TextStyle(
+                              color: tc.textMuted,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.6,
+                            ),
+                          ),
+                        );
+                      }
+
+                      final city = entry.city;
+                      if (city != null) {
+                        return Padding(
+                          key: ValueKey<String>(
+                            'city-search-result-${city.iso}-${CitySpotSearch.normalize(city.name)}',
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          child: Material(
+                            color: tc.surfaceLight.withValues(alpha: 0.8),
+                            borderRadius: BorderRadius.circular(10),
+                            clipBehavior: Clip.antiAlias,
+                            child: ListTile(
                               dense: true,
-                              leading: Container(
-                                  width: 10,
-                                  height: 10,
-                                  decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: spot.type.color,
-                                      boxShadow: [
-                                        BoxShadow(
-                                            color: spot.type.color
-                                                .withValues(alpha: 0.4),
-                                            blurRadius: 6,
-                                            spreadRadius: 1)
-                                      ])),
-                              title: Text(spot.name,
-                                  style: TextStyle(
-                                      color: tc.textPrimary,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600)),
-                              subtitle: Text(distanceText(spot),
-                                  style: TextStyle(
-                                      color: tc.textMuted, fontSize: 11)),
-                              trailing: Icon(Icons.chevron_right,
-                                  color: tc.textMuted, size: 16),
-                              onTap: () => onSelect(spot)));
+                              leading: Icon(
+                                Icons.location_city_rounded,
+                                color: tc.oceanMedium,
+                                size: 22,
+                              ),
+                              title: Text(
+                                city.name,
+                                style: TextStyle(
+                                  color: tc.textPrimary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              subtitle: Text(
+                                '${city.country} • ${city.iso}',
+                                style: TextStyle(
+                                  color: tc.textMuted,
+                                  fontSize: 11,
+                                ),
+                              ),
+                              trailing: Icon(
+                                Icons.chevron_right,
+                                color: tc.textMuted,
+                                size: 16,
+                              ),
+                              onTap: () => onSelectCity(city),
+                            ),
+                          ),
+                        );
+                      }
+
+                      final spot = entry.spot;
+                      if (spot == null) {
+                        return Padding(
+                          key: const ValueKey<String>('city-search-empty'),
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                          child: Text(
+                            l10n.translate('map.noSpotsAroundCity'),
+                            style: TextStyle(
+                              color: tc.textMuted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        );
+                      }
+                      return Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          child: Material(
+                              color: tc.surfaceLight.withValues(alpha: 0.8),
+                              borderRadius: BorderRadius.circular(10),
+                              clipBehavior: Clip.antiAlias,
+                              child: ListTile(
+                                  dense: true,
+                                  leading: Container(
+                                      width: 10,
+                                      height: 10,
+                                      decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: spot.type.color,
+                                          boxShadow: [
+                                            BoxShadow(
+                                                color: spot.type.color
+                                                    .withValues(alpha: 0.4),
+                                                blurRadius: 6,
+                                                spreadRadius: 1)
+                                          ])),
+                                  title: Text(spot.name,
+                                      style: TextStyle(
+                                          color: tc.textPrimary,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600)),
+                                  subtitle: Text(distanceText(spot),
+                                      style: TextStyle(
+                                          color: tc.textMuted, fontSize: 11)),
+                                  trailing: Icon(Icons.chevron_right,
+                                      color: tc.textMuted, size: 16),
+                                  onTap: () => onSelectSpot(spot))));
                     }))),
     ]);
   }
+
+  List<_MapSearchEntry> _buildEntries() {
+    final city = selectedCity;
+    if (city != null) {
+      return <_MapSearchEntry>[
+        _MapSearchEntry.section(
+          key: 'city-search-summary',
+          label: (l10n) => l10n.trArgs(
+            'map.spotsAroundCity',
+            args: {
+              'city': city.name,
+              'radius': CitySpotSearch.radiusKm.toStringAsFixed(0),
+              'count': spotResults.length.toString(),
+            },
+          ),
+        ),
+        if (spotResults.isEmpty)
+          const _MapSearchEntry.empty()
+        else
+          ...spotResults.map(_MapSearchEntry.spot),
+      ];
+    }
+
+    return <_MapSearchEntry>[
+      if (cityResults.isNotEmpty) ...[
+        _MapSearchEntry.section(
+          key: 'city-search-section',
+          label: (l10n) => l10n.translate('map.cities'),
+        ),
+        ...cityResults.map(_MapSearchEntry.city),
+      ],
+      if (spotResults.isNotEmpty) ...[
+        _MapSearchEntry.section(
+          key: 'spot-search-section',
+          label: (l10n) => l10n.translate('map.spots'),
+        ),
+        ...spotResults.map(_MapSearchEntry.spot),
+      ],
+    ];
+  }
+}
+
+class _MapSearchEntry {
+  final String? sectionKey;
+  final String Function(AppLocalizations)? sectionLabel;
+  final CoastalCity? city;
+  final Spot? spot;
+
+  const _MapSearchEntry._({
+    this.sectionKey,
+    this.sectionLabel,
+    this.city,
+    this.spot,
+  });
+
+  const _MapSearchEntry.city(CoastalCity city) : this._(city: city);
+
+  const _MapSearchEntry.spot(Spot spot) : this._(spot: spot);
+
+  const _MapSearchEntry.empty() : this._();
+
+  _MapSearchEntry.section({
+    required String key,
+    required String Function(AppLocalizations) label,
+  }) : this._(sectionKey: key, sectionLabel: label);
 }
 
 class ZoomButton extends StatelessWidget {
@@ -895,9 +1047,12 @@ class _MapScreenState extends State<MapScreen>
   double? _pendingZoom;
 
   List<Spot> _spots = [];
+  SpotSearchIndex _spotSearchIndex = SpotSearchIndex.empty();
   LatLngBounds? _lastBounds;
   List<Spot> _visibleSpots = [];
   String _searchQuery = '';
+  CoastalCity? _selectedSearchCity;
+  List<Spot> _citySearchSpots = const [];
   Position? _currentPosition;
   Spot? _selectedSpot;
   UserSpot? _selectedUserSpot;
@@ -928,12 +1083,13 @@ class _MapScreenState extends State<MapScreen>
   bool _positionStreamStartedForCompass = false;
   Position? _lastPosition;
 
-  List<Spot> get _searchResults {
-    final q = _searchQuery.trim().toLowerCase();
-    return q.isEmpty
-        ? []
-        : _spots.where((s) => s.name.toLowerCase().contains(q)).toList();
-  }
+  List<CoastalCity> get _citySearchResults => _selectedSearchCity == null
+      ? CitySpotSearch.matchingCities(_searchQuery)
+      : const [];
+
+  List<Spot> get _spotSearchResults => _selectedSearchCity == null
+      ? _spotSearchIndex.search(_searchQuery)
+      : _citySearchSpots;
 
   String _distanceText(Spot spot) {
     if (_currentPosition == null) return 'Distance inconnue';
@@ -942,6 +1098,13 @@ class _MapScreenState extends State<MapScreen>
         LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
         LatLng(spot.latitude, spot.longitude));
     return '${km.toStringAsFixed(1)} km';
+  }
+
+  String _searchDistanceText(Spot spot) {
+    final city = _selectedSearchCity;
+    if (city == null) return _distanceText(spot);
+    final km = CitySpotSearch.distanceFromCityKm(city, spot);
+    return km.isFinite ? '${km.toStringAsFixed(1)} km' : '';
   }
 
   String get _formattedMeasuredDistance =>
@@ -962,7 +1125,6 @@ class _MapScreenState extends State<MapScreen>
         widget.userSpotSelectionRequests?.value?.serial ?? 0;
     widget.userSpotSelectionRequests
         ?.addListener(_handleUserSpotSelectionRequest);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _loadSpots();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -1013,12 +1175,30 @@ class _MapScreenState extends State<MapScreen>
   void _handleMapActivityChanged() {
     if (widget.isActive?.value ?? true) return;
 
+    final compassSubscription = _compassSubscription;
+    final positionSubscription = _positionSubscription;
+    _compassSubscription = null;
+    _positionSubscription = null;
+    _positionStreamStartedForCompass = false;
+    if (compassSubscription != null) {
+      unawaited(compassSubscription.cancel());
+    }
+    if (positionSubscription != null) {
+      unawaited(positionSubscription.cancel());
+    }
+
     final fishProvider = FishProvider.instance;
     if (fishProvider.isFishModalVisible) {
       fishProvider.closeFishModal();
     }
-    if (!mounted || !_isFishBarVisible) return;
-    setState(() => _isFishBarVisible = false);
+    if (!mounted) return;
+    setState(() {
+      _isFishBarVisible = false;
+      _isCompassEnabled = false;
+      _magneticHeading = null;
+      _gpsCourseOverGround = null;
+      _lastPosition = null;
+    });
   }
 
   void _handleSpotSelectionRequest() {
@@ -1105,6 +1285,7 @@ class _MapScreenState extends State<MapScreen>
   }
 
   void _initPositionStream({bool startedForCompass = false}) {
+    if (!mounted || !(widget.isActive?.value ?? true)) return;
     if (_positionSubscription != null) {
       if (!startedForCompass) _positionStreamStartedForCompass = false;
       return;
@@ -1140,7 +1321,6 @@ class _MapScreenState extends State<MapScreen>
 
   @override
   void dispose() {
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _cancelCameraFlight();
     _cameraFlightController.dispose();
     _mapController.dispose();
@@ -1184,9 +1364,16 @@ class _MapScreenState extends State<MapScreen>
   Future<void> _loadSpots() async {
     try {
       if (widget.initialSpots != null && widget.initialSpots!.isNotEmpty) {
+        final initialSpots = widget.initialSpots!;
+        final searchIndex = SpotSearchIndex(initialSpots);
         if (!mounted) return;
         setState(() {
-          _spots = widget.initialSpots!;
+          _spots = initialSpots;
+          _spotSearchIndex = searchIndex;
+          final city = _selectedSearchCity;
+          if (city != null) {
+            _citySearchSpots = CitySpotSearch.spotsAroundCity(city, _spots);
+          }
           _isLoadingSpots = false;
         });
         WidgetsBinding.instance
@@ -1194,9 +1381,15 @@ class _MapScreenState extends State<MapScreen>
         return;
       }
       final spots = await SpotService.loadSpots();
+      final searchIndex = SpotSearchIndex(spots);
       if (!mounted) return;
       setState(() {
         _spots = spots;
+        _spotSearchIndex = searchIndex;
+        final city = _selectedSearchCity;
+        if (city != null) {
+          _citySearchSpots = CitySpotSearch.spotsAroundCity(city, _spots);
+        }
         _isLoadingSpots = false;
       });
       WidgetsBinding.instance
@@ -1240,7 +1433,10 @@ class _MapScreenState extends State<MapScreen>
     await _animateToPoint(LatLng(spot.latitude, spot.longitude));
   }
 
-  Future<void> _animateToPoint(LatLng target) async {
+  Future<void> _animateToPoint(
+    LatLng target, {
+    double targetZoom = MapZoomLimits.automaticSpotSelection,
+  }) async {
     if (!_isValidMapPoint(target)) return;
     final flightSerial = ++_cameraFlightSerial;
     _cameraFlightController.stop();
@@ -1258,7 +1454,6 @@ class _MapScreenState extends State<MapScreen>
 
     // Toute sélection automatique s'arrête à 16x, même si l'utilisateur
     // observait auparavant la carte au niveau manuel 20x.
-    const targetZoom = MapZoomLimits.automaticSpotSelection;
     final distanceKm = _distance.as(LengthUnit.Kilometer, start, target);
     final plan = MapFlightPlan.adaptive(
       start: start,
@@ -1312,6 +1507,44 @@ class _MapScreenState extends State<MapScreen>
     _cameraFlightPlan = null;
   }
 
+  void _resetCitySearch() {
+    _selectedSearchCity = null;
+    _citySearchSpots = const [];
+  }
+
+  Future<void> _selectCity(CoastalCity city) async {
+    if (!city.lat.isFinite ||
+        !city.lon.isFinite ||
+        city.lat < -90 ||
+        city.lat > 90 ||
+        city.lon < -180 ||
+        city.lon > 180) {
+      return;
+    }
+
+    final nearbySpots = CitySpotSearch.spotsAroundCity(city, _spots);
+    setState(() {
+      _selectedSearchCity = city;
+      _citySearchSpots = nearbySpots;
+      _searchQuery = city.name;
+      _selectedSpot = null;
+      _selectedUserSpot = null;
+      _pendingPersonalSpot = null;
+      _isFishBarVisible = false;
+      _showToolsPanel = false;
+    });
+    _searchController.value = TextEditingValue(
+      text: city.name,
+      selection: TextSelection.collapsed(offset: city.name.length),
+    );
+    FocusScope.of(context).unfocus();
+
+    await _animateToPoint(
+      LatLng(city.lat, city.lon),
+      targetZoom: MapZoomLimits.automaticCitySearch,
+    );
+  }
+
   Future<void> _selectSpot(Spot spot) async {
     setState(() {
       _selectedSpot = spot;
@@ -1320,6 +1553,7 @@ class _MapScreenState extends State<MapScreen>
       _searchQuery = '';
       _isFishBarVisible = false;
       _showToolsPanel = false;
+      _resetCitySearch();
     });
     _searchController.clear();
     FocusScope.of(context).unfocus();
@@ -1339,6 +1573,7 @@ class _MapScreenState extends State<MapScreen>
       _selectedSpot = null;
       _pendingPersonalSpot = null;
       _searchQuery = '';
+      _resetCitySearch();
       _isFishBarVisible = false;
       _showToolsPanel = false;
     });
@@ -1385,6 +1620,7 @@ class _MapScreenState extends State<MapScreen>
       _measurePoints.clear();
       _measuredDistanceKm = 0;
       _searchQuery = '';
+      _resetCitySearch();
     });
     _searchController.clear();
     FocusScope.of(context).unfocus();
@@ -1404,6 +1640,7 @@ class _MapScreenState extends State<MapScreen>
       _showToolsPanel = false;
       _isFishBarVisible = false;
       _searchQuery = '';
+      _resetCitySearch();
     });
     _searchController.clear();
     FocusScope.of(context).unfocus();
@@ -1538,6 +1775,7 @@ class _MapScreenState extends State<MapScreen>
         _isFishBarVisible = false;
         _showToolsPanel = false;
         _searchQuery = '';
+        _resetCitySearch();
       });
       _searchController.clear();
       FocusScope.of(context).unfocus();
@@ -1635,468 +1873,503 @@ class _MapScreenState extends State<MapScreen>
       builder: (context, _) {
         final tc = ThemeColors.of(context);
         final hasSel = _selectedSpot != null;
-        final media = MediaQuery.of(context);
-        final isLandscape = media.orientation == Orientation.landscape;
+        final mediaPadding = MediaQuery.paddingOf(context);
+        final isLandscape =
+            MediaQuery.orientationOf(context) == Orientation.landscape;
 
         return Scaffold(
+            resizeToAvoidBottomInset: false,
             body: Stack(children: [
-          if (_isLoadingSpots)
-            Center(
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-              CircularProgressIndicator(color: tc.oceanLight),
-              const SizedBox(height: 12),
-              Text('Chargement des spots...',
-                  style: TextStyle(color: tc.textSecondary)),
-            ])),
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: const LatLng(30.5, -9.7),
-              initialZoom: 6,
-              maxZoom: MapZoomLimits.manualMaximum,
-              minZoom: MapZoomLimits.minimum,
-              interactionOptions: const InteractionOptions(
-                // Pinch zoom is essential. Pinch-move and rotation remain
-                // disabled so two fingers only change the finite, clamped zoom.
-                flags: InteractiveFlag.drag |
-                    InteractiveFlag.flingAnimation |
-                    InteractiveFlag.pinchZoom |
-                    InteractiveFlag.doubleTapZoom |
-                    InteractiveFlag.doubleTapDragZoom,
-              ),
-              onPositionChanged: _onPositionChanged,
-              onLongPress: _onMapLongPress,
-              onMapReady: () {
-                final region = OfflineMapService.instance.activeRegion;
-                if (_mapStyle == MapStyle.offline && region != null) {
-                  _showOfflineRegion(region);
-                }
-              },
-            ),
-            children: [
-              AppTileLayer(style: _mapStyle),
-              AppMapAttribution(style: _mapStyle),
-              if (_currentPosition != null)
-                FiniteMarkerLayer(markers: [
-                  Marker(
-                      width: 20,
-                      height: 20,
-                      point: LatLng(_currentPosition!.latitude,
-                          _currentPosition!.longitude),
-                      child: Container(
-                          decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.blue.withValues(alpha: 0.9),
-                              border:
-                                  Border.all(color: Colors.white, width: 2.5),
-                              boxShadow: [
-                            BoxShadow(
-                                color: Colors.blue.withValues(alpha: 0.45),
-                                blurRadius: 10)
-                          ])))
-                ]),
-              SpotsCanvasLayer(
-                visibleSpots: _visibleSpots,
-                mapController: _mapController,
-                selectedSpot: _selectedSpot,
-                onSpotTap: _onCanvasSpotTap,
-                onMapTap: (ll) =>
-                    _onMapTap(const TapPosition(Offset.zero, Offset.zero), ll),
-              ),
-              PersonalSpotsMapLayer(
-                selectedSpotId: _selectedUserSpot?.id,
-                onSpotTap: (spot) => unawaited(_selectUserSpot(spot)),
-              ),
-              if (_selectedUserSpot != null)
-                FiniteMarkerLayer(
-                  markers: [
-                    Marker(
-                      width: 172,
-                      height: 86,
-                      point: LatLng(
-                        _selectedUserSpot!.latitude,
-                        _selectedUserSpot!.longitude,
-                      ),
-                      alignment: Alignment.topCenter,
-                      child: PersonalSpotMapMarker(
-                        spot: _selectedUserSpot!,
-                        selected: true,
-                        onTap: () {},
-                      ),
+              if (_isLoadingSpots)
+                Center(
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  CircularProgressIndicator(color: tc.oceanLight),
+                  const SizedBox(height: 12),
+                  Text('Chargement des spots...',
+                      style: TextStyle(color: tc.textSecondary)),
+                ])),
+              RepaintBoundary(
+                key: const ValueKey<String>('map-render-boundary'),
+                child: FlutterMap(
+                  mapController: _mapController,
+                  options: MapOptions(
+                    initialCenter: const LatLng(30.5, -9.7),
+                    initialZoom: 6,
+                    maxZoom: MapZoomLimits.manualMaximum,
+                    minZoom: MapZoomLimits.minimum,
+                    interactionOptions: const InteractionOptions(
+                      // Pinch zoom is essential. Pinch-move and rotation remain
+                      // disabled so two fingers only change the finite, clamped zoom.
+                      flags: InteractiveFlag.drag |
+                          InteractiveFlag.flingAnimation |
+                          InteractiveFlag.pinchZoom |
+                          InteractiveFlag.doubleTapZoom |
+                          InteractiveFlag.doubleTapDragZoom,
                     ),
-                  ],
-                ),
-              // 🌬️ Couche de particules de vent animees (30fps)
-              // IgnorePointer pour ne pas bloquer les taps sur la carte
-              ListenableBuilder(
-                listenable: FishProvider.instance,
-                child: IgnorePointer(
-                  child: Consumer<WindAnimationProvider>(
-                    builder: (ctx, wind, _) => WindParticleLayer(
-                      provider: wind,
-                      mapController: _mapController,
-                    ),
+                    onPositionChanged: _onPositionChanged,
+                    onLongPress: _onMapLongPress,
+                    onMapReady: () {
+                      final region = OfflineMapService.instance.activeRegion;
+                      if (_mapStyle == MapStyle.offline && region != null) {
+                        _showOfflineRegion(region);
+                      }
+                    },
                   ),
-                ),
-                builder: (context, child) => TickerMode(
-                  enabled: !FishProvider.instance.isFishModalVisible,
-                  child: child!,
-                ),
-              ),
-              if (_selectedSpot != null)
-                FiniteMarkerLayer(markers: [
-                  Marker(
-                      width: 52,
-                      height: 56,
-                      point: LatLng(
-                          _selectedSpot!.latitude, _selectedSpot!.longitude),
-                      child: _markerCacheManager.getOrCreateMarker(
-                          _selectedSpot!, true, _isPremium))
-                ]),
-              if (_pendingPersonalSpot != null)
-                FiniteMarkerLayer(
-                  markers: [
-                    Marker(
-                      width: 210,
-                      height: 96,
-                      point: _pendingPersonalSpot!,
-                      // In flutter_map, topCenter places the whole marker
-                      // above its geographic point. The pin tip at the bottom
-                      // therefore lands exactly on the long-pressed location.
-                      alignment: Alignment.topCenter,
-                      child: _buildPendingPersonalSpotMarker(
-                        _pendingPersonalSpot!,
-                      ),
-                    ),
-                  ],
-                ),
-              if (_isMeasuring && _measurePoints.isNotEmpty)
-                PolylineLayer(polylines: [
-                  Polyline(
-                      points: _measurePoints,
-                      color: Colors.redAccent,
-                      strokeWidth: 4.0)
-                ]),
-              if (_isMeasuring && _measurePoints.isNotEmpty)
-                FiniteMarkerLayer(
-                    markers: _measurePoints
-                        .map((p) => Marker(
-                            width: 14,
-                            height: 14,
-                            point: p,
+                  children: [
+                    AppTileLayer(style: _mapStyle),
+                    AppMapAttribution(style: _mapStyle),
+                    if (_currentPosition != null)
+                      FiniteMarkerLayer(markers: [
+                        Marker(
+                            width: 20,
+                            height: 20,
+                            point: LatLng(_currentPosition!.latitude,
+                                _currentPosition!.longitude),
                             child: Container(
                                 decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: Colors.white,
+                                    color: Colors.blue.withValues(alpha: 0.9),
                                     border: Border.all(
-                                        color: Colors.redAccent, width: 2)))))
-                        .toList()),
-            ],
-          ),
-          if (_showToolsPanel) _buildToolsPanel(),
-          if (_isAddingSpot) _buildAddSpotModeBanner(),
-          if (_isLoadingSpots) const SizedBox.shrink(),
-          Positioned(
-              bottom: 96 + 16 + 8,
-              left: 0,
-              right: 0,
-              child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Consumer<FishProvider>(builder: (ctx, fp, _) {
-                    if (fp.isFishModalVisible) {
-                      return const SizedBox.shrink();
-                    }
-                    if (!_isFishBarVisible) {
-                      return const SizedBox.shrink();
-                    }
-                    final df = fp.allFish;
-                    if (df.isEmpty) return const SizedBox.shrink();
-                    return _FishVerticalMenu(
-                        fishes: df,
-                        selectedFish: fp.selectedFish,
-                        onFishSelected: (f) {
-                          if (_isFishBarVisible) {
-                            setState(() => _isFishBarVisible = false);
-                          }
-                          unawaited(fp.selectFish(
-                            f,
-                            _spots,
-                            _currentPosition,
-                          ));
-                        },
-                        onFishDeselected: fp.deselectFish);
-                  }))),
-          Positioned(
-              bottom: 16,
-              left: 16,
-              width: _mapBottomControlHeight,
-              height: _mapBottomControlHeight,
-              child: Directionality(
-                  textDirection: TextDirection.ltr,
-                  child: _buildFishFilterButton())),
-          if (!hasSel && _selectedUserSpot == null)
-            ListenableBuilder(
-                listenable: LanguageController.instance,
-                builder: (ctx, _) {
-                  return Positioned(
-                      bottom: 16,
-                      left: 16,
-                      right: 16,
-                      child: Center(
-                          child: SizedBox(
-                              width: MediaQuery.of(ctx).size.width * 0.45,
-                              child: _SearchBar(
-                                  controller: _searchController,
-                                  results: _searchResults,
-                                  onTap: () {
-                                    if (_isFishBarVisible) {
-                                      setState(() => _isFishBarVisible = false);
-                                    }
-                                  },
-                                  onChanged: (q) => setState(() {
-                                        _searchQuery = q.trim().toLowerCase();
-                                        _selectedSpot = null;
-                                        _selectedUserSpot = null;
-                                        _isFishBarVisible = false;
-                                      }),
-                                  onClear: () {
-                                    _searchController.clear();
-                                    setState(() {
-                                      _searchQuery = '';
-                                      _selectedSpot = null;
-                                      _selectedUserSpot = null;
-                                    });
-                                    FocusScope.of(context).unfocus();
-                                  },
-                                  onSelect: _selectSpot,
-                                  distanceText: _distanceText,
-                                  measurementText: _isMeasuring
-                                      ? _formattedMeasuredDistance
-                                      : null,
-                                  onStopMeasurement: _stopMeasuring))));
-                }),
-          if (_isCompassEnabled)
-            Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: _CompassRibbon(
-                    magneticHeading: _magneticHeading,
-                    gpsCourseOverGround: _gpsCourseOverGround)),
-          Positioned(
-            top: media.padding.top + (isLandscape ? 12 : 80),
-            right: 16 + media.padding.right,
-            bottom: isLandscape ? null : 100,
-            child: SingleChildScrollView(
-              scrollDirection: isLandscape ? Axis.horizontal : Axis.vertical,
-              child: _buildPrimaryMapControls(
-                isLandscape ? Axis.horizontal : Axis.vertical,
+                                        color: Colors.white, width: 2.5),
+                                    boxShadow: [
+                                  BoxShadow(
+                                      color:
+                                          Colors.blue.withValues(alpha: 0.45),
+                                      blurRadius: 10)
+                                ])))
+                      ]),
+                    SpotsCanvasLayer(
+                      visibleSpots: _visibleSpots,
+                      mapController: _mapController,
+                      selectedSpot: _selectedSpot,
+                      onSpotTap: _onCanvasSpotTap,
+                      onMapTap: (ll) => _onMapTap(
+                          const TapPosition(Offset.zero, Offset.zero), ll),
+                    ),
+                    PersonalSpotsMapLayer(
+                      selectedSpotId: _selectedUserSpot?.id,
+                      onSpotTap: (spot) => unawaited(_selectUserSpot(spot)),
+                    ),
+                    if (_selectedUserSpot != null)
+                      FiniteMarkerLayer(
+                        markers: [
+                          Marker(
+                            width: 172,
+                            height: 86,
+                            point: LatLng(
+                              _selectedUserSpot!.latitude,
+                              _selectedUserSpot!.longitude,
+                            ),
+                            alignment: Alignment.topCenter,
+                            child: PersonalSpotMapMarker(
+                              spot: _selectedUserSpot!,
+                              selected: true,
+                              onTap: () {},
+                            ),
+                          ),
+                        ],
+                      ),
+                    // 🌬️ Couche de particules de vent animees (30fps)
+                    // IgnorePointer pour ne pas bloquer les taps sur la carte
+                    ListenableBuilder(
+                      listenable: FishProvider.instance,
+                      child: IgnorePointer(
+                        child: Consumer<WindAnimationProvider>(
+                          builder: (ctx, wind, _) => WindParticleLayer(
+                            provider: wind,
+                            mapController: _mapController,
+                          ),
+                        ),
+                      ),
+                      builder: (context, child) => TickerMode(
+                        enabled: !FishProvider.instance.isFishModalVisible,
+                        child: child!,
+                      ),
+                    ),
+                    if (_selectedSpot != null)
+                      FiniteMarkerLayer(markers: [
+                        Marker(
+                            width: 52,
+                            height: 56,
+                            point: LatLng(_selectedSpot!.latitude,
+                                _selectedSpot!.longitude),
+                            child: _markerCacheManager.getOrCreateMarker(
+                                _selectedSpot!, true, _isPremium))
+                      ]),
+                    if (_pendingPersonalSpot != null)
+                      FiniteMarkerLayer(
+                        markers: [
+                          Marker(
+                            width: 210,
+                            height: 96,
+                            point: _pendingPersonalSpot!,
+                            // In flutter_map, topCenter places the whole marker
+                            // above its geographic point. The pin tip at the bottom
+                            // therefore lands exactly on the long-pressed location.
+                            alignment: Alignment.topCenter,
+                            child: _buildPendingPersonalSpotMarker(
+                              _pendingPersonalSpot!,
+                            ),
+                          ),
+                        ],
+                      ),
+                    if (_isMeasuring && _measurePoints.isNotEmpty)
+                      PolylineLayer(polylines: [
+                        Polyline(
+                            points: _measurePoints,
+                            color: Colors.redAccent,
+                            strokeWidth: 4.0)
+                      ]),
+                    if (_isMeasuring && _measurePoints.isNotEmpty)
+                      FiniteMarkerLayer(
+                          markers: _measurePoints
+                              .map((p) => Marker(
+                                  width: 14,
+                                  height: 14,
+                                  point: p,
+                                  child: Container(
+                                      decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: Colors.white,
+                                          border: Border.all(
+                                              color: Colors.redAccent,
+                                              width: 2)))))
+                              .toList()),
+                  ],
+                ),
               ),
-            ),
-          ),
-          if (hasSel)
-            ListenableBuilder(
-                listenable: LanguageController.instance,
-                builder: (ctx, _) {
-                  final media = MediaQuery.of(ctx);
-                  final isPortrait = media.orientation == Orientation.portrait;
-                  final panelHeight =
-                      (media.size.height * (isPortrait ? 0.28 : 0.49))
-                          .clamp(
-                            isPortrait ? 210.0 : 190.0,
-                            isPortrait ? 240.0 : 220.0,
-                          )
-                          .toDouble();
-                  return Align(
-                      alignment: Alignment.bottomCenter,
-                      child: SizedBox(
-                          width: MediaQuery.of(ctx).size.width * 0.92,
-                          height: panelHeight,
-                          child: SpotDetailsPanel(
-                              spot: _selectedSpot!,
-                              distanceText: _distanceText(_selectedSpot!),
-                              isPremium: _isPremium,
-                              onClose: _clearSelection,
-                              onPremiumTap: () {},
-                              currentPosition: _currentPosition != null
-                                  ? LatLng(_currentPosition!.latitude,
-                                      _currentPosition!.longitude)
-                                  : null,
-                              allSpots: _spots,
-                              onSpotSelected: _selectSpot)));
-                }),
-          ListenableBuilder(
-              listenable: LanguageController.instance,
-              builder: (ctx, _) {
-                return Consumer<FishProvider>(builder: (ctx, fp, __) {
-                  if (!fp.isFishModalVisible || fp.selectedFish == null) {
-                    return const SizedBox.shrink();
-                  }
-                  return Positioned.fill(
-                      child: GestureDetector(
-                          onTap: fp.closeFishModal,
-                          child: Container(
-                              color: Colors.black.withValues(alpha: 0.45),
-                              child: Center(
-                                  child: TweenAnimationBuilder<double>(
-                                      duration:
-                                          const Duration(milliseconds: 350),
-                                      curve: Curves.easeOutBack,
-                                      tween: Tween(begin: 0.0, end: 1.0),
-                                      builder: (ctx, v, c) => Opacity(
-                                          opacity: v.clamp(0.0, 1.0),
-                                          child: Transform.scale(
-                                              scale: 0.8 + 0.2 * v, child: c)),
-                                      child: GestureDetector(
-                                          onTap: () {},
-                                          child: RepaintBoundary(
-                                              child: FishIntelligenceModal(
-                                                  fish: fp.selectedFish!,
-                                                  nearbySpots: fp.nearbySpots,
-                                                  isLoadingNearby:
-                                                      fp.isLoadingNearby,
-                                                  distanceText: _distanceText,
-                                                  onSpotSelected: (s) {
-                                                    fp.closeFishModal();
-                                                    _selectSpot(s);
-                                                  },
-                                                  onClose: fp.closeFishModal,
-                                                  currentPosition:
-                                                      _currentPosition))))))));
-                });
-              }),
-        ]));
+              if (_isAddingSpot) _buildAddSpotModeBanner(),
+              if (_isLoadingSpots) const SizedBox.shrink(),
+              Positioned(
+                  bottom: 96 + 16 + 8 + mediaPadding.bottom,
+                  left: mediaPadding.left,
+                  right: mediaPadding.right,
+                  child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Consumer<FishProvider>(builder: (ctx, fp, _) {
+                        if (fp.isFishModalVisible) {
+                          return const SizedBox.shrink();
+                        }
+                        if (!_isFishBarVisible) {
+                          return const SizedBox.shrink();
+                        }
+                        final df = fp.allFish;
+                        if (df.isEmpty) return const SizedBox.shrink();
+                        return _FishVerticalMenu(
+                            fishes: df,
+                            selectedFish: fp.selectedFish,
+                            onFishSelected: (f) {
+                              if (_isFishBarVisible) {
+                                setState(() => _isFishBarVisible = false);
+                              }
+                              unawaited(fp.selectFish(
+                                f,
+                                _spots,
+                                _currentPosition,
+                              ));
+                            },
+                            onFishDeselected: fp.deselectFish);
+                      }))),
+              Positioned(
+                  bottom: 16 + mediaPadding.bottom,
+                  left: 16 + mediaPadding.left,
+                  width: _mapBottomControlHeight,
+                  height: _mapBottomControlHeight,
+                  child: Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: _buildFishFilterButton())),
+              if (!hasSel && _selectedUserSpot == null)
+                ListenableBuilder(
+                    listenable: LanguageController.instance,
+                    builder: (ctx, _) {
+                      final keyboardInset = MediaQuery.viewInsetsOf(ctx).bottom;
+                      return Positioned(
+                          bottom: 16 + keyboardInset + mediaPadding.bottom,
+                          left: 16 + mediaPadding.left,
+                          right: 16 + mediaPadding.right,
+                          child: Center(
+                              child: SizedBox(
+                                  width: MediaQuery.sizeOf(ctx).width * 0.45,
+                                  child: RepaintBoundary(
+                                    child: _SearchBar(
+                                        controller: _searchController,
+                                        cityResults: _citySearchResults,
+                                        spotResults: _spotSearchResults,
+                                        selectedCity: _selectedSearchCity,
+                                        onTap: () {
+                                          if (_isFishBarVisible) {
+                                            setState(() =>
+                                                _isFishBarVisible = false);
+                                          }
+                                        },
+                                        onChanged: (q) => setState(() {
+                                              _searchQuery = q;
+                                              _resetCitySearch();
+                                              _selectedSpot = null;
+                                              _selectedUserSpot = null;
+                                              _isFishBarVisible = false;
+                                            }),
+                                        onClear: () {
+                                          _searchController.clear();
+                                          setState(() {
+                                            _searchQuery = '';
+                                            _resetCitySearch();
+                                            _selectedSpot = null;
+                                            _selectedUserSpot = null;
+                                          });
+                                          FocusScope.of(context).unfocus();
+                                        },
+                                        onSelectCity: (city) =>
+                                            unawaited(_selectCity(city)),
+                                        onSelectSpot: (spot) =>
+                                            unawaited(_selectSpot(spot)),
+                                        distanceText: _searchDistanceText,
+                                        measurementText: _isMeasuring
+                                            ? _formattedMeasuredDistance
+                                            : null,
+                                        onStopMeasurement: _stopMeasuring),
+                                  ))));
+                    }),
+              if (_showToolsPanel) _buildToolsPanel(),
+              if (_isCompassEnabled)
+                Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: _CompassRibbon(
+                        magneticHeading: _magneticHeading,
+                        gpsCourseOverGround: _gpsCourseOverGround)),
+              Positioned(
+                top: mediaPadding.top + (isLandscape ? 12 : 80),
+                right: 16 + mediaPadding.right,
+                bottom: isLandscape ? null : 100,
+                child: SingleChildScrollView(
+                  scrollDirection:
+                      isLandscape ? Axis.horizontal : Axis.vertical,
+                  child: _buildPrimaryMapControls(
+                    isLandscape ? Axis.horizontal : Axis.vertical,
+                  ),
+                ),
+              ),
+              if (hasSel)
+                ListenableBuilder(
+                    listenable: LanguageController.instance,
+                    builder: (ctx, _) {
+                      final media = MediaQuery.of(ctx);
+                      final isPortrait =
+                          media.orientation == Orientation.portrait;
+                      final panelHeight =
+                          (media.size.height * (isPortrait ? 0.28 : 0.49))
+                              .clamp(
+                                isPortrait ? 210.0 : 190.0,
+                                isPortrait ? 240.0 : 220.0,
+                              )
+                              .toDouble();
+                      return Align(
+                          alignment: Alignment.bottomCenter,
+                          child: SizedBox(
+                              width: MediaQuery.of(ctx).size.width * 0.92,
+                              height: panelHeight,
+                              child: SpotDetailsPanel(
+                                  spot: _selectedSpot!,
+                                  distanceText: _distanceText(_selectedSpot!),
+                                  isPremium: _isPremium,
+                                  onClose: _clearSelection,
+                                  onPremiumTap: () {},
+                                  currentPosition: _currentPosition != null
+                                      ? LatLng(_currentPosition!.latitude,
+                                          _currentPosition!.longitude)
+                                      : null,
+                                  allSpots: _spots,
+                                  onSpotSelected: _selectSpot)));
+                    }),
+              ListenableBuilder(
+                  listenable: LanguageController.instance,
+                  builder: (ctx, _) {
+                    return Consumer<FishProvider>(builder: (ctx, fp, __) {
+                      if (!fp.isFishModalVisible || fp.selectedFish == null) {
+                        return const SizedBox.shrink();
+                      }
+                      return Positioned.fill(
+                          child: GestureDetector(
+                              onTap: fp.closeFishModal,
+                              child: Container(
+                                  color: Colors.black.withValues(alpha: 0.45),
+                                  child: Center(
+                                      child: TweenAnimationBuilder<double>(
+                                          duration:
+                                              const Duration(milliseconds: 350),
+                                          curve: Curves.easeOutBack,
+                                          tween: Tween(begin: 0.0, end: 1.0),
+                                          builder: (ctx, v, c) => Opacity(
+                                              opacity: v.clamp(0.0, 1.0),
+                                              child: Transform.scale(
+                                                  scale: 0.8 + 0.2 * v,
+                                                  child: c)),
+                                          child: GestureDetector(
+                                              onTap: () {},
+                                              child: RepaintBoundary(
+                                                  child: FishIntelligenceModal(
+                                                      fish: fp.selectedFish!,
+                                                      nearbySpots:
+                                                          fp.nearbySpots,
+                                                      isLoadingNearby:
+                                                          fp.isLoadingNearby,
+                                                      distanceText:
+                                                          _distanceText,
+                                                      onSpotSelected: (s) {
+                                                        fp.closeFishModal();
+                                                        _selectSpot(s);
+                                                      },
+                                                      onClose:
+                                                          fp.closeFishModal,
+                                                      currentPosition:
+                                                          _currentPosition))))))));
+                    });
+                  }),
+            ]));
       },
     );
   }
 
   Widget _buildToolsPanel() {
     final tc = ThemeColors.of(context);
+    final padding = MediaQuery.paddingOf(context);
+    final isLandscape =
+        MediaQuery.orientationOf(context) == Orientation.landscape;
     return Positioned(
-        bottom: 170,
-        right: 80,
-        child: Container(
-            width: 180,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-                color: tc.surface.withValues(alpha: 0.95),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: tc.glassBorder, width: 1.2),
-                boxShadow: [
-                  BoxShadow(
-                      color: tc.shadowColor,
-                      blurRadius: 12,
-                      offset: const Offset(0, 4))
-                ]),
-            child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(context.tr('map.tools'),
-                      style: TextStyle(
+        top: padding.top + (isLandscape ? 72 : 12),
+        bottom: padding.bottom + (isLandscape ? 12 : 170),
+        right: padding.right + 80,
+        child: Align(
+          alignment: Alignment.bottomRight,
+          child: SingleChildScrollView(
+            key: const ValueKey<String>('map-tools-scroll'),
+            child: Container(
+                width: 180,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                    color: tc.surface.withValues(alpha: 0.95),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: tc.glassBorder, width: 1.2),
+                    boxShadow: [
+                      BoxShadow(
+                          color: tc.shadowColor,
+                          blurRadius: 12,
+                          offset: const Offset(0, 4))
+                    ]),
+                child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(context.tr('map.tools'),
+                          style: TextStyle(
+                              color: tc.textPrimary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14)),
+                      const Divider(height: 16),
+                      _toolItem(
+                        icon: Icons.add_location_alt_rounded,
+                        label: context.tr('mySpots.addTitle'),
+                        color: tc.oceanMedium,
+                        onTap: _startAddingSpot,
+                      ),
+                      const SizedBox(height: 10),
+                      _toolItem(
+                          key: const ValueKey<String>('map-measurement-toggle'),
+                          icon: _isMeasuring ? Icons.stop : Icons.straighten,
+                          label: _isMeasuring
+                              ? context.tr('map.stopMeasure')
+                              : context.tr('map.measureDistance'),
+                          color: _isMeasuring ? AppColors.gold : tc.textPrimary,
+                          onTap: () {
+                            if (_isMeasuring) {
+                              _stopMeasuring();
+                            } else {
+                              setState(() {
+                                _isMeasuring = true;
+                                _showToolsPanel = false;
+                              });
+                            }
+                          }),
+                      if (_isMeasuring && _measurePoints.isNotEmpty)
+                        Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(_formattedMeasuredDistance,
+                                style: const TextStyle(
+                                    color: AppColors.gold,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold))),
+                      const SizedBox(height: 10),
+                      Text('Fond de carte',
+                          style: TextStyle(
+                              color: tc.textMuted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 6),
+                      _toolItem(
+                          icon: Icons.map,
+                          label: 'Standard',
+                          color: _mapStyle == MapStyle.standard
+                              ? tc.oceanMedium
+                              : tc.textPrimary,
+                          onTap: () =>
+                              setState(() => _mapStyle = MapStyle.standard)),
+                      const SizedBox(height: 6),
+                      _toolItem(
+                          icon: Icons.satellite,
+                          label: 'Satellite',
+                          color: _mapStyle == MapStyle.satellite
+                              ? tc.oceanMedium
+                              : tc.textPrimary,
+                          onTap: () =>
+                              setState(() => _mapStyle = MapStyle.satellite)),
+                      const SizedBox(height: 6),
+                      _toolItem(
+                          icon: Icons.dark_mode,
+                          label: 'Sombre',
+                          color: _mapStyle == MapStyle.dark
+                              ? tc.oceanMedium
+                              : tc.textPrimary,
+                          onTap: () =>
+                              setState(() => _mapStyle = MapStyle.dark)),
+                      const SizedBox(height: 6),
+                      _toolItem(
+                          icon: Icons.map_outlined,
+                          label: context.tr('offlineMaps.offlineStyle'),
+                          color: _mapStyle == MapStyle.offline
+                              ? tc.oceanMedium
+                              : tc.textPrimary,
+                          onTap: () {
+                            final service = OfflineMapService.instance;
+                            if (service.hasActiveMap) {
+                              final region = service.activeRegion;
+                              if (region == null) {
+                                setState(() => _mapStyle = MapStyle.offline);
+                              } else {
+                                _showOfflineRegion(region);
+                              }
+                            } else {
+                              unawaited(_openOfflineMaps());
+                            }
+                          }),
+                      const SizedBox(height: 6),
+                      _toolItem(
+                          icon: Icons.download_for_offline,
+                          label: context.tr('offlineMaps.manage'),
                           color: tc.textPrimary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14)),
-                  const Divider(height: 16),
-                  _toolItem(
-                    icon: Icons.add_location_alt_rounded,
-                    label: context.tr('mySpots.addTitle'),
-                    color: tc.oceanMedium,
-                    onTap: _startAddingSpot,
-                  ),
-                  const SizedBox(height: 10),
-                  _toolItem(
-                      key: const ValueKey<String>('map-measurement-toggle'),
-                      icon: _isMeasuring ? Icons.stop : Icons.straighten,
-                      label: _isMeasuring
-                          ? context.tr('map.stopMeasure')
-                          : context.tr('map.measureDistance'),
-                      color: _isMeasuring ? AppColors.gold : tc.textPrimary,
-                      onTap: () {
-                        if (_isMeasuring) {
-                          _stopMeasuring();
-                        } else {
-                          setState(() {
-                            _isMeasuring = true;
-                            _showToolsPanel = false;
-                          });
-                        }
-                      }),
-                  if (_isMeasuring && _measurePoints.isNotEmpty)
-                    Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(_formattedMeasuredDistance,
-                            style: const TextStyle(
-                                color: AppColors.gold,
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold))),
-                  const SizedBox(height: 10),
-                  Text('Fond de carte',
-                      style: TextStyle(
-                          color: tc.textMuted,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 6),
-                  _toolItem(
-                      icon: Icons.map,
-                      label: 'Standard',
-                      color: _mapStyle == MapStyle.standard
-                          ? tc.oceanMedium
-                          : tc.textPrimary,
-                      onTap: () =>
-                          setState(() => _mapStyle = MapStyle.standard)),
-                  const SizedBox(height: 6),
-                  _toolItem(
-                      icon: Icons.satellite,
-                      label: 'Satellite',
-                      color: _mapStyle == MapStyle.satellite
-                          ? tc.oceanMedium
-                          : tc.textPrimary,
-                      onTap: () =>
-                          setState(() => _mapStyle = MapStyle.satellite)),
-                  const SizedBox(height: 6),
-                  _toolItem(
-                      icon: Icons.dark_mode,
-                      label: 'Sombre',
-                      color: _mapStyle == MapStyle.dark
-                          ? tc.oceanMedium
-                          : tc.textPrimary,
-                      onTap: () => setState(() => _mapStyle = MapStyle.dark)),
-                  const SizedBox(height: 6),
-                  _toolItem(
-                      icon: Icons.map_outlined,
-                      label: context.tr('offlineMaps.offlineStyle'),
-                      color: _mapStyle == MapStyle.offline
-                          ? tc.oceanMedium
-                          : tc.textPrimary,
-                      onTap: () {
-                        final service = OfflineMapService.instance;
-                        if (service.hasActiveMap) {
-                          final region = service.activeRegion;
-                          if (region == null) {
-                            setState(() => _mapStyle = MapStyle.offline);
-                          } else {
-                            _showOfflineRegion(region);
-                          }
-                        } else {
-                          unawaited(_openOfflineMaps());
-                        }
-                      }),
-                  const SizedBox(height: 6),
-                  _toolItem(
-                      icon: Icons.download_for_offline,
-                      label: context.tr('offlineMaps.manage'),
-                      color: tc.textPrimary,
-                      onTap: () => unawaited(_openOfflineMaps())),
-                ])));
+                          onTap: () => unawaited(_openOfflineMaps())),
+                    ])),
+          ),
+        ));
   }
 
   Widget _buildAddSpotModeBanner() {
     final tc = ThemeColors.of(context);
     return Positioned(
       top: MediaQuery.paddingOf(context).top + (_isCompassEnabled ? 92 : 12),
-      left: 14,
-      right: 76,
+      left: 14 + MediaQuery.paddingOf(context).left,
+      right: 76 + MediaQuery.paddingOf(context).right,
       child: Material(
         color: tc.surface.withValues(alpha: 0.96),
         borderRadius: BorderRadius.circular(8),
@@ -2277,6 +2550,7 @@ class _MapScreenState extends State<MapScreen>
           onTap: () => setState(() {
                 _isFishBarVisible = !_isFishBarVisible;
                 _searchQuery = '';
+                _resetCitySearch();
               }),
           child: SizedBox(
               width: _mapBottomControlHeight,

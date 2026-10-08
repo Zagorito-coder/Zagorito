@@ -54,4 +54,62 @@ void main() {
       1,
     );
   });
+
+  group('active publication protection', () {
+    final now = DateTime.utc(2026, 9, 2, 8);
+
+    PrivateCatch publishedAt(DateTime? date) => PrivateCatch(
+          id: 'private-catch-1',
+          ownerUid: 'owner-1',
+          photoPath: '/private/photo.jpg',
+          species: 'Bar',
+          weightKg: 4.25,
+          spotName: 'Zone privée',
+          latitude: 33.5,
+          longitude: -7.6,
+          montage: '',
+          bait: '',
+          notes: '',
+          advice: '',
+          caughtAt: now,
+          createdAt: now,
+          publishedPostId: 'public-post-1',
+          publishedAt: date,
+        );
+
+    test('blocks republication during the seven-day public lifetime', () {
+      final item = publishedAt(now.subtract(const Duration(days: 6)));
+
+      expect(
+        item.hasActivePublicationAt(
+          now,
+          publicationLifetime: const Duration(days: 7),
+        ),
+        isTrue,
+      );
+    });
+
+    test('allows republication once the seven-day lifetime has expired', () {
+      final item = publishedAt(now.subtract(const Duration(days: 7)));
+
+      expect(
+        item.hasActivePublicationAt(
+          now,
+          publicationLifetime: const Duration(days: 7),
+        ),
+        isFalse,
+      );
+    });
+
+    test('keeps legacy publication records protected when the date is absent',
+        () {
+      expect(
+        publishedAt(null).hasActivePublicationAt(
+          now,
+          publicationLifetime: const Duration(days: 7),
+        ),
+        isTrue,
+      );
+    });
+  });
 }

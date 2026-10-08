@@ -35,6 +35,7 @@ void main() {
           ],
           home: AppShell(
             key: appShellKey,
+            disablePostLaunchTasksForTesting: true,
             pageBuilderForTesting: (index) => ColoredBox(
               key: ValueKey<String>('shell-page-$index'),
               color: Colors.transparent,

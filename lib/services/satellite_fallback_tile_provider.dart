@@ -29,6 +29,7 @@ class SatelliteFallbackTileProvider extends TileProvider {
 
   static const int preferredNativeZoom = 18;
   static const int minimumFallbackZoom = 16;
+  static const int _emergencyFallbackZoom = 15;
 
   // L'égalité exacte reste le chemin le moins coûteux. La détection visuelle
   // complémentaire protège aussi l'application si ArcGIS réencode le même
@@ -64,7 +65,12 @@ class SatelliteFallbackTileProvider extends TileProvider {
     TileLayer options,
     Future<void> cancelLoading,
   ) async {
-    final lowestZoom = requested.z.clamp(0, minimumFallbackZoom);
+    // Z16 correspond au niveau natif choisi par flutter_map autour de 15,7x.
+    // Si cette tuile précise échoue, Z15 fournit un dernier parent de secours
+    // sans modifier les chemins normaux Z17/Z18 ni ajouter d'appel habituel.
+    final lowestZoom = requested.z == minimumFallbackZoom
+        ? _emergencyFallbackZoom
+        : requested.z.clamp(0, minimumFallbackZoom);
 
     for (var candidateZoom = requested.z;
         candidateZoom >= lowestZoom;
@@ -310,6 +316,10 @@ class _SatelliteFallbackImageProvider
   }
 
   Future<Codec> _loadCodec(ImageDecoderCallback decode) async {
+    void evictFailedImage() => scheduleMicrotask(
+          () => PaintingBinding.instance.imageCache.evict(this),
+        );
+
     try {
       final bytes = await provider.loadBestAvailableTile(
         coordinates,
@@ -318,7 +328,11 @@ class _SatelliteFallbackImageProvider
       );
       return decode(await ImmutableBuffer.fromUint8List(bytes));
     } catch (_) {
-      // Les erreurs réseau attendues restent silencieuses et transparentes.
+      // Une annulation est une situation normale pendant un mouvement de
+      // caméra. La tuile transparente reste silencieuse, mais ne doit jamais
+      // être mémorisée comme une vraie image pour ces coordonnées : la
+      // prochaine apparition doit pouvoir relancer le chargement réseau.
+      evictFailedImage();
       return decode(
         await ImmutableBuffer.fromUint8List(TileProvider.transparentImage),
       );

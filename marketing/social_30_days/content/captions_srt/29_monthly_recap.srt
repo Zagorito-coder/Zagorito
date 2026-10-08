@@ -1,0 +1,15 @@
+1
+00:00:00,000 --> 00:00:03,000
+30 jours pour mieux préparer
+
+2
+00:00:03,000 --> 00:00:06,000
+Sécurité et conditions
+
+3
+00:00:06,000 --> 00:00:09,000
+Spots, techniques et communauté
+
+4
+00:00:09,000 --> 00:00:12,000
+Continuez à apprendre avec BoosterFish

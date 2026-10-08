@@ -50,6 +50,16 @@ class PrivateCatch {
 
   bool get isPublished => publishedPostId?.isNotEmpty ?? false;
 
+  bool hasActivePublicationAt(
+    DateTime time, {
+    required Duration publicationLifetime,
+  }) {
+    if (!isPublished) return false;
+    final publicationDate = publishedAt;
+    if (publicationDate == null) return true;
+    return publicationDate.add(publicationLifetime).isAfter(time);
+  }
+
   PrivateCatch copyWith({
     String? species,
     double? weightKg,

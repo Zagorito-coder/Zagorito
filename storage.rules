@@ -1,0 +1,23 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    match /profile_avatars/{userId}/avatar.jpg {
+      // Cette image est volontairement publique lorsqu'elle est choisie comme
+      // identité communautaire. Seul son propriétaire peut l'écrire.
+      allow read: if true;
+      allow create, update: if isOwner(userId)
+        && request.resource.size > 0
+        && request.resource.size <= 358400
+        && request.resource.contentType == 'image/jpeg';
+      allow delete: if isOwner(userId);
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

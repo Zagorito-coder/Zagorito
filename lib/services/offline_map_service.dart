@@ -27,7 +27,19 @@ class OfflineMapException implements Exception {
 }
 
 class OfflineMapService extends ChangeNotifier {
-  OfflineMapService._();
+  OfflineMapService._()
+      : _httpClientFactory = http.Client.new,
+        _downloadTimeout = const Duration(seconds: 20);
+
+  @visibleForTesting
+  OfflineMapService.forTesting({
+    required Directory mapsDirectory,
+    required http.Client Function() httpClientFactory,
+    Duration downloadTimeout = const Duration(milliseconds: 100),
+  })  : _mapsDirectory = mapsDirectory,
+        _httpClientFactory = httpClientFactory,
+        _downloadTimeout = downloadTimeout,
+        _initialized = true;
 
   static final OfflineMapService instance = OfflineMapService._();
 
@@ -44,6 +56,9 @@ class OfflineMapService extends ChangeNotifier {
   static const _catalogFileName = 'catalog.json';
   static const _userAgent = 'BoosterFish/1.0 (offline maps)';
 
+  final http.Client Function() _httpClientFactory;
+  final Duration _downloadTimeout;
+
   Directory? _mapsDirectory;
   List<OfflineMapRegion> _regions = const [];
   Set<String> _installedRegionIds = const {};
@@ -53,6 +68,7 @@ class OfflineMapService extends ChangeNotifier {
   String? _downloadingRegionId;
   double _downloadProgress = 0;
   bool _cancelRequested = false;
+  Completer<void>? _downloadAbort;
   OfflineMapFailure? _lastFailure;
   bool _initialized = false;
 
@@ -172,12 +188,13 @@ class OfflineMapService extends ChangeNotifier {
     _downloadingRegionId = region.id;
     _downloadProgress = 0;
     _cancelRequested = false;
+    final abort = _downloadAbort = Completer<void>();
     _lastFailure = null;
     notifyListeners();
 
     final finalFile = _fileFor(region.fileName);
     final partialFile = File('${finalFile.path}.download');
-    final client = http.Client();
+    final client = _httpClientFactory();
     IOSink? sink;
 
     try {
@@ -188,14 +205,18 @@ class OfflineMapService extends ChangeNotifier {
         downloadedBytes = 0;
       }
 
-      final request = http.Request('GET', region.downloadUri(baseUri));
+      final request = http.AbortableRequest(
+        'GET',
+        region.downloadUri(baseUri),
+        abortTrigger: abort.future,
+      );
       request.headers[HttpHeaders.userAgentHeader] = _userAgent;
       if (downloadedBytes > 0) {
         request.headers[HttpHeaders.rangeHeader] = 'bytes=$downloadedBytes-';
       }
 
-      final response =
-          await client.send(request).timeout(const Duration(seconds: 20));
+      final response = await client.send(request).timeout(_downloadTimeout);
+      _throwIfDownloadCancelled();
       final canResume = response.statusCode == HttpStatus.partialContent;
       if (response.statusCode != HttpStatus.ok && !canResume) {
         throw const OfflineMapException(OfflineMapFailure.downloadFailed);
@@ -208,8 +229,8 @@ class OfflineMapService extends ChangeNotifier {
       sink = partialFile.openWrite(
         mode: canResume ? FileMode.append : FileMode.write,
       );
-      await for (final chunk in response.stream) {
-        if (_cancelRequested) throw const _DownloadCancelled();
+      await for (final chunk in response.stream.timeout(_downloadTimeout)) {
+        _throwIfDownloadCancelled();
         sink.add(chunk);
         downloadedBytes += chunk.length;
         _downloadProgress =
@@ -219,11 +240,13 @@ class OfflineMapService extends ChangeNotifier {
       await sink.flush();
       await sink.close();
       sink = null;
+      _throwIfDownloadCancelled();
 
       if (downloadedBytes != region.sizeBytes) {
         throw const OfflineMapException(OfflineMapFailure.downloadFailed);
       }
       final digest = await sha256.bind(partialFile.openRead()).first;
+      _throwIfDownloadCancelled();
       if (digest.toString() != region.sha256Digest) {
         await partialFile.delete();
         throw const OfflineMapException(OfflineMapFailure.checksumMismatch);
@@ -235,14 +258,24 @@ class OfflineMapService extends ChangeNotifier {
         await partialFile.delete();
         throw const OfflineMapException(OfflineMapFailure.invalidArchive);
       }
+      _throwIfDownloadCancelled();
 
       if (await finalFile.exists()) await finalFile.delete();
       await partialFile.rename(finalFile.path);
       await _refreshInstalledRegions();
       await activate(region);
       _lastFailure = null;
+    } on http.RequestAbortedException {
+      if (!_cancelRequested) {
+        _lastFailure = OfflineMapFailure.downloadFailed;
+        throw const OfflineMapException(OfflineMapFailure.downloadFailed);
+      }
+      // Keep the partial file so the next attempt can resume safely.
     } on _DownloadCancelled {
       // Keep the partial file so the next attempt can resume safely.
+    } on TimeoutException {
+      _lastFailure = OfflineMapFailure.downloadFailed;
+      throw const OfflineMapException(OfflineMapFailure.downloadFailed);
     } on OfflineMapException catch (error) {
       _lastFailure = error.failure;
       rethrow;
@@ -251,18 +284,28 @@ class OfflineMapService extends ChangeNotifier {
       _lastFailure = OfflineMapFailure.downloadFailed;
       throw const OfflineMapException(OfflineMapFailure.downloadFailed);
     } finally {
-      await sink?.close();
-      client.close();
-      _downloadingRegionId = null;
-      _downloadProgress = 0;
-      _cancelRequested = false;
-      notifyListeners();
+      try {
+        await sink?.close();
+      } finally {
+        client.close();
+        _downloadAbort = null;
+        _downloadingRegionId = null;
+        _downloadProgress = 0;
+        _cancelRequested = false;
+        notifyListeners();
+      }
     }
   }
 
   void cancelDownload() {
     if (_downloadingRegionId == null) return;
     _cancelRequested = true;
+    final abort = _downloadAbort;
+    if (abort != null && !abort.isCompleted) abort.complete();
+  }
+
+  void _throwIfDownloadCancelled() {
+    if (_cancelRequested) throw const _DownloadCancelled();
   }
 
   Future<void> activate(OfflineMapRegion region) async {

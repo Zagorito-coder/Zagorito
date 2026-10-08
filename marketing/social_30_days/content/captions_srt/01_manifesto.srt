@@ -1,0 +1,15 @@
+1
+00:00:00,000 --> 00:00:03,000
+Et si chaque sortie commençait mieux ?
+
+2
+00:00:03,000 --> 00:00:06,000
+Spots, mer, marées et techniques
+
+3
+00:00:06,000 --> 00:00:09,000
+Tout préparer dans une seule app
+
+4
+00:00:09,000 --> 00:00:12,000
+BoosterFish — bientôt disponible

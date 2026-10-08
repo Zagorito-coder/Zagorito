@@ -54,6 +54,14 @@ app.*.symbols
 # Obfuscation related
 app.*.map.json
 
+# Livrables marketing générés (les sources et scripts restent versionnés)
+/marketing/*.zip
+/marketing/*.zip.sha256
+/marketing/marketing/
+/marketing/social_30_days/exports/
+/marketing/social_30_days/qa/**/*.png
+/marketing/social_30_days/qa/*.log
+
 # Environment secrets
 .env
 

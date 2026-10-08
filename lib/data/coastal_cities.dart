@@ -8,6 +8,8 @@ class CoastalCity {
   final String iso; // code ISO 3166-1 alpha-2
   final double lat;
   final double lon;
+  final List<String> searchAliases;
+  final bool isRegionalSearchArea;
 
   const CoastalCity({
     required this.name,
@@ -15,6 +17,8 @@ class CoastalCity {
     required this.iso,
     required this.lat,
     required this.lon,
+    this.searchAliases = const [],
+    this.isRegionalSearchArea = false,
   });
 }
 
@@ -296,4 +300,190 @@ const List<CoastalCity> coastalCities = [
       iso: 'KW',
       lat: 29.0769,
       lon: 48.0838),
+];
+
+/// Zones supplémentaires proposées uniquement dans la recherche de la carte.
+///
+/// Elles sont volontairement séparées de [coastalCities] afin de ne pas
+/// augmenter les requêtes Overpass utilisées pour rechercher les magasins.
+/// Les libellés « littoral » et « corridor » évitent aussi de présenter ces
+/// points de couverture météo comme des villes officielles.
+const List<CoastalCity> moroccoWeatherSearchAreas = [
+  CoastalCity(
+    name: "Littoral d'Aousserd — extrême sud",
+    country: 'Maroc',
+    iso: 'MA',
+    lat: 21.12819,
+    lon: -16.94092,
+    searchAliases: ['Aousserd sud'],
+    isRegionalSearchArea: true,
+  ),
+  CoastalCity(
+    name: 'Littoral de Tan-Tan / El Ouatia',
+    country: 'Maroc',
+    iso: 'MA',
+    lat: 28.61326,
+    lon: -11.21374,
+    isRegionalSearchArea: true,
+  ),
+  CoastalCity(
+    name: 'Littoral de Boujdour — sud',
+    country: 'Maroc',
+    iso: 'MA',
+    lat: 25.52581,
+    lon: -14.70870,
+    searchAliases: ['Boujdour sud'],
+    isRegionalSearchArea: true,
+  ),
+  CoastalCity(
+    name: "Littoral d'Aousserd — nord",
+    country: 'Maroc',
+    iso: 'MA',
+    lat: 22.44095,
+    lon: -16.45138,
+    searchAliases: ['Aousserd nord'],
+    isRegionalSearchArea: true,
+  ),
+  CoastalCity(
+    name: 'Sidi Ifni',
+    country: 'Maroc',
+    iso: 'MA',
+    lat: 29.36693,
+    lon: -10.18696,
+    isRegionalSearchArea: true,
+  ),
+  CoastalCity(
+    name: 'Corridor Tarfaya–Akhfennir',
+    country: 'Maroc',
+    iso: 'MA',
+    lat: 28.041664,
+    lon: -12.708328,
+    searchAliases: ['Tarfaya Akhfenir'],
+    isRegionalSearchArea: true,
+  ),
+  CoastalCity(
+    name: 'Corridor Dakhla–Boujdour',
+    country: 'Maroc',
+    iso: 'MA',
+    lat: 24.51228,
+    lon: -15.11409,
+    isRegionalSearchArea: true,
+  ),
+  CoastalCity(
+    name: 'Littoral de Boujdour — nord',
+    country: 'Maroc',
+    iso: 'MA',
+    lat: 26.43321,
+    lon: -14.09085,
+    searchAliases: ['Boujdour nord'],
+    isRegionalSearchArea: true,
+  ),
+  CoastalCity(
+    name: "Littoral d'Aousserd",
+    country: 'Maroc',
+    iso: 'MA',
+    lat: 21.89563,
+    lon: -16.90179,
+    isRegionalSearchArea: true,
+  ),
+  CoastalCity(
+    name: 'Littoral de Dakhla — sud',
+    country: 'Maroc',
+    iso: 'MA',
+    lat: 23.08228,
+    lon: -16.20727,
+    searchAliases: ['Dakhla sud'],
+    isRegionalSearchArea: true,
+  ),
+  CoastalCity(
+    name: 'Littoral de Tarfaya — sud',
+    country: 'Maroc',
+    iso: 'MA',
+    lat: 27.78174,
+    lon: -13.03329,
+    searchAliases: ['Tarfaya sud'],
+    isRegionalSearchArea: true,
+  ),
+  CoastalCity(
+    name: 'Corridor Kénitra–Moulay Bousselham',
+    country: 'Maroc',
+    iso: 'MA',
+    lat: 34.59778,
+    lon: -6.44856,
+    isRegionalSearchArea: true,
+  ),
+  CoastalCity(
+    name: 'Littoral de Chefchaouen — secteur Jabha',
+    country: 'Maroc',
+    iso: 'MA',
+    lat: 35.20981,
+    lon: -4.66566,
+    searchAliases: ['Jabha', 'Jebha'],
+    isRegionalSearchArea: true,
+  ),
+  CoastalCity(
+    name: 'Corridor Akhfennir–Chbika',
+    country: 'Maroc',
+    iso: 'MA',
+    lat: 28.23050,
+    lon: -11.73065,
+    searchAliases: ['Akhfenir Chbika'],
+    isRegionalSearchArea: true,
+  ),
+  CoastalCity(
+    name: "Littoral d'Aglou–Tiznit",
+    country: 'Maroc',
+    iso: 'MA',
+    lat: 29.85254,
+    lon: -9.79749,
+    isRegionalSearchArea: true,
+  ),
+  CoastalCity(
+    name: 'Saïdia',
+    country: 'Maroc',
+    iso: 'MA',
+    lat: 35.09066,
+    lon: -2.23885,
+    isRegionalSearchArea: true,
+  ),
+  CoastalCity(
+    name: 'Oualidia',
+    country: 'Maroc',
+    iso: 'MA',
+    lat: 32.80346,
+    lon: -8.95479,
+    isRegionalSearchArea: true,
+  ),
+  CoastalCity(
+    name: "Littoral d'Imsouane — nord",
+    country: 'Maroc',
+    iso: 'MA',
+    lat: 30.95543,
+    lon: -9.82194,
+    searchAliases: ['Imsouane nord'],
+    isRegionalSearchArea: true,
+  ),
+  CoastalCity(
+    name: 'Littoral de Guelmim–Tan-Tan',
+    country: 'Maroc',
+    iso: 'MA',
+    lat: 28.96584,
+    lon: -10.59871,
+    isRegionalSearchArea: true,
+  ),
+  CoastalCity(
+    name: 'Corridor Laâyoune–Boujdour',
+    country: 'Maroc',
+    iso: 'MA',
+    lat: 26.73018,
+    lon: -13.57505,
+    searchAliases: ['Laayoune Boujdour'],
+    isRegionalSearchArea: true,
+  ),
+];
+
+/// Catalogue complet de la barre de recherche, sans effet sur Overpass.
+const List<CoastalCity> mapSearchLocations = [
+  ...coastalCities,
+  ...moroccoWeatherSearchAreas,
 ];

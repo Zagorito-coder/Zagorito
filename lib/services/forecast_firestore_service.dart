@@ -8,9 +8,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:spots_app/utils/geo_utils.dart';
+import 'package:spots_app/utils/station_time_zone.dart';
 import 'package:spots_app/widgets/forecast_table.dart';
 
 class GfsWeatherPoint {
+  /// Instant absolu UTC du créneau publié.
+  ///
+  /// Le nom historique `dateTime` est conservé pour ne pas casser les appels
+  /// existants, mais la valeur ne dépend plus du fuseau du téléphone.
   final DateTime dateTime;
   final double? pressureHpa;
   final double? precipitationProbabilityPct;
@@ -82,10 +87,14 @@ class SpotForecast {
   final List<ForecastSlot> slots;
   final List<DateTime> dayStarts;
   final List<int> dayStartIndexes;
+  final List<String?> daySunrises;
+  final List<String?> daySunsets;
 
   // Nouveaux champs spot (Phase 4)
   final double? latitude;
   final double? longitude;
+  final int? utcOffsetSeconds;
+  final String? timeZoneId;
   final String? sunrise;
   final String? sunset;
   final double? waterTempC;
@@ -96,17 +105,40 @@ class SpotForecast {
     required this.slots,
     required this.dayStarts,
     required this.dayStartIndexes,
+    this.daySunrises = const [],
+    this.daySunsets = const [],
     this.latitude,
     this.longitude,
+    this.utcOffsetSeconds,
+    this.timeZoneId,
     this.sunrise,
     this.sunset,
     this.waterTempC,
   });
+
+  DateTime stationTimeAt(DateTime instant) {
+    return StationTimeZone.civilAt(
+      instant,
+      timeZoneId: timeZoneId,
+      fallbackOffsetSeconds: utcOffsetSeconds,
+    );
+  }
+
+  String? sunriseForDay(int? index) {
+    if (index == null || index < 0 || index >= daySunrises.length) return null;
+    return daySunrises[index];
+  }
+
+  String? sunsetForDay(int? index) {
+    if (index == null || index < 0 || index >= daySunsets.length) return null;
+    return daySunsets[index];
+  }
 }
 
 class ForecastFirestoreService {
   static final _db = FirebaseFirestore.instance;
   static const _gfsCacheDuration = Duration(minutes: 20);
+  static const _maximumForecastAge = Duration(hours: 36);
 
   /// Rayon maximal volontairement conservateur pour associer une position à
   /// une station météo publiée. Au-delà de 75 km, une prévision régionale peut
@@ -121,21 +153,16 @@ class ForecastFirestoreService {
   /// Utilise la collection legere `spots_index` creee par harvest_forecast.py
   /// pour eviter de charger les donnees de forecast completes (OOM).
   static Future<List<Map<String, dynamic>>> listAvailableSpots() async {
-    try {
-      final snap = await _db.collection('spots_index').get();
-      return snap.docs.map((doc) {
-        final d = doc.data();
-        return {
-          'id': doc.id,
-          'name': d['name'] ?? doc.id,
-          'latitude': (d['latitude'] as num?)?.toDouble() ?? 0.0,
-          'longitude': (d['longitude'] as num?)?.toDouble() ?? 0.0,
-        };
-      }).toList();
-    } on FirebaseException catch (e) {
-      if (e.code == 'permission-denied') return [];
-      rethrow;
-    }
+    final snap = await _db.collection('spots_index').get();
+    return snap.docs.map((doc) {
+      final d = doc.data();
+      return {
+        'id': doc.id,
+        'name': d['name'] ?? doc.id,
+        'latitude': (d['latitude'] as num?)?.toDouble() ?? 0.0,
+        'longitude': (d['longitude'] as num?)?.toDouble() ?? 0.0,
+      };
+    }).toList();
   }
 
   /// Lit le même bloc `models.wind` que le tableau « Vent GFS » sans créer la
@@ -243,9 +270,29 @@ class ForecastFirestoreService {
     Map<String, dynamic> data, {
     required DateTime now,
   }) {
+    // Le document `spots_meteo` peut encore contenir des créneaux futurs
+    // après l'arrêt de la récolte. Ne pas les présenter comme une observation
+    // actuelle lorsque leur run a dépassé la même limite de fraîcheur que la
+    // page Marées Pro.
+    if (!_isFresh(data['last_update'], now: now)) return null;
+
     final points = <GfsWeatherPoint>[];
-    final earliest = now.subtract(const Duration(hours: 6));
-    final latest = now.add(const Duration(hours: 36));
+    final nowInstant = now.toUtc();
+    final earliest = nowInstant.subtract(const Duration(hours: 6));
+    final latest = nowInstant.add(const Duration(hours: 36));
+    final offsetRaw = data['utc_offset_seconds'];
+    final offsetCandidate =
+        offsetRaw is num && offsetRaw.isFinite ? offsetRaw.round() : null;
+    final utcOffsetSeconds = offsetCandidate != null &&
+            offsetCandidate >= -18 * 3600 &&
+            offsetCandidate <= 18 * 3600
+        ? offsetCandidate
+        : null;
+    final rawTimeZoneId = data['timezone'];
+    final timeZoneId =
+        rawTimeZoneId is String && rawTimeZoneId.trim().isNotEmpty
+            ? rawTimeZoneId.trim()
+            : null;
     final days = data['days'];
     if (days is! List<dynamic>) return null;
 
@@ -256,7 +303,16 @@ class ForecastFirestoreService {
       for (final rawSlot in slots) {
         final slot = _asStringMap(rawSlot);
         final timeRaw = slot?['hour'];
-        final dateTime = timeRaw is String ? DateTime.tryParse(timeRaw) : null;
+        final explicitInstant = _parseExplicitInstant(slot?['hour_utc']);
+        final civilTime = timeRaw is String ? DateTime.tryParse(timeRaw) : null;
+        final dateTime = explicitInstant ??
+            (civilTime == null
+                ? null
+                : StationTimeZone.instantAt(
+                    civilTime,
+                    timeZoneId: timeZoneId,
+                    fallbackOffsetSeconds: utcOffsetSeconds,
+                  ));
         if (slot == null ||
             dateTime == null ||
             dateTime.isBefore(earliest) ||
@@ -403,6 +459,15 @@ class ForecastFirestoreService {
     return Map<String, dynamic>.from(value);
   }
 
+  static DateTime? _parseExplicitInstant(dynamic value) {
+    if (value is! String || value.trim().isEmpty) return null;
+    final raw = value.trim();
+    if (!raw.endsWith('Z') && !RegExp(r'[+-]\d{2}:\d{2}$').hasMatch(raw)) {
+      return null;
+    }
+    return DateTime.tryParse(raw)?.toUtc();
+  }
+
   static double? _boundedNumber(
     Map<String, dynamic>? map,
     String key, {
@@ -439,16 +504,15 @@ class ForecastFirestoreService {
 
   /// Recupere une seule fois les previsions d'un spot.
   static Future<SpotForecast?> fetchSpot(String spotId) async {
-    try {
-      final doc = await _db.collection('spots_meteo').doc(spotId).get();
-      if (!doc.exists) {
-        throw Exception('Spot "$spotId" introuvable dans Firestore.');
-      }
-      return _parseDoc(doc.data()!);
-    } on FirebaseException catch (e) {
-      if (e.code == 'permission-denied') return null;
-      rethrow;
+    final doc = await _db.collection('spots_meteo').doc(spotId).get();
+    if (!doc.exists) {
+      throw Exception('Spot "$spotId" introuvable dans Firestore.');
     }
+    final data = doc.data()!;
+    if (!_isFresh(data['last_update'])) {
+      throw const FormatException('Prévisions météo périmées.');
+    }
+    return parseSpotForecast(data);
   }
 
   /// Version "temps reel" : stream.
@@ -464,14 +528,33 @@ class ForecastFirestoreService {
           throw e;
         })
         .where((doc) => doc.exists)
-        .map((doc) => _parseDoc(doc.data()!));
+        .map((doc) {
+          final data = doc.data()!;
+          return _isFresh(data['last_update']) ? parseSpotForecast(data) : null;
+        });
   }
 
-  static SpotForecast _parseDoc(Map<String, dynamic> data) {
+  @visibleForTesting
+  static SpotForecast parseSpotForecast(Map<String, dynamic> data) {
     final days = (data['days'] as List<dynamic>? ?? []);
+    final offsetRaw = data['utc_offset_seconds'];
+    final offsetCandidate =
+        offsetRaw is num && offsetRaw.isFinite ? offsetRaw.round() : null;
+    final offset = offsetCandidate != null &&
+            offsetCandidate >= -18 * 3600 &&
+            offsetCandidate <= 18 * 3600
+        ? offsetCandidate
+        : null;
+    final rawTimeZoneId = data['timezone'];
+    final timeZoneId =
+        rawTimeZoneId is String && rawTimeZoneId.trim().isNotEmpty
+            ? rawTimeZoneId.trim()
+            : null;
     final List<ForecastSlot> allSlots = [];
     final List<DateTime> dayStarts = [];
     final List<int> dayStartIndexes = [];
+    final List<String?> daySunrises = [];
+    final List<String?> daySunsets = [];
 
     for (final dayRaw in days) {
       final day = dayRaw as Map<String, dynamic>;
@@ -479,11 +562,20 @@ class ForecastFirestoreService {
       if (slotsRaw.isEmpty) continue;
 
       dayStartIndexes.add(allSlots.length);
+      daySunrises.add(day['sunrise'] as String?);
+      daySunsets.add(day['sunset'] as String?);
       bool first = true;
 
       for (final slotRaw in slotsRaw) {
         final s = slotRaw as Map<String, dynamic>;
-        final dt = DateTime.parse(s['hour'] as String);
+        final hour = DateTime.parse(s['hour'] as String);
+        final rawUtc = s['hour_utc'];
+        final instantUtc =
+            rawUtc is String ? DateTime.tryParse(rawUtc)?.toUtc() : null;
+        // `hour` reste l'heure civile exacte fournie par Open-Meteo et validée
+        // par le backend. `hour_utc` apporte l'instant absolu sans réinterpréter
+        // l'affichage avec une éventuelle base IANA ancienne du téléphone.
+        final dt = hour;
         if (first) dayStarts.add(DateTime(dt.year, dt.month, dt.day));
 
         // Lire le sous-objet models (additif, null si absent)
@@ -501,16 +593,20 @@ class ForecastFirestoreService {
 
         allSlots.add(ForecastSlot(
           dateTime: dt,
-          windSpeedKnots: (s['wind_speed_kt'] as num?)?.toDouble() ?? 0,
-          windGustKnots: (s['wind_gust_kt'] as num?)?.toDouble() ?? 0,
-          windDirectionDeg: (s['wind_dir_deg'] as num?)?.toDouble() ?? 0,
-          waveHeightM: (s['wave_height_m'] as num?)?.toDouble() ?? 0,
-          wavePeriodS: (s['wave_period_s'] as num?)?.toDouble() ?? 0,
-          waveDirectionDeg: (s['wave_dir_deg'] as num?)?.toDouble() ?? 0,
-          temperatureC: (s['temp_c'] as num?)?.toInt() ?? 0,
+          instantUtc: instantUtc,
+          windSpeedKnots: (s['wind_speed_kt'] as num?)?.toDouble(),
+          windGustKnots: (s['wind_gust_kt'] as num?)?.toDouble(),
+          windDirectionDeg: (s['wind_dir_deg'] as num?)?.toDouble(),
+          waveHeightM: (s['wave_height_m'] as num?)?.toDouble(),
+          wavePeriodS: (s['wave_period_s'] as num?)?.toDouble(),
+          waveDirectionDeg: (s['wave_dir_deg'] as num?)?.toDouble(),
+          temperatureC: (s['temp_c'] as num?)?.toInt(),
           cloudCoverPct: (s['cloud_pct'] as num?)?.toInt(),
           precipProbPct: (s['precip_pct'] as num?)?.toInt(),
-          ratingStars: (s['rating'] as num?)?.toInt() ?? 0,
+          // La note publiee ignore deja la composante houle quand celle-ci est
+          // absente. La conserver telle quelle evite qu'un faux 0 m ajoute ou
+          // retire des points cote client.
+          ratingStars: (s['rating'] as num?)?.toInt(),
           isNewDay: first,
           modelWind: modelWind,
           modelHires: modelHires,
@@ -520,8 +616,7 @@ class ForecastFirestoreService {
       }
     }
 
-    final ts = data['last_update'];
-    final lastUpdate = ts is Timestamp ? ts.toDate() : null;
+    final lastUpdate = _timestamp(data['last_update']);
 
     final sunrise = data['sunrise'] as String?;
     final sunset = data['sunset'] as String?;
@@ -533,12 +628,30 @@ class ForecastFirestoreService {
       slots: allSlots,
       dayStarts: dayStarts,
       dayStartIndexes: dayStartIndexes,
+      daySunrises: daySunrises,
+      daySunsets: daySunsets,
       latitude: (data['latitude'] as num?)?.toDouble(),
       longitude: (data['longitude'] as num?)?.toDouble(),
+      utcOffsetSeconds: offset,
+      timeZoneId: timeZoneId,
       sunrise: sunrise,
       sunset: sunset,
       waterTempC: waterTempC,
     );
+  }
+
+  static DateTime? _timestamp(dynamic value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    if (value is String) return DateTime.tryParse(value.trim());
+    return null;
+  }
+
+  static bool _isFresh(dynamic value, {DateTime? now}) {
+    final updatedAt = _timestamp(value);
+    if (updatedAt == null) return false;
+    final age = (now ?? DateTime.now()).toUtc().difference(updatedAt.toUtc());
+    return age >= const Duration(minutes: -5) && age <= _maximumForecastAge;
   }
 }
 

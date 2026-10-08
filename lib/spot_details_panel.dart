@@ -514,7 +514,7 @@ class SpotDetailsPanel extends StatelessWidget {
     final wind = context.watch<WindAnimationProvider>();
 
     // Charger les donnees si pas encore fait (independant du toggle)
-    if (wind.currentVector == null && !wind.isLoading) {
+    if (wind.currentVector == null && !wind.isLoading && wind.error == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         wind.fetchForPanel(spot.latitude, spot.longitude);
       });
@@ -527,7 +527,11 @@ class SpotDetailsPanel extends StatelessWidget {
     }
 
     if (wind.currentVector == null) {
-      return _buildWindPlaceholder(context, loading: false);
+      return _buildWindPlaceholder(
+        context,
+        loading: false,
+        onRetry: () => wind.retryForPanel(spot.latitude, spot.longitude),
+      );
     }
 
     final tc = ThemeColors.of(context);
@@ -717,6 +721,7 @@ class SpotDetailsPanel extends StatelessWidget {
   Widget _buildWindPlaceholder(
     BuildContext context, {
     required bool loading,
+    VoidCallback? onRetry,
   }) {
     final tc = ThemeColors.of(context);
     return _DashboardSection(
@@ -733,10 +738,28 @@ class SpotDetailsPanel extends StatelessWidget {
                   color: tc.oceanLight,
                 ),
               )
-            : Text(
-                'Données indisponibles',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: tc.textMuted, fontSize: 9.5),
+            : InkWell(
+                onTap: onRetry,
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Données indisponibles',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: tc.textMuted, fontSize: 9.5),
+                      ),
+                      if (onRetry != null) ...[
+                        const SizedBox(width: 4),
+                        Icon(Icons.refresh_rounded,
+                            size: 12, color: tc.oceanLight),
+                      ],
+                    ],
+                  ),
+                ),
               ),
       ),
     );
