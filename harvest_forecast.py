@@ -317,6 +317,12 @@ def _base_params(lat, lon):
         "latitude": lat,
         "longitude": lon,
         "timezone": "auto",
+        # Les horodatages ISO locaux d'Open-Meteo gardent le décalage UTC
+        # résolu au début de la réponse. Ils deviennent donc ambigus lorsqu'une
+        # fenêtre traverse un changement d'heure. Les timestamps Unix restent
+        # des instants UTC absolus, puis sont reconvertis avec le fuseau IANA
+        # propre à chaque station.
+        "timeformat": "unixtime",
         "forecast_days": FORECAST_DAYS,
     }
     if OPEN_METEO_API_KEY:
@@ -401,15 +407,17 @@ def _utc_candidates_for_local(local_time, station_timezone):
 
 
 def _utc_datetimes_from_open_meteo(
-    local_timestamps,
+    timestamps,
     utc_offset_seconds=0,
     timezone_name=None,
 ):
-    """Résout une série locale Open-Meteo en instants UTC non ambigus.
+    """Résout une série Open-Meteo en instants UTC non ambigus.
 
-    L'ordre de la série permet de distinguer les deux occurrences d'une heure
-    répétée à la fin de l'heure d'été. Une heure civile inexistante ou une
-    série qui recule fait échouer la récolte avant toute écriture Firestore.
+    La Production utilise ``timeformat=unixtime`` : chaque valeur est alors un
+    instant UTC absolu et les deux occurrences d'une heure répétée restent
+    distinctes. Les chaînes ISO locales restent acceptées pour la compatibilité
+    avec les tests et anciens appels. Une valeur invalide ou une série qui ne
+    progresse pas fait échouer la récolte avant toute écriture Firestore.
     """
     station_timezone = _open_meteo_timezone(
         timezone_name,
@@ -417,7 +425,30 @@ def _utc_datetimes_from_open_meteo(
     )
     resolved = []
     previous = None
-    for raw_timestamp in local_timestamps:
+    for raw_timestamp in timestamps:
+        if (
+            isinstance(raw_timestamp, (int, float))
+            and not isinstance(raw_timestamp, bool)
+            and math.isfinite(raw_timestamp)
+            and float(raw_timestamp).is_integer()
+        ):
+            try:
+                selected = datetime.fromtimestamp(
+                    int(raw_timestamp),
+                    tz=timezone.utc,
+                )
+            except (OverflowError, OSError, ValueError) as error:
+                raise ValueError(
+                    f"Horodatage Unix Open-Meteo invalide : {raw_timestamp!r}."
+                ) from error
+            if previous is not None and selected <= previous:
+                raise ValueError(
+                    "Les horodatages Open-Meteo doivent être strictement croissants."
+                )
+            resolved.append(selected)
+            previous = selected
+            continue
+
         if not isinstance(raw_timestamp, str) or not raw_timestamp.strip():
             raise ValueError("Horodatage Open-Meteo absent ou invalide.")
         try:
@@ -439,6 +470,103 @@ def _utc_datetimes_from_open_meteo(
         resolved.append(selected)
         previous = selected
     return resolved
+
+
+def _local_datetime_from_open_meteo(
+    timestamp,
+    utc_offset_seconds=0,
+    timezone_name=None,
+):
+    """Convertit un timestamp Open-Meteo vers l'heure civile de la station."""
+    station_timezone = _open_meteo_timezone(
+        timezone_name,
+        utc_offset_seconds,
+    )
+    instant = _utc_datetimes_from_open_meteo(
+        [timestamp],
+        utc_offset_seconds,
+        timezone_name,
+    )[0]
+    return instant.astimezone(station_timezone).replace(tzinfo=None)
+
+
+def _daily_date_from_open_meteo(timestamp, utc_offset_seconds=0):
+    """Convertit ``daily.time`` vers la date civile annoncée par Open-Meteo.
+
+    En format Unix, ``daily.time`` est une grille de dates encodée avec le
+    décalage fixe ``utc_offset_seconds`` de la réponse. Open-Meteo demande donc
+    d'appliquer ce décalage pour retrouver la date. Les heures de lever et de
+    coucher restent, elles, des instants à convertir avec le fuseau IANA.
+    """
+    if (
+        isinstance(timestamp, (int, float))
+        and not isinstance(timestamp, bool)
+        and math.isfinite(timestamp)
+        and float(timestamp).is_integer()
+    ):
+        try:
+            shifted = datetime.fromtimestamp(
+                int(timestamp) + int(utc_offset_seconds or 0),
+                tz=timezone.utc,
+            )
+        except (OverflowError, OSError, ValueError) as error:
+            raise ValueError(
+                f"Date Unix quotidienne Open-Meteo invalide : {timestamp!r}."
+            ) from error
+        return shifted.date()
+
+    if not isinstance(timestamp, str) or not timestamp.strip():
+        raise ValueError("Date quotidienne Open-Meteo absente ou invalide.")
+    try:
+        return datetime.fromisoformat(timestamp).date()
+    except ValueError as error:
+        raise ValueError(
+            f"Date quotidienne Open-Meteo invalide : {timestamp!r}."
+        ) from error
+
+
+def _daily_sun_from_open_meteo(response):
+    """Normalise les dates, levers et couchers en ISO civil local."""
+    daily = response.get("daily")
+    if not isinstance(daily, dict):
+        return {}
+
+    raw_dates = daily.get("time") or []
+    raw_sunrises = daily.get("sunrise") or []
+    raw_sunsets = daily.get("sunset") or []
+    utc_offset_seconds = int(
+        _safe_num(response.get("utc_offset_seconds"), 0) or 0
+    )
+    timezone_name = response.get("timezone")
+    normalized = {}
+    for index, raw_date in enumerate(raw_dates):
+        local_date = _daily_date_from_open_meteo(
+            raw_date,
+            utc_offset_seconds,
+        ).isoformat()
+        sunrise = (
+            _local_datetime_from_open_meteo(
+                raw_sunrises[index],
+                utc_offset_seconds,
+                timezone_name,
+            ).isoformat(timespec="minutes")
+            if index < len(raw_sunrises)
+            else None
+        )
+        sunset = (
+            _local_datetime_from_open_meteo(
+                raw_sunsets[index],
+                utc_offset_seconds,
+                timezone_name,
+            ).isoformat(timespec="minutes")
+            if index < len(raw_sunsets)
+            else None
+        )
+        normalized[local_date] = {
+            "sunrise": sunrise,
+            "sunset": sunset,
+        }
+    return normalized
 
 
 def _utc_iso(instant):
@@ -870,6 +998,10 @@ def build_days_payload(
         _safe_num(wind_json.get("utc_offset_seconds"), 0) or 0
     )
     wind_timezone_name = wind_json.get("timezone")
+    station_timezone = _open_meteo_timezone(
+        wind_timezone_name,
+        utc_offset_seconds,
+    )
     wind_utc_times = _utc_datetimes_from_open_meteo(
         w_data["time"],
         utc_offset_seconds,
@@ -889,9 +1021,12 @@ def build_days_payload(
     hires_by_time = {instant: i for i, instant in enumerate(hires_utc_times)}
     wave_by_time = {instant: i for i, instant in enumerate(wave_utc_times)}
 
-    for i, (t, utc_time) in enumerate(zip(w_data["time"], wind_utc_times)):
+    for i, utc_time in enumerate(wind_utc_times):
         if not _is_native_gfs_instant(utc_time):
             continue
+
+        local_time = utc_time.astimezone(station_timezone).replace(tzinfo=None)
+        local_time_iso = local_time.isoformat(timespec="minutes")
 
         # --- modele vent GFS (utilise comme champs racine pour compat arriere) ---
         wind_kt = ms_to_knots(_safe_num(w_data["wind_speed_10m"][i]))
@@ -937,7 +1072,7 @@ def build_days_payload(
 
         slot = {
             # champs racine (compat arriere)
-            "hour": t,
+            "hour": local_time_iso,
             # Champ additif : la v1.0.9 (24) continue de lire `hour`, tandis
             # que les nouveaux consommateurs disposent d'un instant absolu.
             "hour_utc": _utc_iso(utc_time),
@@ -961,7 +1096,7 @@ def build_days_payload(
             },
         }
 
-        day_key = t[:10]
+        day_key = local_time.date().isoformat()
         days[day_key].append(slot)
 
     # Construire les jours triés
@@ -1481,10 +1616,9 @@ def build_conditions_document(
     )
 
     tide_slots = []
-    for index, (local_time, utc_time) in enumerate(
-        zip(wave_times, wave_utc_times)
-    ):
-        if not isinstance(local_time, str) or local_time[:10] not in published_dates:
+    for index, utc_time in enumerate(wave_utc_times):
+        local_date = utc_time.astimezone(wave_timezone).date().isoformat()
+        if local_date not in published_dates:
             continue
         slot = {"time": _utc_iso(utc_time)}
         for api_key, output_key, minimum, maximum in _MARINE_CONDITIONS_FIELDS:
@@ -1510,10 +1644,9 @@ def build_conditions_document(
         )
 
     weather_slots = []
-    for index, (local_time, utc_time) in enumerate(
-        zip(wind_times, wind_utc_times)
-    ):
-        if not isinstance(local_time, str) or local_time[:10] not in published_dates:
+    for index, utc_time in enumerate(wind_utc_times):
+        local_date = utc_time.astimezone(wind_timezone).date().isoformat()
+        if local_date not in published_dates:
             continue
         slot = {"time": _utc_iso(utc_time)}
         for api_key, output_key, minimum, maximum, multiplier in _WEATHER_CONDITIONS_FIELDS:
@@ -1668,22 +1801,7 @@ def _build_station_publication(
         slot_count = len(models[model_name].get("hourly", {}).get("time", []))
         print(f"  [{model_name}] OK ({slot_count} slots)")
 
-    daily_json = {}
-    if "daily" in wind_json:
-        daily = wind_json["daily"]
-        for index, day_value in enumerate(daily.get("time", [])):
-            daily_json[day_value] = {
-                "sunrise": (
-                    daily["sunrise"][index]
-                    if index < len(daily.get("sunrise", []))
-                    else None
-                ),
-                "sunset": (
-                    daily["sunset"][index]
-                    if index < len(daily.get("sunset", []))
-                    else None
-                ),
-            }
+    daily_json = _daily_sun_from_open_meteo(wind_json)
 
     days_payload, water_temp_c = build_days_payload(
         wind_json,
@@ -2496,14 +2614,7 @@ def main_test_single_spot(spot_id, spots_list=None):
     print(f"        -> {len(wave_json['hourly']['time'])} creneaux horaires")
 
     # Extraire daily (sunrise/sunset) depuis wind_json
-    daily_json = {}
-    if "daily" in wind_json:
-        daily = wind_json["daily"]
-        for i, d in enumerate(daily.get("time", [])):
-            daily_json[d] = {
-                "sunrise": daily["sunrise"][i] if i < len(daily.get("sunrise", [])) else None,
-                "sunset": daily["sunset"][i] if i < len(daily.get("sunset", [])) else None,
-            }
+    daily_json = _daily_sun_from_open_meteo(wind_json)
 
     days_payload, water_temp_c = build_days_payload(wind_json, hires_json, wave_json, daily_json)
 
@@ -2511,6 +2622,7 @@ def main_test_single_spot(spot_id, spots_list=None):
     validate_payload(
         days_payload,
         int(_safe_num(wind_json.get("utc_offset_seconds"), 0) or 0),
+        timezone_name=wind_json.get("timezone"),
     )
 
     # Construction du document
