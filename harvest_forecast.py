@@ -82,10 +82,10 @@ FORECAST_RUN_ID = (os.environ.get("FORECAST_RUN_ID") or "").strip() or None
 
 # Les documents météo et conditions contiennent dix jours de données. Firestore
 # refuse tout Commit supérieur à 10 Mio. Une limite fixe de vingt stations garde
-# chaque requête loin de ce plafond même lorsque les documents des 143 stations
+# chaque requête loin de ce plafond même lorsque les documents des 140 stations
 # et les cinq alias de transition sont écrits ensemble.
 PUBLISH_BATCH_STATION_COUNT = 20
-EXPECTED_STATION_COUNT = 143
+EXPECTED_STATION_COUNT = 140
 
 FORECAST_BASE_URL = "https://customer-api.open-meteo.com/v1/forecast"
 MARINE_BASE_URL = "https://customer-marine-api.open-meteo.com/v1/marine"
@@ -245,9 +245,6 @@ SPOTS = [
     {"id": "eilat_israel", "name": "Eilat, Israël", "lat": 29.48, "lon": 34.94},
     {"id": "telaviv_israel", "name": "Tel Aviv, Israël", "lat": 32.09, "lon": 34.78},
     {"id": "haifa_israel", "name": "Haïfa, Israël", "lat": 32.82, "lon": 34.99},
-    {"id": "beyrouth_liban", "name": "Beyrouth, Liban", "lat": 33.89, "lon": 35.50},
-    {"id": "tripoli_liban", "name": "Tripoli, Liban", "lat": 34.44, "lon": 35.84},
-    {"id": "saida_liban", "name": "Saïda, Liban", "lat": 33.56, "lon": 35.37},
     {"id": "lattaquie_syrie", "name": "Lattaquié, Syrie", "lat": 35.52, "lon": 35.78},
     {"id": "tartous_syrie", "name": "Tartous, Syrie", "lat": 34.89, "lon": 35.89},
     {"id": "istanbul_turquie", "name": "Istanbul, Turquie", "lat": 41.01, "lon": 28.98},
@@ -2617,7 +2614,7 @@ def main():
         firebase_admin.initialize_app(cred)
     db = firestore.client()
 
-    # Aucune écriture n'est créée tant que les 143 stations n'ont pas
+    # Aucune écriture n'est créée tant que les 140 stations n'ont pas
     # toutes passé les contrôles modèles/build/dates/créneaux. Les documents
     # sont ensuite publiés par lots atomiques bornés sous la limite de 10 Mio.
     publications, write_count, commit_count = _prepare_and_publish_forecasts(
