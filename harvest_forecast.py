@@ -82,10 +82,10 @@ FORECAST_RUN_ID = (os.environ.get("FORECAST_RUN_ID") or "").strip() or None
 
 # Les documents météo et conditions contiennent dix jours de données. Firestore
 # refuse tout Commit supérieur à 10 Mio. Une limite fixe de vingt stations garde
-# chaque requête loin de ce plafond même lorsque les documents des 140 stations
+# chaque requête loin de ce plafond même lorsque les documents des 135 stations
 # et les cinq alias de transition sont écrits ensemble.
 PUBLISH_BATCH_STATION_COUNT = 20
-EXPECTED_STATION_COUNT = 140
+EXPECTED_STATION_COUNT = 135
 
 FORECAST_BASE_URL = "https://customer-api.open-meteo.com/v1/forecast"
 MARINE_BASE_URL = "https://customer-marine-api.open-meteo.com/v1/marine"
@@ -242,9 +242,6 @@ SPOTS = [
     # Le nord du golfe est plus étroit que la grille GFS-Wave. Ces points,
     # toujours proches des deux villes, sont associés à une cellule marine.
     {"id": "aqaba_jordanie", "name": "Aqaba, Jordanie", "lat": 29.45, "lon": 35.00},
-    {"id": "eilat_israel", "name": "Eilat, Israël", "lat": 29.48, "lon": 34.94},
-    {"id": "telaviv_israel", "name": "Tel Aviv, Israël", "lat": 32.09, "lon": 34.78},
-    {"id": "haifa_israel", "name": "Haïfa, Israël", "lat": 32.82, "lon": 34.99},
     {"id": "lattaquie_syrie", "name": "Lattaquié, Syrie", "lat": 35.52, "lon": 35.78},
     {"id": "tartous_syrie", "name": "Tartous, Syrie", "lat": 34.89, "lon": 35.89},
     {"id": "istanbul_turquie", "name": "Istanbul, Turquie", "lat": 41.01, "lon": 28.98},
@@ -254,8 +251,6 @@ SPOTS = [
     {"id": "samsun_turquie", "name": "Samsun, Turquie", "lat": 41.29, "lon": 36.33},
     {"id": "trabzon_turquie", "name": "Trabzon, Turquie", "lat": 41.00, "lon": 39.72},
     {"id": "bodrum_turquie", "name": "Bodrum, Turquie", "lat": 37.03, "lon": 27.43},
-    {"id": "larnaca_chypre", "name": "Larnaca, Chypre", "lat": 34.92, "lon": 33.63},
-    {"id": "limassol_chypre", "name": "Limassol, Chypre", "lat": 34.68, "lon": 33.04},
     {"id": "sharm_el_sheikh_egypte", "name": "Sharm El-Sheikh, Egypte", "lat": 27.97, "lon": 34.39},
     {"id": "hurgada_egypte", "name": "Hurghada, Egypte", "lat": 27.26, "lon": 33.81},
 ]
@@ -2614,7 +2609,7 @@ def main():
         firebase_admin.initialize_app(cred)
     db = firestore.client()
 
-    # Aucune écriture n'est créée tant que les 140 stations n'ont pas
+    # Aucune écriture n'est créée tant que les 135 stations n'ont pas
     # toutes passé les contrôles modèles/build/dates/créneaux. Les documents
     # sont ensuite publiés par lots atomiques bornés sous la limite de 10 Mio.
     publications, write_count, commit_count = _prepare_and_publish_forecasts(

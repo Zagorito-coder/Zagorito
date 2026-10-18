@@ -470,6 +470,13 @@ class StationCollectionTests(unittest.TestCase):
 
 
 class SpotCatalogTests(unittest.TestCase):
+    def test_dst_blocking_foreign_stations_are_excluded(self):
+        removed = {"eilat_israel", "telaviv_israel", "haifa_israel",
+                   "larnaca_chypre", "limassol_chypre"}
+        self.assertTrue(removed.isdisjoint(spot["id"] for spot in harvest_forecast.SPOTS))
+        self.assertTrue(removed.isdisjoint(harvest_forecast.CONDITIONS_SPOT_IDS))
+        self.assertEqual(35, sum(spot["id"].endswith("_maroc") for spot in harvest_forecast.SPOTS))
+
     def test_problematic_lebanese_stations_are_excluded(self):
         removed = {"beyrouth_liban", "tripoli_liban", "saida_liban"}
         self.assertTrue(removed.isdisjoint(spot["id"] for spot in harvest_forecast.SPOTS))
@@ -478,7 +485,7 @@ class SpotCatalogTests(unittest.TestCase):
     def test_spot_ids_are_unique_and_coordinates_are_valid(self):
         ids = [spot["id"] for spot in harvest_forecast.SPOTS]
 
-        self.assertEqual(140, len(ids))
+        self.assertEqual(135, len(ids))
         self.assertEqual(len(ids), len(set(ids)))
         for spot in harvest_forecast.SPOTS:
             self.assertGreaterEqual(spot["lat"], -90)
@@ -487,7 +494,7 @@ class SpotCatalogTests(unittest.TestCase):
             self.assertLessEqual(spot["lon"], 180)
 
     def test_every_catalog_spot_has_its_own_conditions_document(self):
-        self.assertEqual(140, len(harvest_forecast.CONDITIONS_SPOT_IDS))
+        self.assertEqual(135, len(harvest_forecast.CONDITIONS_SPOT_IDS))
         self.assertEqual(
             {spot["id"] for spot in harvest_forecast.SPOTS},
             set(harvest_forecast.CONDITIONS_SPOT_IDS),
@@ -529,7 +536,6 @@ class SpotCatalogTests(unittest.TestCase):
             "tetouan_maroc": (35.62, -5.27),
             "portharcourt_nigeria": (4.45, 7.17),
             "aqaba_jordanie": (29.45, 35.00),
-            "eilat_israel": (29.48, 34.94),
         }
 
         for spot_id, coordinates in expected.items():
