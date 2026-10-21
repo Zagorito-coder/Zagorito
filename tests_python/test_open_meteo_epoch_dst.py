@@ -104,3 +104,35 @@ class OpenMeteoEpochDstTests(unittest.TestCase):
         for values in [[1792530000, 1792530000], [1792533600, 1792530000]]:
             with self.assertRaisesRegex(ValueError, 'strictement croissants'):
                 harvest._utc_datetimes_from_open_meteo(values, 10800, 'Africa/Cairo')
+
+
+class PublishedOffsetTests(unittest.TestCase):
+    def test_stale_morocco_provider_offset_is_not_published(self):
+        for zone in ['Africa/Casablanca', 'Africa/El_Aaiun']:
+            with self.subTest(zone=zone):
+                spot, wind, wave, _ = fixed_offset_response(zone, date(2026, 10, 21), epochs=True)
+                wind['utc_offset_seconds'] = 3600
+                wave['utc_offset_seconds'] = 3600
+                result = harvest._build_station_publication(
+                    {'spot': spot, 'models': {'wind': wind, 'hires': wind, 'wave': wave}},
+                    'offset-regression', conditions_spot_ids={spot['id']: spot['id']},
+                )
+                self.assertEqual(0, result['weather_doc']['utc_offset_seconds'])
+                self.assertEqual(0, result['conditions_doc']['utc_offset_seconds'])
+                self.assertEqual(3600, wind['utc_offset_seconds'])
+                self.assertEqual('2026-10-21T00:00', result['weather_doc']['days'][0]['slots'][0]['hour'])
+
+    def test_offset_follows_station_rules_at_forecast_start(self):
+        for zone, first_day, expected in [
+            ('Africa/Casablanca', date(2026, 8, 1), 3600),
+            ('Africa/Casablanca', date(2026, 10, 21), 0),
+            ('Africa/Cairo', date(2026, 10, 21), 10800),
+            ('Africa/Cairo', date(2026, 10, 31), 7200),
+        ]:
+            with self.subTest(zone=zone, first_day=first_day):
+                _, wind, _, _ = fixed_offset_response(zone, first_day, epochs=True)
+                self.assertEqual(expected, harvest._published_utc_offset_seconds(wind))
+
+    def test_empty_forecast_cannot_publish_an_offset(self):
+        with self.assertRaisesRegex(ValueError, 'Grille horaire absente'):
+            harvest._published_utc_offset_seconds({'timezone':'Africa/Casablanca'})

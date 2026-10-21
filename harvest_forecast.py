@@ -503,6 +503,24 @@ def _open_meteo_local_iso(
     ).isoformat(timespec="minutes")
 
 
+def _published_utc_offset_seconds(model_json):
+    """Offset at the forecast start from IANA, not stale provider metadata.
+
+    Keep the provider's raw offset in model_json for decoding its daily labels.
+    Published metadata must describe the civil timezone used by our payload.
+    """
+    times = (model_json.get("hourly") or {}).get("time") or []
+    if not times:
+        raise ValueError("Grille horaire absente pour le décalage publié.")
+    raw_offset = int(_safe_num(model_json.get("utc_offset_seconds"), 0) or 0)
+    zone_name = model_json.get("timezone")
+    first_instant = _utc_datetimes_from_open_meteo(
+        [times[0]], raw_offset, zone_name
+    )[0]
+    zone = _open_meteo_timezone(zone_name, raw_offset)
+    return int(first_instant.astimezone(zone).utcoffset().total_seconds())
+
+
 def _daily_sun_from_open_meteo(wind_json):
     """Preserve provider daily date labels; convert solar instants with IANA.
 
@@ -1688,7 +1706,7 @@ def build_conditions_document(
         "name": spot["name"],
         "lat": spot["lat"],
         "lon": spot["lon"],
-        "utc_offset_seconds": wind_offset,
+        "utc_offset_seconds": _published_utc_offset_seconds(wind_json),
         "timestamp": last_update,
         "tide_datum": "global_mean_sea_level",
         "source": {
@@ -1807,7 +1825,7 @@ def _build_station_publication(
         "location_name": spot["name"],
         "latitude": spot["lat"],
         "longitude": spot["lon"],
-        "utc_offset_seconds": utc_offset_seconds,
+        "utc_offset_seconds": _published_utc_offset_seconds(wind_json),
         "days": published_days,
     }
     if isinstance(timezone_name, str) and timezone_name.strip():
