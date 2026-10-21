@@ -10,16 +10,24 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/tide_page_models.dart' as tm;
 import '../models/tide_data.dart' as tide_data;
-import '../services/forecast_firestore_service.dart';
+import '../services/marine_location_controller.dart';
+import '../widgets/marine_location_selector.dart';
+import '../data/marine_weather_points.dart';
+import 'forecast_page.dart';
 import '../services/tide_service.dart' as tide_svc;
 import '../services/casablanca_tide_reference.dart';
 import '../services/tide_coefficient_service.dart';
+import '../services/tide_event_timeline.dart';
+import '../services/tide_extrema_service.dart';
 import '../services/tide_forecast_presentation_service.dart';
+import '../services/local_tide_coefficient_service.dart';
 import '../theme_controller.dart';
 import '../widgets/app_back_button.dart';
 import '../widgets/open_meteo_attribution.dart';
 import '../widgets/tide_coefficients_view.dart';
 import '../l10n/app_localizations.dart';
+import '../utils/tide_chart_scale.dart';
+import '../utils/tide_height_formatter.dart';
 import '../utils/wind_direction.dart';
 
 // ── Palette adaptative ──────────────────────────────────────
@@ -75,14 +83,11 @@ String _localizedMoonPhase(BuildContext context, String phase) {
 }
 
 // ── Conversion TideService → modèle TidePage ─────────────────
-tm.TideData _fromTideService(
-  tide_data.TideData src, {
-  GfsWeatherTimeline? gfsWeather,
-}) {
-  final now = DateTime.now();
+tm.TideData _fromTideService(tide_data.TideData src) {
+  final now = src.stationTimeAt(DateTime.now());
   final currentHour = now.hour;
 
-  final today = DateTime.now();
+  final today = now;
   final todayOnly = src.hourlyPoints
       .where((p) =>
           p.time.year == today.year &&
@@ -91,12 +96,13 @@ tm.TideData _fromTideService(
       .toList();
 
   final usesCasablancaReference =
-      src.location.toLowerCase().contains('casablanca');
+      src.tideHeightDatum == tide_data.TideHeightDatum.casablancaBmi;
   final todayStart = DateTime(today.year, today.month, today.day);
   final chartSourcePoints = usesCasablancaReference
       ? _casablancaReferencePoints(
           todayStart,
           const Duration(days: 1),
+          src,
         )
       : (todayOnly.isNotEmpty ? todayOnly : src.hourlyPoints);
 
@@ -126,8 +132,20 @@ tm.TideData _fromTideService(
     final prevH = h > 0
         ? tidePoints.where((p) => p.time >= h - 1 && p.time < h).toList()
         : <tm.TidePoint>[];
-    double prev = prevH.isNotEmpty ? prevH.last.height : hh;
-    final trend = hh >= prev ? 'montante' : 'descendante';
+    final nextH = h < 23
+        ? tidePoints.where((p) => p.time >= h + 1 && p.time < h + 2).toList()
+        : <tm.TidePoint>[];
+    final prev = prevH.isNotEmpty ? prevH.last.height : hh;
+    final next = nextH.isNotEmpty ? nextH.first.height : hh;
+    // Une égalité entre deux échantillons horaires est fréquente au sommet
+    // arrondi d'une marée. La pente centrée (heure suivante - heure précédente)
+    // évite alors d'annoncer à tort une marée montante juste après le maximum.
+    final centeredSlope = next - prev;
+    final fallbackSlope = hh - prev;
+    final trend =
+        (centeredSlope.abs() > 1e-9 ? centeredSlope : fallbackSlope) >= 0
+            ? 'montante'
+            : 'descendante';
 
     final isNow = h == currentHour;
     final activity = ((hh - chartLow) / (chartHigh - chartLow).clamp(0.01, 10))
@@ -160,15 +178,13 @@ tm.TideData _fromTideService(
             : src.hourlyPoints.reduce((a, b) =>
                 (a.time.hour - h).abs() <= (b.time.hour - h).abs() ? a : b));
 
+    final windDirectionDeg = matchPoint?.windDirectionDeg;
     final windDir =
-        matchPoint != null ? _degToCompass(matchPoint.windDirectionDeg) : 'N';
-    final wavePeriodH = matchPoint?.wavePeriod ?? 0.0;
-    final windWaveH = matchPoint?.windWaveHeight ?? 0.0;
-    final windSpeed = matchPoint?.windSpeedKmh?.round().clamp(0, 200) ?? 0;
-    final temperature = matchPoint?.temperatureC?.round() ?? 0;
-    final requestedTime = DateTime(today.year, today.month, today.day, h);
-    final gfsPoint = gfsWeather?.nearestTo(requestedTime);
-
+        windDirectionDeg == null ? null : _degToCompass(windDirectionDeg);
+    final wavePeriodH = matchPoint?.wavePeriod;
+    final windWaveH = matchPoint?.windWaveHeight;
+    final windSpeed = matchPoint?.windSpeedKmh?.round().clamp(0, 200);
+    final temperature = matchPoint?.temperatureC?.round();
     hourlyCards.add(tm.HourlyCard(
       hour: h,
       label: '${h.toString().padLeft(2, '0')}:00',
@@ -181,34 +197,25 @@ tm.TideData _fromTideService(
       windDirection: windDir,
       waveHeight: windWaveH,
       temp: temperature,
-      pressureHpa: matchPoint?.pressureHpa ?? gfsPoint?.pressureHpa,
-      precipitationProbabilityPct: matchPoint?.precipitationProbabilityPct ??
-          gfsPoint?.precipitationProbabilityPct,
-      relativeHumidityPct:
-          matchPoint?.relativeHumidityPct ?? gfsPoint?.relativeHumidityPct,
-      windGustKmh: matchPoint?.windGustKmh ?? gfsPoint?.windGustKmh,
-      visibilityKm: matchPoint?.visibilityKm ?? gfsPoint?.visibilityKm,
-      cloudCoverPct: matchPoint?.cloudCoverPct ?? gfsPoint?.cloudCoverPct,
-      precipitationMm: matchPoint?.precipitationMm ?? gfsPoint?.precipitationMm,
-      swellHeightM: matchPoint?.swellHeightM ?? gfsPoint?.swellHeightM,
-      swellPeriodS: matchPoint?.swellPeriodS ?? gfsPoint?.swellPeriodS,
-      swellDirectionDeg:
-          matchPoint?.swellDirectionDeg ?? gfsPoint?.swellDirectionDeg,
-      secondarySwellHeightM:
-          matchPoint?.secondarySwellHeightM ?? gfsPoint?.secondarySwellHeightM,
-      secondarySwellPeriodS:
-          matchPoint?.secondarySwellPeriodS ?? gfsPoint?.secondarySwellPeriodS,
-      secondarySwellDirectionDeg: matchPoint?.secondarySwellDirectionDeg ??
-          gfsPoint?.secondarySwellDirectionDeg,
-      seaSurfaceTemperatureC: matchPoint?.seaSurfaceTemperatureC ??
-          gfsPoint?.seaSurfaceTemperatureC,
-      oceanCurrentSpeedKmh:
-          matchPoint?.oceanCurrentSpeedKmh ?? gfsPoint?.oceanCurrentSpeedKmh,
-      oceanCurrentDirectionDeg: matchPoint?.oceanCurrentDirectionDeg ??
-          gfsPoint?.oceanCurrentDirectionDeg,
+      pressureHpa: matchPoint?.pressureHpa,
+      precipitationProbabilityPct: matchPoint?.precipitationProbabilityPct,
+      relativeHumidityPct: matchPoint?.relativeHumidityPct,
+      windGustKmh: matchPoint?.windGustKmh,
+      visibilityKm: matchPoint?.visibilityKm,
+      cloudCoverPct: matchPoint?.cloudCoverPct,
+      precipitationMm: matchPoint?.precipitationMm,
+      swellHeightM: matchPoint?.swellHeightM,
+      swellPeriodS: matchPoint?.swellPeriodS,
+      swellDirectionDeg: matchPoint?.swellDirectionDeg,
+      secondarySwellHeightM: matchPoint?.secondarySwellHeightM,
+      secondarySwellPeriodS: matchPoint?.secondarySwellPeriodS,
+      secondarySwellDirectionDeg: matchPoint?.secondarySwellDirectionDeg,
+      seaSurfaceTemperatureC: matchPoint?.seaSurfaceTemperatureC,
+      oceanCurrentSpeedKmh: matchPoint?.oceanCurrentSpeedKmh,
+      oceanCurrentDirectionDeg: matchPoint?.oceanCurrentDirectionDeg,
       isIdeal: activity > 0.7,
       isNow: isNow,
-      wavePeriod: wavePeriodH.round(),
+      wavePeriod: wavePeriodH?.round(),
     ));
   }
 
@@ -220,87 +227,57 @@ tm.TideData _fromTideService(
   final hourlyForecastDays = usesCasablancaReference
       ? TideForecastPresentationService.attachCasablancaTides(
           groupedHourlyForecastDays,
+          utcOffsetSeconds: src.utcOffsetSeconds,
+          timeZoneId: src.timeZoneId,
         )
-      : groupedHourlyForecastDays;
+      : TideForecastPresentationService.attachPublishedTides(
+          groupedHourlyForecastDays,
+          src.hourlyPoints,
+        );
 
-  final events = <tm.TideEvent>[];
-  if (tidePoints.length >= 3) {
-    for (int i = 1; i < tidePoints.length - 1; i++) {
-      final a = tidePoints[i - 1].height;
-      final b = tidePoints[i].height;
-      final c = tidePoints[i + 1].height;
-      if (b < a && b < c) {
-        events.add(tm.TideEvent(
-            type: 'low',
-            time: tidePoints[i].time,
-            height: b,
-            label: 'Basse Mer',
-            dateTime: DateTime(today.year, today.month, today.day)
-                .add(Duration(minutes: (tidePoints[i].time * 60).round()))));
-      } else if (b > a && b > c) {
-        events.add(tm.TideEvent(
-            type: 'high',
-            time: tidePoints[i].time,
-            height: b,
-            label: 'Haute Mer',
-            dateTime: DateTime(today.year, today.month, today.day)
-                .add(Duration(minutes: (tidePoints[i].time * 60).round()))));
-      }
-    }
-  }
-  if (events.isEmpty) {
-    final lowPoint = tidePoints.reduce((a, b) => a.height <= b.height ? a : b);
-    final highPoint = tidePoints.reduce((a, b) => a.height >= b.height ? a : b);
-    events.add(tm.TideEvent(
-        type: 'low',
-        time: lowPoint.time,
-        height: lowPoint.height,
-        label: 'Basse Mer',
-        dateTime: DateTime(today.year, today.month, today.day)
-            .add(Duration(minutes: (lowPoint.time * 60).round()))));
-    events.add(tm.TideEvent(
-        type: 'high',
-        time: highPoint.time,
-        height: highPoint.height,
-        label: 'Haute Mer',
-        dateTime: DateTime(today.year, today.month, today.day)
-            .add(Duration(minutes: (highPoint.time * 60).round()))));
-  }
+  final events = TideExtremaService.detect(
+    chartSourcePoints,
+    instantOf: (point) => point.instantUtc ?? src.stationInstantAt(point.time),
+    civilAt: src.stationTimeAt,
+  )
+      .map(
+        (extremum) => tm.TideEvent(
+          type: extremum.isHigh ? 'high' : 'low',
+          time: extremum.time.hour + extremum.time.minute / 60,
+          height: extremum.height,
+          label: extremum.isHigh ? 'Haute Mer' : 'Basse Mer',
+          dateTime: extremum.time,
+          instantUtc: extremum.instantUtc,
+        ),
+      )
+      .toList(growable: false);
 
-  final upcomingEvents = <tm.TideEvent>[];
   final sourcePoints = usesCasablancaReference
       ? _casablancaReferencePoints(
           todayStart,
           const Duration(days: 2),
+          src,
         )
       : src.hourlyPoints;
-  for (int i = 1; i < sourcePoints.length - 1; i++) {
-    final previous = sourcePoints[i - 1].height;
-    final current = sourcePoints[i].height;
-    final next = sourcePoints[i + 1].height;
-    final point = sourcePoints[i];
-    if (point.time.isBefore(now.subtract(const Duration(minutes: 30)))) {
-      continue;
-    }
-    if (current > previous && current > next) {
-      upcomingEvents.add(tm.TideEvent(
-        type: 'high',
-        time: point.time.hour + point.time.minute / 60,
-        height: current,
-        label: 'Haute Mer',
-        dateTime: point.time,
-      ));
-    } else if (current < previous && current < next) {
-      upcomingEvents.add(tm.TideEvent(
-        type: 'low',
-        time: point.time.hour + point.time.minute / 60,
-        height: current,
-        label: 'Basse Mer',
-        dateTime: point.time,
-      ));
-    }
-    if (upcomingEvents.length == 4) break;
-  }
+  final referenceInstant = DateTime.now().toUtc();
+  final upcomingEvents = TideExtremaService.detect(
+    sourcePoints,
+    instantOf: (point) => point.instantUtc ?? src.stationInstantAt(point.time),
+    civilAt: src.stationTimeAt,
+  )
+      .where((extremum) => !extremum.instantUtc.isBefore(referenceInstant))
+      .take(8)
+      .map(
+        (extremum) => tm.TideEvent(
+          type: extremum.isHigh ? 'high' : 'low',
+          time: extremum.time.hour + extremum.time.minute / 60,
+          height: extremum.height,
+          label: extremum.isHigh ? 'Haute Mer' : 'Basse Mer',
+          dateTime: extremum.time,
+          instantUtc: extremum.instantUtc,
+        ),
+      )
+      .toList(growable: false);
 
   final astro = src.astro;
   final moon = astro.moonPhaseName;
@@ -312,19 +289,25 @@ tm.TideData _fromTideService(
           ? 'mid'
           : 'low';
   final overallLabel = astro.activityLabel;
-
   final bestHours = <String>[];
-  if (astro.lunarTransit.isNotEmpty) bestHours.add(astro.lunarTransit);
-  if (astro.lunarUnder.isNotEmpty) bestHours.add(astro.lunarUnder);
+  if (usesCasablancaReference && astro.lunarTransit.isNotEmpty) {
+    bestHours.add(astro.lunarTransit);
+  }
+  if (usesCasablancaReference && astro.lunarUnder.isNotEmpty) {
+    bestHours.add(astro.lunarUnder);
+  }
 
   return tm.TideData(
     location: src.location,
     generatedAt: src.generatedAt,
+    utcOffsetSeconds: src.utcOffsetSeconds,
+    timeZoneId: src.timeZoneId,
+    tideHeightDatum: src.tideHeightDatum,
     hourlyCards: hourlyCards,
     hourlyForecastDays: hourlyForecastDays,
     tidePoints: tidePoints,
     tideEvents: events,
-    upcomingEvents: upcomingEvents.isEmpty ? events : upcomingEvents,
+    upcomingEvents: upcomingEvents,
     currentHour: currentHour,
     moonInfo: tm.MoonInfo(phaseName: moon, influence: influence),
     sunTimes: tm.SunTimes(
@@ -335,18 +318,14 @@ tm.TideData _fromTideService(
     bestHours: bestHours,
     waveInfo: tm.WaveInfo(
       height: src.waveHeight,
-      period: src.hourlyPoints.isNotEmpty
-          ? src.hourlyPoints.first.wavePeriod.round()
-          : 0,
+      period: src.hourlyPoints.firstOrNull?.wavePeriod?.round() ?? 0,
       swell: src.waveHeight > 0 ? 'Houle disponible' : 'Données indisponibles',
     ),
     windInfo: tm.WindInfo(
-      speed: src.hourlyPoints.isNotEmpty
-          ? (src.hourlyPoints.first.windSpeedKmh?.round() ?? 0)
-          : 0,
-      direction: src.hourlyPoints.isNotEmpty
-          ? _degToCompass(src.hourlyPoints.first.windDirectionDeg)
-          : '--',
+      speed: src.hourlyPoints.firstOrNull?.windSpeedKmh?.round() ?? 0,
+      direction: src.hourlyPoints.firstOrNull?.windDirectionDeg == null
+          ? '--'
+          : _degToCompass(src.hourlyPoints.first.windDirectionDeg!),
       gust: 0,
     ),
   );
@@ -370,15 +349,17 @@ List<tm.HourlyForecastDay> _groupHourlyForecast(
     grouped.putIfAbsent(date, () => <tm.HourlyForecastSlot>[]).add(
           tm.HourlyForecastSlot(
             time: point.time,
-            windSpeedKmh: point.windSpeedKmh ?? todayCard?.windSpeed.toDouble(),
+            instantUtc: point.instantUtc,
+            windSpeedKmh:
+                point.windSpeedKmh ?? todayCard?.windSpeed?.toDouble(),
             windGustKmh: point.windGustKmh ?? todayCard?.windGustKmh,
             windDirectionDeg: point.windDirectionDeg,
             weatherCode: point.weatherCode,
             isDay: point.isDay,
-            temperatureC: point.temperatureC ?? todayCard?.temp.toDouble(),
+            temperatureC: point.temperatureC ?? todayCard?.temp?.toDouble(),
             pressureHpa: point.pressureHpa ?? todayCard?.pressureHpa,
             waveHeightM: point.waveHeightM ?? todayCard?.waveHeight,
-            wavePeriodS: point.wavePeriodS ?? todayCard?.wavePeriod.toDouble(),
+            wavePeriodS: point.wavePeriodS ?? todayCard?.wavePeriod?.toDouble(),
             waveDirectionDeg: point.waveDirectionDeg,
             precipitationProbabilityPct: point.precipitationProbabilityPct ??
                 todayCard?.precipitationProbabilityPct,
@@ -389,7 +370,7 @@ List<tm.HourlyForecastDay> _groupHourlyForecast(
   }
 
   // Rétrocompatibilité pendant le premier cycle de publication du résumé
-  // 10 jours : les données du jour déjà chargées restent toujours visibles.
+  // marin : les données du jour déjà chargées restent toujours visibles.
   if (!grouped.containsKey(todayDate) && todayCards.isNotEmpty) {
     grouped[todayDate] = todayCards
         .where((card) => card.hour % 3 == 0)
@@ -401,12 +382,12 @@ List<tm.HourlyForecastDay> _groupHourlyForecast(
               todayDate.day,
               card.hour,
             ),
-            windSpeedKmh: card.windSpeed.toDouble(),
+            windSpeedKmh: card.windSpeed?.toDouble(),
             windGustKmh: card.windGustKmh,
-            temperatureC: card.temp.toDouble(),
+            temperatureC: card.temp?.toDouble(),
             pressureHpa: card.pressureHpa,
             waveHeightM: card.waveHeight,
-            wavePeriodS: card.wavePeriod.toDouble(),
+            wavePeriodS: card.wavePeriod?.toDouble(),
             precipitationProbabilityPct: card.precipitationProbabilityPct,
             cloudCoverPct: card.cloudCoverPct,
             activityScore: card.activityScore,
@@ -416,7 +397,9 @@ List<tm.HourlyForecastDay> _groupHourlyForecast(
   }
 
   final days = grouped.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
-  return days.take(10).map((entry) {
+  // L'API Marine garantit au maximum huit jours. La page n'affiche que cette
+  // fenêtre complète afin de ne laisser aucun jour avec une marée manquante.
+  return days.take(8).map((entry) {
     final slots = entry.value..sort((a, b) => a.time.compareTo(b.time));
     return tm.HourlyForecastDay(
       date: entry.key,
@@ -428,14 +411,19 @@ List<tm.HourlyForecastDay> _groupHourlyForecast(
 List<tide_data.TidePoint> _casablancaReferencePoints(
   DateTime startLocal,
   Duration duration,
+  tide_data.TideData source,
 ) {
   const step = Duration(minutes: 1);
-  final count = duration.inMinutes ~/ step.inMinutes;
+  final startInstant = source.stationInstantAt(startLocal);
+  final endInstant = source.stationInstantAt(startLocal.add(duration));
+  final count = endInstant.difference(startInstant).inMinutes ~/ step.inMinutes;
   return List<tide_data.TidePoint>.generate(count + 1, (index) {
-    final localTime = startLocal.add(Duration(minutes: index));
+    final instant = startInstant.add(Duration(minutes: index));
+    final localTime = source.stationTimeAt(instant);
     return tide_data.TidePoint(
       time: localTime,
-      height: CasablancaTideReference.heightAtUtc(localTime.toUtc()),
+      instantUtc: instant,
+      height: CasablancaTideReference.heightAtUtc(instant),
     );
   }, growable: false);
 }
@@ -447,11 +435,15 @@ class TidePage extends StatefulWidget {
   const TidePage({
     super.key,
     this.embeddedInBottomNavigation = false,
+    this.locationController,
+    this.tideLoader,
   });
 
   /// Masque la navigation de retour et suspend les tâches périodiques lorsque
   /// la page est conservée hors écran par la barre de navigation principale.
   final bool embeddedInBottomNavigation;
+  final MarineLocationController? locationController;
+  final Future<tide_data.TideData> Function(tide_svc.TideStation)? tideLoader;
 
   @override
   State<TidePage> createState() => _TidePageState();
@@ -475,6 +467,24 @@ class _TidePageState extends State<TidePage>
 
   bool _isLoading = true;
   tm.TideData _data = _emptyData();
+  late final _location =
+      widget.locationController ?? MarineLocationController.instance;
+  int _locationRevision = -1;
+  int _loadRequest = 0;
+  tide_svc.TideStation? _tideStation;
+  bool get _isCasablanca => _tideStation?.id == 'casablanca_maroc';
+  bool get _usesMeanSeaLevelDatum =>
+      _data.tideHeightDatum == tide_data.TideHeightDatum.globalMeanSeaLevel;
+  bool get _usesCasablancaBmiDatum =>
+      _data.tideHeightDatum == tide_data.TideHeightDatum.casablancaBmi;
+  bool get _usesMoroccoCasablancaModel =>
+      _data.tideHeightDatum == tide_data.TideHeightDatum.moroccoCasablancaModel;
+  bool get _usesCasablancaPresentationModel =>
+      _data.tideHeightDatum ==
+          tide_data.TideHeightDatum.casablancaPresentationModel ||
+      _usesMoroccoCasablancaModel;
+  bool get _usesFixedLocalDatum =>
+      _usesCasablancaBmiDatum || _usesCasablancaPresentationModel;
   final _scrollController = ScrollController();
   final _clockNotifier = ValueNotifier<DateTime>(DateTime.now());
   Timer? _clockTimer;
@@ -483,6 +493,7 @@ class _TidePageState extends State<TidePage>
   int _expandedForecastDayIndex = 0;
   _TideView _selectedTideView = _TideView.today;
   LocalTideCoefficientMonth? _coefficientMonth;
+  LocalTideCoefficientMonth? _localCoefficientPeriod;
   bool _coefficientLoading = false;
   Object? _coefficientError;
   int _selectedCoefficientDay = DateTime.now().day;
@@ -513,26 +524,74 @@ class _TidePageState extends State<TidePage>
     );
   }
 
+  void _onLocationChanged() {
+    if (!mounted || _locationRevision == _location.revision) return;
+    _locationRevision = _location.revision;
+    _loadRequest++;
+    final position = _location.coordinates;
+    setState(() {
+      _loadInProgress = false;
+      _data = _emptyData();
+      _coefficientMonth = null;
+      _localCoefficientPeriod = null;
+      _coefficientLoading = false;
+      _coefficientError = null;
+      _selectedCoefficientDay = 1;
+      _selectedTideView = _TideView.today;
+      _lastLoadedAt = null;
+      _lastLoadAttemptAt = null;
+      _tideStation = position == null
+          ? null
+          : tide_svc.TideService.stationForPosition(
+              position.latitude, position.longitude);
+      _isLoading = _tideStation != null;
+    });
+    if (_tideStation != null) unawaited(_loadTideData());
+  }
+
   Future<void> _loadTideData() async {
     if (_loadInProgress) return;
+    final station = _tideStation;
+    if (station == null) return;
+    final request = ++_loadRequest;
     _loadInProgress = true;
     _lastLoadAttemptAt = DateTime.now();
     final hadUsableData = _data.hourlyCards.isNotEmpty;
-    final gfsFuture = ForecastFirestoreService.fetchGfsWeather(
-      'casablanca_maroc',
-    )
-        .timeout(
-          const Duration(seconds: 12),
-          onTimeout: () => null,
-        )
-        .catchError((_) => null);
     try {
-      final d = await tide_svc.TideService.fetchTides();
-      if (!mounted) return;
+      final d = await (widget.tideLoader?.call(station) ??
+          tide_svc.TideService.fetchTides(
+              latitude: station.latitude,
+              longitude: station.longitude,
+              locationName: station.name));
+      if (!mounted || request != _loadRequest) return;
       final hasUsableData = d.hourlyPoints.isNotEmpty;
+      final localCoefficientPeriod =
+          hasUsableData && station.id != 'casablanca_maroc'
+              ? LocalTideCoefficientService.build(
+                  d.hourlyPoints,
+                  utcOffsetSeconds: d.utcOffsetSeconds,
+                  timeZoneId: d.timeZoneId,
+                  showMoroccanTradition: station.id.endsWith('_maroc'),
+                )
+              : null;
       setState(() {
         if (hasUsableData || !hadUsableData) {
           _data = hasUsableData ? _fromTideService(d) : _emptyData(d.location);
+          _localCoefficientPeriod = localCoefficientPeriod;
+          if (localCoefficientPeriod != null &&
+              localCoefficientPeriod.days.isNotEmpty) {
+            final stationNow = _data.stationTimeAt(DateTime.now());
+            final todayIndex = localCoefficientPeriod.days.indexWhere(
+              (day) =>
+                  day.date.year == stationNow.year &&
+                  day.date.month == stationNow.month &&
+                  day.date.day == stationNow.day,
+            );
+            _selectedCoefficientDay = todayIndex < 0 ? 1 : todayIndex + 1;
+          } else {
+            _selectedCoefficientDay =
+                _isCasablanca ? _data.stationTimeAt(DateTime.now()).day : 1;
+          }
           if (!hadUsableData) {
             _selectedHourIndex = _data.hourlyCards.indexWhere((c) => c.isNow);
             if (_selectedHourIndex < 0) _selectedHourIndex = 0;
@@ -545,26 +604,19 @@ class _TidePageState extends State<TidePage>
       });
       if (!hasUsableData) return;
       _lastLoadedAt = DateTime.now();
+      _updateClock();
       if (!hadUsableData) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) _autoScroll();
         });
       }
-      final gfsWeather = await gfsFuture;
-      if (!mounted || gfsWeather == null || d.hourlyPoints.isEmpty) return;
-      setState(() {
-        _data = _fromTideService(d, gfsWeather: gfsWeather);
-        if (_selectedHourIndex >= _data.hourlyCards.length) {
-          _selectedHourIndex = 0;
-        }
-      });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || request != _loadRequest) return;
       setState(() {
         _isLoading = false;
       });
     } finally {
-      _loadInProgress = false;
+      if (request == _loadRequest) _loadInProgress = false;
     }
   }
 
@@ -575,7 +627,10 @@ class _TidePageState extends State<TidePage>
     _appIsResumed = WidgetsBinding.instance.lifecycleState == null ||
         WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
     ThemeController.instance.addListener(_onThemeChanged);
-    unawaited(_loadTideData());
+    _location.addListener(_onLocationChanged);
+    unawaited(_location.initialize().then((_) {
+      if (mounted) _onLocationChanged();
+    }));
     _ctrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 1400));
     const items = 12;
@@ -640,7 +695,7 @@ class _TidePageState extends State<TidePage>
   }
 
   void _updateClock() {
-    final now = DateTime.now();
+    final now = _data.stationTimeAt(DateTime.now());
     final previousHour = _clockNotifier.value.hour;
     _clockNotifier.value = now;
     if (!mounted ||
@@ -717,6 +772,8 @@ class _TidePageState extends State<TidePage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     ThemeController.instance.removeListener(_onThemeChanged);
+    _location.removeListener(_onLocationChanged);
+    _loadRequest++;
     _ctrl.dispose();
     _stopClock();
     _clockNotifier.dispose();
@@ -727,31 +784,39 @@ class _TidePageState extends State<TidePage>
   void _onCardTap(int index) {
     setState(() {
       _selectedHourIndex = index;
-      _followsCurrentHour =
-          _data.hourlyCards[index].hour == DateTime.now().hour;
+      _followsCurrentHour = _data.hourlyCards[index].hour ==
+          _data.stationTimeAt(DateTime.now()).hour;
     });
   }
 
   Future<void> _loadCoefficientMonth() async {
-    if (_coefficientMonth != null || _coefficientLoading) return;
+    if (!_isCasablanca || _coefficientMonth != null || _coefficientLoading) {
+      return;
+    }
+    final revision = _locationRevision;
     setState(() {
       _coefficientLoading = true;
       _coefficientError = null;
     });
     try {
-      final now = DateTime.now();
+      final now = _data.stationTimeAt(DateTime.now());
       final result = await compute(
         buildCasablancaTideCoefficientMonth,
-        DateTime(now.year, now.month),
+        <String, dynamic>{
+          'year': now.year,
+          'month': now.month,
+          'utcOffsetSeconds': _data.utcOffsetSeconds,
+          'timeZoneId': _data.timeZoneId,
+        },
       );
-      if (!mounted) return;
+      if (!mounted || revision != _locationRevision || !_isCasablanca) return;
       setState(() {
         _coefficientMonth = result;
         _selectedCoefficientDay = now.day.clamp(1, result.days.length);
         _coefficientLoading = false;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || revision != _locationRevision || !_isCasablanca) return;
       setState(() {
         _coefficientLoading = false;
         _coefficientError = error;
@@ -760,7 +825,7 @@ class _TidePageState extends State<TidePage>
   }
 
   Widget _buildCoefficientSection() {
-    final month = _coefficientMonth;
+    final month = _isCasablanca ? _coefficientMonth : _localCoefficientPeriod;
     if (month != null) {
       return TideCoefficientsView(
         month: month,
@@ -812,17 +877,29 @@ class _TidePageState extends State<TidePage>
   }
 
   void _showCoefficientInfo() {
+    final usesLocalForecast = !_isCasablanca;
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor:
             _isDark ? const Color(0xFF071A2B) : const Color(0xFFF7FCFF),
         title: Text(
-          context.tr('tide.coefficientInfoTitle'),
+          context.tr(
+            usesLocalForecast
+                ? 'tide.forecastCoefficientInfoTitle'
+                : 'tide.coefficientInfoTitle',
+          ),
           style: TextStyle(color: _txt(0.96)),
         ),
         content: Text(
-          context.tr('tide.coefficientInfoBody'),
+          usesLocalForecast
+              ? context.trArgs(
+                  'tide.forecastCoefficientInfoBody',
+                  args: {
+                    'count': '${_localCoefficientPeriod?.days.length ?? 8}',
+                  },
+                )
+              : context.tr('tide.coefficientInfoBody'),
           style: TextStyle(color: _txt(0.78), height: 1.45),
         ),
         actions: [
@@ -840,13 +917,16 @@ class _TidePageState extends State<TidePage>
     if (_isLoading) {
       return _buildPageShell(
         SafeArea(
-          child: Stack(
+          child: SingleChildScrollView(
+              child: Column(
             children: [
               if (!widget.embeddedInBottomNavigation)
                 const Align(
                   alignment: Alignment.topLeft,
                   child: AppBackButton(),
                 ),
+              MarineLocationSelector(controller: _location),
+              const SizedBox(height: 24),
               Center(
                 child: CircularProgressIndicator(
                   color: _accent,
@@ -854,19 +934,21 @@ class _TidePageState extends State<TidePage>
                 ),
               ),
             ],
-          ),
+          )),
         ),
       );
     }
     if (_data.hourlyCards.isEmpty) {
       return _buildPageShell(
         SafeArea(
-          child: Column(
+          child: SingleChildScrollView(
+              child: Column(
             children: [
               if (!widget.embeddedInBottomNavigation)
                 const Align(
                     alignment: Alignment.centerLeft, child: AppBackButton()),
-              const Spacer(),
+              MarineLocationSelector(controller: _location),
+              const SizedBox(height: 20),
               Icon(Icons.cloud_off_outlined, color: _txt(0.55), size: 48),
               const SizedBox(height: 16),
               Text(
@@ -879,7 +961,11 @@ class _TidePageState extends State<TidePage>
               ),
               const SizedBox(height: 8),
               Text(
-                context.tr('tide.marineDataUnavailableMessage'),
+                context.tr(_location.coordinates == null
+                    ? 'marineLocation.choose'
+                    : _tideStation == null
+                        ? 'marineLocation.noTides'
+                        : 'tide.marineDataUnavailableMessage'),
                 style: TextStyle(color: _txt(0.55), fontSize: 13),
                 textAlign: TextAlign.center,
               ),
@@ -887,16 +973,23 @@ class _TidePageState extends State<TidePage>
               OutlinedButton(
                 onPressed: () {
                   setState(() {
-                    _isLoading = true;
+                    _isLoading = _tideStation != null;
                     _data = _emptyData();
                   });
                   unawaited(_loadTideData());
                 },
                 child: Text(context.tr('tide.retry')),
               ),
-              const Spacer(),
+              if (_location.weatherPoint != null)
+                TextButton(
+                    onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                            builder: (_) =>
+                                ForecastPage(locationController: _location))),
+                    child: Text(context.tr('marineLocation.openForecast'))),
+              const SizedBox(height: 20),
             ],
-          ),
+          )),
         ),
       );
     }
@@ -906,14 +999,30 @@ class _TidePageState extends State<TidePage>
           key: const Key('tide-page-scroll'),
           physics: const BouncingScrollPhysics(),
           slivers: [
+            SliverToBoxAdapter(
+                child: MarineLocationSelector(controller: _location)),
             SliverToBoxAdapter(child: _buildHeader()),
+            SliverToBoxAdapter(
+                child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                  context.trArgs('marineLocation.tideSource', args: {
+                    'name': _tideStation!.name,
+                    'distance': MarineWeatherPoint('', '',
+                            _tideStation!.latitude, _tideStation!.longitude)
+                        .distanceKm(_location.coordinates!.latitude,
+                            _location.coordinates!.longitude)
+                        .toStringAsFixed(1),
+                  }),
+                  textAlign: TextAlign.center),
+            )),
             SliverToBoxAdapter(child: _buildTideModeSelector()),
             if (_selectedTideView == _TideView.forecasts) ...[
               SliverToBoxAdapter(child: _buildHourlyForecastSection()),
             ] else if (_selectedTideView == _TideView.coefficients) ...[
               SliverToBoxAdapter(child: _buildCoefficientSection()),
             ] else ...[
-              SliverToBoxAdapter(child: _buildScoreCard()),
+              if (_isCasablanca) SliverToBoxAdapter(child: _buildScoreCard()),
               SliverToBoxAdapter(child: _buildCurrentTideRibbon()),
               SliverToBoxAdapter(child: _buildCurveCard()),
               SliverToBoxAdapter(child: _buildHourlyActivitySection()),
@@ -1076,11 +1185,10 @@ class _TidePageState extends State<TidePage>
                             alignment: AlignmentDirectional.centerStart,
                             child: Text(
                               context
-                                  .tr(
-                                    _selectedTideView == _TideView.coefficients
-                                        ? 'tide.coefficientTitle'
-                                        : 'tide.title',
-                                  )
+                                  .tr(_selectedTideView ==
+                                          _TideView.coefficients
+                                      ? 'tide.coefficientTitle'
+                                      : 'tide.title')
                                   .toUpperCase(),
                               maxLines: 1,
                               softWrap: false,
@@ -1099,7 +1207,11 @@ class _TidePageState extends State<TidePage>
                   if (_selectedTideView == _TideView.coefficients)
                     Semantics(
                       button: true,
-                      label: context.tr('tide.coefficientInfoTitle'),
+                      label: context.tr(
+                        _isCasablanca
+                            ? 'tide.coefficientInfoTitle'
+                            : 'tide.forecastCoefficientInfoTitle',
+                      ),
                       child: InkWell(
                         onTap: _showCoefficientInfo,
                         customBorder: const CircleBorder(),
@@ -1330,8 +1442,6 @@ class _TidePageState extends State<TidePage>
   Widget _buildCurrentTideRibbon() {
     final selected = _data.hourlyCards[_selectedHourIndex];
     final rising = selected.tideTrend == 'montante';
-    final nextHigh = _nextEvent('high');
-    final nextLow = _nextEvent('low');
     return FadeTransition(
       opacity: _fadeAnims[2],
       child: SlideTransition(
@@ -1341,10 +1451,12 @@ class _TidePageState extends State<TidePage>
           child: Semantics(
             container: true,
             label: context.trArgs(
-              'tide.currentTideSemantics',
+              _usesCasablancaPresentationModel
+                  ? 'tide.presentationLevelSemantics'
+                  : 'tide.currentTideSemantics',
               args: {
                 'trend': _localizedTrend(context, selected.tideTrend),
-                'height': selected.tideHeight.toStringAsFixed(2),
+                'height': _tideHeightFull(selected.tideHeight),
                 'time': selected.label,
               },
             ),
@@ -1362,9 +1474,17 @@ class _TidePageState extends State<TidePage>
                           valueListenable: _clockNotifier,
                           builder: (context, now, _) => Text(
                             selected.hour == now.hour
-                                ? context.tr('tide.currentTide').toUpperCase()
+                                ? context
+                                    .tr(
+                                      _usesCasablancaPresentationModel
+                                          ? 'tide.presentationLevel'
+                                          : 'tide.currentTide',
+                                    )
+                                    .toUpperCase()
                                 : context.trArgs(
-                                    'tide.tideAt',
+                                    _usesCasablancaPresentationModel
+                                        ? 'tide.presentationLevelAt'
+                                        : 'tide.tideAt',
                                     args: {'time': selected.label},
                                   ).toUpperCase(),
                             style: TextStyle(
@@ -1377,7 +1497,7 @@ class _TidePageState extends State<TidePage>
                         ),
                         const SizedBox(height: 5),
                         Text(
-                          '${selected.tideHeight.toStringAsFixed(2)} m',
+                          _tideHeightValue(selected.tideHeight),
                           style: TextStyle(
                             color: _txt(1),
                             fontSize: 22,
@@ -1388,15 +1508,18 @@ class _TidePageState extends State<TidePage>
                           ),
                         ),
                         Text(
-                          context.trArgs(
-                            'tide.tideStatus',
-                            args: {
-                              'trend': _localizedTrend(
-                                context,
-                                selected.tideTrend,
-                              ),
-                            },
-                          ),
+                          <String>[
+                            context.trArgs(
+                              'tide.tideStatus',
+                              args: {
+                                'trend': _localizedTrend(
+                                  context,
+                                  selected.tideTrend,
+                                ),
+                              },
+                            ),
+                            _tideHeightQualifier(selected.tideHeight),
+                          ].where((part) => part.isNotEmpty).join(' · '),
                           style: TextStyle(
                             color: _accent,
                             fontSize: 9,
@@ -1427,23 +1550,30 @@ class _TidePageState extends State<TidePage>
                   const SizedBox(width: 9),
                   Expanded(
                     flex: 10,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          context.tr('tide.nextExtremes').toUpperCase(),
-                          style: TextStyle(
-                            color: _txt(0.52),
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                        const SizedBox(height: 7),
-                        _compactEventLine(nextHigh, true),
-                        const SizedBox(height: 7),
-                        _compactEventLine(nextLow, false),
-                      ],
+                    child: ValueListenableBuilder<DateTime>(
+                      valueListenable: _clockNotifier,
+                      builder: (context, _, __) {
+                        final nextHigh = _nextEvent('high');
+                        final nextLow = _nextEvent('low');
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              context.tr('tide.nextExtremes').toUpperCase(),
+                              style: TextStyle(
+                                color: _txt(0.52),
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                            const SizedBox(height: 7),
+                            _compactEventLine(nextHigh, true),
+                            const SizedBox(height: 7),
+                            _compactEventLine(nextLow, false),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ],
@@ -1456,15 +1586,36 @@ class _TidePageState extends State<TidePage>
   }
 
   tm.TideEvent? _nextEvent(String type) {
-    final currentDecimalHour =
-        DateTime.now().hour + DateTime.now().minute / 60.0;
-    final futureEvents = _data.tideEvents
-        .where(
-            (event) => event.type == type && event.time >= currentDecimalHour)
-        .toList()
-      ..sort((a, b) => a.time.compareTo(b.time));
-    if (futureEvents.isNotEmpty) return futureEvents.first;
-    return _data.tideEvents.where((event) => event.type == type).firstOrNull;
+    return _futureEvents().where((event) => event.type == type).firstOrNull;
+  }
+
+  List<tm.TideEvent> _futureEvents() {
+    return TideEventTimeline.upcoming(
+      _data.upcomingEvents,
+      referenceInstant: DateTime.now(),
+    );
+  }
+
+  String _eventTimeLabel(tm.TideEvent event) {
+    final time = _formatDecimalTime(event.time);
+    final dayLabel = _eventDayLabel(event);
+    return dayLabel == null ? time : '$dayLabel $time';
+  }
+
+  String? _eventDayLabel(tm.TideEvent event) {
+    final dateTime = event.dateTime;
+    if (dateTime == null) return null;
+    final now = _data.stationTimeAt(DateTime.now());
+    final dayDifference = TideEventTimeline.dayDifference(
+      eventCivilTime: dateTime,
+      referenceCivilTime: now,
+    );
+    if (dayDifference == 1) return context.tr('tide.tomorrowShort');
+    if (dayDifference > 1) {
+      return '${dateTime.day.toString().padLeft(2, '0')}/'
+          '${dateTime.month.toString().padLeft(2, '0')}';
+    }
+    return null;
   }
 
   Widget _compactEventLine(tm.TideEvent? event, bool isHigh) {
@@ -1481,7 +1632,7 @@ class _TidePageState extends State<TidePage>
           child: Text(
             event == null
                 ? '${context.tr(isHigh ? 'tide.highTideLabel' : 'tide.lowTideLabel')} —'
-                : '${context.tr(isHigh ? 'tide.highTideLabel' : 'tide.lowTideLabel')} ${_formatDecimalTime(event.time)} · ${event.height.toStringAsFixed(2)} m',
+                : '${context.tr(isHigh ? 'tide.highTideLabel' : 'tide.lowTideLabel')} ${_eventTimeLabel(event)} · ${_usesMeanSeaLevelDatum ? _tideHeightCompactFull(event.height) : _tideHeightFull(event.height)}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
@@ -1512,7 +1663,11 @@ class _TidePageState extends State<TidePage>
                   children: [
                     Expanded(
                       child: Text(
-                        context.tr('tide.tideCurveTitle').toUpperCase(),
+                        context
+                            .tr(_usesMeanSeaLevelDatum
+                                ? 'tide.meanSeaLevelCurveTitle'
+                                : 'tide.tideCurveTitle')
+                            .toUpperCase(),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -1533,29 +1688,44 @@ class _TidePageState extends State<TidePage>
                   height: _tideCurveCanvasHeight,
                   child: ValueListenableBuilder<DateTime>(
                     valueListenable: _clockNotifier,
-                    builder: (context, now, _) => RepaintBoundary(
-                      child: CustomPaint(
-                        size: Size.infinite,
-                        painter: _PillCurvePainter(
-                          points: _data.tidePoints,
-                          events: _data.tideEvents,
-                          currentHour: now.hour + now.minute / 60,
-                          nowLabel: context.tr('tide.nowShort'),
-                          highTideShort: context.tr('tide.highTide'),
-                          lowTideShort: context.tr('tide.lowTide'),
-                          isDark: _isDark,
-                          fixedChartDatumScale: _data.location
-                              .toLowerCase()
-                              .contains('casablanca'),
+                    builder: (context, now, _) => Semantics(
+                      image: true,
+                      label: <String>[
+                        context.tr(_usesMeanSeaLevelDatum
+                            ? 'tide.meanSeaLevelCurveTitle'
+                            : 'tide.tideCurveTitle'),
+                        if (_usesMeanSeaLevelDatum)
+                          context.tr('tide.meanSeaLevelReference'),
+                      ].join('. '),
+                      child: RepaintBoundary(
+                        child: CustomPaint(
+                          size: Size.infinite,
+                          painter: _PillCurvePainter(
+                            points: _data.tidePoints,
+                            events: _data.tideEvents,
+                            currentHour: now.hour + now.minute / 60,
+                            nowLabel: context.tr('tide.nowShort'),
+                            highTideShort: context.tr('tide.highTide'),
+                            lowTideShort: context.tr('tide.lowTide'),
+                            isDark: _isDark,
+                            usesMeanSeaLevelDatum: _usesMeanSeaLevelDatum,
+                            fixedChartDatumScale: _usesFixedLocalDatum,
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-                if (_data.location.toLowerCase().contains('casablanca')) ...[
+                if (_usesFixedLocalDatum || _usesMeanSeaLevelDatum) ...[
                   const SizedBox(height: 7),
                   Text(
-                    context.tr('tide.tideCurveJrcSource'),
+                    _usesCasablancaBmiDatum
+                        ? context.tr('tide.tideCurveJrcSource')
+                        : _usesCasablancaPresentationModel
+                            ? context.tr(
+                                'tide.globalModeledDatumReference',
+                              )
+                            : context.tr('tide.meanSeaLevelReference'),
                     style: TextStyle(
                       color: _txt(0.42),
                       fontSize: 10.5,
@@ -1636,7 +1806,7 @@ class _TidePageState extends State<TidePage>
                 onTap: () {
                   if (_selectedTideView == _TideView.coefficients) return;
                   setState(() => _selectedTideView = _TideView.coefficients);
-                  _loadCoefficientMonth();
+                  if (_isCasablanca) _loadCoefficientMonth();
                 },
               ),
             ],
@@ -1843,6 +2013,35 @@ class _TidePageState extends State<TidePage>
         child: Column(
           children: [
             _buildForecastTitle(forecastDays.length),
+            if (_usesMeanSeaLevelDatum || _usesCasablancaPresentationModel)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 2, 10, 5),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.straighten_rounded,
+                      size: 13,
+                      color: _accent,
+                    ),
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: Text(
+                        context.tr(
+                          _usesCasablancaPresentationModel
+                              ? 'tide.globalModeledDatumReference'
+                              : 'tide.meanSeaLevelReference',
+                        ),
+                        style: TextStyle(
+                          color: _txt(0.58),
+                          fontSize: 8.5,
+                          height: 1.2,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             if (forecastDays.isEmpty)
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
@@ -2097,7 +2296,7 @@ class _TidePageState extends State<TidePage>
     tm.HourlyForecastSlot slot, {
     required bool isLast,
   }) {
-    final now = DateTime.now();
+    final now = _data.stationTimeAt(DateTime.now());
     final isCurrentSlot = slot.time.year == now.year &&
         slot.time.month == now.month &&
         slot.time.day == now.day &&
@@ -2108,13 +2307,18 @@ class _TidePageState extends State<TidePage>
     final weatherColor = _weatherColor(slot);
     final windDirection = slot.windDirectionDeg;
     final waveDirection = slot.waveDirectionDeg;
+    final tideHeight = slot.tideExtremum?.heightM ?? slot.tideHeightM;
     return Semantics(
       button: _isToday(slot.time),
       selected: isCurrentSlot,
-      label: context.trArgs(
-        'tide.hourSemantics',
-        args: {'hour': slot.time.hour.toString()},
-      ),
+      label: <String>[
+        context.trArgs(
+          'tide.hourSemantics',
+          args: {'hour': slot.time.hour.toString()},
+        ),
+        if (tideHeight != null)
+          '${context.tr(_usesCasablancaPresentationModel ? 'tide.presentationLevel' : 'tide.title')} : ${_tideHeightFull(tideHeight)}',
+      ].join('. '),
       child: InkWell(
         onTap: _isToday(slot.time)
             ? () {
@@ -2369,6 +2573,12 @@ class _TidePageState extends State<TidePage>
 
     final isHigh = extremum?.isHigh;
     final isRising = slot.tideIsRising ?? false;
+    final heightLabel = _usesMeanSeaLevelDatum
+        ? TideHeightFormatter.coordinateValue(
+            height,
+            _data.tideHeightDatum,
+          )
+        : _tideHeightValue(height);
     final color = isHigh == true
         ? const Color(0xFF35D66F)
         : isHigh == false
@@ -2388,7 +2598,7 @@ class _TidePageState extends State<TidePage>
         Icon(icon, color: color, size: compact ? 15 : 17),
         const SizedBox(height: 1),
         Text(
-          _meterValue(height),
+          heightLabel,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
@@ -2401,6 +2611,7 @@ class _TidePageState extends State<TidePage>
           Text(
             _formatForecastEventTime(extremum.time),
             maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: color,
               fontSize: compact ? 9.5 : 10.2,
@@ -2417,7 +2628,7 @@ class _TidePageState extends State<TidePage>
   }
 
   bool _isToday(DateTime time) {
-    final now = DateTime.now();
+    final now = _data.stationTimeAt(DateTime.now());
     return time.year == now.year &&
         time.month == now.month &&
         time.day == now.day;
@@ -2430,6 +2641,30 @@ class _TidePageState extends State<TidePage>
   String _meterValue(double? value) => value == null
       ? context.tr('tide.unavailableShort')
       : '${_compactNumber(value)} m';
+
+  String _tideHeightValue(double value) => TideHeightFormatter.value(
+        value,
+        _data.tideHeightDatum,
+      );
+
+  String _tideHeightQualifier(double value) => TideHeightFormatter.qualifier(
+        context,
+        value,
+        _data.tideHeightDatum,
+      );
+
+  String _tideHeightFull(double value) => TideHeightFormatter.full(
+        context,
+        value,
+        _data.tideHeightDatum,
+      );
+
+  String _tideHeightCompactFull(double value) =>
+      TideHeightFormatter.compactFull(
+        context,
+        value,
+        _data.tideHeightDatum,
+      );
 
   String _waveDetails(tm.HourlyForecastSlot slot) {
     final parts = <String>[];
@@ -2827,8 +3062,8 @@ class _TidePageState extends State<TidePage>
                         size: 20,
                       ),
                       label: context.tr('tide.wind').toUpperCase(),
-                      value: selected.windSpeed > 0
-                          ? '${selected.windSpeed} km/h\n${selected.windDirection}'
+                      value: selected.windSpeed != null
+                          ? '${selected.windSpeed} km/h\n${selected.windDirection ?? '--'}'
                           : context.tr('tide.unavailable'),
                     ),
                   ),
@@ -2841,8 +3076,8 @@ class _TidePageState extends State<TidePage>
                         size: 20,
                       ),
                       label: context.tr('tide.waves').toUpperCase(),
-                      value: selected.waveHeight > 0
-                          ? '${selected.waveHeight.toStringAsFixed(1)} m / ${selected.wavePeriod} s'
+                      value: selected.waveHeight != null
+                          ? '${selected.waveHeight!.toStringAsFixed(1)} m${selected.wavePeriod == null ? '' : ' / ${selected.wavePeriod} s'}'
                           : context.tr('tide.unavailable'),
                     ),
                   ),
@@ -2967,47 +3202,52 @@ class _TidePageState extends State<TidePage>
   }
 
   Widget _buildEventsPanel() {
-    final events = _data.upcomingEvents.take(4).toList();
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 5, 16, 4),
-      child: _glassPanel(
-        borderRadius: BorderRadius.circular(14),
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 9),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              context.tr('tide.upcomingTideEvents').toUpperCase(),
-              style: TextStyle(
-                color: _txt(0.64),
-                fontSize: _conditionSectionTitleFontSize,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.9,
-              ),
+    return ValueListenableBuilder<DateTime>(
+      valueListenable: _clockNotifier,
+      builder: (context, _, __) {
+        final events = _futureEvents().take(4).toList();
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 5, 16, 4),
+          child: _glassPanel(
+            borderRadius: BorderRadius.circular(14),
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 9),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  context.tr('tide.upcomingTideEvents').toUpperCase(),
+                  style: TextStyle(
+                    color: _txt(0.64),
+                    fontSize: _conditionSectionTitleFontSize,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.9,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                SizedBox(
+                  height: 55,
+                  child: Row(
+                    children: [
+                      for (var index = 0; index < events.length; index++) ...[
+                        Expanded(child: _compactEventCard(events[index])),
+                        if (index != events.length - 1)
+                          const SizedBox(width: 5),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 6),
-            SizedBox(
-              height: 55,
-              child: Row(
-                children: [
-                  for (var index = 0; index < events.length; index++) ...[
-                    Expanded(child: _compactEventCard(events[index])),
-                    if (index != events.length - 1) const SizedBox(width: 5),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
   Widget _compactEventCard(tm.TideEvent event) {
     final isHigh = event.type == 'high';
     final color = isHigh ? _accent : _red;
-    final dateTime = event.dateTime;
-    final tomorrow = dateTime != null && dateTime.day != DateTime.now().day;
+    final dayLabel = _eventDayLabel(event);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
       decoration: BoxDecoration(
@@ -3052,7 +3292,7 @@ class _TidePageState extends State<TidePage>
             ),
           ),
           Text(
-            '${event.height.toStringAsFixed(2)} m${tomorrow ? ' · ${context.tr('tide.tomorrowShort')}' : ''}',
+            '${_tideHeightCompactFull(event.height)}${dayLabel == null ? '' : ' · $dayLabel'}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
@@ -3496,24 +3736,27 @@ class _HourlyCardWidget extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  card.windDirection,
+                  card.windDirection ?? '--',
                   style: TextStyle(
                     color: isSelected ? selectedText : accentText,
                     fontSize: 8,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                Transform.rotate(
-                  angle: _compassToRadians(card.windDirection),
-                  child: Icon(
-                    Icons.arrow_downward_rounded,
-                    size: 14,
-                    color: isSelected ? selectedText : accentText,
+                Opacity(
+                  opacity: card.windDirection == null ? 0 : 1,
+                  child: Transform.rotate(
+                    angle: _compassToRadians(card.windDirection ?? 'N'),
+                    child: Icon(
+                      Icons.arrow_downward_rounded,
+                      size: 14,
+                      color: isSelected ? selectedText : accentText,
+                    ),
                   ),
                 ),
                 Text(
-                  card.waveHeight > 0
-                      ? card.waveHeight.toStringAsFixed(1)
+                  card.waveHeight != null
+                      ? card.waveHeight!.toStringAsFixed(1)
                       : context.tr('tide.unavailableShort'),
                   style: TextStyle(
                     color: isSelected ? selectedText : _txt(0.94),
@@ -3522,7 +3765,7 @@ class _HourlyCardWidget extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  card.wavePeriod > 0
+                  card.wavePeriod != null
                       ? '${card.wavePeriod}s'
                       : context.tr('tide.unavailableShort'),
                   style: TextStyle(
@@ -3553,6 +3796,7 @@ class _PillCurvePainter extends CustomPainter {
   final String highTideShort;
   final String lowTideShort;
   final bool isDark;
+  final bool usesMeanSeaLevelDatum;
   final bool fixedChartDatumScale;
   _PillCurvePainter(
       {required this.points,
@@ -3562,6 +3806,7 @@ class _PillCurvePainter extends CustomPainter {
       required this.highTideShort,
       required this.lowTideShort,
       required this.isDark,
+      required this.usesMeanSeaLevelDatum,
       required this.fixedChartDatumScale});
 
   static const double _padL = 18.0,
@@ -3582,35 +3827,42 @@ class _PillCurvePainter extends CustomPainter {
     final h = chartBottom - chartTop;
     if (h <= 0 || w <= 0) return;
 
-    final maxH = sampled.map((p) => p.height).reduce(math.max);
-    final minH = sampled.map((p) => p.height).reduce(math.min);
-    final range = (maxH - minH).clamp(0.02, 100.0);
-    final paddedMin = minH - range * 0.1;
-    final paddedRange = range * 1.2;
-    final axisMin = fixedChartDatumScale ? 0.0 : paddedMin;
-    final axisRange = fixedChartDatumScale ? 5.0 : paddedRange;
-    final tickCount = fixedChartDatumScale ? 5 : 4;
+    final dataRange = (sampled.map((p) => p.height).reduce(math.max) -
+            sampled.map((p) => p.height).reduce(math.min))
+        .clamp(0.02, 100.0)
+        .toDouble();
+    final scale = TideChartScale.forValues(
+      sampled.map((point) => point.height),
+      fixedChartDatumScale: fixedChartDatumScale,
+      usesMeanSeaLevelDatum: usesMeanSeaLevelDatum,
+    );
+    final axisMin = scale.min;
+    final axisRange = scale.range;
+    final tickCount = scale.tickCount;
 
     double xFor(double t) => _padL + (t / 24.0) * w;
     double yFor(double v) => chartTop + h - ((v - axisMin) / axisRange) * h;
 
-    final decimals = fixedChartDatumScale ? 0 : (range < 0.5 ? 2 : 1);
+    final decimals = fixedChartDatumScale ? 0 : (dataRange < 0.5 ? 2 : 1);
     for (int i = 0; i <= tickCount; i++) {
-      final v = axisMin + axisRange * i / tickCount;
+      final v = scale.tickAt(i);
       final gy = chartTop + h - h * i / tickCount;
+      final isMeanSeaLevel = usesMeanSeaLevelDatum && v.abs() < 1e-9;
       canvas.drawLine(
           Offset(_padL, gy),
           Offset(_padL + w, gy),
           Paint()
-            ..color = _txt(0.06)
-            ..strokeWidth = 0.6);
+            ..color =
+                isMeanSeaLevel ? _accent.withValues(alpha: 0.34) : _txt(0.06)
+            ..strokeWidth = isMeanSeaLevel ? 1.25 : 0.6);
       final tp = TextPainter(
           text: TextSpan(
-              text: '${v.toStringAsFixed(decimals)}m',
+              text: _axisHeightLabel(v, decimals),
               style: TextStyle(
-                  color: _txt(0.45),
+                  color: isMeanSeaLevel ? _accent : _txt(0.45),
                   fontSize: 11.5,
-                  fontWeight: FontWeight.w600)),
+                  fontWeight:
+                      isMeanSeaLevel ? FontWeight.w800 : FontWeight.w600)),
           textDirection: TextDirection.ltr)
         ..layout();
       tp.paint(canvas, Offset(_padL + w + 8, gy - tp.height / 2));
@@ -3698,11 +3950,21 @@ class _PillCurvePainter extends CustomPainter {
                   fontWeight: FontWeight.w800)),
           textDirection: TextDirection.ltr)
         ..layout();
+      final symTp = TextPainter(
+          text: TextSpan(
+              text: symbol,
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800)),
+          textDirection: TextDirection.ltr)
+        ..layout();
       const hPad = 11.0;
-      final pillW = tp.width + hPad * 2 + 9;
+      const symbolGap = 4.0;
+      final pillW = tp.width + symTp.width + symbolGap + hPad * 2;
       const pillH = 28.0;
       // Les étiquettes restent dans la zone de tracé afin de ne jamais
-      // recouvrir l'échelle verticale 0–5 m réservée à droite.
+      // recouvrir l'échelle verticale réservée à droite.
       final maxPillX = math.max(_padL, _padL + w - pillW);
       double px = (targetX - pillW / 2).clamp(_padL, maxPillX);
       double py = _topMargin;
@@ -3716,28 +3978,27 @@ class _PillCurvePainter extends CustomPainter {
       placedPills.add(rect);
       canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(14)),
           Paint()..color = color);
-      tp.paint(canvas,
-          Offset(rect.left + hPad + 8, rect.top + (pillH - tp.height) / 2));
-      final symTp = TextPainter(
-          text: TextSpan(
-              text: symbol,
-              style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w800)),
-          textDirection: TextDirection.ltr)
-        ..layout();
       symTp.paint(canvas,
           Offset(rect.left + hPad, rect.top + (pillH - symTp.height) / 2));
+      tp.paint(
+        canvas,
+        Offset(
+          rect.left + hPad + symTp.width + symbolGap,
+          rect.top + (pillH - tp.height) / 2,
+        ),
+      );
     }
 
     drawPill(nx, nowLabel.toUpperCase(), _green, '●', isNow: true);
     for (final e in events) {
       final isHigh = e.type == 'high';
       final ex = xFor(e.time);
+      final eventType = isHigh ? highTideShort : lowTideShort;
       drawPill(
           ex,
-          '${e.height.toStringAsFixed(2)}m ${isHigh ? highTideShort : lowTideShort}',
+          usesMeanSeaLevelDatum
+              ? '$eventType ${_eventHeightLabel(e.height)}'
+              : '${_eventHeightLabel(e.height)} $eventType',
           isHigh ? _accent : _red,
           isHigh ? '▲' : '▼');
       canvas.drawCircle(Offset(ex, yFor(e.height)), 5,
@@ -3754,6 +4015,22 @@ class _PillCurvePainter extends CustomPainter {
         25, (i) => src[(i * step).round().clamp(0, src.length - 1)]);
   }
 
+  String _axisHeightLabel(double value, int decimals) {
+    if (!usesMeanSeaLevelDatum) {
+      return '${value.toStringAsFixed(decimals)}m';
+    }
+    final magnitude = value.abs().toStringAsFixed(decimals);
+    if (double.tryParse(magnitude) == 0) return '0m';
+    return '${value > 0 ? '+' : '−'}${magnitude}m';
+  }
+
+  String _eventHeightLabel(double value) {
+    if (!usesMeanSeaLevelDatum) return '${value.toStringAsFixed(2)}m';
+    final magnitude = value.abs().toStringAsFixed(2);
+    if (double.tryParse(magnitude) == 0) return '0.00m';
+    return '${value > 0 ? '+' : '−'}${magnitude}m';
+  }
+
   @override
   bool shouldRepaint(covariant _PillCurvePainter old) =>
       old.currentHour != currentHour ||
@@ -3763,5 +4040,6 @@ class _PillCurvePainter extends CustomPainter {
       old.highTideShort != highTideShort ||
       old.lowTideShort != lowTideShort ||
       old.isDark != isDark ||
+      old.usesMeanSeaLevelDatum != usesMeanSeaLevelDatum ||
       old.fixedChartDatumScale != fixedChartDatumScale;
 }

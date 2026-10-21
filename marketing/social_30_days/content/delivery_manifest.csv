@@ -1,0 +1,31 @@
+﻿day,slug,language,video,cover,subtitle,caption_source
+1,manifesto,FR + Darija,exports/reels/01_manifesto.mp4,exports/covers/01_manifesto.png,content/captions_srt/01_manifesto.srt,content/captions_ready_to_post.md
+2,checklist_depart,FR,exports/reels/02_checklist_depart.mp4,exports/covers/02_checklist_depart.png,content/captions_srt/02_checklist_depart.srt,content/captions_ready_to_post.md
+3,safety_darija,Darija,exports/reels/03_safety_darija.mp4,exports/covers/03_safety_darija.png,content/captions_srt/03_safety_darija.srt,content/captions_ready_to_post.md
+4,official_spots,FR,exports/reels/04_official_spots.mp4,exports/covers/04_official_spots.png,content/captions_srt/04_official_spots.srt,content/captions_ready_to_post.md
+5,private_spots,Darija,exports/reels/05_private_spots.mp4,exports/covers/05_private_spots.png,content/captions_srt/05_private_spots.srt,content/captions_ready_to_post.md
+6,read_tides,FR,exports/reels/06_read_tides.mp4,exports/covers/06_read_tides.png,content/captions_srt/06_read_tides.srt,content/captions_ready_to_post.md
+7,fg_knot,FR,exports/reels/07_fg_knot.mp4,exports/covers/07_fg_knot.png,content/captions_srt/07_fg_knot.srt,content/captions_ready_to_post.md
+8,palomar_knot,Darija,exports/reels/08_palomar_knot.mp4,exports/covers/08_palomar_knot.png,content/captions_srt/08_palomar_knot.srt,content/captions_ready_to_post.md
+9,clinch_knot,FR,exports/reels/09_clinch_knot.mp4,exports/covers/09_clinch_knot.png,content/captions_srt/09_clinch_knot.srt,content/captions_ready_to_post.md
+10,offshore_swivel,FR + Darija,exports/reels/10_offshore_swivel.mp4,exports/covers/10_offshore_swivel.png,content/captions_srt/10_offshore_swivel.srt,content/captions_ready_to_post.md
+11,jigging_prep,FR,exports/reels/11_jigging_prep.mp4,exports/covers/11_jigging_prep.png,content/captions_srt/11_jigging_prep.srt,content/captions_ready_to_post.md
+12,trolling_prep,Darija,exports/reels/12_trolling_prep.mp4,exports/covers/12_trolling_prep.png,content/captions_srt/12_trolling_prep.srt,content/captions_ready_to_post.md
+13,species_guide,FR,exports/reels/13_species_guide.mp4,exports/covers/13_species_guide.png,content/captions_srt/13_species_guide.srt,content/captions_ready_to_post.md
+14,sea_conditions,FR + Darija,exports/reels/14_sea_conditions.mp4,exports/covers/14_sea_conditions.png,content/captions_srt/14_sea_conditions.srt,content/captions_ready_to_post.md
+15,offline_maps,FR,exports/reels/15_offline_maps.mp4,exports/covers/15_offline_maps.png,content/captions_srt/15_offline_maps.srt,content/captions_ready_to_post.md
+16,community_privacy,Darija,exports/reels/16_community_privacy.mp4,exports/covers/16_community_privacy.png,content/captions_srt/16_community_privacy.srt,content/captions_ready_to_post.md
+17,publish_catch,FR,exports/reels/17_publish_catch.mp4,exports/covers/17_publish_catch.png,content/captions_srt/17_publish_catch.srt,content/captions_ready_to_post.md
+18,community_controls,FR,exports/reels/18_community_controls.mp4,exports/covers/18_community_controls.png,content/captions_srt/18_community_controls.srt,content/captions_ready_to_post.md
+19,fishing_shops,FR + Darija,exports/reels/19_fishing_shops.mp4,exports/covers/19_fishing_shops.png,content/captions_srt/19_fishing_shops.srt,content/captions_ready_to_post.md
+20,personal_log,FR,exports/reels/20_personal_log.mp4,exports/covers/20_personal_log.png,content/captions_srt/20_personal_log.srt,content/captions_ready_to_post.md
+21,forecast_honesty,Darija,exports/reels/21_forecast_honesty.mp4,exports/covers/21_forecast_honesty.png,content/captions_srt/21_forecast_honesty.srt,content/captions_ready_to_post.md
+22,closed_test,FR,exports/reels/22_closed_test.mp4,exports/covers/22_closed_test.png,content/captions_srt/22_closed_test.srt,content/captions_ready_to_post.md
+23,tester_mission,FR + Darija,exports/reels/23_tester_mission.mp4,exports/covers/23_tester_mission.png,content/captions_srt/23_tester_mission.srt,content/captions_ready_to_post.md
+24,plan_darija,Darija,exports/reels/24_plan_darija.mp4,exports/covers/24_plan_darija.png,content/captions_srt/24_plan_darija.srt,content/captions_ready_to_post.md
+25,one_app,FR,exports/reels/25_one_app.mp4,exports/covers/25_one_app.png,content/captions_srt/25_one_app.srt,content/captions_ready_to_post.md
+26,big_game_prep,FR,exports/reels/26_big_game_prep.mp4,exports/covers/26_big_game_prep.png,content/captions_srt/26_big_game_prep.srt,content/captions_ready_to_post.md
+27,bimini_yucatan,FR + Darija,exports/reels/27_bimini_yucatan.mp4,exports/covers/27_bimini_yucatan.png,content/captions_srt/27_bimini_yucatan.srt,content/captions_ready_to_post.md
+28,knot_quiz,Darija,exports/reels/28_knot_quiz.mp4,exports/covers/28_knot_quiz.png,content/captions_srt/28_knot_quiz.srt,content/captions_ready_to_post.md
+29,monthly_recap,FR,exports/reels/29_monthly_recap.mp4,exports/covers/29_monthly_recap.png,content/captions_srt/29_monthly_recap.srt,content/captions_ready_to_post.md
+30,coming_soon,FR + Darija,exports/reels/30_coming_soon.mp4,exports/covers/30_coming_soon.png,content/captions_srt/30_coming_soon.srt,content/captions_ready_to_post.md

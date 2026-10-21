@@ -11,6 +11,7 @@ import '../l10n/app_localizations.dart';
 import '../models.dart';
 import '../models/tide_data.dart';
 import '../theme_controller.dart';
+import '../utils/tide_height_formatter.dart';
 import 'settings_page.dart';
 
 class HomeDashboard extends StatefulWidget {
@@ -361,7 +362,7 @@ class _ConditionsHero extends StatelessWidget {
 
   TidePoint? get _currentPoint {
     if (!_hasData) return null;
-    final now = DateTime.now();
+    final now = tideData.stationTimeAt(DateTime.now());
     return tideData.hourlyPoints.reduce(
       (a, b) =>
           a.time.difference(now).abs() <= b.time.difference(now).abs() ? a : b,
@@ -370,7 +371,7 @@ class _ConditionsHero extends StatelessWidget {
 
   String get _nextTime {
     if (!_hasData) return '--:--';
-    final now = DateTime.now();
+    final now = tideData.stationTimeAt(DateTime.now());
     final upcoming = tideData.hourlyPoints.where((p) => p.time.isAfter(now));
     final point =
         upcoming.isEmpty ? tideData.hourlyPoints.last : upcoming.first;
@@ -394,13 +395,40 @@ class _ConditionsHero extends StatelessWidget {
     final current = _currentPoint;
     final activity =
         _hasData ? tideData.astro.fishActivity.clamp(0.0, 1.0) : 0.0;
-    final activityValue = _hasData ? '${(activity * 100).round()}%' : '--';
-    final tideValue = _hasData ? '${tideData.next.toStringAsFixed(1)} m' : '--';
+    final usesCasablancaReference =
+        tideData.tideHeightDatum == TideHeightDatum.casablancaBmi ||
+            (tideData.tideHeightDatum == TideHeightDatum.unknown &&
+                tideData.location.toLowerCase().contains('casablanca'));
+    final activityValue = _hasData && usesCasablancaReference
+        ? '${(activity * 100).round()}%'
+        : '--';
+    final tideValue = _hasData
+        ? TideHeightFormatter.coordinateValue(
+            tideData.next,
+            tideData.tideHeightDatum,
+            fractionDigits: 1,
+          )
+        : '--';
+    final tideReference = _hasData
+        ? TideHeightFormatter.datumLabel(context, tideData.tideHeightDatum)
+        : '';
+    final tideDetail = !_hasData
+        ? ''
+        : TideHeightFormatter.isPresentationDatum(tideData.tideHeightDatum)
+            ? context.trArgs(
+                'tide.presentationLevelAt',
+                args: {'time': _nextTime},
+              )
+            : <String>[
+                tideReference,
+                _nextTime,
+              ].where((part) => part.isNotEmpty).join(' · ');
     final windValue = current?.windSpeedKmh == null
         ? '--'
         : '${current!.windSpeedKmh!.round()} km/h';
+    final waveHeight = current?.windWaveHeight;
     final waveValue =
-        _hasData ? '${tideData.waveHeight.toStringAsFixed(1)} m' : '--';
+        waveHeight == null ? '--' : '${waveHeight.toStringAsFixed(1)} m';
 
     return Center(
       child: ConstrainedBox(
@@ -513,7 +541,7 @@ class _ConditionsHero extends StatelessWidget {
                               icon: Icons.waves_rounded,
                               label: context.tr('home.tidesTitle'),
                               value: tideValue,
-                              detail: _nextTime,
+                              detail: tideDetail,
                             ),
                           ),
                           _HeroDivider(color: palette.heroPanelBorder),
@@ -531,9 +559,9 @@ class _ConditionsHero extends StatelessWidget {
                               icon: Icons.water_rounded,
                               label: context.tr('home.sea'),
                               value: waveValue,
-                              detail: _hasData
-                                  ? '${current?.wavePeriod.round() ?? 0} s'
-                                  : '--',
+                              detail: current?.wavePeriod == null
+                                  ? '--'
+                                  : '${current!.wavePeriod!.round()} s',
                             ),
                           ),
                           _HeroDivider(color: palette.heroPanelBorder),

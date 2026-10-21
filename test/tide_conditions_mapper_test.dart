@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:spots_app/models/tide_data.dart';
 import 'package:spots_app/services/tide_conditions_mapper.dart';
 
 void main() {
@@ -51,6 +52,61 @@ void main() {
     expect(result.hourlyForecast.first.activityScore, 80);
     expect(result.low, -0.35);
     expect(result.high, 1.08);
+    expect(result.astro.sunRise, '06:15');
+    expect(result.astro.sunSet, '20:42');
+    expect(
+      result.tideHeightDatum,
+      TideHeightDatum.globalMeanSeaLevel,
+      reason: 'Un ancien document sans tide_datum reste identifié comme MSL.',
+    );
+  });
+
+  test('propage le référentiel MSL explicitement publié', () {
+    final document = _conditionsDocument(
+      tideHeights: const [0.1, 0.4, 0.2],
+      waveHeights: const [1.1, 1.2, 1.3],
+    )..['tide_datum'] = 'global_mean_sea_level';
+
+    final result = TideConditionsMapper.fromDocument(
+      document,
+      fallbackLocation: 'Fallback',
+      now: DateTime.utc(2026, 7, 26, 1),
+    );
+
+    expect(result.tideHeightDatum, TideHeightDatum.globalMeanSeaLevel);
+  });
+
+  test('reconnaît le repère mondial de présentation Casablanca', () {
+    final document = _conditionsDocument(
+      tideHeights: const [0.1, 0.4, 0.2],
+      waveHeights: const [1.1, 1.2, 1.3],
+    )..['tide_datum'] = 'casablanca_presentation_model';
+
+    final result = TideConditionsMapper.fromDocument(
+      document,
+      fallbackLocation: 'Fallback',
+      now: DateTime.utc(2026, 7, 26, 1),
+    );
+
+    expect(
+      result.tideHeightDatum,
+      TideHeightDatum.casablancaPresentationModel,
+    );
+  });
+
+  test('ne qualifie pas un référentiel publié inconnu', () {
+    final document = _conditionsDocument(
+      tideHeights: const [0.1, 0.4, 0.2],
+      waveHeights: const [1.1, 1.2, 1.3],
+    )..['tide_datum'] = 'unsupported_local_datum';
+
+    final result = TideConditionsMapper.fromDocument(
+      document,
+      fallbackLocation: 'Fallback',
+      now: DateTime.utc(2026, 7, 26, 1),
+    );
+
+    expect(result.tideHeightDatum, TideHeightDatum.unknown);
   });
 
   test('interprète les heures Open-Meteo sans suffixe comme UTC', () {
@@ -101,7 +157,7 @@ void main() {
     );
   });
 
-  test('la météo GFS absente reste rétrocompatible', () {
+  test('la météo horaire reste complète sans résumé GFS', () {
     final document = _conditionsDocument(
       tideHeights: const [0.1, 0.4, 0.2],
       waveHeights: const [1.1, 1.2, 1.3],
@@ -113,9 +169,10 @@ void main() {
       now: DateTime.utc(2026, 7, 26, 1).toLocal(),
     );
 
-    expect(result.hourlyPoints.first.pressureHpa, isNull);
-    expect(result.hourlyPoints.first.precipitationProbabilityPct, isNull);
-    expect(result.hourlyPoints.first.relativeHumidityPct, isNull);
+    expect(result.hourlyPoints.first.pressureHpa, 1014);
+    expect(result.hourlyPoints.first.precipitationProbabilityPct, 18);
+    expect(result.hourlyPoints.first.relativeHumidityPct, 72);
+    expect(result.hourlyPoints.first.visibilityKm, 14);
   });
 
   test('ignore les valeurs GFS hors limites', () {
@@ -125,6 +182,13 @@ void main() {
     );
     final gfs = document['gfs'] as Map<String, dynamic>;
     final slots = gfs['hourly'] as List<Map<String, dynamic>>;
+    final weather = document['weather'] as Map<String, dynamic>;
+    final weatherSlots = weather['hourly'] as List<Map<String, dynamic>>;
+    weatherSlots.first
+      ..remove('pressureHpa')
+      ..remove('precipitationProbabilityPct')
+      ..remove('relativeHumidityPct')
+      ..remove('visibilityKm');
     slots.first
       ..['pressureHpa'] = 400
       ..['precipitationProbabilityPct'] = 150
@@ -147,7 +211,7 @@ void main() {
     expect(result.hourlyPoints.first.oceanCurrentDirectionDeg, isNull);
   });
 
-  test('limite la prévision détaillée aux dix premiers jours', () {
+  test('limite la prévision détaillée aux huit jours marins disponibles', () {
     final document = _conditionsDocument(
       tideHeights: const [0.1, 0.4, 0.2],
       waveHeights: const [1.1, 1.2, 1.3],
@@ -169,9 +233,129 @@ void main() {
       now: DateTime(2026, 7, 26, 1),
     );
 
-    expect(result.hourlyForecast, hasLength(10));
+    expect(result.hourlyForecast, hasLength(8));
     expect(result.hourlyForecast.first.time.day, 26);
-    expect(result.hourlyForecast.last.time, DateTime(2026, 8, 4));
+    expect(result.hourlyForecast.last.time, DateTime(2026, 8, 2));
+  });
+
+  test('aligne toutes les séries sur le fuseau de la station distante', () {
+    final document = _conditionsDocument(
+      tideHeights: const [0.1, 0.4, 0.2],
+      waveHeights: const [1.1, 1.2, 1.3],
+    )..['utc_offset_seconds'] = -5 * 3600;
+    final tide = document['tide'] as Map<String, dynamic>;
+    final weather = document['weather'] as Map<String, dynamic>;
+    final tideSlots = tide['hourly'] as List<Map<String, dynamic>>;
+    final weatherSlots = weather['hourly'] as List<Map<String, dynamic>>;
+    for (var index = 0; index < tideSlots.length; index++) {
+      final time =
+          '2026-07-26T${(5 + index).toString().padLeft(2, '0')}:00:00Z';
+      tideSlots[index]['time'] = time;
+      weatherSlots[index]['time'] = time;
+    }
+    final gfs = document['gfs'] as Map<String, dynamic>;
+    final gfsSlots = gfs['hourly'] as List<Map<String, dynamic>>;
+    gfsSlots.first['time'] = '2026-07-26T05:00:00Z';
+    document['sun'] = {
+      'date': '2026-07-25',
+      'sunrise': '2026-07-25T06:01',
+      'sunset': '2026-07-25T20:01',
+      'daily': [
+        {
+          'date': '2026-07-25',
+          'sunrise': '2026-07-25T06:01',
+          'sunset': '2026-07-25T20:01',
+        },
+        {
+          'date': '2026-07-26',
+          'sunrise': '2026-07-26T06:02',
+          'sunset': '2026-07-26T20:02',
+        },
+      ],
+    };
+
+    final result = TideConditionsMapper.fromDocument(
+      document,
+      fallbackLocation: 'Fallback',
+      now: DateTime.utc(2026, 7, 26, 5, 15),
+    );
+
+    expect(result.utcOffsetSeconds, -5 * 3600);
+    expect(result.hourlyPoints.first.time, DateTime(2026, 7, 26));
+    expect(result.hourlyForecast.first.time, DateTime(2026, 7, 26));
+    expect(result.hourlyPoints.first.pressureHpa, 1014);
+    expect(result.stationTimeAt(DateTime.utc(2026, 7, 26, 5, 15)),
+        DateTime(2026, 7, 26, 0, 15));
+    expect(
+      result.stationInstantAt(DateTime(2026, 7, 26, 0, 15)),
+      DateTime.utc(2026, 7, 26, 5, 15),
+    );
+    expect(result.astro.sunRise, '06:02');
+    expect(result.astro.sunSet, '20:02');
+  });
+
+  test('n’affiche pas les horaires solaires de la veille', () {
+    final document = _conditionsDocument(
+      tideHeights: const [0.1, 0.4, 0.2],
+      waveHeights: const [1.1, 1.2, 1.3],
+    );
+    document['sun'] = {
+      'date': '2026-07-25',
+      'sunrise': '2026-07-25T06:15',
+      'sunset': '2026-07-25T20:42',
+    };
+
+    final result = TideConditionsMapper.fromDocument(
+      document,
+      fallbackLocation: 'Fallback',
+      now: DateTime(2026, 7, 26, 1),
+    );
+
+    expect(result.astro.sunRise, '--:--');
+    expect(result.astro.sunSet, '--:--');
+  });
+
+  test('utilise le fuseau IANA et les instants UTC après le retour à GMT', () {
+    final document = _conditionsDocument(
+      tideHeights: const [0.1, 0.4, 0.2],
+      waveHeights: const [1.1, 1.2, 1.3],
+    )
+      ..['timezone'] = 'Africa/Casablanca'
+      // Simule un ancien champ de tête afin de vérifier que le fuseau daté
+      // et les instants explicites ont bien priorité.
+      ..['utc_offset_seconds'] = 3600;
+    final tideSlots =
+        (document['tide'] as Map<String, dynamic>)['hourly'] as List<dynamic>;
+    final weatherSlots = (document['weather'] as Map<String, dynamic>)['hourly']
+        as List<dynamic>;
+    for (var index = 0; index < tideSlots.length; index++) {
+      final hour = index.toString().padLeft(2, '0');
+      final instant = '2026-10-05T$hour:00:00Z';
+      (tideSlots[index] as Map<String, dynamic>)['time'] = instant;
+      (weatherSlots[index] as Map<String, dynamic>)['time'] = instant;
+    }
+    final gfsSlots =
+        (document['gfs'] as Map<String, dynamic>)['hourly'] as List<dynamic>;
+    (gfsSlots.first as Map<String, dynamic>)['time'] = '2026-10-05T00:00:00Z';
+    document['sun'] = {
+      'date': '2026-10-05',
+      'sunrise': '2026-10-05T06:25',
+      'sunset': '2026-10-05T18:08',
+    };
+
+    final result = TideConditionsMapper.fromDocument(
+      document,
+      fallbackLocation: 'Fallback',
+      now: DateTime.utc(2026, 10, 5, 1, 10),
+    );
+
+    expect(result.timeZoneId, 'Africa/Casablanca');
+    expect(result.hourlyPoints.first.time, DateTime(2026, 10, 5));
+    expect(result.hourlyPoints.first.instantUtc, DateTime.utc(2026, 10, 5));
+    expect(
+      result.stationTimeAt(DateTime.utc(2026, 10, 5, 1, 10)),
+      DateTime(2026, 10, 5, 1, 10),
+    );
   });
 }
 
@@ -197,6 +381,13 @@ Map<String, dynamic> _conditionsDocument({
       'temperatureC': 24,
       'windSpeedKmh': 18,
       'windDirectionDeg': 225,
+      'windGustKmh': 32,
+      'pressureHpa': 1014,
+      'precipitationProbabilityPct': 18,
+      'precipitationMm': 0.4,
+      'relativeHumidityPct': 72,
+      'cloudCoverPct': 42,
+      'visibilityKm': 14,
     });
   }
   return {
@@ -206,6 +397,11 @@ Map<String, dynamic> _conditionsDocument({
     'moon': {
       'phaseName': 'Waxing Gibbous',
       'ageDays': 11.2,
+    },
+    'sun': {
+      'date': '2026-07-26',
+      'sunrise': '2026-07-26T06:15',
+      'sunset': '2026-07-26T20:42',
     },
     'tide': {'hourly': tideSlots},
     'weather': {'hourly': weatherSlots},

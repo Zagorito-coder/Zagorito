@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart';
 import 'package:spots_app/services/crash_reporting_service.dart';
@@ -93,6 +94,29 @@ void main() {
         tileStack,
       ),
       isFalse,
+    );
+  });
+
+  test('une erreur Flutter silencieuse reste non fatale', () {
+    final details = FlutterErrorDetails(
+      exception: StateError('image distante indisponible'),
+      silent: true,
+    );
+
+    expect(
+      CrashReportingService.shouldRecordFlutterErrorAsFatal(details),
+      isFalse,
+    );
+  });
+
+  test('une erreur Flutter non silencieuse reste fatale', () {
+    final details = FlutterErrorDetails(
+      exception: StateError('invariant applicatif invalide'),
+    );
+
+    expect(
+      CrashReportingService.shouldRecordFlutterErrorAsFatal(details),
+      isTrue,
     );
   });
 

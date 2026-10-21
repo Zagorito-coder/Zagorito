@@ -14,13 +14,24 @@ class _TransparentTileProvider extends TileProvider {
     'EQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
   );
 
+  bool disposed = false;
+
   @override
   ImageProvider getImage(TileCoordinates coordinates, TileLayer options) {
     return MemoryImage(_tile);
   }
+
+  @override
+  void dispose() {
+    disposed = true;
+    super.dispose();
+  }
 }
 
-Widget _mapWithStyle(MapStyle style) {
+Widget _mapWithStyle(
+  MapStyle style, {
+  TileProvider Function()? tileProviderFactory,
+}) {
   return MaterialApp(
     home: SizedBox.shrink(
       child: FlutterMap(
@@ -31,7 +42,8 @@ Widget _mapWithStyle(MapStyle style) {
         children: [
           AppTileLayer(
             style: style,
-            networkTileProviderFactory: _TransparentTileProvider.new,
+            networkTileProviderFactory:
+                tileProviderFactory ?? _TransparentTileProvider.new,
           ),
         ],
       ),
@@ -59,6 +71,24 @@ void main() {
     );
   });
 
+  test('le fond sombre utilise le service raster CARTO authentifie', () {
+    final source = File('lib/widgets/app_tile_layer.dart').readAsStringSync();
+
+    expect(
+      source,
+      contains("String.fromEnvironment(\n    'CARTO_BASEMAP_API_KEY',"),
+    );
+    expect(
+      source,
+      contains('https://basemaps.cartocdn.com/rastertiles/'),
+    );
+    expect(source, contains('dark_all/{z}/{x}/{y}.png?key='));
+    expect(
+      source,
+      isNot(contains('{s}.basemaps.cartocdn.com/dark_all')),
+    );
+  });
+
   testWidgets(
     'recree le fournisseur reseau apres le mode hors ligne',
     (tester) async {
@@ -79,6 +109,47 @@ void main() {
       // le binding de test vérifie l'absence de timers résiduels.
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump(const Duration(milliseconds: 100));
+    },
+  );
+
+  testWidgets(
+    'libere chaque fournisseur remplace lors des changements de fond',
+    (tester) async {
+      final providers = <_TransparentTileProvider>[];
+
+      _TransparentTileProvider createProvider() {
+        final provider = _TransparentTileProvider();
+        providers.add(provider);
+        return provider;
+      }
+
+      await tester.pumpWidget(
+        _mapWithStyle(
+          MapStyle.satellite,
+          tileProviderFactory: createProvider,
+        ),
+      );
+      await tester.pumpWidget(
+        _mapWithStyle(
+          MapStyle.standard,
+          tileProviderFactory: createProvider,
+        ),
+      );
+      await tester.pumpWidget(
+        _mapWithStyle(
+          MapStyle.dark,
+          tileProviderFactory: createProvider,
+        ),
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(providers, hasLength(3));
+      expect(
+        providers.every((provider) => provider.disposed),
+        isTrue,
+        reason: 'Chaque changement doit fermer le client HTTP précédent.',
+      );
     },
   );
 

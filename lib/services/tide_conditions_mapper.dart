@@ -1,4 +1,7 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../models/tide_data.dart';
+import '../utils/station_time_zone.dart';
 import 'astronomy_service.dart';
 
 /// Convertit le document Firestore `conditions/{station}` en données marines.
@@ -9,11 +12,21 @@ import 'astronomy_service.dart';
 class TideConditionsMapper {
   const TideConditionsMapper._();
 
+  static const int _maximumDetailedForecastDays = 8;
+
   static TideData fromDocument(
     Map<String, dynamic> data, {
     required String fallbackLocation,
     DateTime? now,
   }) {
+    final utcOffsetSeconds = _utcOffsetSeconds(data['utc_offset_seconds']);
+    final timeZoneId = _timeZoneId(data['timezone']);
+    final referenceInstant = (now ?? DateTime.now()).toUtc();
+    final referenceTime = StationTimeZone.civilAt(
+      referenceInstant,
+      timeZoneId: timeZoneId,
+      fallbackOffsetSeconds: utcOffsetSeconds,
+    );
     final tide = _asMap(data['tide']);
     final weather = _asMap(data['weather']);
     final gfs = _asMap(data['gfs']);
@@ -29,9 +42,14 @@ class TideConditionsMapper {
     if (weatherSlots is List<dynamic>) {
       for (final raw in weatherSlots) {
         final slot = _asMap(raw);
-        final time = _parseForecastTime(slot?['time']);
+        final time = _parseStationForecastTime(
+          slot?['time'],
+          utcOffsetSeconds,
+          timeZoneId: timeZoneId,
+          legacyUnzonedIsUtc: true,
+        );
         if (slot != null && time != null) {
-          weatherByTime[time.millisecondsSinceEpoch] = slot;
+          weatherByTime[time.instantUtc.millisecondsSinceEpoch] = slot;
         }
       }
     }
@@ -40,11 +58,13 @@ class TideConditionsMapper {
     if (gfsSlots is List<dynamic>) {
       for (final raw in gfsSlots) {
         final slot = _asMap(raw);
-        // Le job GFS utilise `timezone=auto` et publie donc une heure locale,
-        // contrairement au document de conditions dont les heures sont UTC.
-        final time = _parseLocalForecastTime(slot?['time']);
+        final time = _parseStationForecastTime(
+          slot?['time'],
+          utcOffsetSeconds,
+          timeZoneId: timeZoneId,
+        );
         if (slot != null && time != null) {
-          gfsByTime[time.millisecondsSinceEpoch] = slot;
+          gfsByTime[time.instantUtc.millisecondsSinceEpoch] = slot;
         }
       }
     }
@@ -52,7 +72,12 @@ class TideConditionsMapper {
     final points = <TidePoint>[];
     for (final raw in tideSlots) {
       final slot = _asMap(raw);
-      final time = _parseForecastTime(slot?['time']);
+      final time = _parseStationForecastTime(
+        slot?['time'],
+        utcOffsetSeconds,
+        timeZoneId: timeZoneId,
+        legacyUnzonedIsUtc: true,
+      );
       final height = _number(slot, 'height');
       if (slot == null ||
           time == null ||
@@ -63,122 +88,258 @@ class TideConditionsMapper {
         continue;
       }
 
-      final weatherAtTime = weatherByTime[time.millisecondsSinceEpoch];
-      final gfsAtTime = _nearestSlot(gfsByTime, time);
-      final totalWaveHeight = _number(slot, 'waveHeightM');
-      final windWaveHeight = _number(slot, 'windWaveHeightM');
-      final wavePeriod = _number(slot, 'wavePeriodS');
+      final weatherAtTime =
+          weatherByTime[time.instantUtc.millisecondsSinceEpoch];
+      final gfsAtTime = _nearestSlot(gfsByTime, time.instantUtc);
+      final totalWaveHeight = _boundedNumber(
+        slot,
+        'waveHeightM',
+        minimum: 0,
+        maximum: 40,
+      );
+      final wavePeriod = _boundedNumber(
+        slot,
+        'wavePeriodS',
+        minimum: 0,
+        maximum: 60,
+      );
+      final windDirection = _boundedNumber(
+            weatherAtTime,
+            'windDirectionDeg',
+            minimum: 0,
+            maximum: 360,
+          ) ??
+          _boundedNumber(
+            slot,
+            'windWaveDirectionDeg',
+            minimum: 0,
+            maximum: 360,
+          );
+      final temperature = _boundedNumber(
+        weatherAtTime,
+        'temperatureC',
+        minimum: -90,
+        maximum: 60,
+      );
+      final windSpeed = _boundedNumber(
+        weatherAtTime,
+        'windSpeedKmh',
+        minimum: 0,
+        maximum: 400,
+      );
+
+      if (totalWaveHeight == null ||
+          wavePeriod == null ||
+          windDirection == null ||
+          temperature == null ||
+          windSpeed == null) {
+        throw const FormatException(
+          'Créneau marin incomplet : publication refusée.',
+        );
+      }
 
       points.add(
         TidePoint(
-          time: time,
+          time: time.civil,
+          instantUtc: time.instantUtc,
           height: height,
-          windDirectionDeg: _number(weatherAtTime, 'windDirectionDeg') ??
-              _number(slot, 'windDirectionDeg') ??
-              0,
-          wavePeriod:
-              wavePeriod != null && wavePeriod.isFinite && wavePeriod >= 0
-                  ? wavePeriod
-                  : 0,
-          windWaveHeight: totalWaveHeight ?? windWaveHeight ?? 0,
-          temperatureC: _number(weatherAtTime, 'temperatureC'),
-          windSpeedKmh: _number(weatherAtTime, 'windSpeedKmh'),
+          windDirectionDeg: windDirection,
+          wavePeriod: wavePeriod,
+          windWaveHeight: totalWaveHeight,
+          temperatureC: temperature,
+          windSpeedKmh: windSpeed,
           pressureHpa: _boundedNumber(
-            gfsAtTime,
-            'pressureHpa',
-            minimum: 800,
-            maximum: 1200,
-          ),
+                weatherAtTime,
+                'pressureHpa',
+                minimum: 800,
+                maximum: 1200,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'pressureHpa',
+                minimum: 800,
+                maximum: 1200,
+              ),
           precipitationProbabilityPct: _boundedNumber(
-            gfsAtTime,
-            'precipitationProbabilityPct',
-            minimum: 0,
-            maximum: 100,
-          ),
+                weatherAtTime,
+                'precipitationProbabilityPct',
+                minimum: 0,
+                maximum: 100,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'precipitationProbabilityPct',
+                minimum: 0,
+                maximum: 100,
+              ),
           relativeHumidityPct: _boundedNumber(
-            gfsAtTime,
-            'relativeHumidityPct',
-            minimum: 0,
-            maximum: 100,
-          ),
+                weatherAtTime,
+                'relativeHumidityPct',
+                minimum: 0,
+                maximum: 100,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'relativeHumidityPct',
+                minimum: 0,
+                maximum: 100,
+              ),
           windGustKmh: _boundedNumber(
-            gfsAtTime,
-            'windGustKmh',
-            minimum: 0,
-            maximum: 400,
-          ),
+                weatherAtTime,
+                'windGustKmh',
+                minimum: 0,
+                maximum: 500,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'windGustKmh',
+                minimum: 0,
+                maximum: 500,
+              ),
           visibilityKm: _boundedNumber(
-            gfsAtTime,
-            'visibilityKm',
-            minimum: 0,
-            maximum: 100,
-          ),
+                weatherAtTime,
+                'visibilityKm',
+                minimum: 0,
+                maximum: 100,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'visibilityKm',
+                minimum: 0,
+                maximum: 100,
+              ),
           cloudCoverPct: _boundedNumber(
-            gfsAtTime,
-            'cloudCoverPct',
-            minimum: 0,
-            maximum: 100,
-          ),
+                weatherAtTime,
+                'cloudCoverPct',
+                minimum: 0,
+                maximum: 100,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'cloudCoverPct',
+                minimum: 0,
+                maximum: 100,
+              ),
           precipitationMm: _boundedNumber(
-            gfsAtTime,
-            'precipitationMm',
-            minimum: 0,
-            maximum: 500,
-          ),
+                weatherAtTime,
+                'precipitationMm',
+                minimum: 0,
+                maximum: 500,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'precipitationMm',
+                minimum: 0,
+                maximum: 500,
+              ),
           swellHeightM: _boundedNumber(
-            gfsAtTime,
-            'swellHeightM',
-            minimum: 0,
-            maximum: 40,
-          ),
+                slot,
+                'swellHeightM',
+                minimum: 0,
+                maximum: 40,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'swellHeightM',
+                minimum: 0,
+                maximum: 40,
+              ),
           swellPeriodS: _boundedNumber(
-            gfsAtTime,
-            'swellPeriodS',
-            minimum: 0,
-            maximum: 60,
-          ),
+                slot,
+                'swellPeriodS',
+                minimum: 0,
+                maximum: 60,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'swellPeriodS',
+                minimum: 0,
+                maximum: 60,
+              ),
           swellDirectionDeg: _boundedNumber(
-            gfsAtTime,
-            'swellDirectionDeg',
-            minimum: 0,
-            maximum: 360,
-          ),
+                slot,
+                'swellDirectionDeg',
+                minimum: 0,
+                maximum: 360,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'swellDirectionDeg',
+                minimum: 0,
+                maximum: 360,
+              ),
           secondarySwellHeightM: _boundedNumber(
-            gfsAtTime,
-            'secondarySwellHeightM',
-            minimum: 0,
-            maximum: 40,
-          ),
+                slot,
+                'secondarySwellHeightM',
+                minimum: 0,
+                maximum: 40,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'secondarySwellHeightM',
+                minimum: 0,
+                maximum: 40,
+              ),
           secondarySwellPeriodS: _boundedNumber(
-            gfsAtTime,
-            'secondarySwellPeriodS',
-            minimum: 0,
-            maximum: 60,
-          ),
+                slot,
+                'secondarySwellPeriodS',
+                minimum: 0,
+                maximum: 60,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'secondarySwellPeriodS',
+                minimum: 0,
+                maximum: 60,
+              ),
           secondarySwellDirectionDeg: _boundedNumber(
-            gfsAtTime,
-            'secondarySwellDirectionDeg',
-            minimum: 0,
-            maximum: 360,
-          ),
+                slot,
+                'secondarySwellDirectionDeg',
+                minimum: 0,
+                maximum: 360,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'secondarySwellDirectionDeg',
+                minimum: 0,
+                maximum: 360,
+              ),
           seaSurfaceTemperatureC: _boundedNumber(
-            gfsAtTime,
-            'seaSurfaceTemperatureC',
-            minimum: -5,
-            maximum: 45,
-          ),
+                slot,
+                'seaSurfaceTemperatureC',
+                minimum: -5,
+                maximum: 45,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'seaSurfaceTemperatureC',
+                minimum: -5,
+                maximum: 45,
+              ),
           oceanCurrentSpeedKmh: _boundedNumber(
-            gfsAtTime,
-            'oceanCurrentSpeedKmh',
-            minimum: 0,
-            maximum: 30,
-          ),
+                slot,
+                'oceanCurrentSpeedKmh',
+                minimum: 0,
+                maximum: 30,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'oceanCurrentSpeedKmh',
+                minimum: 0,
+                maximum: 30,
+              ),
           oceanCurrentDirectionDeg: _boundedNumber(
-            gfsAtTime,
-            'oceanCurrentDirectionDeg',
-            minimum: 0,
-            maximum: 360,
-          ),
+                slot,
+                'oceanCurrentDirectionDeg',
+                minimum: 0,
+                maximum: 360,
+              ) ??
+              _boundedNumber(
+                gfsAtTime,
+                'oceanCurrentDirectionDeg',
+                minimum: 0,
+                maximum: 360,
+              ),
         ),
       );
     }
@@ -186,12 +347,17 @@ class TideConditionsMapper {
     if (points.length < 3) {
       throw const FormatException('Prévisions de marée insuffisantes.');
     }
-    points.sort((a, b) => a.time.compareTo(b.time));
+    points.sort(
+      (a, b) => a.instantUtc!.compareTo(b.instantUtc!),
+    );
 
-    final referenceTime = now ?? DateTime.now();
     const coverageTolerance = Duration(minutes: 90);
-    if (referenceTime.isBefore(points.first.time.subtract(coverageTolerance)) ||
-        referenceTime.isAfter(points.last.time.add(coverageTolerance))) {
+    if (referenceInstant.isBefore(
+          points.first.instantUtc!.subtract(coverageTolerance),
+        ) ||
+        referenceInstant.isAfter(
+          points.last.instantUtc!.add(coverageTolerance),
+        )) {
       throw const FormatException(
         'La série de marée ne couvre pas l’heure actuelle.',
       );
@@ -205,13 +371,13 @@ class TideConditionsMapper {
     }
 
     final nearest = points.reduce(
-      (a, b) => a.time.difference(referenceTime).abs() <=
-              b.time.difference(referenceTime).abs()
+      (a, b) => a.instantUtc!.difference(referenceInstant).abs() <=
+              b.instantUtc!.difference(referenceInstant).abs()
           ? a
           : b,
     );
     final next = points
-            .where((point) => point.time.isAfter(referenceTime))
+            .where((point) => point.instantUtc!.isAfter(referenceInstant))
             .firstOrNull ??
         points.last;
 
@@ -231,17 +397,28 @@ class TideConditionsMapper {
         ? computedAstro.moonPhase
         : (ageDays / 29.5305882).clamp(0.0, 1.0);
 
+    final sun = _sunTimesForDate(_asMap(data['sun']), referenceTime);
+    final sunrise = sun?.sunrise ?? '--:--';
+    final sunset = sun?.sunset ?? '--:--';
     final location = (data['name'] as String?)?.trim();
     return TideData(
       hourlyPoints: points,
-      hourlyForecast: _parseHourlyForecast(gfsSlots, referenceTime),
+      hourlyForecast: _parseHourlyForecast(
+        gfsSlots,
+        referenceTime,
+        utcOffsetSeconds,
+        timeZoneId,
+      ),
       low: low,
       high: high,
       next: next.height,
-      waveHeight: nearest.windWaveHeight,
+      waveHeight: nearest.windWaveHeight!,
       location:
           location == null || location.isEmpty ? fallbackLocation : location,
       generatedAt: _parseTimestamp(data['timestamp']),
+      utcOffsetSeconds: utcOffsetSeconds,
+      timeZoneId: timeZoneId,
+      tideHeightDatum: _tideHeightDatum(data['tide_datum']),
       astro: AstroData(
         moonPhase: phase,
         moonPhaseName: phaseName == null || phaseName.isEmpty
@@ -252,26 +429,83 @@ class TideConditionsMapper {
         activityLabel: _activityLabel(safeScore),
         moonRise: computedAstro.moonRise,
         moonSet: computedAstro.moonSet,
-        sunRise: computedAstro.sunRise,
-        sunSet: computedAstro.sunSet,
+        sunRise: sunrise,
+        sunSet: sunset,
         lunarTransit: computedAstro.lunarTransit,
         lunarUnder: computedAstro.lunarUnder,
       ),
     );
   }
 
-  static DateTime? _parseForecastTime(dynamic value) {
+  /// Les documents historiques proviennent du même champ Open-Meteo
+  /// `sea_level_height_msl`, mais ont été publiés avant l'ajout explicite de
+  /// `tide_datum`. Seule l'absence du champ bénéficie de cette compatibilité ;
+  /// toute valeur présente mais inconnue reste volontairement non qualifiée.
+  static TideHeightDatum _tideHeightDatum(dynamic value) {
+    if (value == null) return TideHeightDatum.globalMeanSeaLevel;
+    if (value is! String) return TideHeightDatum.unknown;
+
+    return switch (value.trim()) {
+      'global_mean_sea_level' => TideHeightDatum.globalMeanSeaLevel,
+      'casablanca_bmi' => TideHeightDatum.casablancaBmi,
+      'casablanca_presentation_model' =>
+        TideHeightDatum.casablancaPresentationModel,
+      'morocco_casablanca_model' => TideHeightDatum.moroccoCasablancaModel,
+      _ => TideHeightDatum.unknown,
+    };
+  }
+
+  /// Convertit un instant ISO explicite vers l'heure civile de la station.
+  ///
+  /// Les anciens résumés GFS ne possédaient pas de suffixe UTC : ils étaient
+  /// déjà exprimés dans l'heure locale Open-Meteo et restent donc inchangés.
+  /// Les nouveaux documents utilisent tous un ISO UTC explicite et le
+  /// décalage publié avec la station.
+  static _ParsedStationTime? _parseStationForecastTime(
+    dynamic value,
+    int? utcOffsetSeconds, {
+    String? timeZoneId,
+    bool legacyUnzonedIsUtc = false,
+  }) {
     if (value is! String || value.trim().isEmpty) return null;
     final raw = value.trim();
     final hasOffset =
         raw.endsWith('Z') || RegExp(r'[+-]\d{2}:\d{2}$').hasMatch(raw);
-    final parsed = DateTime.tryParse(hasOffset ? raw : '${raw}Z');
-    return parsed?.toLocal();
+    final parsed =
+        DateTime.tryParse(!hasOffset && legacyUnzonedIsUtc ? '${raw}Z' : raw);
+    if (parsed == null) return null;
+
+    final instantUtc = hasOffset || legacyUnzonedIsUtc
+        ? parsed.toUtc()
+        : StationTimeZone.instantAt(
+            parsed,
+            timeZoneId: timeZoneId,
+            fallbackOffsetSeconds: utcOffsetSeconds,
+          );
+    return _ParsedStationTime(
+      instantUtc: instantUtc,
+      civil: StationTimeZone.civilAt(
+        instantUtc,
+        timeZoneId: timeZoneId,
+        fallbackOffsetSeconds: utcOffsetSeconds,
+      ),
+    );
   }
 
-  static DateTime? _parseLocalForecastTime(dynamic value) {
+  static int? _utcOffsetSeconds(dynamic value) {
+    if (value is! num || !value.isFinite) return null;
+    final rounded = value.round();
+    if ((value.toDouble() - rounded).abs() > 0.001 ||
+        rounded < -18 * 3600 ||
+        rounded > 18 * 3600) {
+      return null;
+    }
+    return rounded;
+  }
+
+  static String? _timeZoneId(dynamic value) {
     if (value is! String || value.trim().isEmpty) return null;
-    return DateTime.tryParse(value.trim())?.toLocal();
+    return value.trim();
   }
 
   static Map<String, dynamic>? _nearestSlot(
@@ -281,9 +515,10 @@ class TideConditionsMapper {
     Map<String, dynamic>? nearest;
     var shortestDifference = const Duration(days: 365);
     for (final entry in slots.entries) {
-      final difference = DateTime.fromMillisecondsSinceEpoch(entry.key)
-          .difference(target)
-          .abs();
+      final difference = DateTime.fromMillisecondsSinceEpoch(
+        entry.key,
+        isUtc: true,
+      ).difference(target).abs();
       if (difference < shortestDifference) {
         shortestDifference = difference;
         nearest = entry.value;
@@ -296,13 +531,58 @@ class TideConditionsMapper {
   }
 
   static DateTime? _parseTimestamp(dynamic value) {
+    if (value is Timestamp) return value.toDate().toLocal();
+    if (value is DateTime) return value.toLocal();
     if (value is! String || value.trim().isEmpty) return null;
     return DateTime.tryParse(value.trim())?.toLocal();
+  }
+
+  static String? _timeOfDay(dynamic value) {
+    if (value is! String || value.trim().isEmpty) return null;
+    final parsed = DateTime.tryParse(value.trim());
+    if (parsed == null) return null;
+    return '${parsed.hour.toString().padLeft(2, '0')}:'
+        '${parsed.minute.toString().padLeft(2, '0')}';
+  }
+
+  static ({String sunrise, String sunset})? _sunTimesForDate(
+    Map<String, dynamic>? sun,
+    DateTime stationTime,
+  ) {
+    if (sun == null) return null;
+    final dateKey = '${stationTime.year.toString().padLeft(4, '0')}-'
+        '${stationTime.month.toString().padLeft(2, '0')}-'
+        '${stationTime.day.toString().padLeft(2, '0')}';
+
+    final daily = sun['daily'];
+    if (daily is List<dynamic>) {
+      for (final raw in daily) {
+        final entry = _asMap(raw);
+        if (entry?['date'] != dateKey) continue;
+        final sunrise = _timeOfDay(entry?['sunrise']);
+        final sunset = _timeOfDay(entry?['sunset']);
+        if (sunrise != null && sunset != null) {
+          return (sunrise: sunrise, sunset: sunset);
+        }
+      }
+    }
+
+    // Compatibilité avec les documents antérieurs : les champs racine ne
+    // sont utilisés que s'ils appartiennent réellement au jour affiché.
+    final legacyDate = sun['date'];
+    if (legacyDate != null && legacyDate != dateKey) return null;
+    final sunrise = _timeOfDay(sun['sunrise']);
+    final sunset = _timeOfDay(sun['sunset']);
+    return sunrise == null || sunset == null
+        ? null
+        : (sunrise: sunrise, sunset: sunset);
   }
 
   static List<HourlyForecastPoint> _parseHourlyForecast(
     dynamic rawSlots,
     DateTime referenceTime,
+    int? utcOffsetSeconds,
+    String? timeZoneId,
   ) {
     if (rawSlots is! List<dynamic>) return const [];
 
@@ -314,9 +594,13 @@ class TideConditionsMapper {
     final parsed = <HourlyForecastPoint>[];
     for (final raw in rawSlots) {
       final slot = _asMap(raw);
-      final time = _parseLocalForecastTime(slot?['time']);
+      final time = _parseStationForecastTime(
+        slot?['time'],
+        utcOffsetSeconds,
+        timeZoneId: timeZoneId,
+      );
       if (slot == null || time == null) continue;
-      final day = DateTime(time.year, time.month, time.day);
+      final day = DateTime(time.civil.year, time.civil.month, time.civil.day);
       if (day.isBefore(firstDay)) continue;
 
       final weatherCode = _boundedNumber(
@@ -339,7 +623,8 @@ class TideConditionsMapper {
       );
       parsed.add(
         HourlyForecastPoint(
-          time: time,
+          time: time.civil,
+          instantUtc: time.instantUtc,
           windSpeedKmh: _boundedNumber(
             slot,
             'windSpeedKmh',
@@ -425,12 +710,17 @@ class TideConditionsMapper {
       );
     }
 
-    parsed.sort((a, b) => a.time.compareTo(b.time));
+    parsed.sort(
+      (a, b) => a.instantUtc!.compareTo(b.instantUtc!),
+    );
     final acceptedDays = <String>{};
     final result = <HourlyForecastPoint>[];
     for (final point in parsed) {
       final key = '${point.time.year}-${point.time.month}-${point.time.day}';
-      if (!acceptedDays.contains(key) && acceptedDays.length >= 10) break;
+      if (!acceptedDays.contains(key) &&
+          acceptedDays.length >= _maximumDetailedForecastDays) {
+        break;
+      }
       acceptedDays.add(key);
       result.add(point);
     }
@@ -482,4 +772,14 @@ class TideConditionsMapper {
       _ => value,
     };
   }
+}
+
+class _ParsedStationTime {
+  final DateTime instantUtc;
+  final DateTime civil;
+
+  const _ParsedStationTime({
+    required this.instantUtc,
+    required this.civil,
+  });
 }

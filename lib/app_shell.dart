@@ -7,6 +7,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spots_app/theme.dart';
 import 'package:spots_app/theme_controller.dart';
@@ -25,7 +26,10 @@ import 'package:spots_app/models.dart';
 import 'package:spots_app/models/spot_selection_request.dart';
 import 'package:spots_app/models/user_spot.dart';
 import 'package:spots_app/models/user_spot_selection_request.dart';
+import 'package:spots_app/services/analytics_service.dart';
+import 'package:spots_app/services/marine_location_controller.dart';
 import 'package:spots_app/services/ad_service.dart';
+import 'package:spots_app/services/optional_update_service.dart';
 import 'package:spots_app/widgets/adaptive_banner_ad.dart';
 
 /// Clé globale pour accéder au state de navigation
@@ -38,19 +42,34 @@ class AppShell extends StatefulWidget {
   @visibleForTesting
   final Widget Function(int index)? pageBuilderForTesting;
 
+  @visibleForTesting
+  final VoidCallback? exitAppForTesting;
+
+  @visibleForTesting
+  final bool disablePostLaunchTasksForTesting;
+
   const AppShell({
     super.key,
     this.initialSpots,
     this.pageBuilderForTesting,
+    this.exitAppForTesting,
+    this.disablePostLaunchTasksForTesting = false,
   });
 
   @override
   State<AppShell> createState() => AppShellState();
 }
 
-class AppShellState extends State<AppShell> {
+class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   static const _personalSpotBadgePreferenceKey =
       'unread_personal_spot_badge_count';
+  static const Map<int, String> _analyticsScreenNames = {
+    0: 'home',
+    1: 'tides',
+    2: 'my_spots',
+    3: 'map',
+    4: 'settings',
+  };
 
   int _currentIndex = 3;
 
@@ -65,24 +84,83 @@ class AppShellState extends State<AppShell> {
   bool _showAds = false;
   int _personalSpotBadgeCount = 0;
   bool _personalSpotBadgeChangedLocally = false;
+  bool _exitConfirmationArmed = false;
+  Timer? _exitConfirmationTimer;
 
   @override
   void initState() {
     super.initState();
+    if (!widget.disablePostLaunchTasksForTesting) {
+      WidgetsBinding.instance.addObserver(this);
+      unawaited(MarineLocationController.instance.initialize());
+    }
     _addSpotRequests = ValueNotifier<int>(0);
     _mapIsActive = ValueNotifier<bool>(_currentIndex == 3);
     _spotSelectionRequests = ValueNotifier<SpotSelectionRequest?>(null);
     _userSpotSelectionRequests = ValueNotifier<UserSpotSelectionRequest?>(null);
     _pages = List<Widget?>.filled(5, null);
     _pages[_currentIndex] = _buildPage(_currentIndex);
+    unawaited(AnalyticsService.logScreenView(
+      screenName: _analyticsScreenNames[_currentIndex]!,
+    ));
     unawaited(_restorePersonalSpotBadge());
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future<void>.delayed(const Duration(seconds: 1), () {
-        if (!mounted) return;
-        setState(() => _showAds = true);
-        unawaited(AdService.instance.initialize());
+    if (!widget.disablePostLaunchTasksForTesting) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_startPostLaunchTasks());
       });
-    });
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        !widget.disablePostLaunchTasksForTesting) {
+      unawaited(MarineLocationController.instance.refresh());
+    }
+  }
+
+  Future<void> _startPostLaunchTasks() async {
+    await Future<void>.delayed(const Duration(seconds: 1));
+    if (!mounted) return;
+
+    setState(() => _showAds = true);
+    await AdService.instance.initialize();
+    if (!mounted) return;
+
+    await _showOptionalUpdateIfAvailable();
+  }
+
+  Future<void> _showOptionalUpdateIfAvailable() async {
+    final shouldShow = await OptionalUpdateService.isUpdateAvailable();
+    if (!shouldShow || !mounted) return;
+
+    final shouldOpenStore = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(dialogContext.tr('optionalUpdate.title')),
+        content: Text(dialogContext.tr('optionalUpdate.message')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(dialogContext.tr('optionalUpdate.later')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(dialogContext.tr('optionalUpdate.update')),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldOpenStore != true || !mounted) return;
+
+    final didOpen = await OptionalUpdateService.openStoreListing();
+    if (!didOpen && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr('optionalUpdate.storeError'))),
+      );
+    }
   }
 
   Widget _buildPage(int index) {
@@ -113,6 +191,8 @@ class AppShellState extends State<AppShell> {
   /// Navigue vers un onglet spécifique
   void navigateTo(int index) {
     if (index < 0 || index >= _pages.length) return;
+    _resetExitConfirmation(hideMessage: true);
+    final didChangeScreen = index != _currentIndex;
     final openedMySpots = index == 2;
     _mapIsActive.value = index == 3;
     setState(() {
@@ -126,6 +206,10 @@ class AppShellState extends State<AppShell> {
     if (openedMySpots) {
       unawaited(_persistPersonalSpotBadge(0));
     }
+    if (!didChangeScreen) return;
+    unawaited(AnalyticsService.logScreenView(
+      screenName: _analyticsScreenNames[index]!,
+    ));
   }
 
   Future<void> _restorePersonalSpotBadge() async {
@@ -161,6 +245,50 @@ class AppShellState extends State<AppShell> {
     }
   }
 
+  void _resetExitConfirmation({bool hideMessage = false}) {
+    _exitConfirmationTimer?.cancel();
+    _exitConfirmationTimer = null;
+    _exitConfirmationArmed = false;
+    if (hideMessage && mounted) {
+      ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
+    }
+  }
+
+  void _handleSystemBack(bool didPop) {
+    if (didPop) return;
+
+    if (_exitConfirmationArmed) {
+      _resetExitConfirmation(hideMessage: true);
+      final testExit = widget.exitAppForTesting;
+      if (testExit != null) {
+        testExit();
+        return;
+      }
+      unawaited(SystemNavigator.pop());
+      return;
+    }
+
+    if (_currentIndex != 3) navigateTo(3);
+
+    _exitConfirmationArmed = true;
+    _exitConfirmationTimer = Timer(const Duration(seconds: 2), () {
+      _exitConfirmationArmed = false;
+      _exitConfirmationTimer = null;
+    });
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(context.tr('common.pressBackAgainToExit')),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+  }
+
+  @visibleForTesting
+  void handleSystemBackForTesting() => _handleSystemBack(false);
+
   void openSpotCreation() {
     navigateTo(3);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -190,10 +318,12 @@ class AppShellState extends State<AppShell> {
 
   @override
   void dispose() {
+    _exitConfirmationTimer?.cancel();
     _addSpotRequests.dispose();
     _mapIsActive.dispose();
     _spotSelectionRequests.dispose();
     _userSpotSelectionRequests.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
@@ -207,10 +337,8 @@ class AppShellState extends State<AppShell> {
         LanguageController.instance,
       ]),
       builder: (context, _) => PopScope(
-        canPop: _currentIndex == 3,
-        onPopInvokedWithResult: (didPop, _) {
-          if (!didPop && _currentIndex != 3) navigateTo(3);
-        },
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) => _handleSystemBack(didPop),
         child: Scaffold(
           body: Column(
             children: [

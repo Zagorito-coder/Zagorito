@@ -1,0 +1,15 @@
+1
+00:00:00,000 --> 00:00:03,000
+Tresse vers fluorocarbone
+
+2
+00:00:03,000 --> 00:00:06,000
+Découvrez le nœud FG
+
+3
+00:00:06,000 --> 00:00:09,000
+Suivez chaque étape dans l'app
+
+4
+00:00:09,000 --> 00:00:12,000
+Serrez et testez avant usage

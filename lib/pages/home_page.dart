@@ -2,7 +2,9 @@
 //  home_page.dart — Données et contrat fonctionnel de l'accueil
 // ============================================================
 
+import 'dart:async';
 import 'package:flutter/material.dart';
+import '../services/marine_location_controller.dart';
 
 import '../models.dart';
 import '../models/tide_data.dart';
@@ -37,7 +39,11 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  TideData _tideData = TideData.fallback();
+  final _location = MarineLocationController.instance;
+  int _locationRevision = -1;
+  int _loadRequest = 0;
+  TideData _tideData =
+      TideData.fallback(location: TideService.unavailableLocationLabel);
   bool _isLoading = true;
   late List<Spot> _spots;
 
@@ -46,7 +52,10 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _spots = widget.initialSpots ?? [];
     // Les chargements historiques restent non bloquants au premier frame.
-    _loadTides();
+    _location.addListener(_onLocationChanged);
+    unawaited(_location.initialize().then((_) {
+      if (mounted) _onLocationChanged();
+    }));
     _loadSpots();
   }
 
@@ -58,13 +67,40 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  void _onLocationChanged() {
+    if (!mounted || _locationRevision == _location.revision) return;
+    _locationRevision = _location.revision;
+    unawaited(_loadTides());
+  }
+
+  @override
+  void dispose() {
+    _location.removeListener(_onLocationChanged);
+    _loadRequest++;
+    super.dispose();
+  }
+
   Future<void> _loadTides() async {
-    final data = await TideService.fetchTides();
-    if (mounted) {
+    final request = ++_loadRequest;
+    final position = _location.coordinates;
+    setState(() {
+      _tideData =
+          TideData.fallback(location: TideService.unavailableLocationLabel);
+      _isLoading = position != null;
+    });
+    if (position == null) return;
+    try {
+      final data = await TideService.fetchTides(
+          latitude: position.latitude, longitude: position.longitude);
+      if (!mounted || request != _loadRequest) return;
       setState(() {
         _tideData = data;
         _isLoading = false;
       });
+    } catch (_) {
+      if (mounted && request == _loadRequest) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 

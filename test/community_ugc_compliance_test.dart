@@ -20,6 +20,65 @@ void main() {
     expect(source, contains('community.acceptAndContinue'));
   });
 
+  test('une prise publique active ne peut pas être publiée deux fois', () {
+    final view = File(
+      'lib/features/community/widgets/private_catches_view.dart',
+    ).readAsStringSync();
+    final repository = File(
+      'lib/features/community/services/community_repository.dart',
+    ).readAsStringSync();
+
+    expect(view, contains("community.alreadyPublished"));
+    expect(repository, contains('CommunityFailure.alreadyPublished'));
+    expect(
+      repository.indexOf('hasActivePublicationAt'),
+      lessThan(repository.indexOf('await _photoService.upload')),
+    );
+  });
+
+  test('les échecs Firestore avant publication restent récupérables', () {
+    final view = File(
+      'lib/features/community/widgets/private_catches_view.dart',
+    ).readAsStringSync().replaceAll('\r\n', '\n');
+    final repository = File(
+      'lib/features/community/services/community_repository.dart',
+    ).readAsStringSync().replaceAll('\r\n', '\n');
+
+    final publishStart = view.indexOf('Future<void> _publish(');
+    final publishEnd =
+        view.indexOf('Future<bool> _showTermsDialog', publishStart);
+    expect(publishStart, greaterThanOrEqualTo(0));
+    expect(publishEnd, greaterThan(publishStart));
+    final publishMethod = view.substring(publishStart, publishEnd);
+    expect(
+      publishMethod.indexOf('await _run(() async'),
+      lessThan(publishMethod.indexOf('await _community.hasAcceptedTerms()')),
+    );
+    expect(publishMethod, contains('await _community.acceptTerms()'));
+
+    for (final methodName in [
+      'hasAcceptedTerms',
+      'acceptTerms',
+      'nextPublicationAt',
+    ]) {
+      final methodStart = repository.indexOf(' $methodName(');
+      final methodEnd = repository.indexOf('\n  }', methodStart);
+      expect(methodStart, greaterThanOrEqualTo(0), reason: methodName);
+      expect(methodEnd, greaterThan(methodStart), reason: methodName);
+      final method = repository.substring(methodStart, methodEnd);
+      expect(
+        method,
+        contains('on FirebaseException catch (error)'),
+        reason: methodName,
+      );
+      expect(
+        method,
+        contains('CommunityException(_mapFirebaseFailure(error))'),
+        reason: methodName,
+      );
+    }
+  });
+
   test('le détail propose séparément signalement et blocage', () {
     final source = File(
       'lib/features/community/widgets/community_map_view.dart',
@@ -83,6 +142,9 @@ void main() {
     expect(rules, contains('match /community_public_profiles/{userId}'));
     expect(rules, contains("'publicDisplayName'"));
     expect(rules, contains("'publishAnonymously'"));
+    expect(rules, contains("'avatarSource'"));
+    expect(rules, contains("'avatarId'"));
+    expect(rules, contains('hasValidProfileAvatarUrl'));
     expect(repository, contains('savePublicProfile'));
     expect(repository, contains('loadPublicProfile'));
     expect(repository, contains('hasSavedPreference: snapshot.exists'));
@@ -92,8 +154,11 @@ void main() {
     expect(settings, contains('_showUpdateHint = !profile.hasSavedPreference'));
     expect(settings, contains('_showUpdateHint = false'));
     expect(settings, contains('publicIdentityAnonymous'));
+    expect(settings, contains('profilePhotoAvatars'));
+    expect(settings, contains('ProfileAvatarProcessor'));
     expect(
         functions, contains("community_public_profiles').doc(uid).delete()"));
+    expect(functions, contains('deleteFirebaseProfileAvatar'));
   });
 
   test('les CGU publient des standards explicites de sécurité des mineurs', () {

@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:spots_app/models/tide_data.dart' as source;
 import 'package:spots_app/models/tide_page_models.dart';
+import 'package:spots_app/services/casablanca_tide_reference.dart';
 import 'package:spots_app/services/tide_coefficient_service.dart';
 import 'package:spots_app/services/tide_forecast_presentation_service.dart';
 
@@ -63,5 +65,56 @@ void main() {
         isTrue,
       );
     }
+  });
+
+  test('convertit les heures civiles Casablanca avec le fuseau de la station',
+      () {
+    final civilTime = DateTime(2026, 8, 20, 12);
+    final day = HourlyForecastDay(
+      date: DateTime(2026, 8, 20),
+      slots: [HourlyForecastSlot(time: civilTime)],
+    );
+
+    final result = TideForecastPresentationService.attachCasablancaTides(
+      [day],
+      utcOffsetSeconds: 3600,
+    ).single;
+    final expectedInstant = DateTime.utc(2026, 8, 20, 11);
+
+    expect(
+      result.slots.single.tideHeightM,
+      closeTo(CasablancaTideReference.heightAtUtc(expectedInstant), 0.000001),
+    );
+  });
+
+  test('associe les marées horaires publiées à une station hors Casablanca',
+      () {
+    final date = DateTime(2026, 8, 20);
+    final forecast = HourlyForecastDay(
+      date: date,
+      slots: [
+        HourlyForecastSlot(time: date.add(const Duration(hours: 1))),
+        HourlyForecastSlot(time: date.add(const Duration(hours: 4))),
+        HourlyForecastSlot(time: date.add(const Duration(hours: 7))),
+      ],
+    );
+    final published = List.generate(
+      10,
+      (index) => source.TidePoint(
+        time: date.add(Duration(hours: index)),
+        height: index <= 4 ? index / 4 : (8 - index) / 4,
+      ),
+    );
+
+    final result = TideForecastPresentationService.attachPublishedTides(
+      [forecast],
+      published,
+    ).single;
+
+    expect(result.slots.map((slot) => slot.tideHeightM), [0.25, 1.0, 0.25]);
+    expect(result.slots.map((slot) => slot.tideIsRising), [true, false, false]);
+    expect(result.slots[1].tideExtremum?.isHigh, isTrue);
+    expect(
+        result.slots[1].tideExtremum?.time, date.add(const Duration(hours: 4)));
   });
 }

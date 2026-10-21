@@ -7,7 +7,10 @@ void main() {
     final tideSource = File('lib/pages/tide_page.dart').readAsStringSync();
     final coefficientsSource =
         File('lib/widgets/tide_coefficients_view.dart').readAsStringSync();
-    final localizedTideSource = '$tideSource\n$coefficientsSource';
+    final heightFormatterSource =
+        File('lib/utils/tide_height_formatter.dart').readAsStringSync();
+    final localizedTideSource =
+        '$tideSource\n$coefficientsSource\n$heightFormatterSource';
     final attributionSource =
         File('lib/widgets/open_meteo_attribution.dart').readAsStringSync();
 
@@ -35,6 +38,16 @@ void main() {
       'tide.humidity',
       'tide.upcomingTideEvents',
       'tide.forecastDisclaimer',
+      'tide.meanSeaLevelReference',
+      'tide.globalModeledDatumReference',
+      'tide.meanSeaLevelCurveTitle',
+      'tide.meanSeaLevelAbbreviation',
+      'tide.aboveMeanSeaLevelShort',
+      'tide.belowMeanSeaLevelShort',
+      'tide.atMeanSeaLevelShort',
+      'tide.aboveMeanSeaLevelCompact',
+      'tide.belowMeanSeaLevelCompact',
+      'tide.atMeanSeaLevelCompact',
       'tide.hourSemantics',
       'tide.unavailableShort',
       'tide.viewSelector',
@@ -53,11 +66,24 @@ void main() {
       'tide.localIndex',
       'tide.tidalRange',
       'tide.localHarmonicCalculation',
+      'tide.localForecastCalculation',
       'tide.monthlyCycle',
+      'tide.forecastCoefficientCycle',
       'tide.moroccanTraditionalReading',
       'tide.culturalReadingDisclaimer',
       'tide.localHarmonicIndicative',
+      'tide.localForecastIndicative',
+      'tide.localForecastCoefficientNoticeTitle',
+      'tide.localForecastCoefficientNotice',
       'tide.coefficientInfoBody',
+      'tide.forecastCoefficientInfoTitle',
+      'tide.forecastCoefficientInfoBody',
+      'tide.relativeLow',
+      'tide.relativeMedium',
+      'tide.relativeHigh',
+      'tide.presentationLevel',
+      'tide.presentationLevelAt',
+      'tide.presentationLevelSemantics',
     ]) {
       expect(localizedTideSource, contains(key), reason: 'Clé absente: $key');
     }
@@ -121,7 +147,7 @@ void main() {
     );
   });
 
-  test('le modèle 10 jours reste vertical et ne construit que le jour ouvert',
+  test('le modèle 8 jours reste vertical et ne construit que le jour ouvert',
       () {
     final tideSource = File('lib/pages/tide_page.dart').readAsStringSync();
     final sectionStart =
@@ -158,6 +184,9 @@ void main() {
         File('lib/services/tide_coefficient_service.dart').readAsStringSync();
     final widgetSource =
         File('lib/widgets/tide_coefficients_view.dart').readAsStringSync();
+    final localServiceSource =
+        File('lib/services/local_tide_coefficient_service.dart')
+            .readAsStringSync();
 
     expect(source, contains('CasablancaTideReference.heightAtUtc'));
     expect(source, contains('localIndexForRange'));
@@ -168,8 +197,11 @@ void main() {
     );
     expect(
       widgetSource,
-      contains("context.tr('tide.localHarmonicIndicative')"),
+      contains('tide.localHarmonicIndicative'),
     );
+    expect(widgetSource, contains('tide.localForecastIndicative'));
+    expect(localServiceSource, isNot(contains('CasablancaTideReference')));
+    expect(localServiceSource, isNot(contains('FirebaseFirestore')));
   });
 
   test("les panneaux retardés deviennent visibles à l'activation de l'onglet",

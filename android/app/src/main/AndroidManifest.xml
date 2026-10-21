@@ -46,6 +46,27 @@
         <meta-data
             android:name="firebase_crashlytics_collection_enabled"
             android:value="true"/>
+        <!-- Analytics est limité à la Release Android. Les quatre états du
+             Consent Mode v2 sont refusés par défaut puis mis à jour par UMP.
+             L'identifiant publicitaire n'est jamais collecté par Analytics. -->
+        <meta-data
+            android:name="firebase_analytics_collection_enabled"
+            android:value="true"/>
+        <meta-data
+            android:name="google_analytics_adid_collection_enabled"
+            android:value="false"/>
+        <meta-data
+            android:name="google_analytics_default_allow_analytics_storage"
+            android:value="false"/>
+        <meta-data
+            android:name="google_analytics_default_allow_ad_storage"
+            android:value="false"/>
+        <meta-data
+            android:name="google_analytics_default_allow_ad_user_data"
+            android:value="false"/>
+        <meta-data
+            android:name="google_analytics_default_allow_ad_personalization_signals"
+            android:value="false"/>
         <meta-data
             android:name="flutterEmbedding"
             android:value="2"/>

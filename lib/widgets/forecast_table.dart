@@ -100,9 +100,6 @@ class WaveModelSlot {
   factory WaveModelSlot.fromJson(Map<String, dynamic>? json) {
     if (json == null || json.isEmpty) return const WaveModelSlot();
     double? n(String k) => (json[k] as num?)?.toDouble();
-    final hasData = json.containsKey('wave_height_m') ||
-        json.containsKey('swell_wave_height');
-    if (!hasData) return const WaveModelSlot();
     return WaveModelSlot(
       waveHeightM: n('wave_height_m'),
       wavePeriodS: n('wave_period_s'),
@@ -121,24 +118,38 @@ class WaveModelSlot {
   }
 
   /// True si ce slot contient au moins une donnee reelle.
-  bool get hasData => waveHeightM != null || swellHeightM != null;
+  bool get hasData =>
+      waveHeightM != null ||
+      wavePeriodS != null ||
+      waveDirDeg != null ||
+      swellHeightM != null ||
+      swellPeriodS != null ||
+      swellDirDeg != null ||
+      swell2HeightM != null ||
+      swell2PeriodS != null ||
+      swell2DirDeg != null ||
+      windwaveHeightM != null ||
+      windwavePeriodS != null ||
+      windwaveDirDeg != null ||
+      sstC != null;
 }
 
 /// Une "colonne" du tableau = un creneau horaire avec toutes ses valeurs.
 class ForecastSlot {
   final DateTime dateTime;
+  final DateTime? instantUtc;
 
   // Champs racine (compat arriere)
-  final double windSpeedKnots;
-  final double windGustKnots;
-  final double windDirectionDeg;
-  final double waveHeightM;
-  final double wavePeriodS;
-  final double waveDirectionDeg;
-  final int temperatureC;
+  final double? windSpeedKnots;
+  final double? windGustKnots;
+  final double? windDirectionDeg;
+  final double? waveHeightM;
+  final double? wavePeriodS;
+  final double? waveDirectionDeg;
+  final int? temperatureC;
   final int? cloudCoverPct;
   final int? precipProbPct;
-  final int ratingStars;
+  final int? ratingStars;
   final bool isNewDay;
 
   // Nouveaux sous-objets modeles (additifs, null si absents)
@@ -148,16 +159,17 @@ class ForecastSlot {
 
   const ForecastSlot({
     required this.dateTime,
-    required this.windSpeedKnots,
-    required this.windGustKnots,
-    required this.windDirectionDeg,
-    required this.waveHeightM,
-    required this.wavePeriodS,
-    required this.waveDirectionDeg,
-    required this.temperatureC,
+    this.instantUtc,
+    this.windSpeedKnots,
+    this.windGustKnots,
+    this.windDirectionDeg,
+    this.waveHeightM,
+    this.wavePeriodS,
+    this.waveDirectionDeg,
+    this.temperatureC,
     this.cloudCoverPct,
     this.precipProbPct,
-    required this.ratingStars,
+    this.ratingStars,
     this.isNewDay = false,
     this.modelWind,
     this.modelHires,
@@ -536,18 +548,28 @@ class _ForecastTableState extends State<ForecastTable> {
   Column _buildRootRows(ForecastSlot s) {
     return Column(
       children: [
-        _valueCell(s.windSpeedKnots.toStringAsFixed(1),
-            _Palette.wind(s.windSpeedKnots)),
-        _valueCell(
-            s.windGustKnots.toStringAsFixed(1), _Palette.wind(s.windGustKnots)),
+        s.windSpeedKnots != null
+            ? _valueCell(s.windSpeedKnots!.toStringAsFixed(1),
+                _Palette.wind(s.windSpeedKnots!))
+            : _emptyCell(),
+        s.windGustKnots != null
+            ? _valueCell(s.windGustKnots!.toStringAsFixed(1),
+                _Palette.wind(s.windGustKnots!))
+            : _emptyCell(),
         _arrowCell(s.windDirectionDeg),
-        _valueCell(
-            s.waveHeightM.toStringAsFixed(1), _Palette.wave(s.waveHeightM)),
-        _valueCell(
-            s.wavePeriodS.toStringAsFixed(0), _Palette.wave(s.wavePeriodS / 2)),
+        s.waveHeightM != null
+            ? _valueCell(s.waveHeightM!.toStringAsFixed(1),
+                _Palette.wave(s.waveHeightM!))
+            : _emptyCell(),
+        s.wavePeriodS != null
+            ? _valueCell(s.wavePeriodS!.toStringAsFixed(0),
+                _Palette.wave(s.wavePeriodS! / 2))
+            : _emptyCell(),
         _arrowCell(s.waveDirectionDeg),
-        _valueCell(
-            s.temperatureC.toString(), _Palette.temperature(s.temperatureC)),
+        s.temperatureC != null
+            ? _valueCell(s.temperatureC.toString(),
+                _Palette.temperature(s.temperatureC!))
+            : _emptyCell(),
         s.cloudCoverPct != null
             ? _valueCell('${s.cloudCoverPct}', _Palette.cloud(s.cloudCoverPct!))
             : _emptyCell(),
@@ -577,7 +599,7 @@ class _ForecastTableState extends State<ForecastTable> {
             m?.windGustKt != null
                 ? _Palette.wind(m!.windGustKt!)
                 : Colors.grey[200]!),
-        _arrowCell(m?.windDirDeg ?? 0),
+        _arrowCell(m?.windDirDeg),
         _valueCell(
             m?.tempC != null ? '${m!.tempC!.round()}' : '-',
             m?.tempC != null
@@ -619,7 +641,7 @@ class _ForecastTableState extends State<ForecastTable> {
         _valueCell(
             m?.wavePeriodS != null ? m!.wavePeriodS!.toStringAsFixed(0) : '-',
             Colors.transparent),
-        _arrowCell(m?.waveDirDeg ?? 0),
+        _arrowCell(m?.waveDirDeg),
         // Houle primaire
         _valueCell(
             m?.swellHeightM != null ? m!.swellHeightM!.toStringAsFixed(1) : '-',
@@ -629,7 +651,7 @@ class _ForecastTableState extends State<ForecastTable> {
         _valueCell(
             m?.swellPeriodS != null ? m!.swellPeriodS!.toStringAsFixed(0) : '-',
             Colors.transparent),
-        _arrowCell(m?.swellDirDeg ?? 0),
+        _arrowCell(m?.swellDirDeg),
         // Houle secondaire
         _valueCell(
             m?.swell2HeightM != null
@@ -643,7 +665,7 @@ class _ForecastTableState extends State<ForecastTable> {
                 ? m!.swell2PeriodS!.toStringAsFixed(0)
                 : '-',
             Colors.transparent),
-        _arrowCell(m?.swell2DirDeg ?? 0),
+        _arrowCell(m?.swell2DirDeg),
         // Vagues de vent locales
         _valueCell(
             m?.windwaveHeightM != null
@@ -657,7 +679,7 @@ class _ForecastTableState extends State<ForecastTable> {
                 ? m!.windwavePeriodS!.toStringAsFixed(0)
                 : '-',
             Colors.transparent),
-        _arrowCell(m?.windwaveDirDeg ?? 0),
+        _arrowCell(m?.windwaveDirDeg),
       ],
     );
   }
@@ -696,35 +718,40 @@ class _ForecastTableState extends State<ForecastTable> {
         );
       });
 
-  Widget _arrowCell(double directionDeg) => Builder(builder: (context) {
-        final dark = _isDark(context);
-        return SizedBox(
-          height: _rowHeight,
-          child: Center(
-            child: Transform.rotate(
-              angle: (directionDeg + 180) * 3.14159265 / 180,
-              child: Icon(Icons.arrow_upward,
-                  size: 16, color: dark ? Colors.white70 : Colors.black87),
-            ),
-          ),
-        );
-      });
-
-  Widget _starsCell(int count) => SizedBox(
+  Widget _arrowCell(double? directionDeg) {
+    if (directionDeg == null) return _emptyCell();
+    return Builder(builder: (context) {
+      final dark = _isDark(context);
+      return SizedBox(
         height: _rowHeight,
         child: Center(
-          child: FittedBox(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: List.generate(
-                count.clamp(0, 5),
-                (_) =>
-                    const Icon(Icons.star, size: 12, color: Color(0xFFF5A623)),
-              ),
-            ),
+          child: Transform.rotate(
+            angle: (directionDeg + 180) * 3.14159265 / 180,
+            child: Icon(Icons.arrow_upward,
+                size: 16, color: dark ? Colors.white70 : Colors.black87),
           ),
         ),
       );
+    });
+  }
+
+  Widget _starsCell(int? count) => count == null
+      ? _emptyCell()
+      : SizedBox(
+          height: _rowHeight,
+          child: Center(
+            child: FittedBox(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: List.generate(
+                  count.clamp(0, 5),
+                  (_) => const Icon(Icons.star,
+                      size: 12, color: Color(0xFFF5A623)),
+                ),
+              ),
+            ),
+          ),
+        );
 
   String _weekday(DateTime d) {
     const names = ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di'];

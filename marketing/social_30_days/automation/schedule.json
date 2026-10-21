@@ -1,0 +1,487 @@
+{
+  "timezone": "Africa/Casablanca",
+  "generated_at": "2026-09-28T06:28:09+00:00",
+  "notes": "Modifier publish_at si nécessaire. L'ordre éditorial reste celui du livrable validé.",
+  "posts": [
+    {
+      "day": 1,
+      "slug": "manifesto",
+      "enabled": true,
+      "publish_at": "2026-10-01T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "CAP SUR BOOSTERFISH",
+      "caption": "Une sortie réussie commence bien avant le premier lancer. BoosterFish rassemble carte, conditions marines, marées, espèces et techniques dans une expérience pensée pour les pêcheurs en mer. التطبيق مازال فالتست المغلق، وقريباً نشاركو معاكم الجديد. 🎣🌊\n\nSuivez la page pour le lancement\n\n#BoosterFish #PecheEnMer #Maroc #FishingApp #صيد_البحر",
+      "video": "exports/reels/01_manifesto.mp4",
+      "cover": "exports/covers/01_manifesto.png",
+      "public_video_path": "01_manifesto.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 2,
+      "slug": "checklist_depart",
+      "enabled": true,
+      "publish_at": "2026-10-02T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "AVANT DE PARTIR",
+      "caption": "Votre checklist express avant une sortie : conditions marines, marées, accès au spot et matériel adapté. BoosterFish aide à regrouper ces informations sans promettre la prise : la décision finale reste toujours celle du pêcheur.\n\nEnregistrez cette checklist\n\n#ConseilPeche #PecheEnMer #BoosterFish #SortiePeche",
+      "video": "exports/reels/02_checklist_depart.mp4",
+      "cover": "exports/covers/02_checklist_depart.png",
+      "public_video_path": "02_checklist_depart.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 3,
+      "slug": "safety_darija",
+      "enabled": true,
+      "publish_at": "2026-10-03T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "البحر أولاً",
+      "caption": "قبل أي خرجة: راقب الريح، الموج، والمد والجزر، وخبر شي واحد فين غادي. BoosterFish كيساعدك تحضر، والقرار الآمن كيبقى ديالك. 🌊\n\nصيفطها لصاحبك\n\n#BoosterFish #صيد_البحر #المغرب #السلامة_أولاً",
+      "video": "exports/reels/03_safety_darija.mp4",
+      "cover": "exports/covers/03_safety_darija.png",
+      "public_video_path": "03_safety_darija.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 4,
+      "slug": "official_spots",
+      "enabled": true,
+      "publish_at": "2026-10-04T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "CARTE MARINE",
+      "caption": "Explorez plus de 6 000 spots officiels dans BoosterFish. La carte sert à préparer votre recherche ; elle ne remplace ni la réglementation locale, ni la vérification de l'accès, ni votre jugement sur place.\n\nQuel littoral voulez-vous explorer ?\n\n#CarteDePeche #BoosterFish #PecheMaroc #FishingSpots",
+      "video": "exports/reels/04_official_spots.mp4",
+      "cover": "exports/covers/04_official_spots.png",
+      "public_video_path": "04_official_spots.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 5,
+      "slug": "private_spots",
+      "enabled": true,
+      "publish_at": "2026-10-05T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "VOS SPOTS",
+      "caption": "السبوطات الخاصة ديالك كتبقى فحسابك، والإحداثيات ديالها مخفية. نظم الأماكن اللي بغيتي ترجع ليها بلا ما تنشر الموقع للعموم.\n\nشنو أهم حاجة فسبوط مزيان؟\n\n#BoosterFish #سبوطات_الصيد #صيد_البحر #خصوصية",
+      "video": "exports/reels/05_private_spots.mp4",
+      "cover": "exports/covers/05_private_spots.png",
+      "public_video_path": "05_private_spots.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 6,
+      "slug": "read_tides",
+      "enabled": true,
+      "publish_at": "2026-10-06T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "1 MINUTE MARÉES",
+      "caption": "Pour lire une marée, observez trois éléments : l'heure, la hauteur et l'évolution. Les conditions locales peuvent modifier la situation réelle ; vérifiez toujours le terrain.\n\nGardez ce rappel pour votre prochaine sortie\n\n#Marees #PecheEnMer #BoosterFish #ConseilPeche",
+      "video": "exports/reels/06_read_tides.mp4",
+      "cover": "exports/covers/06_read_tides.png",
+      "public_video_path": "06_read_tides.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 7,
+      "slug": "fg_knot",
+      "enabled": true,
+      "publish_at": "2026-10-07T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "NŒUD DU JOUR",
+      "caption": "Le nœud FG est une option courante pour relier tresse et bas de ligne. Le tutoriel BoosterFish détaille le geste. Adaptez toujours le nœud au diamètre, au fil et à l'usage.\n\nEnregistrez le tutoriel\n\n#NoeudFG #Jigging #BoosterFish #MontagePeche",
+      "video": "exports/reels/07_fg_knot.mp4",
+      "cover": "exports/covers/07_fg_knot.png",
+      "public_video_path": "07_fg_knot.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 8,
+      "slug": "palomar_knot",
+      "enabled": true,
+      "publish_at": "2026-10-08T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "عقدة اليوم",
+      "caption": "عقدة Palomar كتستعمل فبزاف ديال التركيبات. تعلمها بالصور داخل BoosterFish، وديما بلّل الخيط وشد بالتدريج حسب نوع الخيط.\n\nحفظ الفيديو وجربها\n\n#BoosterFish #عقد_الصيد #Palomar #صيد_البحر",
+      "video": "exports/reels/08_palomar_knot.mp4",
+      "cover": "exports/covers/08_palomar_knot.png",
+      "public_video_path": "08_palomar_knot.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 9,
+      "slug": "clinch_knot",
+      "enabled": true,
+      "publish_at": "2026-10-09T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "NŒUD DU JOUR",
+      "caption": "Un bon nœud dépend aussi du fil, du diamètre et du montage. Le guide montre le Clinch amélioré étape par étape, avec un rappel simple : testez chaque nœud avant usage.\n\nQuel nœud utilisez-vous le plus ?\n\n#NoeudDePeche #Clinch #BoosterFish #TechniquePeche",
+      "video": "exports/reels/09_clinch_knot.mp4",
+      "cover": "exports/covers/09_clinch_knot.png",
+      "public_video_path": "09_clinch_knot.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 10,
+      "slug": "offshore_swivel",
+      "enabled": true,
+      "publish_at": "2026-10-10T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "BIG GAME",
+      "caption": "Les montages destinés à des poissons puissants exigent un matériel dimensionné et un nœud parfaitement exécuté. Le guide Offshore Swivel de BoosterFish sert de support visuel ; choisissez toujours fil, émerillon et frein selon votre pratique.\n\nPartagez à votre équipage\n\n#BigGameFishing #Traîne #BoosterFish #صيد_الكبار",
+      "video": "exports/reels/10_offshore_swivel.mp4",
+      "cover": "exports/covers/10_offshore_swivel.png",
+      "public_video_path": "10_offshore_swivel.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 11,
+      "slug": "jigging_prep",
+      "enabled": true,
+      "publish_at": "2026-10-11T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "PRÉPARATION JIGGING",
+      "caption": "Checklist jigging : état de la tresse, bas de ligne, connexion, anneaux brisés, hameçons et frein. Une vérification simple évite une mauvaise surprise au large.\n\nEnregistrez la checklist\n\n#Jigging #PecheAuLarge #BoosterFish #FishingTips",
+      "video": "exports/reels/11_jigging_prep.mp4",
+      "cover": "exports/covers/11_jigging_prep.png",
+      "public_video_path": "11_jigging_prep.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 12,
+      "slug": "trolling_prep",
+      "enabled": true,
+      "publish_at": "2026-10-12T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "PRÉPARATION TRAÎNE",
+      "caption": "فالتراينة، التنظيم مهم: راجع الخيط، الليدر، العقد، الفرامل، والطُعم. وتجهيزات السلامة خاصها تكون واجدة قبل الخروج.\n\nشاركها مع طاقم القارب\n\n#BoosterFish #التراينة #صيد_البحر #Trolling",
+      "video": "exports/reels/12_trolling_prep.mp4",
+      "cover": "exports/covers/12_trolling_prep.png",
+      "public_video_path": "12_trolling_prep.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 13,
+      "slug": "species_guide",
+      "enabled": true,
+      "publish_at": "2026-10-13T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "CONNAÎTRE L'ESPÈCE",
+      "caption": "Les fiches espèces de BoosterFish rassemblent des informations utiles pour mieux comprendre les poissons marins. Pour les tailles, quotas et périodes autorisées, référez-vous toujours aux règles locales en vigueur.\n\nQuelle espèce voulez-vous voir ?\n\n#PoissonsMarins #BoosterFish #PecheResponsable #Ocean",
+      "video": "exports/reels/13_species_guide.mp4",
+      "cover": "exports/covers/13_species_guide.png",
+      "public_video_path": "13_species_guide.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 14,
+      "slug": "sea_conditions",
+      "enabled": true,
+      "publish_at": "2026-10-14T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "LIRE LA MER",
+      "caption": "Ne prenez pas une décision sur un seul indicateur. Vent, vagues, marées et terrain doivent être lus ensemble. BoosterFish aide à consulter les données ; votre sécurité exige aussi l'observation réelle sur place.\n\nEnvoyez ce rappel à votre binôme\n\n#MeteoMarine #SecuriteEnMer #BoosterFish #السلامة",
+      "video": "exports/reels/14_sea_conditions.mp4",
+      "cover": "exports/covers/14_sea_conditions.png",
+      "public_video_path": "14_sea_conditions.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 15,
+      "slug": "offline_maps",
+      "enabled": true,
+      "publish_at": "2026-10-15T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "MODE HORS LIGNE",
+      "caption": "Conseil pratique : préparez la région hors ligne avant la sortie. Une carte déjà téléchargée reste utile quand le réseau devient faible. Vérifiez le téléchargement et l'espace disponible avant de partir.\n\nAjoutez cette étape à votre routine\n\n#HorsLigne #CarteMarine #BoosterFish #PecheEnMer",
+      "video": "exports/reels/15_offline_maps.mp4",
+      "cover": "exports/covers/15_offline_maps.png",
+      "public_video_path": "15_offline_maps.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 16,
+      "slug": "community_privacy",
+      "enabled": true,
+      "publish_at": "2026-10-16T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "COMMUNAUTÉ",
+      "caption": "شارك التجربة والصيدة بمسؤولية. فالنشر العمومي، الموقع كيبقى تقريبي، أما السبوطات الخاصة والإحداثيات ديالها فكتبقى مخفية فحسابك.\n\nشنو بغيتي تشوف فمجتمع الصيادة؟\n\n#BoosterFish #مجتمع_الصيادة #صيد_البحر #خصوصية",
+      "video": "exports/reels/16_community_privacy.mp4",
+      "cover": "exports/covers/16_community_privacy.png",
+      "public_video_path": "16_community_privacy.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 17,
+      "slug": "publish_catch",
+      "enabled": true,
+      "publish_at": "2026-10-17T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "VOTRE PRISE",
+      "caption": "Photo, espèce, récit : partagez ce qui rend votre sortie mémorable. BoosterFish sépare la publication communautaire de vos spots personnels privés.\n\nPréparez votre première publication\n\n#PriseDuJour #BoosterFish #CommunautePeche #FishingLife",
+      "video": "exports/reels/17_publish_catch.mp4",
+      "cover": "exports/covers/17_publish_catch.png",
+      "public_video_path": "17_publish_catch.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 18,
+      "slug": "community_controls",
+      "enabled": true,
+      "publish_at": "2026-10-18T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "COMMUNAUTÉ SÛRE",
+      "caption": "Une communauté utile doit aussi être modérée. Les fonctions de signalement et de blocage permettent d'agir face à un contenu ou un comportement inadapté.\n\nRespectez la mer et la communauté\n\n#CommunauteResponsable #BoosterFish #Pecheurs #Respect",
+      "video": "exports/reels/18_community_controls.mp4",
+      "cover": "exports/covers/18_community_controls.png",
+      "public_video_path": "18_community_controls.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 19,
+      "slug": "fishing_shops",
+      "enabled": true,
+      "publish_at": "2026-10-19T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "PRÈS DE VOUS",
+      "caption": "Besoin de compléter le matériel ? La section magasins aide à repérer des commerces d'articles de pêche. Vérifiez les horaires et la disponibilité directement auprès du magasin.\n\nQuel magasin recommandez-vous ?\n\n#MagasinDePeche #BoosterFish #MaterielDePeche #المغرب",
+      "video": "exports/reels/19_fishing_shops.mp4",
+      "cover": "exports/covers/19_fishing_shops.png",
+      "public_video_path": "19_fishing_shops.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 20,
+      "slug": "personal_log",
+      "enabled": true,
+      "publish_at": "2026-10-20T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "MÉMOIRE DE PÊCHE",
+      "caption": "Votre expérience vaut plus qu'un souvenir flou. Organisez vos spots personnels dans votre compte pour retrouver rapidement les lieux que vous souhaitez revisiter.\n\nCommencez par votre dernier spot\n\n#CarnetDePeche #SpotsPrives #BoosterFish #FishingLog",
+      "video": "exports/reels/20_personal_log.mp4",
+      "cover": "exports/covers/20_personal_log.png",
+      "public_video_path": "20_personal_log.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 21,
+      "slug": "forecast_honesty",
+      "enabled": true,
+      "publish_at": "2026-10-21T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "PÊCHER PLUS LUCIDE",
+      "caption": "لا تطبيق يقدر يضمن الصيدة. التوقعات كتعاونك تنظم الوقت وتفهم الظروف، ولكن خاصك ديما تقارنها مع الواقع وتحترم السلامة والقوانين المحلية.\n\nالصراحة أولاً\n\n#BoosterFish #توقعات_البحر #صيد_مسؤول #المغرب",
+      "video": "exports/reels/21_forecast_honesty.mp4",
+      "cover": "exports/covers/21_forecast_honesty.png",
+      "public_video_path": "21_forecast_honesty.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 22,
+      "slug": "closed_test",
+      "enabled": true,
+      "publish_at": "2026-10-22T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "TEST FERMÉ",
+      "caption": "La version actuelle est distribuée à un groupe de testeurs via Google Play. Nous suivons les retours, les parcours essentiels et la stabilité avant de demander l'accès à la production.\n\nTesteur invité ? Envoyez votre retour\n\n#ClosedTesting #BoosterFish #BetaTest #ApplicationMobile",
+      "video": "exports/reels/22_closed_test.mp4",
+      "cover": "exports/covers/22_closed_test.png",
+      "public_video_path": "22_closed_test.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 23,
+      "slug": "tester_mission",
+      "enabled": true,
+      "publish_at": "2026-10-23T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "MISSION TESTEUR",
+      "caption": "Pour les testeurs invités : indiquez le modèle du téléphone, la version Android, l'écran concerné, les étapes et ce qui s'est passé. Une description précise accélère la correction.\n\nEnvoyez un retour précis\n\n#Testeurs #BoosterFish #Feedback #اختبار_التطبيق",
+      "video": "exports/reels/23_tester_mission.mp4",
+      "cover": "exports/covers/23_tester_mission.png",
+      "public_video_path": "23_tester_mission.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 24,
+      "slug": "plan_darija",
+      "enabled": true,
+      "publish_at": "2026-10-24T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "خطط للخرجة",
+      "caption": "خطة بسيطة: المنطقة، حالة البحر، المد والجزر، الوصول، والعتاد. BoosterFish كيجمع ليك أدوات التحضير فبلاصة وحدة.\n\nشنو أول حاجة كتراجع؟\n\n#BoosterFish #خرجة_الصيد #صيد_البحر #المغرب",
+      "video": "exports/reels/24_plan_darija.mp4",
+      "cover": "exports/covers/24_plan_darija.png",
+      "public_video_path": "24_plan_darija.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 25,
+      "slug": "one_app",
+      "enabled": true,
+      "publish_at": "2026-10-25T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "UNE APP, UNE SORTIE",
+      "caption": "L'idée BoosterFish est simple : réduire les allers-retours entre plusieurs outils avant une sortie en mer. Les données restent des aides à la décision, à compléter par la réglementation et l'observation locale.\n\nQuelle fonction vous fait gagner le plus de temps ?\n\n#BoosterFish #FishingApp #PecheEnMer #Application",
+      "video": "exports/reels/25_one_app.mp4",
+      "cover": "exports/covers/25_one_app.png",
+      "public_video_path": "25_one_app.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 26,
+      "slug": "big_game_prep",
+      "enabled": true,
+      "publish_at": "2026-10-26T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "THON • MARLIN • ESPADON",
+      "caption": "La pêche des grands pélagiques demande expérience, matériel adapté, équipage préparé et respect strict des règles locales. BoosterFish apporte des guides techniques, mais ne remplace ni la formation ni l'encadrement professionnel.\n\nPréparez le montage à quai\n\n#Thon #Marlin #Espadon #BigGameFishing #BoosterFish",
+      "video": "exports/reels/26_big_game_prep.mp4",
+      "cover": "exports/covers/26_big_game_prep.png",
+      "public_video_path": "26_big_game_prep.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 27,
+      "slug": "bimini_yucatan",
+      "enabled": true,
+      "publish_at": "2026-10-27T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "CONNEXIONS BIG GAME",
+      "caption": "Bimini Twist et Yucatan font partie des connexions utilisées dans certains montages puissants. Le choix dépend du fil, du diamètre et de la configuration. Entraînez-vous à terre avant de les utiliser en mer.\n\nLequel voulez-vous apprendre d'abord ?\n\n#BiminiTwist #YucatanKnot #BigGame #BoosterFish",
+      "video": "exports/reels/27_bimini_yucatan.mp4",
+      "cover": "exports/covers/27_bimini_yucatan.png",
+      "public_video_path": "27_bimini_yucatan.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 28,
+      "slug": "knot_quiz",
+      "enabled": true,
+      "publish_at": "2026-10-28T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "QUIZ PÊCHE",
+      "caption": "كل صياد عندو الاختيار ديالو حسب الخيط والتركيب. قول لينا: FG، Albright، Yucatan، ولا شي عقدة أخرى؟ وشنو السبب؟\n\nجاوب فالتعليقات\n\n#BoosterFish #سؤال_الصيادة #عقد_الصيد #FishingKnots",
+      "video": "exports/reels/28_knot_quiz.mp4",
+      "cover": "exports/covers/28_knot_quiz.png",
+      "public_video_path": "28_knot_quiz.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 29,
+      "slug": "monthly_recap",
+      "enabled": true,
+      "publish_at": "2026-10-29T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "CE MOIS-CI",
+      "caption": "Merci d'avoir suivi ce mois de contenus BoosterFish. Votre question peut devenir le prochain tutoriel : conditions marines, carte, espèces, nœuds, jigging, traîne ou communauté.\n\nChoisissez le prochain sujet\n\n#BoosterFish #PecheEnMer #ConseilsPeche #Communaute",
+      "video": "exports/reels/29_monthly_recap.mp4",
+      "cover": "exports/covers/29_monthly_recap.png",
+      "public_video_path": "29_monthly_recap.mp4",
+      "share_to_feed": true
+    },
+    {
+      "day": 30,
+      "slug": "coming_soon",
+      "enabled": true,
+      "publish_at": "2026-10-30T19:30+00:00",
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "title": "BIENTÔT",
+      "caption": "BoosterFish n'est pas encore disponible publiquement. La phase de test fermé sert à vérifier la stabilité et les parcours essentiels. Suivez la page pour connaître l'ouverture officielle sur Google Play.\n\nActivez les notifications de la page\n\n#BoosterFish #BientotDisponible #GooglePlay #قريباً",
+      "video": "exports/reels/30_coming_soon.mp4",
+      "cover": "exports/covers/30_coming_soon.png",
+      "public_video_path": "30_coming_soon.mp4",
+      "share_to_feed": true
+    }
+  ]
+}

@@ -35,4 +35,52 @@ void main() {
     expect(source, contains('width: 32'));
     expect(source, contains('fontSize: 14.5'));
   });
+
+  test('la carte Communauté refuse les caméras non finies', () {
+    final source = File(
+      'lib/features/community/widgets/community_map_view.dart',
+    ).readAsStringSync().replaceAll('\r\n', '\n');
+
+    expect(source, contains('final _mapController = FiniteMapController();'));
+    expect(source, contains('if (!camera.zoom.isFinite) return;'));
+    expect(source, isNot(contains('final _mapController = MapController();')));
+  });
+
+  test('un délai GPS sur la carte Communauté reste récupérable', () {
+    final source = File(
+      'lib/features/community/widgets/community_map_view.dart',
+    ).readAsStringSync().replaceAll('\r\n', '\n');
+    final start = source.indexOf('Future<void> _centerOnUser()');
+    final end = source.indexOf('Future<void> _openDetails', start);
+
+    expect(start, greaterThanOrEqualTo(0));
+    expect(end, greaterThan(start));
+    final method = source.substring(start, end);
+
+    expect(method, contains('on TimeoutException'));
+    expect(method, contains('on LocationServiceDisabledException'));
+    expect(method, contains('on PermissionDeniedException'));
+    expect(method, contains('on PositionUpdateException'));
+    expect(method, contains("context.tr('community.locationUnavailable')"));
+    expect(method, contains('if (mounted) setState(() => _locating = false)'));
+  });
+
+  test('toutes les images Communauté possèdent un fallback local', () {
+    final source = File(
+      'lib/features/community/widgets/community_map_view.dart',
+    ).readAsStringSync().replaceAll('\r\n', '\n');
+
+    expect(source, isNot(contains('CachedNetworkImageProvider(')));
+    expect(source, contains('class _CommunityAvatar extends StatelessWidget'));
+    expect(
+      source,
+      contains('class _CommunityImageFallback extends StatelessWidget'),
+    );
+
+    final imageCount =
+        RegExp(r'CachedNetworkImage\(').allMatches(source).length;
+    final errorFallbackCount =
+        RegExp(r'errorWidget:').allMatches(source).length;
+    expect(errorFallbackCount, imageCount);
+  });
 }

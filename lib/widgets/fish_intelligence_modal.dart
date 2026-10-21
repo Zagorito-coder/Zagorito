@@ -15,6 +15,7 @@ import 'package:spots_app/models/tide_data.dart';
 import 'package:spots_app/services/forecast_firestore_service.dart';
 import 'package:spots_app/services/tide_service.dart';
 import 'package:spots_app/theme.dart';
+import 'package:spots_app/utils/tide_height_formatter.dart';
 
 class FishIntelligenceModal extends StatelessWidget {
   final FishModel fish;
@@ -493,7 +494,7 @@ class _TideBlockState extends State<_TideBlock> {
 
   double _getTideActivity(TideData t) {
     if (t.hourlyPoints.isEmpty) return 0.0;
-    final now = DateTime.now();
+    final now = t.stationTimeAt(DateTime.now());
     double cur = t.low;
     for (final p in t.hourlyPoints) {
       if (p.time.isAfter(now)) {
@@ -508,7 +509,7 @@ class _TideBlockState extends State<_TideBlock> {
 
   TidePoint? _currentPoint(TideData t) {
     if (t.hourlyPoints.isEmpty) return null;
-    final now = DateTime.now();
+    final now = t.stationTimeAt(DateTime.now());
     return t.hourlyPoints.firstWhere(
       (point) => point.time.isAfter(now),
       orElse: () => t.hourlyPoints.last,
@@ -582,7 +583,11 @@ class _TideBlockState extends State<_TideBlock> {
 
     final activity = _getTideActivity(t);
     final point = _currentPoint(t);
-    final gfsPoint = _gfsWeather?.nearestTo(point?.time ?? DateTime.now());
+    final referenceInstant = point?.instantUtc ??
+        (point == null
+            ? DateTime.now().toUtc()
+            : t.stationInstantAt(point.time));
+    final gfsPoint = _gfsWeather?.nearestTo(referenceInstant);
     final wind = point?.windSpeedKmh;
     final temp = point?.temperatureC;
     final pressure = point?.pressureHpa ?? gfsPoint?.pressureHpa;
@@ -590,6 +595,16 @@ class _TideBlockState extends State<_TideBlock> {
         gfsPoint?.precipitationProbabilityPct;
     final humidity =
         point?.relativeHumidityPct ?? gfsPoint?.relativeHumidityPct;
+    final tideSummary =
+        '${TideHeightFormatter.full(context, t.next, t.tideHeightDatum)}  ·  '
+        '${TideHeightFormatter.full(context, t.low, t.tideHeightDatum)}–'
+        '${TideHeightFormatter.full(context, t.high, t.tideHeightDatum)}';
+    final tideDatumLabel =
+        TideHeightFormatter.isPresentationDatum(t.tideHeightDatum)
+            ? context.tr('tide.presentationLevel')
+            : '';
+    final qualifiedTideSummary =
+        tideDatumLabel.isEmpty ? tideSummary : '$tideDatumLabel : $tideSummary';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -666,7 +681,9 @@ class _TideBlockState extends State<_TideBlock> {
                 Expanded(
                   child: ClipRRect(
                     child: Text(
-                      '${t.next.toStringAsFixed(2)} m  ·  ${t.low.toStringAsFixed(1)}–${t.high.toStringAsFixed(1)} m',
+                      qualifiedTideSummary,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: palette.mutedText,
                         fontSize: 8.5,

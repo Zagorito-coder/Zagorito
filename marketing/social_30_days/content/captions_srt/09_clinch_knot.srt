@@ -1,0 +1,15 @@
+1
+00:00:00,000 --> 00:00:03,000
+Attacher un hameçon ou émerillon
+
+2
+00:00:03,000 --> 00:00:06,000
+Nœud Clinch amélioré
+
+3
+00:00:06,000 --> 00:00:09,000
+Des étapes visuelles claires
+
+4
+00:00:09,000 --> 00:00:12,000
+Toujours contrôler le serrage
