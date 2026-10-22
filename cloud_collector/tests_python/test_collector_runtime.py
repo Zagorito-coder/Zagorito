@@ -471,6 +471,33 @@ class CollectorRuntimeTests(unittest.TestCase):
             runtime.cli(self.engine, ["--mode", "collect", "--station-ids", "unknown"])
         self.assertEqual(self.engine.order, [])
 
+
+    def test_transactional_writer_passes_real_engine_production_verifier(self):
+        from unittest import mock
+        import harvest_forecast
+        from test_harvest_forecast import ProductionWriteAndVerificationTests
+        fixture = ProductionWriteAndVerificationTests()
+        fixture.setUp()
+        source = fixture._documents()
+        publication = {
+            "spot": fixture.spot,
+            "weather_doc": source[("spots_meteo", fixture.spot["id"])],
+            "conditions_doc": source[("conditions", "test_condition")],
+        }
+        with mock.patch.object(harvest_forecast, "CONDITIONS_SPOT_IDS", {fixture.spot["id"]: "test_condition"}), \
+             mock.patch.object(harvest_forecast, "LEGACY_CONDITIONS_ALIASES", {fixture.spot["id"]: "legacy"}), \
+             mock.patch.object(harvest_forecast.firestore, "SERVER_TIMESTAMP", SERVER_TIMESTAMP), \
+             mock.patch.object(harvest_forecast.firestore, "transactional", FakeDb.transactional), \
+             mock.patch(__name__ + ".NOW", fixture.updated):
+            outcome = runtime.publish_station_atomic(harvest_forecast, self.db, publication, fixture.run_id,
+                                                     fixture.started, now=fixture.updated)
+            self.assertEqual(outcome, {"state": "written", "writes": 4})
+            harvest_forecast.verify_production_state(
+                self.db, [fixture.spot], fixture.run_id, fixture.started,
+                conditions_spot_ids={fixture.spot["id"]: "test_condition"},
+                conditions_aliases={fixture.spot["id"]: "legacy"}, now=fixture.updated,
+            )
+
     def test_report_is_valid_atomic_json_and_contains_no_credentials(self):
         import json
         report = self.collect()
