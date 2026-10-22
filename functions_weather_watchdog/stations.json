@@ -1,0 +1,821 @@
+{
+  "stations": [
+    {
+      "id": "casablanca_maroc",
+      "name": "Casablanca, Maroc",
+      "lat": 33.5971,
+      "lon": -7.6315
+    },
+    {
+      "id": "agadir_maroc",
+      "name": "Agadir, Maroc",
+      "lat": 30.42,
+      "lon": -9.6
+    },
+    {
+      "id": "tanger_maroc",
+      "name": "Tanger, Maroc",
+      "lat": 35.77,
+      "lon": -5.81
+    },
+    {
+      "id": "rabat_maroc",
+      "name": "Rabat, Maroc",
+      "lat": 34.02,
+      "lon": -6.84
+    },
+    {
+      "id": "essaouira_maroc",
+      "name": "Essaouira, Maroc",
+      "lat": 31.51,
+      "lon": -9.77
+    },
+    {
+      "id": "dakhla_maroc",
+      "name": "Dakhla, Maroc",
+      "lat": 23.7,
+      "lon": -15.93
+    },
+    {
+      "id": "laayoune_maroc",
+      "name": "Laayoune, Maroc",
+      "lat": 27.15,
+      "lon": -13.2
+    },
+    {
+      "id": "safi_maroc",
+      "name": "Safi, Maroc",
+      "lat": 32.3,
+      "lon": -9.24
+    },
+    {
+      "id": "eljadida_maroc",
+      "name": "El Jadida, Maroc",
+      "lat": 33.23,
+      "lon": -8.5
+    },
+    {
+      "id": "mohammedia_maroc",
+      "name": "Mohammedia, Maroc",
+      "lat": 33.69,
+      "lon": -7.38
+    },
+    {
+      "id": "tetouan_maroc",
+      "name": "Martil (Tétouan), Maroc",
+      "lat": 35.62,
+      "lon": -5.27
+    },
+    {
+      "id": "alhoceima_maroc",
+      "name": "Al Hoceima, Maroc",
+      "lat": 35.25,
+      "lon": -3.93
+    },
+    {
+      "id": "nador_maroc",
+      "name": "Nador, Maroc",
+      "lat": 35.17,
+      "lon": -2.93
+    },
+    {
+      "id": "larache_maroc",
+      "name": "Larache, Maroc",
+      "lat": 35.19,
+      "lon": -6.15
+    },
+    {
+      "id": "mdiq_maroc",
+      "name": "Mdiq, Maroc",
+      "lat": 35.69,
+      "lon": -5.32
+    },
+    {
+      "id": "aousserd_extreme_sud_maroc",
+      "name": "Littoral d'Aousserd — extrême sud, Maroc",
+      "lat": 21.12819,
+      "lon": -16.94092
+    },
+    {
+      "id": "tantan_elouatia_maroc",
+      "name": "Littoral de Tan-Tan / El Ouatia, Maroc",
+      "lat": 28.61326,
+      "lon": -11.21374
+    },
+    {
+      "id": "boujdour_sud_maroc",
+      "name": "Littoral de Boujdour — sud, Maroc",
+      "lat": 25.52581,
+      "lon": -14.7087
+    },
+    {
+      "id": "aousserd_nord_maroc",
+      "name": "Littoral d'Aousserd — nord, Maroc",
+      "lat": 22.44095,
+      "lon": -16.45138
+    },
+    {
+      "id": "sidi_ifni_maroc",
+      "name": "Sidi Ifni, Maroc",
+      "lat": 29.36693,
+      "lon": -10.18696
+    },
+    {
+      "id": "tarfaya_akhfennir_maroc",
+      "name": "Corridor Tarfaya–Akhfennir, Maroc",
+      "lat": 28.041664,
+      "lon": -12.708328
+    },
+    {
+      "id": "dakhla_boujdour_maroc",
+      "name": "Corridor Dakhla–Boujdour, Maroc",
+      "lat": 24.51228,
+      "lon": -15.11409
+    },
+    {
+      "id": "boujdour_nord_maroc",
+      "name": "Littoral de Boujdour — nord, Maroc",
+      "lat": 26.43321,
+      "lon": -14.09085
+    },
+    {
+      "id": "aousserd_littoral_maroc",
+      "name": "Littoral d'Aousserd, Maroc",
+      "lat": 21.89563,
+      "lon": -16.90179
+    },
+    {
+      "id": "dakhla_sud_maroc",
+      "name": "Littoral de Dakhla — sud, Maroc",
+      "lat": 23.08228,
+      "lon": -16.20727
+    },
+    {
+      "id": "tarfaya_sud_maroc",
+      "name": "Littoral de Tarfaya — sud, Maroc",
+      "lat": 27.78174,
+      "lon": -13.03329
+    },
+    {
+      "id": "kenitra_moulay_bousselham_maroc",
+      "name": "Corridor Kénitra–Moulay Bousselham, Maroc",
+      "lat": 34.59778,
+      "lon": -6.44856
+    },
+    {
+      "id": "chefchaouen_jabha_maroc",
+      "name": "Littoral de Chefchaouen — secteur Jabha, Maroc",
+      "lat": 35.20981,
+      "lon": -4.66566
+    },
+    {
+      "id": "akhfennir_chbika_maroc",
+      "name": "Corridor Akhfennir–Chbika, Maroc",
+      "lat": 28.2305,
+      "lon": -11.73065
+    },
+    {
+      "id": "aglou_tiznit_maroc",
+      "name": "Littoral d'Aglou–Tiznit, Maroc",
+      "lat": 29.85254,
+      "lon": -9.79749
+    },
+    {
+      "id": "saidia_maroc",
+      "name": "Saïdia, Maroc",
+      "lat": 35.09066,
+      "lon": -2.23885
+    },
+    {
+      "id": "oualidia_maroc",
+      "name": "Oualidia, Maroc",
+      "lat": 32.80346,
+      "lon": -8.95479
+    },
+    {
+      "id": "imsouane_nord_maroc",
+      "name": "Littoral d'Imsouane — nord, Maroc",
+      "lat": 30.95543,
+      "lon": -9.82194
+    },
+    {
+      "id": "guelmim_tantan_maroc",
+      "name": "Littoral de Guelmim–Tan-Tan, Maroc",
+      "lat": 28.96584,
+      "lon": -10.59871
+    },
+    {
+      "id": "laayoune_boujdour_maroc",
+      "name": "Corridor Laâyoune–Boujdour, Maroc",
+      "lat": 26.73018,
+      "lon": -13.57505
+    },
+    {
+      "id": "alger_algerie",
+      "name": "Alger, Algérie",
+      "lat": 36.75,
+      "lon": 3.04
+    },
+    {
+      "id": "oran_algerie",
+      "name": "Oran, Algérie",
+      "lat": 35.7,
+      "lon": -0.64
+    },
+    {
+      "id": "annaba_algerie",
+      "name": "Annaba, Algérie",
+      "lat": 36.9,
+      "lon": 7.77
+    },
+    {
+      "id": "bejaia_algerie",
+      "name": "Bejaia, Algérie",
+      "lat": 36.75,
+      "lon": 5.07
+    },
+    {
+      "id": "skikda_algerie",
+      "name": "Skikda, Algérie",
+      "lat": 36.88,
+      "lon": 6.9
+    },
+    {
+      "id": "mostaganem_algerie",
+      "name": "Mostaganem, Algérie",
+      "lat": 35.93,
+      "lon": 0.09
+    },
+    {
+      "id": "tipaza_algerie",
+      "name": "Tipaza, Algérie",
+      "lat": 36.59,
+      "lon": 2.44
+    },
+    {
+      "id": "tunis_tunisie",
+      "name": "Tunis, Tunisie",
+      "lat": 36.82,
+      "lon": 10.3
+    },
+    {
+      "id": "sfax_tunisie",
+      "name": "Sfax, Tunisie",
+      "lat": 34.74,
+      "lon": 10.76
+    },
+    {
+      "id": "sousse_tunisie",
+      "name": "Sousse, Tunisie",
+      "lat": 35.83,
+      "lon": 10.64
+    },
+    {
+      "id": "bizerte_tunisie",
+      "name": "Bizerte, Tunisie",
+      "lat": 37.27,
+      "lon": 9.87
+    },
+    {
+      "id": "mahdia_tunisie",
+      "name": "Mahdia, Tunisie",
+      "lat": 35.5,
+      "lon": 11.06
+    },
+    {
+      "id": "tripoli_libye",
+      "name": "Tripoli, Libye",
+      "lat": 32.89,
+      "lon": 13.18
+    },
+    {
+      "id": "benghazi_libye",
+      "name": "Benghazi, Libye",
+      "lat": 32.12,
+      "lon": 20.07
+    },
+    {
+      "id": "misrata_libye",
+      "name": "Misrata, Libye",
+      "lat": 32.37,
+      "lon": 15.09
+    },
+    {
+      "id": "alexandria_egypte",
+      "name": "Alexandrie, Egypte",
+      "lat": 31.2,
+      "lon": 29.92
+    },
+    {
+      "id": "portsaid_egypte",
+      "name": "Port Said, Egypte",
+      "lat": 31.26,
+      "lon": 32.29
+    },
+    {
+      "id": "marsamatruh_egypte",
+      "name": "Marsa Matruh, Egypte",
+      "lat": 31.35,
+      "lon": 27.24
+    },
+    {
+      "id": "nouadhibou_mauritanie",
+      "name": "Nouadhibou, Mauritanie",
+      "lat": 20.93,
+      "lon": -17.03
+    },
+    {
+      "id": "nouakchott_mauritanie",
+      "name": "Nouakchott, Mauritanie",
+      "lat": 18.08,
+      "lon": -15.98
+    },
+    {
+      "id": "dakar_senegal",
+      "name": "Dakar, Sénégal",
+      "lat": 14.69,
+      "lon": -17.44
+    },
+    {
+      "id": "saintlouis_senegal",
+      "name": "Saint-Louis, Sénégal",
+      "lat": 16.03,
+      "lon": -16.49
+    },
+    {
+      "id": "thies_senegal",
+      "name": "Mbour, Sénégal",
+      "lat": 14.42,
+      "lon": -16.97
+    },
+    {
+      "id": "banjul_gambie",
+      "name": "Banjul, Gambie",
+      "lat": 13.45,
+      "lon": -16.58
+    },
+    {
+      "id": "bissau_guinee_bissau",
+      "name": "Bissau, Guinée-Bissau",
+      "lat": 11.86,
+      "lon": -15.6
+    },
+    {
+      "id": "conakry_guinee",
+      "name": "Conakry, Guinée",
+      "lat": 9.64,
+      "lon": -13.58
+    },
+    {
+      "id": "freetown_sierra_leone",
+      "name": "Freetown, Sierra Leone",
+      "lat": 8.48,
+      "lon": -13.23
+    },
+    {
+      "id": "monrovia_liberia",
+      "name": "Monrovia, Libéria",
+      "lat": 6.3,
+      "lon": -10.8
+    },
+    {
+      "id": "abidjan_cote_ivoire",
+      "name": "Abidjan, Côte d'Ivoire",
+      "lat": 5.36,
+      "lon": -4.01
+    },
+    {
+      "id": "sanpedro_cote_ivoire",
+      "name": "San-Pédro, Côte d'Ivoire",
+      "lat": 4.75,
+      "lon": -6.64
+    },
+    {
+      "id": "accra_ghana",
+      "name": "Accra, Ghana",
+      "lat": 5.6,
+      "lon": -0.17
+    },
+    {
+      "id": "takoradi_ghana",
+      "name": "Takoradi, Ghana",
+      "lat": 4.9,
+      "lon": -1.76
+    },
+    {
+      "id": "lome_togo",
+      "name": "Lomé, Togo",
+      "lat": 6.13,
+      "lon": 1.22
+    },
+    {
+      "id": "cotonou_benin",
+      "name": "Cotonou, Bénin",
+      "lat": 6.37,
+      "lon": 2.43
+    },
+    {
+      "id": "lagos_nigeria",
+      "name": "Lagos, Nigéria",
+      "lat": 6.45,
+      "lon": 3.4
+    },
+    {
+      "id": "portharcourt_nigeria",
+      "name": "Bonny (Port Harcourt), Nigéria",
+      "lat": 4.45,
+      "lon": 7.17
+    },
+    {
+      "id": "douala_cameroun",
+      "name": "Douala, Cameroun",
+      "lat": 4.05,
+      "lon": 9.7
+    },
+    {
+      "id": "limbe_cameroun",
+      "name": "Limbé, Cameroun",
+      "lat": 4.02,
+      "lon": 9.22
+    },
+    {
+      "id": "malabo_guinee_equatoriale",
+      "name": "Malabo, Guinée Équatoriale",
+      "lat": 3.75,
+      "lon": 8.78
+    },
+    {
+      "id": "libreville_gabon",
+      "name": "Libreville, Gabon",
+      "lat": 0.39,
+      "lon": 9.45
+    },
+    {
+      "id": "portgentil_gabon",
+      "name": "Port-Gentil, Gabon",
+      "lat": -0.72,
+      "lon": 8.78
+    },
+    {
+      "id": "pointe_noire_congo",
+      "name": "Pointe-Noire, Congo",
+      "lat": -4.78,
+      "lon": 11.86
+    },
+    {
+      "id": "luanda_angola",
+      "name": "Luanda, Angola",
+      "lat": -8.84,
+      "lon": 13.23
+    },
+    {
+      "id": "benguela_angola",
+      "name": "Benguela, Angola",
+      "lat": -12.58,
+      "lon": 13.4
+    },
+    {
+      "id": "lobito_angola",
+      "name": "Lobito, Angola",
+      "lat": -12.35,
+      "lon": 13.55
+    },
+    {
+      "id": "namibe_angola",
+      "name": "Namibe, Angola",
+      "lat": -15.2,
+      "lon": 12.15
+    },
+    {
+      "id": "walvisbay_namibie",
+      "name": "Walvis Bay, Namibie",
+      "lat": -22.96,
+      "lon": 14.51
+    },
+    {
+      "id": "swakopmund_namibie",
+      "name": "Swakopmund, Namibie",
+      "lat": -22.68,
+      "lon": 14.53
+    },
+    {
+      "id": "capetown_afrique_sud",
+      "name": "Le Cap, Afrique du Sud",
+      "lat": -33.92,
+      "lon": 18.42
+    },
+    {
+      "id": "durban_afrique_sud",
+      "name": "Durban, Afrique du Sud",
+      "lat": -29.86,
+      "lon": 31.03
+    },
+    {
+      "id": "portelizabeth_afrique_sud",
+      "name": "Port Elizabeth, Afrique du Sud",
+      "lat": -33.96,
+      "lon": 25.6
+    },
+    {
+      "id": "eastlondon_afrique_sud",
+      "name": "East London, Afrique du Sud",
+      "lat": -33.02,
+      "lon": 27.9
+    },
+    {
+      "id": "mosselbay_afrique_sud",
+      "name": "Mossel Bay, Afrique du Sud",
+      "lat": -34.18,
+      "lon": 22.13
+    },
+    {
+      "id": "maputo_mozambique",
+      "name": "Maputo, Mozambique",
+      "lat": -25.97,
+      "lon": 32.59
+    },
+    {
+      "id": "beira_mozambique",
+      "name": "Beira, Mozambique",
+      "lat": -19.83,
+      "lon": 34.84
+    },
+    {
+      "id": "nampula_mozambique",
+      "name": "Nacala, Mozambique",
+      "lat": -14.54,
+      "lon": 40.67
+    },
+    {
+      "id": "dar_essalaam_tanzanie",
+      "name": "Dar es Salaam, Tanzanie",
+      "lat": -6.79,
+      "lon": 39.21
+    },
+    {
+      "id": "zanzibar_tanzanie",
+      "name": "Zanzibar, Tanzanie",
+      "lat": -6.16,
+      "lon": 39.19
+    },
+    {
+      "id": "mombasa_kenya",
+      "name": "Mombasa, Kenya",
+      "lat": -4.04,
+      "lon": 39.67
+    },
+    {
+      "id": "malindi_kenya",
+      "name": "Malindi, Kenya",
+      "lat": -3.22,
+      "lon": 40.12
+    },
+    {
+      "id": "mogadiscio_somalie",
+      "name": "Mogadiscio, Somalie",
+      "lat": 2.04,
+      "lon": 45.34
+    },
+    {
+      "id": "berbera_somaliland",
+      "name": "Berbera, Somaliland",
+      "lat": 10.44,
+      "lon": 45.01
+    },
+    {
+      "id": "djibouti_ville",
+      "name": "Djibouti, Djibouti",
+      "lat": 11.59,
+      "lon": 43.15
+    },
+    {
+      "id": "portlouis_maurice",
+      "name": "Port Louis, Maurice",
+      "lat": -20.16,
+      "lon": 57.5
+    },
+    {
+      "id": "saintdenis_reunion",
+      "name": "Saint-Denis, Réunion",
+      "lat": -20.88,
+      "lon": 55.45
+    },
+    {
+      "id": "toamasina_madagascar",
+      "name": "Toamasina, Madagascar",
+      "lat": -18.15,
+      "lon": 49.4
+    },
+    {
+      "id": "antananarivo_madagascar",
+      "name": "Mahajanga, Madagascar",
+      "lat": -15.72,
+      "lon": 46.32
+    },
+    {
+      "id": "male_maldives",
+      "name": "Malé, Maldives",
+      "lat": 4.18,
+      "lon": 73.51
+    },
+    {
+      "id": "victoria_seychelles",
+      "name": "Victoria, Seychelles",
+      "lat": -4.62,
+      "lon": 55.45
+    },
+    {
+      "id": "jedda_arabie_saoudite",
+      "name": "Jeddah, Arabie Saoudite",
+      "lat": 21.54,
+      "lon": 39.17
+    },
+    {
+      "id": "yanbu_arabie_saoudite",
+      "name": "Yanbu, Arabie Saoudite",
+      "lat": 24.09,
+      "lon": 38.06
+    },
+    {
+      "id": "dammam_arabie_saoudite",
+      "name": "Dammam, Arabie Saoudite",
+      "lat": 26.42,
+      "lon": 50.1
+    },
+    {
+      "id": "jubail_arabie_saoudite",
+      "name": "Jubail, Arabie Saoudite",
+      "lat": 27.0,
+      "lon": 49.66
+    },
+    {
+      "id": "dubai_emirats",
+      "name": "Dubaï, EAU",
+      "lat": 25.2,
+      "lon": 55.27
+    },
+    {
+      "id": "abudhabi_emirats",
+      "name": "Abou Dhabi, EAU",
+      "lat": 24.45,
+      "lon": 54.38
+    },
+    {
+      "id": "sharjah_emirats",
+      "name": "Sharjah, EAU",
+      "lat": 25.35,
+      "lon": 55.39
+    },
+    {
+      "id": "fujairah_emirats",
+      "name": "Fujairah, EAU",
+      "lat": 25.13,
+      "lon": 56.33
+    },
+    {
+      "id": "muscat_oman",
+      "name": "Mascate, Oman",
+      "lat": 23.61,
+      "lon": 58.59
+    },
+    {
+      "id": "salalah_oman",
+      "name": "Salalah, Oman",
+      "lat": 17.02,
+      "lon": 54.09
+    },
+    {
+      "id": "sohar_oman",
+      "name": "Sohar, Oman",
+      "lat": 24.36,
+      "lon": 56.75
+    },
+    {
+      "id": "doha_qatar",
+      "name": "Doha, Qatar",
+      "lat": 25.29,
+      "lon": 51.53
+    },
+    {
+      "id": "manama_bahrein",
+      "name": "Manama, Bahreïn",
+      "lat": 26.22,
+      "lon": 50.59
+    },
+    {
+      "id": "koweit_city_koweit",
+      "name": "Koweït City, Koweït",
+      "lat": 29.37,
+      "lon": 47.98
+    },
+    {
+      "id": "basra_irak",
+      "name": "Al-Faw (Bassorah), Irak",
+      "lat": 29.97,
+      "lon": 48.47
+    },
+    {
+      "id": "aden_yemen",
+      "name": "Aden, Yémen",
+      "lat": 12.78,
+      "lon": 45.03
+    },
+    {
+      "id": "mukalla_yemen",
+      "name": "Mukalla, Yémen",
+      "lat": 14.54,
+      "lon": 49.13
+    },
+    {
+      "id": "hodeidah_yemen",
+      "name": "Al Hudaydah, Yémen",
+      "lat": 14.8,
+      "lon": 42.95
+    },
+    {
+      "id": "port_soudan_soudan",
+      "name": "Port-Soudan, Soudan",
+      "lat": 19.62,
+      "lon": 37.22
+    },
+    {
+      "id": "aqaba_jordanie",
+      "name": "Aqaba, Jordanie",
+      "lat": 29.45,
+      "lon": 35.0
+    },
+    {
+      "id": "lattaquie_syrie",
+      "name": "Lattaquié, Syrie",
+      "lat": 35.52,
+      "lon": 35.78
+    },
+    {
+      "id": "tartous_syrie",
+      "name": "Tartous, Syrie",
+      "lat": 34.89,
+      "lon": 35.89
+    },
+    {
+      "id": "istanbul_turquie",
+      "name": "Istanbul, Turquie",
+      "lat": 41.01,
+      "lon": 28.98
+    },
+    {
+      "id": "izmir_turquie",
+      "name": "Izmir, Turquie",
+      "lat": 38.42,
+      "lon": 27.14
+    },
+    {
+      "id": "antalya_turquie",
+      "name": "Antalya, Turquie",
+      "lat": 36.9,
+      "lon": 30.7
+    },
+    {
+      "id": "mersin_turquie",
+      "name": "Mersin, Turquie",
+      "lat": 36.8,
+      "lon": 34.63
+    },
+    {
+      "id": "samsun_turquie",
+      "name": "Samsun, Turquie",
+      "lat": 41.29,
+      "lon": 36.33
+    },
+    {
+      "id": "trabzon_turquie",
+      "name": "Trabzon, Turquie",
+      "lat": 41.0,
+      "lon": 39.72
+    },
+    {
+      "id": "bodrum_turquie",
+      "name": "Bodrum, Turquie",
+      "lat": 37.03,
+      "lon": 27.43
+    },
+    {
+      "id": "sharm_el_sheikh_egypte",
+      "name": "Sharm El-Sheikh, Egypte",
+      "lat": 27.97,
+      "lon": 34.39
+    },
+    {
+      "id": "hurgada_egypte",
+      "name": "Hurghada, Egypte",
+      "lat": 27.26,
+      "lon": 33.81
+    }
+  ],
+  "aliases": {
+    "casablanca_maroc": "casablanca",
+    "rabat_maroc": "rabat",
+    "agadir_maroc": "agadir",
+    "tanger_maroc": "tanger",
+    "essaouira_maroc": "essaouira"
+  }
+}

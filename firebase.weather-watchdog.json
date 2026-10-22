@@ -1,0 +1,8 @@
+{
+  "functions": [{
+    "source": "functions_weather_watchdog",
+    "codebase": "weather-watchdog",
+    "runtime": "nodejs22",
+    "ignore": ["node_modules", ".git", "*.test.js", "index.test.js", ".env*", "*.log"]
+  }]
+}

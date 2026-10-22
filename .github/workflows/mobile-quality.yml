@@ -138,5 +138,9 @@ jobs:
           python -m pip install --disable-pip-version-check -r requirements-harvest.txt
           python -m pip check
 
-      - name: Tester la récolte météo
+      - name: Tester le collecteur cloud déployé
+        working-directory: cloud_collector
         run: python -m unittest discover -s tests_python -p 'test_*.py'
+
+      - name: Tester les outils de catalogue indépendants
+        run: python -m unittest discover -s tests_python -p 'test_enrich_spots_catalog.py'
