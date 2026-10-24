@@ -73,6 +73,7 @@ except ImportError:
 import requests
 import firebase_admin
 from firebase_admin import credentials, firestore
+from collector_diagnostics import DiagnosticRuntimeError, DiagnosticValueError, diagnostic_fields
 
 # ---------------------------------------------------------------------------
 # URLs commerciales : la clé doit rester côté serveur/GitHub Actions.
@@ -309,7 +310,8 @@ def _coverage_metadata(marine_days=CONDITIONS_FORECAST_DAYS):
         or not isinstance(marine_days, int)
         or not MIN_COMPLETE_CONDITIONS_DAYS <= marine_days <= CONDITIONS_FORECAST_DAYS
     ):
-        raise ValueError("Couverture marine complète invalide.")
+        raise DiagnosticValueError("Couverture marine complète invalide.",
+            code="marine_horizon_invalid", stage="marine_coverage", field="marineDays")
     return {
         "weatherDays": PUBLISHED_FORECAST_DAYS,
         "marineDays": marine_days,
@@ -403,8 +405,9 @@ def _open_meteo_timezone(timezone_name, utc_offset_seconds=0):
         try:
             return ZoneInfo(timezone_name.strip())
         except ZoneInfoNotFoundError as error:
-            raise ValueError(
-                f"Fuseau Open-Meteo inconnu : {timezone_name!r}."
+            raise DiagnosticValueError(
+                f"Fuseau Open-Meteo inconnu : {timezone_name!r}.",
+                code="timezone_invalid", stage="timestamp", field="timezone",
             ) from error
     return timezone(timedelta(seconds=int(utc_offset_seconds or 0)))
 
@@ -447,7 +450,7 @@ def _utc_datetimes_from_open_meteo(
     )
     resolved = []
     previous = None
-    for raw_timestamp in local_timestamps:
+    for timestamp_index, raw_timestamp in enumerate(local_timestamps):
         if (
             isinstance(raw_timestamp, (int, float))
             and not isinstance(raw_timestamp, bool)
@@ -460,17 +463,20 @@ def _utc_datetimes_from_open_meteo(
                     tz=timezone.utc,
                 )
             except (OverflowError, OSError, ValueError) as error:
-                raise ValueError(
-                    f"Horodatage Unix Open-Meteo invalide : {raw_timestamp!r}."
+                raise DiagnosticValueError(
+                    f"Horodatage Unix Open-Meteo invalide : {raw_timestamp!r}.",
+                    code="timestamp_invalid", stage="timestamp", field="time", index=timestamp_index,
                 ) from error
         else:
             if not isinstance(raw_timestamp, str) or not raw_timestamp.strip():
-                raise ValueError("Horodatage Open-Meteo absent ou invalide.")
+                raise DiagnosticValueError("Horodatage Open-Meteo absent ou invalide.",
+                    code="timestamp_missing", stage="timestamp", field="time", index=timestamp_index)
             try:
                 local_time = datetime.fromisoformat(raw_timestamp)
             except ValueError as error:
-                raise ValueError(
-                    f"Horodatage Open-Meteo invalide : {raw_timestamp!r}."
+                raise DiagnosticValueError(
+                    f"Horodatage Open-Meteo invalide : {raw_timestamp!r}.",
+                    code="timestamp_invalid", stage="timestamp", field="time", index=timestamp_index,
                 ) from error
 
             candidates = _utc_candidates_for_local(local_time, station_timezone)
@@ -479,15 +485,17 @@ def _utc_datetimes_from_open_meteo(
                     candidate for candidate in candidates if candidate > previous
                 ]
             if not candidates:
-                raise ValueError(
+                raise DiagnosticValueError(
                     "Impossible de résoudre sans ambiguïté l'heure locale "
                     f"Open-Meteo {raw_timestamp!r} dans "
-                    f"{timezone_name or 'le fuseau fixe'}."
+                    f"{timezone_name or 'le fuseau fixe'}.",
+                    code="local_time_unresolvable", stage="timestamp", field="time", index=timestamp_index,
                 )
             selected = candidates[0]
         if previous is not None and selected <= previous:
-            raise ValueError(
-                "Les horodatages Open-Meteo doivent être strictement croissants."
+            raise DiagnosticValueError(
+                "Les horodatages Open-Meteo doivent être strictement croissants.",
+                code="time_not_increasing", stage="timestamp", field="time", index=timestamp_index,
             )
         resolved.append(selected)
         previous = selected
@@ -541,7 +549,8 @@ def _published_utc_offset_seconds(model_json):
     """
     times = (model_json.get("hourly") or {}).get("time") or []
     if not times:
-        raise ValueError("Grille horaire absente pour le décalage publié.")
+        raise DiagnosticValueError("Grille horaire absente pour le décalage publié.",
+            code="array_missing", stage="timestamp", field="time")
     raw_offset = int(_safe_num(model_json.get("utc_offset_seconds"), 0) or 0)
     zone_name = model_json.get("timezone")
     first_instant = _utc_datetimes_from_open_meteo(
@@ -589,13 +598,16 @@ def _utc_iso(instant):
 
 def _parse_utc_instant(raw_timestamp, label="instant UTC"):
     if not isinstance(raw_timestamp, str) or not raw_timestamp.strip():
-        raise ValueError(f"{label} absent ou invalide.")
+        raise DiagnosticValueError(f"{label} absent ou invalide.",
+            code="timestamp_missing", stage="timestamp", field="time")
     try:
         parsed = datetime.fromisoformat(raw_timestamp.replace("Z", "+00:00"))
     except ValueError as error:
-        raise ValueError(f"{label} invalide : {raw_timestamp!r}.") from error
+        raise DiagnosticValueError(f"{label} invalide : {raw_timestamp!r}.",
+            code="timestamp_invalid", stage="timestamp", field="time") from error
     if parsed.tzinfo is None or parsed.utcoffset() is None:
-        raise ValueError(f"{label} doit contenir un décalage UTC explicite.")
+        raise DiagnosticValueError(f"{label} doit contenir un décalage UTC explicite.",
+            code="timestamp_invalid", stage="timestamp", field="time")
     return parsed.astimezone(timezone.utc)
 
 
@@ -1288,36 +1300,47 @@ def _validated_payload_number(
     integer=False,
     allowed_values=None,
 ):
+    # Labels are kept for compatibility; only a fixed model token is reported.
+    context = {"stage": "forecast_payload", "field": key}
+    for model_name in ("wind", "hires", "wave"):
+        if label.endswith(f".models.{model_name}"):
+            context["model"] = model_name
+            break
     value = mapping.get(key)
     if value is None:
         if required:
-            raise ValueError(f"{label}.{key} absent.")
+            raise DiagnosticValueError(f"{label}.{key} absent.", code="number_missing", **context)
         return None
     if (
         isinstance(value, bool)
         or not isinstance(value, (int, float))
         or not math.isfinite(value)
     ):
-        raise ValueError(f"{label}.{key} n'est pas un nombre fini valide.")
+        raise DiagnosticValueError(f"{label}.{key} n'est pas un nombre fini valide.",
+            code="number_invalid", **context)
     numeric = float(value)
     if numeric < minimum or numeric > maximum:
-        raise ValueError(
-            f"{label}.{key} hors limites [{minimum:g}, {maximum:g}]."
+        raise DiagnosticValueError(
+            f"{label}.{key} hors limites [{minimum:g}, {maximum:g}].",
+            code="number_out_of_range", **context,
         )
     if integer and not numeric.is_integer():
-        raise ValueError(f"{label}.{key} doit être un entier.")
+        raise DiagnosticValueError(f"{label}.{key} doit être un entier.", code="number_not_integer", **context)
     normalized = int(numeric) if integer else numeric
     if allowed_values is not None and normalized not in allowed_values:
-        raise ValueError(f"{label}.{key} contient une valeur non prise en charge.")
+        raise DiagnosticValueError(f"{label}.{key} contient une valeur non prise en charge.",
+            code="number_unsupported", **context)
     return normalized
 
 def _require_model(slot, model_name, label):
     models = slot.get("models")
     if not isinstance(models, dict):
-        raise ValueError(f"{label}.models absent ou invalide.")
+        raise DiagnosticValueError(f"{label}.models absent ou invalide.",
+            code="model_missing", stage="forecast_payload", field="models")
     model = models.get(model_name)
     if not isinstance(model, dict):
-        raise ValueError(f"{label}.models.{model_name} absent ou invalide.")
+        raise DiagnosticValueError(f"{label}.models.{model_name} absent ou invalide.",
+            code="model_missing", stage="forecast_payload", field="models", model=model_name)
     return model
 
 def _validate_equal_values(left, left_key, right, right_key, label):
@@ -1587,14 +1610,20 @@ def validate_payload(
         expected_count = len(expected_by_date[current_date])
         if not isinstance(slots, list) or len(slots) != expected_count:
             if not timezone_name and expected_count == EXPECTED_SLOTS_PER_DAY:
-                raise ValueError(
+                raise DiagnosticValueError(
                     f"{current_date.isoformat()} doit contenir exactement "
-                    f"{EXPECTED_SLOTS_PER_DAY} créneaux GFS natifs."
+                    f"{EXPECTED_SLOTS_PER_DAY} créneaux GFS natifs.",
+                    code="day_slots_invalid", stage="forecast_payload", field="slots", index=index,
+                    expected_count=expected_count,
+                    actual_count=len(slots) if isinstance(slots, list) else 0,
                 )
-            raise ValueError(
+            raise DiagnosticValueError(
                 f"{current_date.isoformat()} doit contenir exactement "
                 f"{expected_count} créneaux GFS natifs selon le fuseau "
-                f"{timezone_name}."
+                f"{timezone_name}.",
+                code="day_slots_invalid", stage="forecast_payload", field="slots", index=index,
+                expected_count=expected_count,
+                actual_count=len(slots) if isinstance(slots, list) else 0,
             )
 
         if any(not isinstance(slot, dict) for slot in slots):
@@ -1604,11 +1633,15 @@ def validate_payload(
         if strict_published:
             _validate_daily_sun(days_payload[index], current_date, current_date.isoformat())
             for slot_index, slot in enumerate(slots):
-                _validate_forecast_slot(
-                    slot,
-                    f"{current_date.isoformat()}.slots[{slot_index}]",
-                    marine_required=index < marine_required_days,
-                )
+                try:
+                    _validate_forecast_slot(
+                        slot,
+                        f"{current_date.isoformat()}.slots[{slot_index}]",
+                        marine_required=index < marine_required_days,
+                    )
+                except DiagnosticValueError as error:
+                    error.collector_diagnostic.setdefault("index", slot_index)
+                    raise
         raw_hours = [slot.get("hour") for slot in slots]
         if any(not isinstance(value, str) for value in raw_hours):
             raise ValueError(
@@ -1694,8 +1727,10 @@ def validate_payload(
             )
 
     if actual_utc_times != expected_utc_times:
-        raise ValueError(
-            "La séquence des créneaux GFS UTC est incomplète, dupliquée ou décalée."
+        raise DiagnosticValueError(
+            "La séquence des créneaux GFS UTC est incomplète, dupliquée ou décalée.",
+            code="grid_alignment", stage="forecast_payload", field="hour_utc",
+            expected_count=len(expected_utc_times), actual_count=len(actual_utc_times),
         )
 
     total = 0
@@ -1935,12 +1970,27 @@ def _haversine_km(lat1, lon1, lat2, lon2):
 def _validated_number(hourly, api_key, index, minimum, maximum, label):
     raw_values = hourly.get(api_key)
     raw = raw_values[index] if isinstance(raw_values, (list, tuple)) and index < len(raw_values) else None
+    context = {
+        "stage": "marine_coverage" if label == "Couverture marine" else "conditions",
+        "model": "wave" if api_key in {item[0] for item in _MARINE_CONDITIONS_FIELDS} else "wind",
+        "field": api_key, "index": index,
+    }
     if isinstance(raw, bool) or not isinstance(raw, (int, float)):
-        raise ValueError(f"{label} : {api_key} absent ou hors limites au créneau {index}.")
+        if not isinstance(raw_values, (list, tuple)):
+            code = "array_missing"
+        elif index >= len(raw_values):
+            code = "array_short"
+            context.update(expected_count=index + 1, actual_count=len(raw_values))
+        else:
+            code = "number_missing" if raw is None else "number_invalid"
+        raise DiagnosticValueError(f"{label} : {api_key} absent ou hors limites au créneau {index}.",
+            code=code, **context)
     value = _hourly_num(hourly, api_key, index)
     if value is None or not math.isfinite(value) or value < minimum or value > maximum:
-        raise ValueError(
-            f"{label} : {api_key} absent ou hors limites au créneau {index}."
+        raise DiagnosticValueError(
+            f"{label} : {api_key} absent ou hors limites au créneau {index}.",
+            code="number_nonfinite" if value is None or not math.isfinite(value) else "number_out_of_range",
+            **context,
         )
     return value
 
@@ -1954,11 +2004,15 @@ def _complete_marine_day_count(wave_json, published_days):
     couvre les journées de 23/25 heures et les fuseaux à demi-heure.
     """
     if not isinstance(published_days, list) or len(published_days) < CONDITIONS_FORECAST_DAYS:
-        raise ValueError("Prévisions météo insuffisantes pour la fenêtre marine.")
+        raise DiagnosticValueError("Prévisions météo insuffisantes pour la fenêtre marine.",
+            code="forecast_horizon_short", stage="marine_coverage", field="days",
+            expected_count=CONDITIONS_FORECAST_DAYS,
+            actual_count=len(published_days) if isinstance(published_days, list) else 0)
     try:
         first_date = date.fromisoformat(published_days[0]["date"])
     except (TypeError, KeyError, ValueError) as error:
-        raise ValueError("Première date marine invalide.") from error
+        raise DiagnosticValueError("Première date marine invalide.",
+            code="date_invalid", stage="marine_coverage", field="date", index=0) from error
     hourly = wave_json.get("hourly") or {}
     station_timezone = _open_meteo_timezone(
         wave_json.get("timezone"), wave_json.get("utc_offset_seconds", 0)
@@ -1969,6 +2023,7 @@ def _complete_marine_day_count(wave_json, published_days):
         wave_json.get("timezone"),
     )
     by_time = {instant: index for index, instant in enumerate(utc_times)}
+    first_error = None
     last_error = None
     for day_count in range(CONDITIONS_FORECAST_DAYS, MIN_COMPLETE_CONDITIONS_DAYS - 1, -1):
         expected = _expected_utc_grid_instants(
@@ -1977,16 +2032,33 @@ def _complete_marine_day_count(wave_json, published_days):
         try:
             for instant in expected:
                 if instant not in by_time:
-                    raise ValueError("Grille marine horaire incomplète.")
+                    raise DiagnosticValueError("Grille marine horaire incomplète.",
+                        code="grid_incomplete", stage="marine_coverage", model="wave", field="time",
+                        index=expected.index(instant), horizon_days=day_count,
+                        expected_count=len(expected), actual_count=len(utc_times))
                 index = by_time[instant]
                 for api_key, _, minimum, maximum in _MARINE_CONDITIONS_FIELDS:
                     _validated_number(hourly, api_key, index, minimum, maximum, "Couverture marine")
         except ValueError as error:
+            if isinstance(error, DiagnosticValueError):
+                error.collector_diagnostic.setdefault("horizon_days", day_count)
+            if first_error is None:
+                first_error = error
             last_error = error
             continue
         return day_count
-    raise ValueError(
-        f"Moins de {MIN_COMPLETE_CONDITIONS_DAYS} jours marins complets : {last_error}"
+    final_diagnostic = diagnostic_fields(last_error)
+    first_diagnostic = diagnostic_fields(first_error)
+    raise DiagnosticValueError(
+        f"Moins de {MIN_COMPLETE_CONDITIONS_DAYS} jours marins complets : {last_error}",
+        code="marine_horizon_incomplete", stage="marine_coverage", model="wave",
+        horizon_days=MIN_COMPLETE_CONDITIONS_DAYS, fallback_from_days=CONDITIONS_FORECAST_DAYS,
+        cause_code=final_diagnostic.get("validation_code"),
+        field=final_diagnostic.get("field"), index=final_diagnostic.get("index"),
+        expected_count=final_diagnostic.get("expected_count"), actual_count=final_diagnostic.get("actual_count"),
+        primary_code=first_diagnostic.get("validation_code"),
+        primary_field=first_diagnostic.get("field"), primary_index=first_diagnostic.get("index"),
+        primary_horizon_days=CONDITIONS_FORECAST_DAYS,
     ) from last_error
 
 
@@ -2031,22 +2103,27 @@ def _validate_hourly_continuity(
     expected_hours=CONDITIONS_FORECAST_DAYS * 24,
 ):
     if len(slots) != expected_hours:
-        raise ValueError(
+        raise DiagnosticValueError(
             f"{label} : couverture incorrecte ({len(slots)}/{expected_hours} "
-            "créneaux)."
+            "créneaux).",
+            code="grid_count_mismatch", stage="conditions", field="time",
+            expected_count=expected_hours, actual_count=len(slots),
         )
     parsed = []
-    for slot in slots:
+    for slot_index, slot in enumerate(slots):
         raw_time = slot.get("time")
         if not isinstance(raw_time, str):
-            raise ValueError(f"{label} : heure absente.")
+            raise DiagnosticValueError(f"{label} : heure absente.",
+                code="timestamp_missing", stage="conditions", field="time", index=slot_index)
         parsed.append(_parse_utc_instant(raw_time, f"{label} : heure"))
     if parsed != sorted(parsed) or len(set(parsed)) != len(parsed):
-        raise ValueError(f"{label} : heures dupliquées ou non triées.")
+        raise DiagnosticValueError(f"{label} : heures dupliquées ou non triées.",
+            code="grid_order_invalid", stage="conditions", field="time")
     for previous, current in zip(parsed, parsed[1:]):
         if current - previous != timedelta(hours=1):
-            raise ValueError(
-                f"{label} : rupture horaire entre {previous} et {current}."
+            raise DiagnosticValueError(
+                f"{label} : rupture horaire entre {previous} et {current}.",
+                code="grid_gap", stage="conditions", field="time",
             )
 
 
@@ -2264,16 +2341,19 @@ def _require_station_models(station_result):
         if model_json is None:
             error = errors.get(model_name) or errors.get("station")
             detail = _error_summary(error) if error is not None else "réponse absente"
-            raise RuntimeError(
+            raise DiagnosticRuntimeError(
                 f"Récolte interrompue pour {spot['id']} : "
-                f"modèle {model_name} indisponible ({detail})."
+                f"modèle {model_name} indisponible ({detail}).",
+                code="model_missing", stage="build", model=model_name, field="models",
             )
         hourly = model_json.get("hourly")
         times = hourly.get("time") if isinstance(hourly, dict) else None
         if not isinstance(times, list) or not times:
-            raise RuntimeError(
+            raise DiagnosticRuntimeError(
                 f"Récolte interrompue pour {spot['id']} : "
-                f"modèle {model_name} sans série horaire."
+                f"modèle {model_name} sans série horaire.",
+                code="array_missing", stage="build", model=model_name,
+                field="hourly" if not isinstance(hourly, dict) else "time",
             )
         required[model_name] = model_json
     return required["wind"], required["hires"], required["wave"]
@@ -2309,17 +2389,19 @@ def _build_station_publication(
     )
     timezone_name = wind_json.get("timezone")
     if not isinstance(timezone_name, str) or not timezone_name.strip():
-        raise ValueError(
-            f"Récolte interrompue pour {spot['id']} : fuseau IANA absent."
+        raise DiagnosticValueError(
+            f"Récolte interrompue pour {spot['id']} : fuseau IANA absent.",
+            code="timezone_missing", stage="build", model="wind", field="timezone",
         )
     timezone_name = timezone_name.strip()
     _open_meteo_timezone(timezone_name, utc_offset_seconds)
     for model_name, model_json in (("hires", hires_json), ("wave", wave_json)):
         model_timezone = model_json.get("timezone")
         if not isinstance(model_timezone, str) or model_timezone.strip() != timezone_name:
-            raise ValueError(
+            raise DiagnosticValueError(
                 f"Récolte interrompue pour {spot['id']} : fuseau IANA "
-                f"incohérent pour {model_name}."
+                f"incohérent pour {model_name}.",
+                code="timezone_mismatch", stage="build", model=model_name, field="timezone",
             )
     # La météo générale conserve dix jours. Les conditions de la page Marées
     # annoncent uniquement huit, sinon sept journées civiles complètes.

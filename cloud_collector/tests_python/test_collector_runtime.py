@@ -25,9 +25,10 @@ class HttpError(Exception):
 
 
 class Snapshot:
-    def __init__(self, value):
+    def __init__(self, value, reference=None):
         self.exists = value is not None
         self.value = copy.deepcopy(value)
+        self.reference = reference
 
     def to_dict(self):
         return copy.deepcopy(self.value)
@@ -40,7 +41,7 @@ class Reference:
     def get(self, transaction=None):
         if transaction is not None and transaction.pending:
             raise AssertionError("Firestore cannot read after transaction writes")
-        return Snapshot(self.db.documents.get(self.path))
+        return Snapshot(self.db.documents.get(self.path), reference=self)
 
 
 class Transaction:
@@ -55,6 +56,7 @@ class FakeDb:
     def __init__(self):
         self.documents = {}
         self.commits = []
+        self.recovery_commits = []
         self.fail_before = False
         self.fail_after = False
 
@@ -63,6 +65,9 @@ class FakeDb:
 
     def transaction(self):
         return Transaction(self)
+
+    def get_all(self, references):
+        return (reference.get() for reference in references)
 
     @staticmethod
     def transactional(function):
@@ -82,7 +87,9 @@ class FakeDb:
                 return value
             if transaction.pending:
                 db.documents.update({path: materialize(data) for path, data in transaction.pending})
-                db.commits.append([path for path, _ in transaction.pending])
+                paths = [path for path, _ in transaction.pending]
+                target = db.recovery_commits if all(path.startswith("collector_health/recovery-") for path in paths) else db.commits
+                target.append(paths)
             if db.fail_after:
                 db.fail_after = False
                 raise TimeoutError("committed but acknowledgement lost")
@@ -214,7 +221,8 @@ class CollectorRuntimeTests(unittest.TestCase):
         report = self.collect()
         self.assertEqual(report["state"], "aborted")
         self.assertEqual(self.engine.order, ["agadir_maroc"])
-        self.assertEqual(self.db.documents, {})
+        self.assertFalse(any(not path.startswith("collector_health/recovery-") for path in self.db.documents))
+        self.assertTrue(all(data["state"] == "blocked" for data in self.db.documents.values()))
         self.assertEqual(report["fatal_error"]["category"], "authentication")
         self.assertNotIn("NEVER_LOG", str(report))
 
@@ -464,6 +472,133 @@ class CollectorRuntimeTests(unittest.TestCase):
                 code = runtime.cli(self.engine, ["--mode", "recover", "--report-file", str(Path(directory) / "report.json")])
         self.assertEqual(code, 0)
         self.assertEqual(self.engine.order, [])
+
+    def cli_report(self, arguments, health):
+        import contextlib
+        import io
+        import json
+        from unittest import mock
+        self.configure_cli()
+        with tempfile.TemporaryDirectory() as directory:
+            filename = str(Path(directory) / "report.json")
+            stdout = io.StringIO()
+            with mock.patch.object(runtime, "check_health", return_value=health), \
+                 contextlib.redirect_stdout(stdout):
+                code = runtime.cli(self.engine, [*arguments, "--report-file", filename])
+            return code, json.loads(Path(filename).read_text()), stdout.getvalue()
+
+    def remember_failure(self, item=None, *, now=NOW, error=None, run_id="previous-failure"):
+        item = item or self.engine.SPOTS[0]
+        row = {"spot_id": item["id"], "state": "failed", "attempts": 3,
+               "errors": [error or runtime._exception_info(ValueError("private source value"), stage="build")]}
+        return runtime.record_outcome(self.engine, self.db, item, row, run_id, now, now=now)
+
+    def test_cli_recovers_due_failure_even_when_health_reports_fresh_station(self):
+        item = self.engine.SPOTS[0]
+        self.publish(item, run_id="old-data", generation=NOW - timedelta(hours=2))
+        self.remember_failure(item, now=NOW - timedelta(hours=1))
+        code, report, _ = self.cli_report(["--mode", "recover"], {"state": "healthy", "recovery_ids": []})
+        self.assertEqual(code, 0)
+        self.assertEqual(report["state"], "complete")
+        self.assertEqual(self.engine.order, [item["id"]])
+        self.assertEqual(report["recovery_memory"]["states"], {"resolved": 1})
+
+    def test_cli_pending_delay_suppresses_stale_health_and_reports_deferred(self):
+        item = self.engine.SPOTS[0]
+        self.remember_failure(item, now=NOW + timedelta(days=365))
+        old = copy.deepcopy(self.db.documents)
+        code, report, _ = self.cli_report(["--mode", "recover"], {"state": "recovery_required", "recovery_ids": [item["id"]]})
+        self.assertEqual(code, 2)
+        self.assertEqual(report["state"], "recovery_deferred")
+        self.assertEqual(self.engine.order, [])
+        self.assertEqual(self.db.documents, old)
+
+    def test_cli_blocked_error_does_not_cause_hourly_provider_requests(self):
+        item = self.engine.SPOTS[0]
+        self.remember_failure(item, error=runtime._exception_info(HttpError(400)))
+        code, report, _ = self.cli_report(["--mode", "recover"], {"state": "recovery_required", "recovery_ids": [item["id"]]})
+        self.assertEqual(code, 2)
+        self.assertEqual(report["recovery_selection"]["deferred"][0]["reason"], "blocked")
+        self.assertEqual(self.engine.order, [])
+
+    def test_cli_scheduled_full_collection_can_reassess_a_blocked_incident(self):
+        self.remember_failure(error=runtime._exception_info(HttpError(400)))
+        code, report, _ = self.cli_report(["--mode", "collect"], {"state": "healthy", "recovery_ids": []})
+        self.assertEqual(code, 0)
+        self.assertEqual(report["successful_station_count"], 3)
+        self.assertEqual(report["recovery_memory"]["states"], {"resolved": 3})
+
+    def test_cli_memory_read_error_never_becomes_empty_or_successful_recovery(self):
+        from unittest import mock
+        with mock.patch.object(self.db, "get_all", side_effect=TimeoutError("https://provider/?apikey=NEVER_LOG")):
+            code, report, stdout = self.cli_report(["--mode", "recover"], {"state": "healthy", "recovery_ids": []})
+        self.assertEqual(code, 2)
+        self.assertEqual(report["state"], "recovery_state_error")
+        self.assertEqual(report["error"]["stage"], "recovery_read")
+        self.assertEqual(self.engine.order, [])
+        self.assertNotIn("NEVER_LOG", stdout)
+
+    def test_memory_write_failure_does_not_hide_successfully_published_forecasts(self):
+        from unittest import mock
+        with mock.patch.object(runtime, "record_outcome", side_effect=TimeoutError("https://provider/?apikey=NEVER_LOG")):
+            report = self.collect()
+        self.assertEqual(report["state"], "recovery_state_error")
+        self.assertEqual(report["successful_station_count"], 3)
+        self.assertEqual(len(self.db.commits), 3)
+        self.assertEqual(report["recovery_memory"]["errors"][0]["stage"], "recovery_write")
+        self.assertNotIn("NEVER_LOG", str(report))
+
+    def test_health_does_not_clear_pending_incidents_or_write_private_memory(self):
+        self.remember_failure()
+        old = copy.deepcopy(self.db.documents)
+        code, report, _ = self.cli_report(["--mode", "health"], {"state": "healthy", "recovery_ids": []})
+        self.assertEqual(code, 0)
+        self.assertEqual(self.db.documents, old)
+        self.assertEqual(self.engine.order, [])
+
+    def test_dry_run_does_not_resolve_or_replace_existing_incident_memory(self):
+        self.remember_failure()
+        old = copy.deepcopy(self.db.documents)
+        report = self.collect(dry_run=True)
+        self.assertEqual(report["state"], "dry_run_complete")
+        self.assertEqual(self.db.documents, old)
+
+    def test_fetch_diagnostics_preserve_model_and_build_errors_preserve_stage(self):
+        self.engine.fetch_failures["agadir_maroc"] = [ValueError("URL?apikey=NEVER_LOG")]
+        self.engine.build_failures.add("foreign")
+        report = self.collect()
+        by_id = {row["spot_id"]: row for row in report["stations"]}
+        self.assertEqual(by_id["agadir_maroc"]["errors"][0]["stage"], "fetch")
+        self.assertEqual(by_id["agadir_maroc"]["errors"][0]["model"], "wind")
+        self.assertEqual(by_id["foreign"]["errors"][0]["stage"], "build")
+        self.assertNotIn("NEVER_LOG", str(report))
+
+    def test_recovery_state_is_resolved_only_after_verification_succeeds(self):
+        self.engine.verification_failures = 20
+        report = self.collect()
+        self.assertEqual(report["state"], "partial")
+        self.assertNotIn("resolved", report["recovery_memory"]["states"])
+        self.assertTrue(all(data["state"] == "pending" for path, data in self.db.documents.items()
+                            if path.startswith("collector_health/recovery-")))
+
+    def test_recovery_with_one_blocked_station_never_claims_complete_even_in_preview(self):
+        for preview in (False, True):
+            with self.subTest(preview=preview):
+                self.setUp()
+                foreign, agadir = self.engine.SPOTS[:2]
+                self.remember_failure(foreign, error=runtime._exception_info(HttpError(400)))
+                self.remember_failure(agadir)
+                before = copy.deepcopy(self.db.documents)
+                args = ["--mode", "recover", *(["--dry-run"] if preview else [])]
+                code, report, _ = self.cli_report(args, {"state": "recovery_required",
+                    "recovery_ids": [foreign["id"], agadir["id"]]})
+                self.assertEqual(code, 2)
+                self.assertEqual(report["state"], "partial")
+                self.assertEqual(report["successful_station_count"], 1)
+                self.assertEqual(self.engine.order, [agadir["id"]])
+                self.assertEqual(report["recovery_selection"]["deferred"][0]["spot_id"], foreign["id"])
+                if preview:
+                    self.assertEqual(self.db.documents, before)
 
     def test_cli_unknown_station_rejected_before_credentials_or_network(self):
         self.configure_cli()

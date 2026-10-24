@@ -15,6 +15,9 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from collector_diagnostics import diagnostic_fields
+from collector_recovery import load_recovery, record_outcome, select_recovery
+
 
 @dataclass(frozen=True)
 class RecoveryPolicy:
@@ -41,9 +44,10 @@ class RecoveryPolicy:
 
 
 class ModelFetchError(RuntimeError):
-    def __init__(self, error):
+    def __init__(self, error, model=None):
         super().__init__("station model unavailable")
         self.original_error = error
+        self.model_name = model
 
 
 class InconsistentPublication(RuntimeError):
@@ -60,7 +64,7 @@ def _iso(value):
     return _utc(value).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
-def _exception_info(error):
+def _exception_info(error, *, stage=None, model=None):
     """Never stringify network exceptions: their URLs can contain API keys."""
     original = error
     seen = set()
@@ -102,6 +106,8 @@ def _exception_info(error):
             and isinstance(retry_after, (int, float)) and math.isfinite(retry_after)
             and retry_after > 0):
         result["retry_after_seconds"] = retry_after
+    result.update(diagnostic_fields(original, stage=stage,
+                                   model=model or getattr(original, "model_name", None)))
     return result
 
 
@@ -285,10 +291,13 @@ def check_health(engine, db, spots=None, *, now=None, max_age_hours=8.0):
             # Even a stale station is checked for corruption and mixed runs.
             _verify_station(engine, db, spot, run_id, updated_at, now)
             _require_current_station_day(engine, db, spot, weather, now)
+            generation = weather.get("forecast_generated_at", updated_at)
+            result["forecast_run_id"] = run_id
+            result["forecast_generated_at"] = _utc(generation).isoformat()
             if age > max_age_hours * 3600:
                 result["state"] = "stale"
         except Exception as error:
-            info = _exception_info(error)
+            info = _exception_info(error, stage="health")
             result.update(state="invalid", error=info)
             results.append(result)
             if info["fatal"]:
@@ -352,9 +361,9 @@ def run_collection(
     def remaining():
         return policy.max_elapsed_seconds - (monotonic_fn() - started_monotonic)
 
-    def fail(row, error):
+    def fail(row, error, *, stage=None):
         nonlocal fatal_error, provider_cooldown
-        info = _exception_info(error)
+        info = _exception_info(error, stage=stage)
         row["errors"].append(info)
         row["state"] = "retry_pending" if info["retryable"] else "failed"
         if info["fatal"]:
@@ -430,7 +439,8 @@ def run_collection(
                             result = future.result()
                             errors = result.get("errors") or {}
                             if errors:
-                                raise ModelFetchError(next(iter(errors.values())))
+                                model, model_error = next(iter(errors.items()))
+                                raise ModelFetchError(model_error, model=model)
                             stage = "build"
                             conditions, _ = _station_config(engine, spot)
                             publication = engine._build_station_publication(
@@ -456,6 +466,9 @@ def run_collection(
                                                           max_age_hours=policy.health_max_age_hours)
                                     if health["state"] != "healthy":
                                         raise InconsistentPublication("newer station did not pass health checks")
+                                    verified = health["stations"][0]
+                                    row["verified_run_id"] = verified["forecast_run_id"]
+                                    row["verified_generation"] = verified["forecast_generated_at"]
                                     row["state"] = "superseded_by_healthy_run"
                                 else:
                                     row["writes"] += outcome.get("writes", 0)
@@ -471,11 +484,11 @@ def run_collection(
                                     row["state"] = "verified_after_uncertain_commit"
                                 except Exception as verification_error:
                                     if _exception_info(verification_error)["fatal"]:
-                                        fail(row, verification_error)
+                                        fail(row, verification_error, stage="verify")
                                     else:
-                                        fail(row, error)
+                                        fail(row, error, stage=stage)
                             else:
-                                fail(row, error)
+                                fail(row, error, stage=stage)
                         if not fatal_error and not budget_exhausted and not provider_cooldown:
                             submit_next()
                     if fatal_error or budget_exhausted or provider_cooldown:
@@ -504,6 +517,27 @@ def run_collection(
         report["fatal_error"] = fatal_error
     if provider_cooldown:
         report["provider_cooldown_until"] = _iso(provider_cooldown)
+    if not dry_run:
+        memory = {"processed_stations": 0, "states": {}, "errors": []}
+        for spot in spots:
+            try:
+                outcome = record_outcome(
+                    engine, db, spot, states[spot["id"]], run_id, started_at,
+                    now=now_fn(), provider_cooldown=provider_cooldown,
+                    fatal_error=fatal_error,
+                )
+                memory["processed_stations"] += 1
+                state = outcome["state"]
+                memory["states"][state] = memory["states"].get(state, 0) + 1
+            except Exception as error:
+                memory["errors"].append({"spot_id": spot["id"],
+                                         **_exception_info(error, stage="recovery_write")})
+                # A failed memory write is an operational error, not evidence
+                # that correctly published forecasts need to be overwritten.
+                break
+        report["recovery_memory"] = memory
+        if memory["errors"]:
+            report["state"] = "recovery_state_error"
     return report
 
 
@@ -550,18 +584,31 @@ def cli(engine=None, argv=None):
         engine.firebase_admin.initialize_app(cred)
     db = engine.firestore.client()
     health = None
+    selection = None
     if args.mode in {"health", "recover", "retry"}:
         health = check_health(engine, db, spots, max_age_hours=policy.health_max_age_hours)
         if args.mode == "health" or health["state"] == "aborted":
             write_report(health, args.output_file)
             print(json.dumps(health, ensure_ascii=False))
             return 0 if health["state"] == "healthy" else 2
-        spots = [spot for spot in spots if spot["id"] in set(health["recovery_ids"])]
-        if not spots:
-            report = {"schema_version": 1, "state": "no_recovery_needed", "health": health}
+        try:
+            entries = load_recovery(db, spots)
+            selection = select_recovery(health, entries, spots, now=datetime.now(timezone.utc))
+        except Exception as error:
+            report = {"schema_version": 1, "state": "recovery_state_error", "health": health,
+                      "error": _exception_info(error, stage="recovery_read")}
             write_report(report, args.output_file)
             print(json.dumps(report, ensure_ascii=False))
-            return 0
+            return 2
+        spots = [spot for spot in spots if spot["id"] in set(selection["selected_ids"])]
+        if not spots:
+            deferred = bool(selection["deferred"])
+            report = {"schema_version": 1,
+                      "state": "recovery_deferred" if deferred else "no_recovery_needed",
+                      "health": health, "recovery_selection": selection}
+            write_report(report, args.output_file)
+            print(json.dumps(report, ensure_ascii=False))
+            return 2 if deferred else 0
     if not engine.OPEN_METEO_API_KEY or not engine.FORECAST_RUN_ID:
         raise ValueError("server API key and immutable forecast run ID are required")
     fixtures = []
@@ -588,6 +635,10 @@ def cli(engine=None, argv=None):
                       "publications": fixture_value(fixtures)}, args.fixture_file)
     if health is not None:
         report["initial_health"] = health
+    if selection is not None:
+        report["recovery_selection"] = selection
+        if selection["deferred"] and report["state"] in {"complete", "dry_run_complete"}:
+            report["state"] = "partial"
     write_report(report, args.output_file)
     print(json.dumps(report, ensure_ascii=False))
     return 0 if report["state"] in {"complete", "dry_run_complete"} else 2
