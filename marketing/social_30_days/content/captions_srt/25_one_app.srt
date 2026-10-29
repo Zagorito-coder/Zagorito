@@ -1,0 +1,15 @@
+1
+00:00:00,000 --> 00:00:03,000
+Moins d'apps à ouvrir
+
+2
+00:00:03,000 --> 00:00:06,000
+Carte et spots
+
+3
+00:00:06,000 --> 00:00:09,000
+Mer, marées, espèces, techniques
+
+4
+00:00:09,000 --> 00:00:12,000
+BoosterFish centralise la préparation

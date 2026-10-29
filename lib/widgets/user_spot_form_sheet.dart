@@ -257,7 +257,12 @@ class _UserSpotFormSheetState extends State<_UserSpotFormSheet> {
               Divider(height: 1, color: tc.divider),
               Flexible(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 20),
+                  padding: EdgeInsets.fromLTRB(
+                    18,
+                    16,
+                    18,
+                    20 + MediaQuery.paddingOf(context).bottom,
+                  ),
                   child: Form(
                     key: _formKey,
                     child: Column(

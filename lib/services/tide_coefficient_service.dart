@@ -1,29 +1,47 @@
 import 'dart:math' as math;
 
+import '../utils/station_time_zone.dart';
 import 'casablanca_tide_reference.dart';
 
-/// Une hauteur harmonique utilisée par la courbe journalière compacte.
+/// Une hauteur utilisée par la courbe journalière compacte.
 class LocalTideSample {
-  const LocalTideSample({required this.time, required this.height});
+  const LocalTideSample({
+    required this.time,
+    required this.instantUtc,
+    required this.height,
+  });
 
   final DateTime time;
+  final DateTime instantUtc;
   final double height;
 }
 
-/// Un extremum (haute ou basse mer) issu du moteur harmonique local.
+/// Un extremum (haute ou basse mer) de la station affichée.
 class LocalTideExtremum {
   const LocalTideExtremum({
     required this.time,
+    required this.instantUtc,
     required this.height,
     required this.isHigh,
   });
 
   final DateTime time;
+  final DateTime instantUtc;
   final double height;
   final bool isHigh;
 }
 
-/// Données scientifiques d'une journée civile à Casablanca.
+/// Origine des valeurs présentées dans le volet Coefficients.
+enum TideCoefficientSource {
+  /// Prédiction harmonique mensuelle du marégraphe Casablanca/JRC.
+  casablancaHarmonic,
+
+  /// Indice relatif construit depuis les jours civils complets Open-Meteo de
+  /// la station.
+  localForecast,
+}
+
+/// Données d'une journée civile présentées dans le volet Coefficients.
 class LocalTideCoefficientDay {
   const LocalTideCoefficientDay({
     required this.date,
@@ -42,19 +60,72 @@ class LocalTideCoefficientDay {
   final List<LocalTideExtremum> extrema;
 
   double get tidalRangeMeters => highMeters - lowMeters;
+
+  /// Premier instant réellement représenté par la courbe quotidienne.
+  DateTime get curveStartInstant => samples.isEmpty
+      ? DateTime.utc(date.year, date.month, date.day)
+      : samples.first.instantUtc;
+
+  /// Fin réelle de la journée représentée.
+  ///
+  /// Casablanca fournit explicitement l'échantillon de minuit suivant. Les
+  /// prévisions horaires Open-Meteo s'arrêtent à 23 h : on ajoute alors leur
+  /// pas réel. Cette distinction conserve une chronologie juste pendant les
+  /// journées DST de 23 ou 25 heures.
+  DateTime get curveEndInstant {
+    if (samples.isEmpty) {
+      return curveStartInstant.add(const Duration(hours: 24));
+    }
+    final last = samples.last;
+    final lastIsNextCivilDay = last.time.year != date.year ||
+        last.time.month != date.month ||
+        last.time.day != date.day;
+    if (lastIsNextCivilDay) return last.instantUtc;
+    final step = samples.length < 2
+        ? const Duration(hours: 1)
+        : samples.last.instantUtc.difference(
+            samples[samples.length - 2].instantUtc,
+          );
+    return last.instantUtc.add(
+      step > Duration.zero ? step : const Duration(hours: 1),
+    );
+  }
+
+  /// Position chronologique d'un instant sur la journée, entre 0 et 1.
+  /// L'heure civile n'est volontairement pas utilisée : elle se répète lors
+  /// du passage à l'heure d'hiver.
+  double curveProgress(DateTime instantUtc) {
+    final start = curveStartInstant;
+    final duration = curveEndInstant.difference(start).inMicroseconds;
+    if (duration <= 0) return 0;
+    return (instantUtc.toUtc().difference(start.toUtc()).inMicroseconds /
+            duration)
+        .clamp(0.0, 1.0);
+  }
 }
 
 class LocalTideCoefficientMonth {
   const LocalTideCoefficientMonth({
     required this.month,
     required this.days,
+    this.source = TideCoefficientSource.casablancaHarmonic,
+    this.showMoroccanTradition = true,
   });
 
   final DateTime month;
   final List<LocalTideCoefficientDay> days;
+  final TideCoefficientSource source;
+  final bool showMoroccanTradition;
 
-  LocalTideCoefficientDay day(int dayOfMonth) =>
-      days[(dayOfMonth - 1).clamp(0, days.length - 1)];
+  /// [selection] est un index 1-based dans la période affichée. Pour le mois
+  /// complet de Casablanca il correspond aussi au numéro du jour. Pour une
+  /// prévision locale de huit jours, il reste correct lors d'un changement de
+  /// mois (par exemple du 29 octobre au 5 novembre).
+  LocalTideCoefficientDay day(int selection) =>
+      days[(selection - 1).clamp(0, days.length - 1)];
+
+  bool get isCasablancaHarmonic =>
+      source == TideCoefficientSource.casablancaHarmonic;
 }
 
 enum MoroccanTidePeriod {
@@ -173,12 +244,20 @@ class TideCoefficientService {
   // officiel SHOM calculé sur le port de référence de Brest.
   static const double _referenceTidalRangeMeters = 3.8;
 
-  static LocalTideCoefficientMonth buildCasablancaMonth(DateTime input) {
+  static LocalTideCoefficientMonth buildCasablancaMonth(
+    DateTime input, {
+    int? utcOffsetSeconds,
+    String? timeZoneId,
+  }) {
     final month = DateTime(input.year, input.month);
     final dayCount = DateTime(input.year, input.month + 1, 0).day;
     final days = List<LocalTideCoefficientDay>.generate(
       dayCount,
-      (index) => _buildDay(DateTime(input.year, input.month, index + 1)),
+      (index) => _buildDay(
+        DateTime(input.year, input.month, index + 1),
+        utcOffsetSeconds,
+        timeZoneId,
+      ),
       growable: false,
     );
     return LocalTideCoefficientMonth(month: month, days: days);
@@ -187,21 +266,50 @@ class TideCoefficientService {
   /// Construit une seule journée pour les tableaux horaires. Cette entrée
   /// évite de calculer un mois entier lorsqu'une vue n'a besoin que des dix
   /// jours de prévision affichés.
-  static LocalTideCoefficientDay buildCasablancaDay(DateTime input) {
-    return _buildDay(DateTime(input.year, input.month, input.day));
+  static LocalTideCoefficientDay buildCasablancaDay(
+    DateTime input, {
+    int? utcOffsetSeconds,
+    String? timeZoneId,
+  }) {
+    return _buildDay(
+      DateTime(input.year, input.month, input.day),
+      utcOffsetSeconds,
+      timeZoneId,
+    );
   }
 
-  static LocalTideCoefficientDay _buildDay(DateTime date) {
+  static LocalTideCoefficientDay _buildDay(
+    DateTime date,
+    int? utcOffsetSeconds,
+    String? timeZoneId,
+  ) {
     const precisionMinutes = 5;
     const curveMinutes = 30;
     final precision = <LocalTideSample>[];
     final curve = <LocalTideSample>[];
 
-    for (var minute = 0; minute <= 24 * 60; minute += precisionMinutes) {
-      final time = date.add(Duration(minutes: minute));
+    final startInstant = _stationInstantAt(
+      date,
+      utcOffsetSeconds,
+      timeZoneId,
+    );
+    final endInstant = _stationInstantAt(
+      DateTime(date.year, date.month, date.day + 1),
+      utcOffsetSeconds,
+      timeZoneId,
+    );
+    final actualMinutes = endInstant.difference(startInstant).inMinutes;
+    for (var minute = 0; minute <= actualMinutes; minute += precisionMinutes) {
+      final instant = startInstant.add(Duration(minutes: minute));
+      final time = StationTimeZone.civilAt(
+        instant,
+        timeZoneId: timeZoneId,
+        fallbackOffsetSeconds: utcOffsetSeconds,
+      );
       final sample = LocalTideSample(
         time: time,
-        height: CasablancaTideReference.heightAtUtc(time.toUtc()),
+        instantUtc: instant,
+        height: CasablancaTideReference.heightAtUtc(instant),
       );
       precision.add(sample);
       if (minute % curveMinutes == 0) curve.add(sample);
@@ -218,8 +326,10 @@ class TideCoefficientService {
           current.height <= previous.height && current.height < next.height;
       if (!isHigh && !isLow) continue;
       final refined = _refineExtremum(
-        previous.time,
-        next.time,
+        previous.instantUtc,
+        next.instantUtc,
+        utcOffsetSeconds: utcOffsetSeconds,
+        timeZoneId: timeZoneId,
         findHigh: isHigh,
       );
       extrema.add(refined);
@@ -239,28 +349,46 @@ class TideCoefficientService {
   }
 
   static LocalTideExtremum _refineExtremum(
-    DateTime start,
-    DateTime end, {
+    DateTime startInstant,
+    DateTime endInstant, {
+    int? utcOffsetSeconds,
+    String? timeZoneId,
     required bool findHigh,
   }) {
-    var bestTime = start;
-    var bestHeight = CasablancaTideReference.heightAtUtc(start.toUtc());
-    final duration = end.difference(start).inMinutes;
+    var bestInstant = startInstant;
+    var bestHeight = CasablancaTideReference.heightAtUtc(bestInstant);
+    final duration = endInstant.difference(startInstant).inMinutes;
     for (var minute = 1; minute <= duration; minute++) {
-      final time = start.add(Duration(minutes: minute));
-      final height = CasablancaTideReference.heightAtUtc(time.toUtc());
+      final instant = startInstant.add(Duration(minutes: minute));
+      final height = CasablancaTideReference.heightAtUtc(instant);
       final isBetter = findHigh ? height > bestHeight : height < bestHeight;
       if (isBetter) {
-        bestTime = time;
+        bestInstant = instant;
         bestHeight = height;
       }
     }
     return LocalTideExtremum(
-      time: bestTime,
+      time: StationTimeZone.civilAt(
+        bestInstant,
+        timeZoneId: timeZoneId,
+        fallbackOffsetSeconds: utcOffsetSeconds,
+      ),
+      instantUtc: bestInstant,
       height: bestHeight,
       isHigh: findHigh,
     );
   }
+
+  static DateTime _stationInstantAt(
+    DateTime civilTime,
+    int? offsetSeconds,
+    String? timeZoneId,
+  ) =>
+      StationTimeZone.instantAt(
+        civilTime,
+        timeZoneId: timeZoneId,
+        fallbackOffsetSeconds: offsetSeconds,
+      );
 
   static int localIndexForRange(double tidalRangeMeters) {
     final normalized = tidalRangeMeters / _referenceTidalRangeMeters;
@@ -270,6 +398,16 @@ class TideCoefficientService {
 
 /// Point d'entrée top-level compatible avec `compute` de Flutter.
 LocalTideCoefficientMonth buildCasablancaTideCoefficientMonth(
-  DateTime month,
-) =>
-    TideCoefficientService.buildCasablancaMonth(month);
+  Map<String, dynamic> request,
+) {
+  final year = request['year'];
+  final month = request['month'];
+  if (year == null || month == null) {
+    throw const FormatException('Mois de coefficients invalide.');
+  }
+  return TideCoefficientService.buildCasablancaMonth(
+    DateTime(year, month),
+    utcOffsetSeconds: request['utcOffsetSeconds'],
+    timeZoneId: request['timeZoneId'],
+  );
+}

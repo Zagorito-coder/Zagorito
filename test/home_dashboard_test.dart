@@ -61,6 +61,21 @@ void main() {
     expect(find.text('92%'), findsNothing);
   });
 
+  testWidgets('qualifie le repère positif dans le résumé des marées',
+      (tester) async {
+    await _setViewport(tester, const Size(430, 932));
+    await tester.pumpWidget(
+      _testApp(
+        tideData: _marineData(
+          datum: TideHeightDatum.casablancaPresentationModel,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Présentation à 06:00'), findsOneWidget);
+  });
+
   testWidgets('ne fabrique aucune métrique quand les données sont absentes',
       (tester) async {
     await _setViewport(tester, const Size(390, 844));
@@ -419,6 +434,8 @@ void main() {
       await _setViewport(tester, const Size(390, 844));
       await tester.pumpWidget(_testApp(tideData: _marineData()));
       await tester.pumpAndSettle();
+      await _precacheExpeditionImages(tester);
+      await tester.pumpAndSettle();
       await expectLater(
         find.byType(HomeDashboard),
         matchesGoldenFile('goldens/home_dashboard_light.png'),
@@ -454,6 +471,29 @@ const _expeditionKeys = <String>[
   'home-expedition-community',
   'home-expedition-shops',
 ];
+
+const _expeditionAssetStems = <String>[
+  'tides_portrait',
+  'advanced_tides_portrait',
+  'fish_species_portrait',
+  'techniques_portrait',
+  'community_portrait',
+  'shops_cart_portrait',
+];
+
+Future<void> _precacheExpeditionImages(WidgetTester tester) async {
+  final imageContext = tester.element(find.byType(HomeDashboard));
+  await tester.runAsync(() async {
+    for (final theme in const ['light', 'dark']) {
+      for (final stem in _expeditionAssetStems) {
+        await precacheImage(
+          AssetImage('assets/home_cards/${stem}_$theme.webp'),
+          imageContext,
+        );
+      }
+    }
+  });
+}
 
 Future<void> _setViewport(WidgetTester tester, Size size) async {
   await tester.binding.setSurfaceSize(size);
@@ -552,7 +592,7 @@ class _TolerantGoldenComparator extends LocalFileComparator {
   }
 }
 
-TideData _marineData() {
+TideData _marineData({TideHeightDatum datum = TideHeightDatum.unknown}) {
   final reference = DateTime(2099, 1, 1, 6);
   return TideData(
     hourlyPoints: [
@@ -578,6 +618,7 @@ TideData _marineData() {
     next: 1.4,
     waveHeight: 1.4,
     location: 'Casablanca',
+    tideHeightDatum: datum,
     astro: const AstroData(
       moonPhase: 0.5,
       moonPhaseName: 'Pleine Lune',

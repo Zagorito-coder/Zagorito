@@ -8,7 +8,9 @@ import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 
+import '../data/marine_weather_points.dart';
 import '../models/tide_data.dart';
+import '../utils/station_time_zone.dart';
 import 'astronomy_service.dart';
 import 'casablanca_tide_reference.dart';
 import 'tide_conditions_mapper.dart';
@@ -17,46 +19,27 @@ class TideService {
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
   static const Duration _requestTimeout = Duration(seconds: 15);
   static const Duration _maximumForecastAge = Duration(hours: 36);
+  static const String casablancaTimeZoneId = 'Africa/Casablanca';
   static const String unavailableLocationLabel =
       'Données marines indisponibles';
 
-  /// Une station marégraphique publiée ne représente une position que dans un
-  /// rayon côtier de 100 km. Hors de ce rayon, le service doit utiliser son
-  /// repli explicite plutôt qu'une station marocaine éloignée.
-  static const double maximumTideStationDistanceKm = 100.0;
+  /// Même rayon que le catalogue partagé Marées/Marées Pro. Au-delà, aucune
+  /// ville distante n'est substituée silencieusement à la position demandée.
+  static const double maximumTideStationDistanceKm = 75.0;
 
-  static const List<_ForecastStation> _publishedStations = [
-    _ForecastStation(
-      id: 'casablanca',
-      name: 'Casablanca, Maroc',
-      latitude: 33.59,
-      longitude: -7.61,
-    ),
-    _ForecastStation(
-      id: 'rabat',
-      name: 'Rabat, Maroc',
-      latitude: 34.02,
-      longitude: -6.84,
-    ),
-    _ForecastStation(
-      id: 'agadir',
-      name: 'Agadir, Maroc',
-      latitude: 30.42,
-      longitude: -9.60,
-    ),
-    _ForecastStation(
-      id: 'tanger',
-      name: 'Tanger, Maroc',
-      latitude: 35.77,
-      longitude: -5.80,
-    ),
-    _ForecastStation(
-      id: 'essaouira',
-      name: 'Essaouira, Maroc',
-      latitude: 31.51,
-      longitude: -9.77,
-    ),
-  ];
+  static final List<TideStation> _publishedStations = marineWeatherPoints
+      .map(
+        (point) => TideStation(
+          id: point.id,
+          name: point.name,
+          latitude: point.latitude,
+          longitude: point.longitude,
+        ),
+      )
+      .toList(growable: false);
+
+  static TideStation? stationForPosition(double latitude, double longitude) =>
+      _nearestStation(_publishedStations, latitude, longitude);
 
   /// Lit les marées et conditions marines publiées par le job serveur.
   ///
@@ -83,13 +66,22 @@ class TideService {
 
     for (var attempt = 0; attempt < 2; attempt++) {
       try {
-        final snapshot = await _db
-            .collection('conditions')
-            .doc(station.id)
-            .get()
-            .timeout(_requestTimeout);
-        final data = snapshot.data();
-        if (!snapshot.exists || data == null || !_isFresh(data['timestamp'])) {
+        Map<String, dynamic>? data;
+        for (final documentId in _conditionDocumentIds(station.id)) {
+          final snapshot = await _db
+              .collection('conditions')
+              .doc(documentId)
+              .get()
+              .timeout(_requestTimeout);
+          final candidate = snapshot.data();
+          if (snapshot.exists &&
+              candidate != null &&
+              _isFresh(candidate['timestamp'])) {
+            data = candidate;
+            break;
+          }
+        }
+        if (data == null) {
           return _fallbackForStation(station);
         }
 
@@ -97,9 +89,7 @@ class TideService {
           data,
           fallbackLocation: station.name,
         );
-        return station.id == 'casablanca'
-            ? CasablancaTideReference.calibrateForecast(mapped)
-            : mapped;
+        return applyPresentationReference(station, mapped);
       } catch (error) {
         debugPrint(
           '[TideService] Conditions publiees indisponibles '
@@ -121,23 +111,36 @@ class TideService {
   /// indisponibles au lieu d'afficher des valeurs inventées.
   @visibleForTesting
   static TideData casablancaOfflineFallback({DateTime? now}) {
-    final referenceTime = (now ?? DateTime.now()).toLocal();
+    final referenceInstant = (now ?? DateTime.now()).toUtc();
+    final referenceTime = StationTimeZone.civilAt(
+      referenceInstant,
+      timeZoneId: casablancaTimeZoneId,
+    );
     final start = DateTime(
       referenceTime.year,
       referenceTime.month,
       referenceTime.day,
     );
+    final startInstant = StationTimeZone.instantAt(
+      start,
+      timeZoneId: casablancaTimeZoneId,
+    );
     final points = List<TidePoint>.generate(49, (index) {
-      final time = start.add(Duration(hours: index));
+      final instant = startInstant.add(Duration(hours: index));
+      final time = StationTimeZone.civilAt(
+        instant,
+        timeZoneId: casablancaTimeZoneId,
+      );
       return TidePoint(
         time: time,
-        height: CasablancaTideReference.heightAtUtc(time.toUtc()),
+        instantUtc: instant,
+        height: CasablancaTideReference.heightAtUtc(instant),
       );
     }, growable: false);
     final low = points.map((point) => point.height).reduce(math.min);
     final high = points.map((point) => point.height).reduce(math.max);
     final next = points
-            .where((point) => point.time.isAfter(referenceTime))
+            .where((point) => point.instantUtc!.isAfter(referenceInstant))
             .firstOrNull ??
         points.last;
 
@@ -149,14 +152,55 @@ class TideService {
       waveHeight: 0,
       location: 'Casablanca, Maroc',
       generatedAt: null,
+      utcOffsetSeconds: StationTimeZone.offsetSecondsAt(
+        referenceInstant,
+        timeZoneId: casablancaTimeZoneId,
+      ),
+      timeZoneId: casablancaTimeZoneId,
+      tideHeightDatum: TideHeightDatum.casablancaBmi,
       astro: AstronomyService.calculate(referenceTime, low, high),
     );
   }
 
-  static TideData _fallbackForStation(_ForecastStation station) =>
-      station.id == 'casablanca'
+  static TideData _fallbackForStation(TideStation station) =>
+      station.id == 'casablanca_maroc'
           ? casablancaOfflineFallback()
           : TideData.fallback(location: station.name);
+
+  /// Compatibilité de transition : les versions antérieures du backend ont
+  /// publié cinq documents sans suffixe pays. Ils restent lisibles jusqu'à la
+  /// première récolte v2, sans jamais servir de repli à une autre ville.
+  static List<String> _conditionDocumentIds(String stationId) {
+    const legacyIds = <String, String>{
+      'casablanca_maroc': 'casablanca',
+      'rabat_maroc': 'rabat',
+      'agadir_maroc': 'agadir',
+      'tanger_maroc': 'tanger',
+      'essaouira_maroc': 'essaouira',
+    };
+    final legacy = legacyIds[stationId];
+    return legacy == null ? <String>[stationId] : <String>[stationId, legacy];
+  }
+
+  /// Applique le référentiel d'affichage sans dépendre de Firestore.
+  ///
+  /// Toutes les stations Open-Meteo reçoivent le même traitement, quel que
+  /// soit leur suffixe pays. Casablanca conserve son modèle harmonique JRC.
+  @visibleForTesting
+  static TideData applyPresentationReference(
+    TideStation station,
+    TideData mapped, {
+    DateTime? now,
+  }) {
+    if (station.id == 'casablanca_maroc') {
+      return mapped.tideHeightDatum == TideHeightDatum.casablancaBmi
+          ? mapped
+          : CasablancaTideReference.calibrateForecast(mapped, now: now);
+    }
+    return mapped.tideHeightDatum == TideHeightDatum.globalMeanSeaLevel
+        ? CasablancaTideReference.calibratePublishedForecast(mapped, now: now)
+        : mapped;
+  }
 
   static String _fallbackLocation(String? locationName) {
     final normalized = locationName?.trim();
@@ -185,12 +229,12 @@ class TideService {
     return age <= _maximumForecastAge && age >= const Duration(minutes: -5);
   }
 
-  static _ForecastStation? _nearestStation(
-    List<_ForecastStation> stations,
+  static TideStation? _nearestStation(
+    List<TideStation> stations,
     double latitude,
     double longitude,
   ) =>
-      _nearestWithinRadius<_ForecastStation>(
+      _nearestWithinRadius<TideStation>(
         stations: stations,
         latitude: latitude,
         longitude: longitude,
@@ -284,13 +328,13 @@ class TideService {
   }
 }
 
-class _ForecastStation {
+class TideStation {
   final String id;
   final String name;
   final double latitude;
   final double longitude;
 
-  const _ForecastStation({
+  const TideStation({
     required this.id,
     required this.name,
     required this.latitude,

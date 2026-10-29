@@ -2,7 +2,7 @@
 //  technique.dart — Modèle pour les nœuds de pêche
 //  Schéma CSV 10 colonnes: ID;Nom;Categorie;Description;
 //  Image URL;Poissons cibles;Technique;Difficulte;
-//  Materiel necessaire;Conseils
+//  Materiel necessaire;Conseils;Etapes (séparées par |)
 // ============================================================
 
 /// ── NŒUD DE PÊCHE ──
@@ -17,6 +17,7 @@ class Technique {
   final String difficulty;
   final String requiredMaterial;
   final String tips;
+  final List<String> steps;
 
   // Champs legacy conservés avec valeurs par défaut
   // pour éviter de casser tout le reste de la page détail
@@ -45,6 +46,7 @@ class Technique {
     this.difficulty = '',
     this.requiredMaterial = '',
     this.tips = '',
+    this.steps = const [],
     this.scientificName = '',
     this.family = '',
     this.region = '',
@@ -61,22 +63,11 @@ class Technique {
   });
 
   factory Technique.fromCsvRow(List<String> cols) {
-    // Construit le chemin d'image depuis l'ID pour garantir
-    // la cohérence entre toutes les langues (les CSV peuvent
-    // avoir des URLs web différentes du fichier local)
+    // Les quatre catalogues localisés partagent les mêmes identifiants.
+    // L'image est donc résolue depuis l'identifiant et ne peut plus varier
+    // accidentellement d'une langue à l'autre.
     final id = cols[0].trim();
-    // Carte de correspondance entre ID et nom de fichier réel
-    const idToFile = {
-      'boucle-hamecon': 'boucle-hamecon',
-      'paternoster-loop': 'boucle-paternoster',
-      'perfection-loop': 'boucle-perfect',
-      'cent-percent': 'cent pourcent',
-      'thunder-knot': 'noeud-tonnerre',
-      'snell': 'sanglante',
-      'triple-loop': 'triple-boucle',
-    };
-    final filename = idToFile[id] ?? id;
-    final photoUrl = 'assets/images/techniques/$filename.jpg';
+    final photoUrl = 'assets/images/techniques_v2/$id.webp';
     return Technique(
       id: id,
       name: cols[1].trim(),
@@ -88,6 +79,13 @@ class Technique {
       difficulty: cols[7].trim(),
       requiredMaterial: cols[8].trim(),
       tips: cols[9].trim(),
+      steps: cols.length > 10
+          ? cols[10]
+              .split('|')
+              .map((step) => step.trim())
+              .where((step) => step.isNotEmpty)
+              .toList(growable: false)
+          : const [],
     );
   }
 }

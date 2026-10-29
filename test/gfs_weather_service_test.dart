@@ -3,12 +3,12 @@ import 'package:spots_app/services/forecast_firestore_service.dart';
 
 void main() {
   test('extrait les mesures atmosphériques et marines utiles', () {
-    final now = DateTime(2026, 8, 1, 10);
+    final now = DateTime.utc(2026, 8, 1, 10);
     final timeline = ForecastFirestoreService.parseGfsWeather(
       _document([
         _slot('2026-08-01T09:00', pressure: 1014, rain: 18, humidity: 72),
         _slot('2026-08-01T12:00', pressure: 1012, rain: 25, humidity: 68),
-      ]),
+      ], lastUpdate: now.subtract(const Duration(hours: 1))),
       now: now,
     );
 
@@ -35,14 +35,14 @@ void main() {
   });
 
   test('ne conserve ni les valeurs invalides ni les prévisions lointaines', () {
-    final now = DateTime(2026, 8, 1, 10);
+    final now = DateTime.utc(2026, 8, 1, 10);
     final timeline = ForecastFirestoreService.parseGfsWeather(
       _document([
         _slot('2026-08-01T09:00',
             pressure: 400, rain: 180, humidity: -2, withMarine: false),
         _slot('2026-08-04T09:00',
             pressure: 1015, rain: 0, humidity: 60, withMarine: false),
-      ]),
+      ], lastUpdate: now.subtract(const Duration(hours: 1))),
       now: now,
     );
 
@@ -54,20 +54,109 @@ void main() {
       locationName: 'Casablanca, Maroc',
       points: [
         GfsWeatherPoint(
-          dateTime: DateTime(2026, 8, 1, 9),
+          dateTime: DateTime.utc(2026, 8, 1, 9),
           pressureHpa: 1014,
         ),
       ],
     );
 
-    expect(timeline.nearestTo(DateTime(2026, 8, 1, 10)), isNotNull);
-    expect(timeline.nearestTo(DateTime(2026, 8, 1, 12)), isNull);
+    expect(timeline.nearestTo(DateTime.utc(2026, 8, 1, 10)), isNotNull);
+    expect(timeline.nearestTo(DateTime.utc(2026, 8, 1, 12)), isNull);
+  });
+
+  test('utilise hour_utc indépendamment du fuseau du téléphone', () {
+    final now = DateTime.utc(2026, 8, 1, 9, 10);
+    final timeline = ForecastFirestoreService.parseGfsWeather(
+      _document(
+        [
+          _slot(
+            '2026-08-01T18:00',
+            hourUtc: '2026-08-01T09:00:00Z',
+            pressure: 1014,
+            rain: 10,
+            humidity: 70,
+          ),
+        ],
+        lastUpdate: now.subtract(const Duration(hours: 1)),
+        timezone: 'Asia/Tokyo',
+        utcOffsetSeconds: 9 * 3600,
+      ),
+      now: now,
+    );
+
+    expect(timeline, isNotNull);
+    expect(timeline!.points.single.dateTime, DateTime.utc(2026, 8, 1, 9));
+    expect(timeline.nearestTo(now), isNotNull);
+  });
+
+  test('convertit les anciens créneaux civils avec le fuseau de station', () {
+    final now = DateTime.utc(2026, 8, 1, 9, 10);
+    final timeline = ForecastFirestoreService.parseGfsWeather(
+      _document(
+        [
+          _slot(
+            '2026-08-01T10:00',
+            includeHourUtc: false,
+            pressure: 1014,
+            rain: 10,
+            humidity: 70,
+          ),
+        ],
+        lastUpdate: now.subtract(const Duration(hours: 1)),
+        timezone: 'Africa/Casablanca',
+        utcOffsetSeconds: 3600,
+      ),
+      now: now,
+    );
+
+    expect(timeline, isNotNull);
+    expect(timeline!.points.single.dateTime, DateTime.utc(2026, 8, 1, 9));
+  });
+
+  test('refuse un document GFS périmé même si ses créneaux sont futurs', () {
+    final now = DateTime.utc(2026, 8, 3, 0);
+    final timeline = ForecastFirestoreService.parseGfsWeather(
+      _document(
+        [_slot('2026-08-03T01:00', pressure: 1014, rain: 10, humidity: 70)],
+        lastUpdate: now.subtract(const Duration(hours: 37)),
+      ),
+      now: now,
+    );
+
+    expect(timeline, isNull);
+  });
+
+  test('refuse un document GFS sans horodatage de récolte valide', () {
+    final now = DateTime.utc(2026, 8, 3, 0);
+    final timeline = ForecastFirestoreService.parseGfsWeather(
+      {
+        'location_name': 'Casablanca, Maroc',
+        'days': [
+          {
+            'slots': [
+              _slot('2026-08-03T01:00', pressure: 1014, rain: 10, humidity: 70),
+            ],
+          },
+        ],
+      },
+      now: now,
+    );
+
+    expect(timeline, isNull);
   });
 }
 
-Map<String, dynamic> _document(List<Map<String, dynamic>> slots) {
+Map<String, dynamic> _document(
+  List<Map<String, dynamic>> slots, {
+  required DateTime lastUpdate,
+  String? timezone,
+  int? utcOffsetSeconds,
+}) {
   return {
     'location_name': 'Casablanca, Maroc',
+    'last_update': lastUpdate,
+    if (timezone != null) 'timezone': timezone,
+    if (utcOffsetSeconds != null) 'utc_offset_seconds': utcOffsetSeconds,
     'days': [
       {'slots': slots},
     ],
@@ -76,6 +165,8 @@ Map<String, dynamic> _document(List<Map<String, dynamic>> slots) {
 
 Map<String, dynamic> _slot(
   String hour, {
+  String? hourUtc,
+  bool includeHourUtc = true,
   required double pressure,
   required double rain,
   required double humidity,
@@ -83,6 +174,7 @@ Map<String, dynamic> _slot(
 }) {
   return {
     'hour': hour,
+    if (includeHourUtc) 'hour_utc': hourUtc ?? '${hour}Z',
     'models': {
       'wind': {
         'pressure_msl': pressure,

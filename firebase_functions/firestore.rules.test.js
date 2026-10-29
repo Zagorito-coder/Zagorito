@@ -13,6 +13,7 @@ const {
   collectionGroup,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   runTransaction,
   serverTimestamp,
@@ -191,7 +192,8 @@ test('publication requires consent and the atomic 24-hour state write',
   await assertFails(publish(ownerDb, ownerUid, 'second-publication'));
 });
 
-test('publication only accepts the strict Google avatar host', async () => {
+test('publication accepts only trusted Google, Storage or local avatars',
+    async () => {
   const allowedUid = 'avatar-allowed';
   await seedAcceptedProfile(allowedUid);
   await assertSucceeds(publish(
@@ -204,6 +206,59 @@ test('publication only accepts the strict Google avatar host', async () => {
         'https://lh3.googleusercontent.com/a/avatar_ABC-123=s96-c?sz=96',
     },
   ));
+
+  const presetUid = 'avatar-preset';
+  await seedAcceptedProfile(presetUid);
+  await assertSucceeds(publish(
+    environment.authenticatedContext(presetUid).firestore(),
+    presetUid,
+    'allowed-preset-avatar',
+    presetUid,
+    {avatarId: 'fisher_10'},
+  ));
+
+  const customUid = 'avatar-custom';
+  await seedAcceptedProfile(customUid);
+  const customAvatarUrl =
+    'https://firebasestorage.googleapis.com/v0/b/'
+    + 'zagorito-9a0c4.firebasestorage.app/o/'
+    + `profile_avatars%2F${customUid}%2Favatar.jpg`
+    + '?alt=media&token=abcdefghijklmnopqrst-1234567890&v=1788312345678';
+  await assertSucceeds(publish(
+    environment.authenticatedContext(customUid).firestore(),
+    customUid,
+    'allowed-custom-avatar',
+    customUid,
+    {avatarUrl: customAvatarUrl, avatarId: ''},
+  ));
+
+  for (const [uid, overrides] of [
+    ['avatar-invalid-preset', {avatarId: 'fisher_11'}],
+    [
+      'avatar-foreign-custom',
+      {
+        avatarUrl: customAvatarUrl,
+        avatarId: '',
+      },
+    ],
+    [
+      'avatar-double-choice',
+      {
+        avatarUrl:
+          'https://lh3.googleusercontent.com/a/avatar_ABC-123=s96-c?sz=96',
+        avatarId: 'fisher_01',
+      },
+    ],
+  ]) {
+    await seedAcceptedProfile(uid);
+    await assertFails(publish(
+      environment.authenticatedContext(uid).firestore(),
+      uid,
+      `${uid}-post`,
+      uid,
+      overrides,
+    ));
+  }
 
   for (const [uid, avatarUrl] of [
     ['avatar-tracker', 'https://tracker.example/avatar.png'],
@@ -226,6 +281,104 @@ test('publication only accepts the strict Google avatar host', async () => {
       {avatarUrl},
     ));
   }
+});
+
+test('public profile v2 validates each avatar source and remains owner-only',
+    async () => {
+  const uid = 'profile-owner';
+  const ownerDb = environment.authenticatedContext(uid).firestore();
+  const reference = doc(ownerDb, 'community_public_profiles', uid);
+  const base = {
+    schemaVersion: 2,
+    ownerUid: uid,
+    publicDisplayName: 'NadirFish',
+    publishAnonymously: false,
+    avatarSource: 'preset',
+    avatarId: 'fisher_09',
+    avatarUrl: '',
+    updatedAt: serverTimestamp(),
+  };
+
+  await assertSucceeds(setDoc(reference, base));
+  await assertSucceeds(setDoc(reference, {
+    ...base,
+    avatarSource: 'custom',
+    avatarId: '',
+    avatarUrl:
+      'https://firebasestorage.googleapis.com/v0/b/'
+      + 'zagorito-9a0c4.firebasestorage.app/o/'
+      + `profile_avatars%2F${uid}%2Favatar.jpg`
+      + '?alt=media&token=abcdefghijklmnopqrst-1234567890&v=1788312345678',
+  }));
+  await assertFails(setDoc(reference, {...base, avatarId: 'fisher_11'}));
+  await assertFails(setDoc(reference, {
+    ...base,
+    avatarSource: 'custom',
+    avatarId: '',
+    avatarUrl:
+      'https://firebasestorage.googleapis.com/v0/b/'
+      + 'zagorito-9a0c4.firebasestorage.app/o/'
+      + 'profile_avatars%2Fother-user%2Favatar.jpg'
+      + '?alt=media&token=abcdefghijklmnopqrst-1234567890',
+  }));
+
+  const attackerDb = environment.authenticatedContext('other-user').firestore();
+  await assertFails(setDoc(
+    doc(attackerDb, 'community_public_profiles', uid),
+    base,
+  ));
+});
+
+test('posts accept explicit anonymity and legacy clients without exposing anonymous avatars',
+    async () => {
+  for (const [uid, overrides, allowed] of [
+    ['legacy', {}, true],
+    ['named', {publishAnonymously: false, avatarId: 'fisher_03'}, true],
+    ['anonymous', {
+      publishAnonymously: true, anglerName: 'Pêcheur anonyme', avatarId: '',
+    }, true],
+    ['invalid-flag', {publishAnonymously: 'false'}, false],
+    ['anonymous-name', {publishAnonymously: true}, false],
+    ['anonymous-preset', {
+      publishAnonymously: true, anglerName: 'Pêcheur anonyme',
+      avatarId: 'fisher_01',
+    }, false],
+    ['anonymous-photo', {
+      publishAnonymously: true, anglerName: 'Pêcheur anonyme',
+      avatarUrl: 'https://lh3.googleusercontent.com/a/test=s96-c',
+    }, false],
+  ]) {
+    await seedAcceptedProfile(uid);
+    const request = publish(environment.authenticatedContext(uid).firestore(),
+      uid, `${uid}-post`, uid, overrides);
+    await (allowed ? assertSucceeds(request) : assertFails(request));
+  }
+});
+
+test('clients cannot rewrite existing post identity; profiles stay owner-only',
+    async () => {
+  const uid = 'avatar-owner';
+  const ownerDb = environment.authenticatedContext(uid).firestore();
+  await seedAcceptedProfile(uid);
+  await publish(ownerDb, uid, 'post', uid, {
+    publishAnonymously: false, avatarId: 'fisher_01',
+  });
+  const reference = doc(ownerDb, 'community_catches', 'post');
+  await assertFails(setDoc(reference, {avatarId: 'fisher_02'}, {merge: true}));
+  await assertFails(setDoc(reference, {publishAnonymously: true}, {merge: true}));
+  const attacker = environment.authenticatedContext('other').firestore();
+  await assertFails(setDoc(doc(attacker, 'community_catches', 'post'), {
+    avatarId: 'fisher_03',
+  }, {merge: true}));
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'community_public_profiles', uid), {
+      ownerUid: uid, avatarSource: 'preset', avatarId: 'fisher_01',
+    });
+  });
+  await assertSucceeds(getDoc(doc(ownerDb, 'community_public_profiles', uid)));
+  await assertFails(getDoc(doc(attacker, 'community_public_profiles', uid)));
+  await assertFails(getDoc(doc(environment.unauthenticatedContext().firestore(),
+    'community_public_profiles', uid)));
 });
 
 test('active feed query is public while unbounded feed queries are denied',

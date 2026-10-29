@@ -1,0 +1,15 @@
+1
+00:00:00,000 --> 00:00:03,000
+Cibler un poisson puissant ?
+
+2
+00:00:03,000 --> 00:00:06,000
+Dimensionnez tout le montage
+
+3
+00:00:06,000 --> 00:00:09,000
+Ligne • leader • nœuds • frein
+
+4
+00:00:09,000 --> 00:00:12,000
+Aucun maillon ne doit être improvisé

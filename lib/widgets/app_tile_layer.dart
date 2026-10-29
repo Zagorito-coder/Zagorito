@@ -27,6 +27,9 @@ class AppTileLayer extends StatefulWidget {
 
 class _AppTileLayerState extends State<AppTileLayer> {
   static const _userAgentPackageName = 'com.zagorito.spots_app';
+  static const _cartoBasemapApiKey = String.fromEnvironment(
+    'CARTO_BASEMAP_API_KEY',
+  );
   late final TileUpdateTransformer _tileUpdateTransformer =
       TileUpdateTransformers.throttle(const Duration(milliseconds: 80));
   TileProvider? _networkTileProvider;
@@ -84,6 +87,7 @@ class _AppTileLayerState extends State<AppTileLayer> {
     switch (widget.style) {
       case MapStyle.satellite:
         return TileLayer(
+          key: ValueKey(widget.style),
           urlTemplate:
               'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
           userAgentPackageName: _userAgentPackageName,
@@ -100,9 +104,10 @@ class _AppTileLayerState extends State<AppTileLayer> {
         );
       case MapStyle.dark:
         return TileLayer(
-          urlTemplate:
-              'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-          subdomains: const ['a', 'b', 'c', 'd'],
+          key: ValueKey(widget.style),
+          urlTemplate: 'https://basemaps.cartocdn.com/rastertiles/'
+              'dark_all/{z}/{x}/{y}.png?key='
+              '${Uri.encodeQueryComponent(_cartoBasemapApiKey)}',
           userAgentPackageName: _userAgentPackageName,
           tileProvider: _tileProvider,
           maxZoom: MapZoomLimits.manualMaximum,
@@ -115,6 +120,7 @@ class _AppTileLayerState extends State<AppTileLayer> {
         );
       case MapStyle.standard:
         return TileLayer(
+          key: ValueKey(widget.style),
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
           userAgentPackageName: _userAgentPackageName,
           tileProvider: _tileProvider,

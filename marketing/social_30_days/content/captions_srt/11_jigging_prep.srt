@@ -1,0 +1,15 @@
+1
+00:00:00,000 --> 00:00:03,000
+Avant une session jigging
+
+2
+00:00:03,000 --> 00:00:06,000
+Contrôlez ligne et bas de ligne
+
+3
+00:00:06,000 --> 00:00:09,000
+Vérifiez anneaux, agrafes et hameçons
+
+4
+00:00:09,000 --> 00:00:12,000
+Préparez avant d'embarquer

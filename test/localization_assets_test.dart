@@ -35,7 +35,10 @@ void main() {
       );
     }
 
-    expect(catalogs['fr']!['map.searchHint'], 'Rechercher un spot...');
+    expect(
+      catalogs['fr']!['map.searchHint'],
+      'Rechercher une ville, une zone côtière ou un spot...',
+    );
     expect(
       catalogs['fr']!['mySpots.favoriteLimitReached'],
       contains('30 favoris'),

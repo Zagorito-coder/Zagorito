@@ -1,0 +1,22 @@
+{
+  "count": 30,
+  "languages": {
+    "FR": 15,
+    "Darija": 8,
+    "FR + Darija": 7
+  },
+  "facts_used": [
+    "Plus de 6 000 spots officiels (catalogue local validé à 6 365 spots)",
+    "Cartes hors ligne téléchargeables et activables",
+    "Spots personnels et coordonnées privées",
+    "Conditions marines, marées, fiches espèces et guides techniques",
+    "Communauté avec publication, signalement et blocage",
+    "Application actuellement en test fermé Google Play"
+  ],
+  "claims_avoided": [
+    "Aucune garantie de prise",
+    "Aucune date de lancement public inventée",
+    "Aucune précision météo présentée comme garantie de sécurité",
+    "Aucun chiffre concurrent repris dans la communication BoosterFish"
+  ]
+}

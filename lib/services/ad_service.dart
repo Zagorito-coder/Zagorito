@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:spots_app/config/ad_config.dart';
+import 'package:spots_app/services/analytics_service.dart';
 
 /// Gère le consentement UMP, puis initialise AdMob uniquement lorsque Google
 /// confirme que les publicités peuvent être demandées.
@@ -60,15 +61,15 @@ class AdService {
         }
       });
       await _refreshPrivacyOptionsRequirement();
-      await _applyCurrentConsentState();
     } catch (error) {
       // Une erreur UMP ne permet jamais de conclure que l'utilisateur se
       // trouve hors EEE/UK. canRequestAds() reste l'unique source de verite et
       // peut reutiliser un consentement valide obtenu lors d'une session
       // precedente. Sans statut valide, les annonces restent desactivees.
       debugPrint('[AdService] Mise à jour UMP indisponible: $error');
-      await _applyCurrentConsentState();
     } finally {
+      await _syncAnalyticsConsentForUnregulatedRegion();
+      await _applyCurrentConsentState();
       _consentRevision.value++;
     }
   }
@@ -128,6 +129,20 @@ class AdService {
     }
   }
 
+  Future<void> _syncAnalyticsConsentForUnregulatedRegion() async {
+    try {
+      final status = await ConsentInformation.instance.getConsentStatus();
+      if (status == ConsentStatus.notRequired) {
+        await AnalyticsService.allowMeasurementOutsideRegulatedRegion();
+      }
+      // Pour required/obtained/unknown, UMP reste l'unique source du choix.
+      // Les quatre valeurs natives restent refusées tant qu'UMP ne les met pas
+      // à jour via le Consent Mode activé dans AdMob.
+    } catch (error) {
+      debugPrint('[AdService] Consentement Analytics illisible: $error');
+    }
+  }
+
   Future<void> _applyCurrentConsentState() async {
     final canRequestAds = await _canRequestAdsSafely();
     if (!canRequestAds) {
@@ -174,6 +189,7 @@ class AdService {
       });
 
       await _refreshPrivacyOptionsRequirement();
+      await _syncAnalyticsConsentForUnregulatedRegion();
       // Une publicité préchargée ne doit pas survivre à un changement de
       // consentement. Les widgets bannières seront aussi avertis.
       _disposeFullScreenAds();

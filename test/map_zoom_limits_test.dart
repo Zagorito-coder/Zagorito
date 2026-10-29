@@ -3,11 +3,16 @@ import 'package:spots_app/utils/map_zoom_limits.dart';
 
 void main() {
   test('la sélection automatique et le zoom manuel restent séparés', () {
+    expect(MapZoomLimits.automaticCitySearch, 9.5);
     expect(MapZoomLimits.automaticSpotSelection, 16.0);
     expect(MapZoomLimits.manualMaximum, 20.0);
     expect(
       MapZoomLimits.automaticSpotSelection,
       lessThan(MapZoomLimits.manualMaximum),
+    );
+    expect(
+      MapZoomLimits.automaticCitySearch,
+      lessThan(MapZoomLimits.automaticSpotSelection),
     );
   });
 

@@ -13,7 +13,6 @@ import 'package:flutter/foundation.dart'
         TargetPlatform,
         visibleForTesting;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show SystemChrome, SystemUiMode;
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
@@ -22,6 +21,7 @@ import 'package:spots_app/firebase_options.dart';
 import 'package:spots_app/app_shell.dart';
 import 'package:spots_app/providers/fish_provider.dart';
 import 'package:spots_app/providers/premium_provider.dart';
+import 'package:spots_app/services/analytics_service.dart';
 import 'package:spots_app/services/offline_map_service.dart';
 import 'package:spots_app/services/crash_reporting_service.dart';
 import 'package:spots_app/services/spot_service.dart';
@@ -42,7 +42,6 @@ class _SplashBootstrapState extends State<SplashBootstrap> {
   @override
   void initState() {
     super.initState();
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _bootstrap();
   }
 
@@ -66,6 +65,8 @@ class _SplashBootstrapState extends State<SplashBootstrap> {
       // sécurisée journalise l'erreur en debug et laisse l'application
       // fonctionner hors ligne.
       await _activateAppCheckSafely();
+
+      await _initializeAnalyticsSafely();
 
       try {
         await CrashReportingService.initialize();
@@ -117,6 +118,17 @@ class _SplashBootstrapState extends State<SplashBootstrap> {
       // que l'enforcement n'est pas activé. Les règles Firebase restent la
       // protection obligatoire des données.
       debugPrint('[SplashBootstrap] App Check activation error: $e\n$st');
+    }
+  }
+
+  Future<void> _initializeAnalyticsSafely() async {
+    try {
+      // Firebase doit précéder UMP. Les valeurs natives de consentement
+      // restent refusées par défaut jusqu'à la décision réglementaire.
+      await AnalyticsService.initialize();
+    } catch (e) {
+      // La mesure d'audience ne doit jamais bloquer l'application.
+      debugPrint('[SplashBootstrap] Analytics init error: $e');
     }
   }
 
